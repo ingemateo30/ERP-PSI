@@ -1,0 +1,2 @@
+color azul: #0e6493
+color rojo: #e21f25
