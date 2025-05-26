@@ -11,7 +11,6 @@ const LoginComponent = () => {
     e.preventDefault();
     console.log('Intento de inicio de sesión:', { email, password });
   };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
       <div className="w-full max-w-4xl flex shadow-2xl rounded-3xl overflow-hidden">
@@ -25,18 +24,15 @@ const LoginComponent = () => {
         >
         </div>
         <div className="w-full md:w-1/2 bg-gradient-to-br from-white/20 to-white/10 backdrop-blur-md p-8 rounded-2xl shadow-lg border border-white/30 relative overflow-hidden">
-        
           <div className="absolute -inset-0.5 bg-gradient-to-tr from-white/50 to-transparent opacity-20 pointer-events-none"></div>
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#0e6493]/20 rounded-full blur-3xl"></div>
           <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-[#e21f25]/10 rounded-full blur-3xl"></div>
-
           <div className="text-center mb-8 relative">
             <h2 className="text-4xl font-bold text-[#0e6493] mb-2 transform transition-transform duration-300 hover:scale-105 drop-shadow-md">
               PSI Login
             </h2>
             <p className="text-gray-600/90 backdrop-blur-sm">Acceso Seguro</p>
           </div>
-
           <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-[#0e6493] mb-2 drop-shadow-sm">
@@ -110,8 +106,7 @@ const LoginComponent = () => {
           <div className="mt-6 text-center relative z-10">
             <p className="text-sm text-gray-600/90 backdrop-blur-sm">
               ¿No tienes una cuenta?{' '}
-              <a
-                href="/dashboard"
+              <a href="/dashboard"
                 className="font-medium text-[#e21f25] hover:text-[#e21f25]/80 transition drop-shadow-sm"
               >
                 Regístrate

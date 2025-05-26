@@ -1,0 +1,33 @@
+backend/
+├── config/
+│   ├── database.js  hecho        # Configuración de MySQL
+│   ├── jwt.js    hecho          # Configuración JWT
+│   └── cors.js    hecho         # Configuración CORS
+├── controllers/
+│   ├── authController.js  hecho # Control de autenticación
+│   └── userController.js  hecho # Control de usuarios
+├── middleware/
+│   ├── auth.js   hecho         # Middleware de autenticación
+│   ├── validation.js hecho  hecho     # Middleware de validación
+│   ├── rateLimiter.js  hecho    # Limitador de intentos
+│   └── security.js        # Headers de seguridad
+├── models/
+│   ├── User.js      hecho      # Modelo de usuario
+│   └── Database.js     hecho   # Conexión a base de datos
+├── routes/
+│   ├── auth.js            # Rutas de autenticación
+│   └── users.js           # Rutas de usuarios
+├── utils/
+│   ├── logger.js     hecho     # Sistema de logs
+│   ├── password.js    hecho    # Utilidades de contraseñas
+│   └── responses.js    hecho   # Respuestas estandarizadas
+├── logs/
+│   ├── access.log         # Logs de acceso
+│   ├── error.log          # Logs de errores
+│   └── auth.log           # Logs de autenticación
+├── .env            hecho       # Variables de entorno
+├── .env.example     hecho      # Ejemplo de variables
+├── .gitignore            # Archivos ignorados por Git
+├── index.js         hecho     # Punto de entrada
+├── package.json      hecho    # Dependencias
+└── README.md        hecho     # Documentación

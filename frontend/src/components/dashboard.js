@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { LineChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Bell, Menu, Search, Settings, User, Activity, Briefcase, PieChart, Users, Calendar, ChevronUp, LogOut, ChevronDown, X } from 'lucide-react';
 
-// Datos de ejemplo para las gráficas
 const data = [
     { name: 'Ene', ingresos: 4000, gastos: 2400, clientes: 240 },
     { name: 'Feb', ingresos: 3000, gastos: 1398, clientes: 210 },
@@ -26,7 +25,6 @@ const Dashboard = () => {
     const [isMobile, setIsMobile] = useState(false);
     const userName = "Carlos Rodríguez";
 
-    // Detectar si es dispositivo móvil
     useEffect(() => {
         const handleResize = () => {
             setIsMobile(window.innerWidth < 768);
@@ -35,24 +33,19 @@ const Dashboard = () => {
             }
         };
 
-        // Ejecutar al inicio
         handleResize();
 
-        // Agregar listener para cambios de tamaño
         window.addEventListener('resize', handleResize);
 
-        // Limpiar listener al desmontar
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Cerrar sidebar en móvil cuando se hace clic fuera
     const handleContentClick = () => {
         if (isMobile && sidebarOpen) {
             setSidebarOpen(false);
         }
     };
 
-    // Cerrar menú de perfil cuando se hace clic en otro lado
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (profileOpen && !event.target.closest('.profile-menu')) {
@@ -66,7 +59,6 @@ const Dashboard = () => {
 
     return (
         <div className="flex h-screen overflow-hidden bg-gray-100">
-            {/* Overlay para móvil */}
             {isMobile && sidebarOpen && (
                 <div
                     className="fixed inset-0 bg-black bg-opacity-50 z-20"
@@ -74,10 +66,8 @@ const Dashboard = () => {
                 ></div>
             )}
 
-            {/* Sidebar */}
             <div className={`fixed md:relative z-30 backdrop-blur-xl bg-gradient-to-b from-[#0e6493]/95 to-[#0e6493]/85 border border-white/10 shadow-lg transition-all duration-300 ease-in-out h-screen flex flex-col ${sidebarOpen ? 'translate-x-0 w-64' : 'translate-x-0 md:translate-x-0 w-0 md:w-20'
                 } overflow-hidden`}>
-                {/* Cerrar en móvil */}
                 {isMobile && sidebarOpen && (
                     <button
                         onClick={() => setSidebarOpen(false)}
@@ -86,8 +76,6 @@ const Dashboard = () => {
                         <X size={18} />
                     </button>
                 )}
-
-                {/* Menú de Navegación */}
                 <nav className="mt-16 flex-1 px-2">
                     {[
                         { icon: <Activity size={22} />, label: 'Dashboard', active: true },
@@ -111,8 +99,6 @@ const Dashboard = () => {
                         </div>
                     ))}
                 </nav>
-
-                {/* Pie del sidebar */}
                 {sidebarOpen && (
                     <div className="p-4 border-t border-white/10 mt-auto">
                         <div className="flex items-center text-white/80 hover:text-white cursor-pointer transition-all">
