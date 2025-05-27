@@ -16,7 +16,7 @@ const rateLimiter = require('./middleware/rateLimiter');
 
 // Importar rutas
 const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/users');
+//const userRoutes = require('./routes/users');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,7 +49,7 @@ app.use(cors(corsConfig));
 app.use(compression());
 
 // Rate limiting global
-app.use(rateLimiter.globalLimiter);
+//app.use(rateLimiter.globalLimiter);
 
 // ============================================
 // MIDDLEWARE DE PARSEO
@@ -84,7 +84,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use(`/api/${process.env.API_VERSION}/auth`, authRoutes);
-app.use(`/api/${process.env.API_VERSION}/users`, userRoutes);
+//app.use(`/api/${process.env.API_VERSION}/users`, userRoutes);
 
 // ============================================
 // MANEJO DE ERRORES

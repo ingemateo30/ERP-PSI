@@ -1,12 +1,15 @@
 const corsOptions = {
   origin: function (origin, callback) {
-    // Permitir requests sin origin (mobile apps, postman, etc.)
+    console.log('CORS Origin recibido:', origin);
+
     if (!origin) return callback(null, true);
-    
-    const allowedOrigins = process.env.CORS_ORIGIN 
+
+    const allowedOrigins = process.env.CORS_ORIGIN
       ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-      : ['http://localhost:5173', 'http://localhost:3000'];
-    
+      : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3002'];
+
+    console.log('CORS Orígenes permitidos:', allowedOrigins);
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {

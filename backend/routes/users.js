@@ -1,3 +1,4 @@
+
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
@@ -10,6 +11,7 @@ const { rateLimiter } = require('../middleware/rateLimiter');
  * @desc Obtener perfil del usuario actual
  * @access Private
  */
+
 router.get('/profile', 
   authMiddleware,
   userController.getProfile
@@ -20,6 +22,7 @@ router.get('/profile',
  * @desc Actualizar perfil del usuario
  * @access Private
  */
+
 router.put('/profile', 
   authMiddleware,
   rateLimiter.updateProfile,
@@ -32,6 +35,7 @@ router.put('/profile',
  * @desc Obtener usuario por ID (solo administradores)
  * @access Private (Admin)
  */
+
 router.get('/:id', 
   authMiddleware,
   validateUser.isAdmin,
@@ -43,6 +47,7 @@ router.get('/:id',
  * @desc Obtener lista de usuarios (solo administradores)
  * @access Private (Admin)
  */
+
 router.get('/', 
   authMiddleware,
   validateUser.isAdmin,
@@ -54,6 +59,7 @@ router.get('/',
  * @desc Actualizar usuario (solo administradores)
  * @access Private (Admin)
  */
+
 router.put('/:id', 
   authMiddleware,
   validateUser.isAdmin,
@@ -66,6 +72,7 @@ router.put('/:id',
  * @desc Eliminar usuario (solo administradores)
  * @access Private (Admin)
  */
+
 router.delete('/:id', 
   authMiddleware,
   validateUser.isAdmin,
@@ -77,6 +84,7 @@ router.delete('/:id',
  * @desc Activar/desactivar usuario (solo administradores)
  * @access Private (Admin)
  */
+
 router.post('/:id/toggle-status', 
   authMiddleware,
   validateUser.isAdmin,
@@ -88,6 +96,7 @@ router.post('/:id/toggle-status',
  * @desc Eliminar cuenta propia
  * @access Private
  */
+
 router.delete('/profile', 
   authMiddleware,
   validateUser.deleteAccount,
@@ -99,6 +108,7 @@ router.delete('/profile',
  * @desc Buscar usuarios (solo administradores)
  * @access Private (Admin)
  */
+
 router.get('/search/:query', 
   authMiddleware,
   validateUser.isAdmin,

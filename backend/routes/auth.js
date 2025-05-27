@@ -1,7 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const authController = require('../controllers/authController');
-const { validateAuth, validateLogin, validateRegister } = require('../middleware/validation');
+const AuthController = require('../controllers/authController');
+const { 
+  validate, 
+  loginSchema, 
+  registerSchema, 
+  changePasswordSchema,
+  refreshTokenSchema,
+  forgotPasswordSchema 
+} = require('../middleware/validation');
 const { rateLimiter } = require('../middleware/rateLimiter');
 const authMiddleware = require('../middleware/auth');
 
@@ -11,9 +18,9 @@ const authMiddleware = require('../middleware/auth');
  * @access Public
  */
 router.post('/register', 
-  rateLimiter.register,
-  validateRegister,
-  authController.register
+  //rateLimiter.register,
+  //validateRegister,
+  AuthController.register
 );
 
 /**
@@ -23,8 +30,8 @@ router.post('/register',
  */
 router.post('/login', 
   rateLimiter.login,
-  validateLogin,
-  authController.login
+  validate(loginSchema),
+  AuthController.login
 );
 
 /**
@@ -33,8 +40,8 @@ router.post('/login',
  * @access Private
  */
 router.post('/logout', 
-  authMiddleware,
-  authController.logout
+  //authMiddleware,
+  AuthController.logout
 );
 
 /**
@@ -43,9 +50,9 @@ router.post('/logout',
  * @access Private
  */
 router.post('/refresh', 
-  rateLimiter.refresh,
-  authMiddleware,
-  authController.refreshToken
+  //rateLimiter.refresh,
+  //authMiddleware,
+  AuthController.refreshToken
 );
 
 /**
@@ -53,32 +60,21 @@ router.post('/refresh',
  * @desc Verificar token JWT válido
  * @access Private
  */
-router.get('/verify', 
-  authMiddleware,
-  authController.verifyToken
-);
+
 
 /**
  * @route POST /api/auth/forgot-password
  * @desc Solicitar restablecimiento de contraseña
  * @access Public
  */
-router.post('/forgot-password', 
-  rateLimiter.forgotPassword,
-  validateAuth.email,
-  authController.forgotPassword
-);
+
 
 /**
  * @route POST /api/auth/reset-password
  * @desc Restablecer contraseña con token
  * @access Public
  */
-router.post('/reset-password', 
-  rateLimiter.resetPassword,
-  validateAuth.resetPassword,
-  authController.resetPassword
-);
+
 
 /**
  * @route POST /api/auth/change-password
@@ -86,9 +82,9 @@ router.post('/reset-password',
  * @access Private
  */
 router.post('/change-password', 
-  authMiddleware,
-  validateAuth.changePassword,
-  authController.changePassword
+  //uthMiddleware,
+  //validateAuth.changePassword,
+  AuthController.changePassword
 );
 
 module.exports = router;

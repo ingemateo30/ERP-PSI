@@ -12,7 +12,9 @@ const dbConfig = {
   timeout: 60000,
   reconnect: true,
   charset: 'utf8mb4',
+   acquireTimeout: 10000,
   timezone: '+00:00'
+  
 };
 
 const pool = mysql.createPool(dbConfig);
