@@ -1,31 +1,20 @@
-// frontend/src/components/SimpleDashboard.js - VERSIÓN SINCRONIZADA CON CONFIGURACIÓN
+// frontend/src/components/SimpleDashboard.js
 
 import React, { useState, useEffect } from 'react';
 import { 
   Bell, Menu, Search, Settings, User, Activity, 
   Users, Calendar, ChevronUp, LogOut, ChevronDown, X,
-  DollarSign, TrendingUp, UserCheck, Wifi, Loader2,
-  AlertTriangle, CheckCircle, Building2, CreditCard, MapPin,
-  Package, ArrowRight, ExternalLink
+  DollarSign, TrendingUp, UserCheck, Wifi, Loader2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import configService from '../services/configService';
 import LogoutButton from './LogoutButton';
 
 const SimpleDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  
-  // Estados para configuración
-  const [configOverview, setConfigOverview] = useState(null);
-  const [configLoading, setConfigLoading] = useState(true);
-  const [configError, setConfigError] = useState(null);
-  const [showConfigAlert, setShowConfigAlert] = useState(true);
 
   const { currentUser, logout, hasPermission } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const handleResize = () => {
@@ -40,39 +29,28 @@ const SimpleDashboard = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Cargar configuración del sistema
-  useEffect(() => {
-    loadConfigurationStatus();
-  }, []);
-
-  const loadConfigurationStatus = async () => {
-    try {
-      setConfigLoading(true);
-      setConfigError(null);
-      
-      const response = await configService.getConfigOverview();
-      setConfigOverview(response.data);
-    } catch (error) {
-      console.error('Error cargando estado de configuración:', error);
-      setConfigError(error.message);
-    } finally {
-      setConfigLoading(false);
-    }
-  };
-
   const handleContentClick = () => {
     if (isMobile && sidebarOpen) {
       setSidebarOpen(false);
     }
   };
 
-  // Datos de ejemplo para gráficos (estos podrían venir del backend también)
+  // Datos de ejemplo para el dashboard
   const exampleStats = {
     totalIngresos: 24780000,
     clientesActivos: 324,
     serviciosActivos: 298,
     tasaCobranza: 96.2
   };
+
+  const exampleChartData = [
+    { mes: 'Ene', ingresos: 4000000, gastos: 2400000, clientes: 240 },
+    { mes: 'Feb', ingresos: 3000000, gastos: 1398000, clientes: 210 },
+    { mes: 'Mar', ingresos: 2000000, gastos: 1800000, clientes: 290 },
+    { mes: 'Abr', ingresos: 2780000, gastos: 1908000, clientes: 200 },
+    { mes: 'May', ingresos: 1890000, gastos: 1800000, clientes: 218 },
+    { mes: 'Jun', ingresos: 2390000, gastos: 1800000, clientes: 250 }
+  ];
 
   const exampleProjects = [
     { id: 1, nombre: 'Instalación Sector Norte', progreso: 75, estado: 'En proceso', responsable: 'María López' },
@@ -83,66 +61,14 @@ const SimpleDashboard = () => {
 
   // Items del menú lateral
   const menuItems = [
-    { icon: <Activity size={22} />, label: 'Dashboard', active: true, onClick: null },
-    { icon: <Users size={22} />, label: 'Clientes', onClick: () => navigate('/clients') },
-    { icon: <DollarSign size={22} />, label: 'Facturación', onClick: () => navigate('/invoices') },
-    { icon: <Wifi size={22} />, label: 'Servicios', onClick: () => navigate('/services') },
-    { icon: <TrendingUp size={22} />, label: 'Reportes', onClick: () => navigate('/reports') },
-    { icon: <Calendar size={22} />, label: 'Instalaciones', onClick: () => navigate('/installations') },
-    { icon: <Settings size={22} />, label: 'Configuración', onClick: () => navigate('/config') }
+    { icon: <Activity size={22} />, label: 'Dashboard', active: true },
+    { icon: <Users size={22} />, label: 'Clientes' },
+    { icon: <DollarSign size={22} />, label: 'Facturación' },
+    { icon: <Wifi size={22} />, label: 'Servicios' },
+    { icon: <TrendingUp size={22} />, label: 'Reportes' },
+    { icon: <Calendar size={22} />, label: 'Instalaciones' },
+    { icon: <Settings size={22} />, label: 'Configuración' }
   ];
-
-  // Obtener tareas de configuración pendientes
-  const getConfigurationTasks = () => {
-    if (!configOverview) return [];
-    
-    const tasks = [];
-    
-    if (!configOverview.empresa_configurada) {
-      tasks.push({
-        title: 'Configurar Empresa',
-        description: 'Completa los datos básicos de tu empresa',
-        priority: 'high',
-        action: () => navigate('/config/company'),
-        icon: <Building2 size={16} />
-      });
-    }
-    
-    if ((configOverview.contadores?.bancos_activos || 0) === 0) {
-      tasks.push({
-        title: 'Agregar Bancos',
-        description: 'Configura los bancos para pagos',
-        priority: 'medium',
-        action: () => navigate('/config/banks'),
-        icon: <CreditCard size={16} />
-      });
-    }
-    
-    if ((configOverview.contadores?.sectores_activos || 0) === 0) {
-      tasks.push({
-        title: 'Configurar Geografía',
-        description: 'Define departamentos, ciudades y sectores',
-        priority: 'medium',
-        action: () => navigate('/config/geography'),
-        icon: <MapPin size={16} />
-      });
-    }
-    
-    if ((configOverview.contadores?.planes_activos || 0) === 0) {
-      tasks.push({
-        title: 'Crear Planes de Servicio',
-        description: 'Define los planes de internet y TV',
-        priority: 'high',
-        action: () => navigate('/config/service-plans'),
-        icon: <Package size={16} />
-      });
-    }
-    
-    return tasks;
-  };
-
-  const configTasks = getConfigurationTasks();
-  const isConfigComplete = configOverview?.configuracion_completa || false;
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -187,9 +113,7 @@ const SimpleDashboard = () => {
                   : 'hover:bg-[#0e6493]/50 hover:text-white text-white/80'
               }`}
               onClick={() => {
-                if (item.onClick) {
-                  item.onClick();
-                } else if (!item.active) {
+                if (!item.active) {
                   alert(`Funcionalidad "${item.label}" en desarrollo`);
                 }
               }}
@@ -253,9 +177,7 @@ const SimpleDashboard = () => {
 
               <button className="p-2 rounded-full hover:bg-gray-100 relative">
                 <Bell size={20} />
-                {configTasks.length > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#e21f25]"></span>
-                )}
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#e21f25]"></span>
               </button>
 
               <div className="w-px h-6 bg-gray-300 hidden sm:block"></div>
@@ -282,14 +204,14 @@ const SimpleDashboard = () => {
                       <p className="text-xs text-gray-500">{currentUser?.email}</p>
                     </div>
                     <button 
-                      onClick={() => navigate('/profile')}
+                      onClick={() => window.location.href = '/profile'}
                       className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                     >
                       <User size={16} className="mr-2" />
                       Ver perfil
                     </button>
                     <button 
-                      onClick={() => navigate('/config')}
+                      onClick={() => alert('Configuración en desarrollo')}
                       className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                     >
                       <Settings size={16} className="mr-2" />
@@ -312,174 +234,42 @@ const SimpleDashboard = () => {
 
         {/* Main content */}
         <main className="flex-1 overflow-auto p-4">
-          {/* Configuration Alert */}
-          {!configLoading && !isConfigComplete && showConfigAlert && configTasks.length > 0 && (
-            <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex">
-                  <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
-                  <div className="ml-3 flex-1">
-                    <h3 className="text-sm font-medium text-orange-800">
-                      Configuración incompleta
-                    </h3>
-                    <p className="mt-1 text-sm text-orange-700">
-                      Hay {configTasks.length} tarea{configTasks.length > 1 ? 's' : ''} de configuración pendiente{configTasks.length > 1 ? 's' : ''} para completar la configuración del sistema.
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {configTasks.slice(0, 2).map((task, index) => (
-                        <button
-                          key={index}
-                          onClick={task.action}
-                          className="inline-flex items-center px-3 py-1.5 border border-orange-300 text-xs font-medium rounded-md text-orange-700 bg-white hover:bg-orange-50 transition-colors"
-                        >
-                          {task.icon}
-                          <span className="ml-1">{task.title}</span>
-                          <ArrowRight size={12} className="ml-1" />
-                        </button>
-                      ))}
-                      {configTasks.length > 2 && (
-                        <button
-                          onClick={() => navigate('/config')}
-                          className="inline-flex items-center px-3 py-1.5 border border-orange-300 text-xs font-medium rounded-md text-orange-700 bg-white hover:bg-orange-50 transition-colors"
-                        >
-                          Ver todas ({configTasks.length})
-                          <ExternalLink size={12} className="ml-1" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowConfigAlert(false)}
-                  className="p-1 hover:bg-orange-100 rounded-md transition-colors"
-                >
-                  <X size={16} className="text-orange-600" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Configuration Complete Alert */}
-          {!configLoading && isConfigComplete && showConfigAlert && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex">
-                  <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-green-800">
-                      ¡Configuración completa!
-                    </h3>
-                    <p className="mt-1 text-sm text-green-700">
-                      El sistema está correctamente configurado y listo para gestionar clientes.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowConfigAlert(false)}
-                  className="p-1 hover:bg-green-100 rounded-md transition-colors"
-                >
-                  <X size={16} className="text-green-600" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Welcome Message with Configuration Status */}
+          {/* Welcome Message */}
           <div className="mb-6 bg-gradient-to-r from-[#0e6493] to-[#0e6493]/80 rounded-xl p-5 shadow-lg text-white overflow-hidden relative">
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
             <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
 
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold mb-2">
-                  ¡Hola, {currentUser?.nombre || 'Usuario'}!
-                </h1>
-                <p className="text-lg md:text-xl opacity-90">
-                  ¿Qué quieres hacer hoy?
-                </p>
-              </div>
-              
-              {/* Configuration Status Badge */}
-              {!configLoading && (
-                <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  isConfigComplete 
-                    ? 'bg-green-500/20 text-green-100 border border-green-400/30' 
-                    : 'bg-orange-500/20 text-orange-100 border border-orange-400/30'
-                }`}>
-                  {isConfigComplete ? '✓ Configurado' : '⚙️ Configuración pendiente'}
-                </div>
-              )}
-            </div>
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">
+              ¡Hola, {currentUser?.nombre || 'Usuario'}!
+            </h1>
+            <p className="text-lg md:text-xl mb-4 md:mb-6 opacity-90">
+              ¿Qué quieres hacer hoy?
+            </p>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
               <button 
-                onClick={() => navigate('/clients')}
+                onClick={() => alert('Gestión de clientes en desarrollo')}
                 className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
               >
                 <Users size={18} className="mr-2" />
                 <span className="text-sm md:text-base">Gestionar clientes</span>
               </button>
               <button 
-                onClick={() => navigate('/invoices')}
+                onClick={() => alert('Facturación en desarrollo')}
                 className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
               >
                 <DollarSign size={18} className="mr-2" />
                 <span className="text-sm md:text-base">Ver facturación</span>
               </button>
               <button 
-                onClick={() => navigate('/config')}
+                onClick={() => alert('Reportes en desarrollo')}
                 className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
               >
-                <Settings size={18} className="mr-2" />
-                <span className="text-sm md:text-base">Configuración</span>
+                <TrendingUp size={18} className="mr-2" />
+                <span className="text-sm md:text-base">Generar informes</span>
               </button>
             </div>
           </div>
-
-          {/* Configuration Overview Cards */}
-          {!configLoading && configOverview && (
-            <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-500">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Departamentos</p>
-                    <p className="text-xl font-bold">{configOverview.contadores?.departamentos || 0}</p>
-                  </div>
-                  <Building2 size={24} className="text-blue-500" />
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-green-500">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Ciudades</p>
-                    <p className="text-xl font-bold">{configOverview.contadores?.ciudades || 0}</p>
-                  </div>
-                  <MapPin size={24} className="text-green-500" />
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-purple-500">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Sectores</p>
-                    <p className="text-xl font-bold">{configOverview.contadores?.sectores_activos || 0}</p>
-                  </div>
-                  <MapPin size={24} className="text-purple-500" />
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-orange-500">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Bancos</p>
-                    <p className="text-xl font-bold">{configOverview.contadores?.bancos_activos || 0}</p>
-                  </div>
-                  <CreditCard size={24} className="text-orange-500" />
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
