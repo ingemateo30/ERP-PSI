@@ -1,9 +1,10 @@
-// frontend/src/App.js - VERSIÓN ACTUALIZADA CON CONFIGURACIONES
+// frontend/src/App.js - VERSIÓN ACTUALIZADA CON MAINLAYOUT
 
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import MainLayout from './components/Layout/MainLayout';
 import { Loader2 } from 'lucide-react';
 
 // Lazy loading de componentes principales
@@ -16,6 +17,10 @@ const ConfigMain = lazy(() => import('./components/Config/ConfigMain'));
 const CompanyConfig = lazy(() => import('./components/Config/CompanyConfig'));
 const BanksConfig = lazy(() => import('./components/Config/BanksConfig'));
 const GeographyConfig = lazy(() => import('./components/Config/GeographyConfig'));
+const ServicePlansConfig = lazy(() => import('./components/Config/ServicePlansConfig'));
+
+// Lazy loading de componentes de gestión
+const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagement'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -29,8 +34,8 @@ const LoadingFallback = ({ message = "Cargando..." }) => (
 
 // Componente temporal para páginas no implementadas
 const ComingSoon = ({ pageName }) => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-50">
-    <div className="text-center p-8">
+  <MainLayout title={pageName} subtitle="Esta funcionalidad está en desarrollo">
+    <div className="text-center py-12">
       <div className="w-24 h-24 mx-auto mb-4 bg-[#0e6493]/10 rounded-full flex items-center justify-center">
         <svg
           className="w-12 h-12 text-[#0e6493]"
@@ -67,7 +72,153 @@ const ComingSoon = ({ pageName }) => (
         </button>
       </div>
     </div>
-  </div>
+  </MainLayout>
+);
+
+// Componente AdminPanel mejorado
+const AdminPanel = () => (
+  <MainLayout title="Panel de Administración" subtitle="Gestión avanzada del sistema">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Configuración del Sistema */}
+      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+        <div className="flex items-center mb-4">
+          <div className="w-12 h-12 bg-[#0e6493]/10 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-[#0e6493]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Configuración del Sistema
+        </h3>
+        <p className="text-gray-600 mb-4">
+          Configurar empresa, bancos, sectores y parámetros generales
+        </p>
+        <button 
+          onClick={() => window.location.href = '/config'}
+          className="w-full px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90 transition-colors"
+        >
+          Acceder
+        </button>
+      </div>
+      
+      {/* Gestión de Usuarios */}
+      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+        <div className="flex items-center mb-4">
+          <div className="w-12 h-12 bg-[#e21f25]/10 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-[#e21f25]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Gestión de Usuarios
+        </h3>
+        <p className="text-gray-600 mb-4">
+          Administrar usuarios del sistema y sus permisos
+        </p>
+        <button 
+          onClick={() => alert('Funcionalidad en desarrollo')}
+          className="w-full px-4 py-2 bg-[#e21f25] text-white rounded-lg hover:bg-[#e21f25]/90 transition-colors"
+        >
+          Acceder
+        </button>
+      </div>
+      
+      {/* Logs del Sistema */}
+      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+        <div className="flex items-center mb-4">
+          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Logs del Sistema
+        </h3>
+        <p className="text-gray-600 mb-4">
+          Revisar actividad y eventos del sistema
+        </p>
+        <button 
+          onClick={() => alert('Funcionalidad en desarrollo')}
+          className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        >
+          Acceder
+        </button>
+      </div>
+
+      {/* Reportes Avanzados */}
+      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+        <div className="flex items-center mb-4">
+          <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Reportes Avanzados
+        </h3>
+        <p className="text-gray-600 mb-4">
+          Generar reportes detallados y análisis
+        </p>
+        <button 
+          onClick={() => window.location.href = '/reports'}
+          className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          Acceder
+        </button>
+      </div>
+
+      {/* Backup y Seguridad */}
+      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+        <div className="flex items-center mb-4">
+          <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Backup y Seguridad
+        </h3>
+        <p className="text-gray-600 mb-4">
+          Gestionar copias de seguridad y configuración de seguridad
+        </p>
+        <button 
+          onClick={() => alert('Funcionalidad en desarrollo')}
+          className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+        >
+          Acceder
+        </button>
+      </div>
+
+      {/* Monitoreo del Sistema */}
+      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+        <div className="flex items-center mb-4">
+          <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Monitoreo del Sistema
+        </h3>
+        <p className="text-gray-600 mb-4">
+          Supervisar rendimiento y estado del sistema
+        </p>
+        <button 
+          onClick={() => alert('Funcionalidad en desarrollo')}
+          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          Acceder
+        </button>
+      </div>
+    </div>
+  </MainLayout>
 );
 
 function App() {
@@ -118,7 +269,9 @@ function App() {
                 path="/profile" 
                 element={
                   <ProtectedRoute>
-                    <UserProfile />
+                    <MainLayout title="Mi Perfil" subtitle="Gestiona tu información personal">
+                      <UserProfile />
+                    </MainLayout>
                   </ProtectedRoute>
                 } 
               />
@@ -167,7 +320,7 @@ function App() {
                 path="/config/service-plans" 
                 element={
                   <ProtectedRoute requiredRole="administrador">
-                    <ComingSoon pageName="Gestión de Planes de Servicio" />
+                    <ServicePlansConfig />
                   </ProtectedRoute>
                 } 
               />
@@ -180,7 +333,7 @@ function App() {
                 path="/clients" 
                 element={
                   <ProtectedRoute requiredRole="supervisor">
-                    <ComingSoon pageName="Gestión de Clientes" />
+                    <ClientsManagement />
                   </ProtectedRoute>
                 } 
               />
@@ -231,10 +384,28 @@ function App() {
               />
 
               <Route 
+                path="/inventory" 
+                element={
+                  <ProtectedRoute requiredRole="supervisor">
+                    <ComingSoon pageName="Gestión de Inventario" />
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
                 path="/reports" 
                 element={
                   <ProtectedRoute requiredRole="supervisor">
                     <ComingSoon pageName="Reportes y Estadísticas" />
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/calendar" 
+                element={
+                  <ProtectedRoute>
+                    <ComingSoon pageName="Calendario de Actividades" />
                   </ProtectedRoute>
                 } 
               />
@@ -247,85 +418,7 @@ function App() {
                 path="/admin" 
                 element={
                   <ProtectedRoute requiredRole="administrador">
-                    <div className="min-h-screen bg-gray-50 p-8">
-                      <div className="max-w-6xl mx-auto">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-6">
-                          Panel de Administración
-                        </h1>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                          {/* Configuración del Sistema */}
-                          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                            <div className="flex items-center mb-4">
-                              <div className="w-12 h-12 bg-[#0e6493]/10 rounded-lg flex items-center justify-center">
-                                <svg className="w-6 h-6 text-[#0e6493]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                              </div>
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                              Configuración del Sistema
-                            </h3>
-                            <p className="text-gray-600 mb-4">
-                              Configurar empresa, bancos, sectores y parámetros generales
-                            </p>
-                            <button 
-                              onClick={() => window.location.href = '/config'}
-                              className="w-full px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90 transition-colors"
-                            >
-                              Acceder
-                            </button>
-                          </div>
-                          
-                          {/* Gestión de Usuarios */}
-                          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                            <div className="flex items-center mb-4">
-                              <div className="w-12 h-12 bg-[#e21f25]/10 rounded-lg flex items-center justify-center">
-                                <svg className="w-6 h-6 text-[#e21f25]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                                </svg>
-                              </div>
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                              Gestión de Usuarios
-                            </h3>
-                            <p className="text-gray-600 mb-4">
-                              Administrar usuarios del sistema y sus permisos
-                            </p>
-                            <button 
-                              onClick={() => alert('Funcionalidad en desarrollo')}
-                              className="w-full px-4 py-2 bg-[#e21f25] text-white rounded-lg hover:bg-[#e21f25]/90 transition-colors"
-                            >
-                              Acceder
-                            </button>
-                          </div>
-                          
-                          {/* Logs del Sistema */}
-                          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                            <div className="flex items-center mb-4">
-                              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                              </div>
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                              Logs del Sistema
-                            </h3>
-                            <p className="text-gray-600 mb-4">
-                              Revisar actividad y eventos del sistema
-                            </p>
-                            <button 
-                              onClick={() => alert('Funcionalidad en desarrollo')}
-                              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                            >
-                              Acceder
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <AdminPanel />
                   </ProtectedRoute>
                 } 
               />
@@ -351,8 +444,8 @@ function App() {
               <Route 
                 path="*" 
                 element={
-                  <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                    <div className="text-center p-8">
+                  <MainLayout title="Página no encontrada" subtitle="Error 404">
+                    <div className="text-center py-12">
                       <div className="w-24 h-24 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
                         <svg
                           className="w-12 h-12 text-red-600"
@@ -387,7 +480,7 @@ function App() {
                         </button>
                       </div>
                     </div>
-                  </div>
+                  </MainLayout>
                 } 
               />
             </Routes>
