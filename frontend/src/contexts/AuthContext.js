@@ -1,4 +1,5 @@
-// frontend/src/contexts/AuthContext.js
+// frontend/src/contexts/AuthContext.js - VERSIÓN MEJORADA
+
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import authService from '../services/authService';
 
@@ -17,7 +18,8 @@ const AuthActions = {
   SET_AUTHENTICATED: 'SET_AUTHENTICATED',
   SET_UNAUTHENTICATED: 'SET_UNAUTHENTICATED',
   SET_ERROR: 'SET_ERROR',
-  CLEAR_ERROR: 'CLEAR_ERROR'
+  CLEAR_ERROR: 'CLEAR_ERROR',
+  UPDATE_USER: 'UPDATE_USER'
 };
 
 // Estado inicial
@@ -74,6 +76,12 @@ function authReducer(state, action) {
         error: null
       };
 
+    case AuthActions.UPDATE_USER:
+      return {
+        ...state,
+        user: { ...state.user, ...action.payload }
+      };
+
     default:
       return state;
   }
@@ -101,16 +109,31 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: AuthActions.SET_LOADING });
 
       try {
+        // Verificar si hay token almacenado
         if (authService.isAuthenticated()) {
-          // Verificar token con el servidor
-          await authService.verifyToken();
-          const user = authService.getUserFromToken();
           const token = authService.getToken();
+          let user = authService.getCurrentUserInfo();
 
-          dispatch({
-            type: AuthActions.SET_AUTHENTICATED,
-            payload: { user, token }
-          });
+          // Si no hay información de usuario, obtenerla del servidor
+          if (!user) {
+            try {
+              const response = await authService.getCurrentUser();
+              user = response.user || response.data?.user;
+            } catch (error) {
+              console.error('Error obteniendo usuario actual:', error);
+              // Si falla, extraer del token
+              user = authService.getUserFromToken();
+            }
+          }
+
+          if (user && token) {
+            dispatch({
+              type: AuthActions.SET_AUTHENTICATED,
+              payload: { user, token }
+            });
+          } else {
+            dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
+          }
         } else {
           dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
         }
@@ -124,25 +147,80 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
+  // Auto-refresh del token
+  useEffect(() => {
+    let refreshTimer;
+
+    const setupTokenRefresh = () => {
+      const token = authService.getToken();
+      if (!token) return;
+
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const expirationTime = payload.exp * 1000;
+        const currentTime = Date.now();
+        const timeUntilExpiry = expirationTime - currentTime;
+        
+        // Refrescar 5 minutos antes de que expire
+        const refreshTime = timeUntilExpiry - (5 * 60 * 1000);
+
+        if (refreshTime > 0) {
+          refreshTimer = setTimeout(async () => {
+            try {
+              await refreshToken();
+            } catch (error) {
+              console.error('Error auto-refrescando token:', error);
+              logout();
+            }
+          }, refreshTime);
+        }
+      } catch (error) {
+        console.error('Error calculando tiempo de refresh:', error);
+      }
+    };
+
+    if (state.status === AuthStates.AUTHENTICATED) {
+      setupTokenRefresh();
+    }
+
+    return () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+    };
+  }, [state.status, state.token]);
+
   // Función para iniciar sesión
   const login = async (email, password) => {
     dispatch({ type: AuthActions.SET_LOADING });
 
     try {
       const response = await authService.login(email, password);
-      const user = authService.getUserFromToken();
-      const token = authService.getToken();
+      
+      // Extraer token y usuario de la respuesta
+      const token = response.token || response.accessToken;
+      let user = response.data?.user || response.user;
 
-      dispatch({
-        type: AuthActions.SET_AUTHENTICATED,
-        payload: { user, token }
-      });
+      // Si no viene usuario en la respuesta, extraer del token
+      if (!user && token) {
+        user = authService.getUserFromToken();
+      }
+
+      if (user && token) {
+        dispatch({
+          type: AuthActions.SET_AUTHENTICATED,
+          payload: { user, token }
+        });
+      } else {
+        throw new Error('Respuesta de login inválida');
+      }
 
       return response;
     } catch (error) {
+      const errorMessage = error.message || 'Error al iniciar sesión';
       dispatch({
         type: AuthActions.SET_ERROR,
-        payload: error.message
+        payload: errorMessage
       });
       throw error;
     }
@@ -154,19 +232,30 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const response = await authService.register(userData);
-      const user = authService.getUserFromToken();
-      const token = authService.getToken();
+      
+      const token = response.token || response.accessToken;
+      let user = response.data?.user || response.user;
 
-      dispatch({
-        type: AuthActions.SET_AUTHENTICATED,
-        payload: { user, token }
-      });
+      if (!user && token) {
+        user = authService.getUserFromToken();
+      }
+
+      if (user && token) {
+        dispatch({
+          type: AuthActions.SET_AUTHENTICATED,
+          payload: { user, token }
+        });
+      } else {
+        // Si no devuelve token (registro sin auto-login)
+        dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
+      }
 
       return response;
     } catch (error) {
+      const errorMessage = error.message || 'Error al registrar usuario';
       dispatch({
         type: AuthActions.SET_ERROR,
-        payload: error.message
+        payload: errorMessage
       });
       throw error;
     }
@@ -199,9 +288,10 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: AuthActions.CLEAR_ERROR });
       return response;
     } catch (error) {
+      const errorMessage = error.message || 'Error al solicitar restablecimiento';
       dispatch({
         type: AuthActions.SET_ERROR,
-        payload: error.message
+        payload: errorMessage
       });
       throw error;
     }
@@ -216,9 +306,10 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: AuthActions.CLEAR_ERROR });
       return response;
     } catch (error) {
+      const errorMessage = error.message || 'Error al restablecer contraseña';
       dispatch({
         type: AuthActions.SET_ERROR,
-        payload: error.message
+        payload: errorMessage
       });
       throw error;
     }
@@ -233,9 +324,10 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: AuthActions.CLEAR_ERROR });
       return response;
     } catch (error) {
+      const errorMessage = error.message || 'Error al cambiar contraseña';
       dispatch({
         type: AuthActions.SET_ERROR,
-        payload: error.message
+        payload: errorMessage
       });
       throw error;
     }
@@ -244,18 +336,83 @@ export const AuthProvider = ({ children }) => {
   // Función para refrescar token
   const refreshToken = async () => {
     try {
-      await authService.refreshToken();
-      const user = authService.getUserFromToken();
-      const token = authService.getToken();
-
-      dispatch({
-        type: AuthActions.SET_AUTHENTICATED,
-        payload: { user, token }
-      });
+      const response = await authService.refreshToken();
+      const token = response.token || response.accessToken;
+      
+      if (token) {
+        // Mantener usuario actual, solo actualizar token
+        dispatch({
+          type: AuthActions.SET_AUTHENTICATED,
+          payload: { user: state.user, token }
+        });
+      }
+      
+      return response;
     } catch (error) {
+      console.error('Error refrescando token:', error);
       dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
       throw error;
     }
+  };
+
+  // Función para actualizar información del usuario
+  const updateUser = async (userData) => {
+    try {
+      // Aquí podrías llamar a un endpoint de actualización
+      // const response = await userService.updateProfile(userData);
+      
+      // Por ahora, actualizar solo localmente
+      dispatch({
+        type: AuthActions.UPDATE_USER,
+        payload: userData
+      });
+      
+      // También actualizar en localStorage
+      const updatedUser = { ...state.user, ...userData };
+      authService.setUser(updatedUser);
+      
+    } catch (error) {
+      console.error('Error actualizando usuario:', error);
+      throw error;
+    }
+  };
+
+  // Función para verificar permisos
+  const hasPermission = (requiredRole) => {
+    if (!state.user) return false;
+    
+    const userRole = state.user.role || state.user.rol;
+    
+    // Sistema de jerarquía de roles
+    const roleHierarchy = {
+      'administrador': 3,
+      'supervisor': 2,
+      'instalador': 1,
+      'usuario': 0
+    };
+    
+    const userLevel = roleHierarchy[userRole] || 0;
+    const requiredLevel = roleHierarchy[requiredRole] || 0;
+    
+    return userLevel >= requiredLevel;
+  };
+
+  // Función para verificar si el usuario puede acceder a un recurso específico
+  const canAccess = (resource, action = 'read') => {
+    if (!state.user) return false;
+    
+    const userRole = state.user.role || state.user.rol;
+    
+    // Definir permisos por rol y recurso
+    const permissions = {
+      'administrador': ['*'], // Acceso total
+      'supervisor': ['clients', 'invoices', 'payments', 'reports'],
+      'instalador': ['clients', 'installations'],
+      'usuario': ['profile']
+    };
+    
+    const userPermissions = permissions[userRole] || [];
+    return userPermissions.includes('*') || userPermissions.includes(resource);
   };
 
   // Valores del contexto
@@ -264,7 +421,11 @@ export const AuthProvider = ({ children }) => {
     ...state,
     isAuthenticated: state.status === AuthStates.AUTHENTICATED,
     
-    // Acciones
+    // Información del usuario
+    currentUser: state.user,
+    userRole: state.user?.role || state.user?.rol,
+    
+    // Acciones de autenticación
     login,
     register,
     logout,
@@ -272,7 +433,19 @@ export const AuthProvider = ({ children }) => {
     forgotPassword,
     resetPassword,
     changePassword,
-    refreshToken
+    refreshToken,
+    
+    // Gestión de usuario
+    updateUser,
+    
+    // Utilidades de permisos
+    hasPermission,
+    canAccess,
+    
+    // Estados derivados
+    isAdmin: state.user?.role === 'administrador' || state.user?.rol === 'administrador',
+    isSupervisor: state.user?.role === 'supervisor' || state.user?.rol === 'supervisor',
+    isInstaller: state.user?.role === 'instalador' || state.user?.rol === 'instalador'
   };
 
   return (

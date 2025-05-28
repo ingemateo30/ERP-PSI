@@ -1,71 +1,47 @@
+// backend/index.js - VERSIÓN SIMPLIFICADA PARA DEBUGGING
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
 const cookieParser = require('cookie-parser');
 
-// Importar configuraciones
-const corsConfig = require('./config/cors');
-const logger = require('./utils/logger');
-const { connectDatabase } = require('./models/Database');
+console.log('🚀 Iniciando servidor...');
 
-// Importar middleware
-const securityMiddleware = require('./middleware/security');
-const rateLimiter = require('./middleware/rateLimiter');
+// Verificar variables de entorno críticas
+const requiredEnvVars = ['JWT_SECRET', 'JWT_REFRESH_SECRET'];
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
-// Importar rutas
-const authRoutes = require('./routes/auth');
-//const userRoutes = require('./routes/users');
+if (missingVars.length > 0) {
+  console.error('❌ Variables de entorno faltantes:', missingVars.join(', '));
+  console.log('📝 Crea un archivo .env con:');
+  console.log('JWT_SECRET=tu_jwt_secret_muy_largo_y_seguro_de_al_menos_32_caracteres');
+  console.log('JWT_REFRESH_SECRET=tu_refresh_secret_muy_largo_y_seguro_diferente_al_anterior');
+  process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// MIDDLEWARE DE SEGURIDAD
+// MIDDLEWARE BÁSICO
 // ============================================
 
-// Helmet para headers de seguridad
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true
-  }
+// CORS básico
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:3002'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
 
-// CORS
-app.use(cors(corsConfig));
-
-// Compresión
-app.use(compression());
-
-// Rate limiting global
-//app.use(rateLimiter.globalLimiter);
-
-// ============================================
-// MIDDLEWARE DE PARSEO
-// ============================================
-
+// Parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Middleware de logging
+// Logging básico
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.originalUrl}`, {
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString()
-  });
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
   next();
 });
 
@@ -78,13 +54,54 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// API Routes
-app.use(`/api/${process.env.API_VERSION}/auth`, authRoutes);
-//app.use(`/api/${process.env.API_VERSION}/users`, userRoutes);
+// Test de base de datos
+app.get('/test-db', async (req, res) => {
+  try {
+    const pool = require('./config/database');
+    const connection = await pool.getConnection();
+    await connection.ping();
+    connection.release();
+    
+    res.json({
+      status: 'OK',
+      message: 'Conexión a base de datos exitosa'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Error de conexión a base de datos',
+      error: error.message
+    });
+  }
+});
+
+// Importar y usar rutas
+try {
+  console.log('📂 Cargando rutas de autenticación...');
+  const authRoutes = require('./routes/auth');
+  app.use('/api/v1/auth', authRoutes);
+  console.log('✅ Rutas de autenticación cargadas');
+} catch (error) {
+  console.error('❌ Error cargando rutas de autenticación:', error.message);
+}
+
+// Ruta base de la API
+app.get('/api/v1', (req, res) => {
+  res.json({
+    message: 'ISP Management System API',
+    version: 'v1',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      auth: '/api/v1/auth',
+      health: '/health',
+      testDb: '/test-db'
+    }
+  });
+});
 
 // ============================================
 // MANEJO DE ERRORES
@@ -92,42 +109,23 @@ app.use(`/api/${process.env.API_VERSION}/auth`, authRoutes);
 
 // 404 Handler
 app.use('*', (req, res) => {
-  logger.warn(`Route not found: ${req.method} ${req.originalUrl}`, {
-    ip: req.ip,
-    userAgent: req.get('User-Agent')
-  });
-  
   res.status(404).json({
     success: false,
     message: 'Ruta no encontrada',
-    error: {
-      status: 404,
-      path: req.originalUrl,
-      method: req.method
-    }
+    path: req.originalUrl,
+    method: req.method
   });
 });
 
 // Error Handler Global
 app.use((error, req, res, next) => {
-  logger.error('Error no controlado:', {
-    error: error.message,
-    stack: error.stack,
-    url: req.originalUrl,
-    method: req.method,
-    ip: req.ip
-  });
+  console.error('💥 Error no controlado:', error.message);
+  console.error('Stack:', error.stack);
 
-  // No revelar detalles del error en producción
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  
   res.status(error.status || 500).json({
     success: false,
-    message: isDevelopment ? error.message : 'Error interno del servidor',
-    error: {
-      status: error.status || 500,
-      ...(isDevelopment && { stack: error.stack })
-    }
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Error interno del servidor',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -137,41 +135,54 @@ app.use((error, req, res, next) => {
 
 async function startServer() {
   try {
-    // Conectar a la base de datos
-    await connectDatabase();
-    logger.info('Conexión a base de datos establecida');
+    console.log('🔗 Probando conexión a base de datos...');
+    
+    // Probar conexión a base de datos
+    const pool = require('./config/database');
+    const connection = await pool.getConnection();
+    await connection.ping();
+    connection.release();
+    console.log('✅ Conexión a base de datos exitosa');
 
     // Iniciar servidor
     app.listen(PORT, () => {
-      logger.info(`Servidor iniciado en puerto ${PORT}`, {
-        environment: process.env.NODE_ENV,
-        pid: process.pid
-      });
+      console.log('🎉 Servidor iniciado exitosamente');
+      console.log(`📍 URL: http://localhost:${PORT}`);
+      console.log(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🆔 PID: ${process.pid}`);
+      console.log('\n📋 Endpoints disponibles:');
+      console.log(`   GET  http://localhost:${PORT}/health`);
+      console.log(`   GET  http://localhost:${PORT}/test-db`);
+      console.log(`   GET  http://localhost:${PORT}/api/v1`);
+      console.log(`   POST http://localhost:${PORT}/api/v1/auth/login`);
+      console.log(`   POST http://localhost:${PORT}/api/v1/auth/register`);
+      console.log('\n✨ Servidor listo para recibir peticiones!');
     });
 
   } catch (error) {
-    logger.error('Error al iniciar servidor:', error.message);
+    console.error('💥 Error al iniciar servidor:', error.message);
+    console.error('Stack:', error.stack);
     process.exit(1);
   }
 }
 
 // Manejo de señales del proceso
 process.on('SIGTERM', () => {
-  logger.info('SIGTERM recibido. Cerrando servidor...');
+  console.log('🛑 SIGTERM recibido. Cerrando servidor...');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  logger.info('SIGINT recibido. Cerrando servidor...');
+  console.log('🛑 SIGINT recibido. Cerrando servidor...');
   process.exit(0);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection:', { reason, promise });
+  console.error('💥 Unhandled Rejection:', reason);
 });
 
 process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error);
+  console.error('💥 Uncaught Exception:', error);
   process.exit(1);
 });
 

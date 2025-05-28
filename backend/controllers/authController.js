@@ -1,17 +1,16 @@
+// backend/controllers/authController.js - VERSIÓN CORREGIDA
+
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const mysql = require('mysql2/promise');
 const { validationResult } = require('express-validator');
 const logger = require('../utils/logger');
 const { success, error } = require('../utils/responses');
-const Database = require('../models/Database');
 const pool = require('../config/database');
 
 class AuthController {
-    // Iniciar sesión
+    // Iniciar sesión - CORREGIDO para compatibilidad con frontend
     static async login(req, res) {
         try {
-            // Verificar errores de validación
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
                 return error(res, 'Datos de entrada inválidos', 400, errors.array());
@@ -21,7 +20,6 @@ class AuthController {
             const clientIP = req.ip || req.connection.remoteAddress;
             const userAgent = req.get('User-Agent');
 
-            // Buscar usuario en la base de datos
             const connection = await pool.getConnection();
 
             const [users] = await connection.execute(
@@ -34,12 +32,12 @@ class AuthController {
                     ip: clientIP,
                     userAgent: userAgent
                 });
+                connection.release();
                 return error(res, 'Credenciales inválidas', 401);
             }
 
             const user = users[0];
 
-            // Verificar contraseña
             const isValidPassword = await bcrypt.compare(password, user.password);
 
             if (!isValidPassword) {
@@ -47,26 +45,29 @@ class AuthController {
                     ip: clientIP,
                     userAgent: userAgent
                 });
+                connection.release();
                 return error(res, 'Credenciales inválidas', 401);
             }
 
-            // Generar tokens
+            // CORREGIDO: Estructura de token compatible con frontend
+            const tokenPayload = {
+                userId: user.id,
+                id: user.id,              // Frontend espera 'id'
+                email: user.email,
+                role: user.rol,           // Frontend espera 'role'
+                rol: user.rol,            // Mantener 'rol' para backend
+                nombre: user.nombre
+            };
+
+            // Generar token con estructura correcta
             const accessToken = jwt.sign(
-                {
-                    id: user.id,
-                    email: user.email,
-                    rol: user.rol,
-                    nombre: user.nombre
-                },
+                tokenPayload,
                 process.env.JWT_SECRET,
-                { expiresIn: process.env.JWT_EXPIRE || '15m' }
+                { expiresIn: process.env.JWT_EXPIRE || '24h' }
             );
 
             const refreshToken = jwt.sign(
-                {
-                    id: user.id,
-                    email: user.email
-                },
+                { userId: user.id, id: user.id, email: user.email },
                 process.env.JWT_REFRESH_SECRET,
                 { expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d' }
             );
@@ -77,7 +78,6 @@ class AuthController {
                 [user.id]
             );
 
-            // Registrar log de acceso exitoso
             logger.info(`Login exitoso: ${email}`, {
                 userId: user.id,
                 rol: user.rol,
@@ -85,33 +85,68 @@ class AuthController {
                 userAgent: userAgent
             });
 
-            // Configurar cookie segura para refresh token
+            // CORREGIDO: Configurar cookie para refresh token
             res.cookie('refreshToken', refreshToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
                 sameSite: 'strict',
-                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 días
+                maxAge: 7 * 24 * 60 * 60 * 1000
             });
 
-            // Retornar respuesta exitosa (sin incluir la contraseña)
             const { password: _, ...userWithoutPassword } = user;
 
-            await connection.release();
+            connection.release();
 
-            return success(res, 'Login exitoso', {
-                user: userWithoutPassword,
-                accessToken,
-                expiresIn: process.env.JWT_EXPIRE || '15m'
+            // CORREGIDO: Estructura de respuesta compatible con frontend
+            return res.status(200).json({
+                success: true,
+                message: 'Login exitoso',
+                data: {
+                    user: {
+                        id: user.id,
+                        email: user.email,
+                        nombre: user.nombre,
+                        telefono: user.telefono,
+                        role: user.rol,  // Frontend espera 'role'
+                        rol: user.rol,   // Backend usa 'rol'
+                        activo: user.activo,
+                        ultimo_acceso: user.ultimo_acceso
+                    }
+                },
+                token: accessToken,        // Frontend espera 'token' en raíz
+                accessToken: accessToken,  // Mantener para consistencia
+                expiresIn: process.env.JWT_EXPIRE || '24h'
             });
 
         } catch (err) {
             logger.error('Error en login:', err);
             return error(res, 'Error interno del servidor', 500);
         }
-      
     }
 
-    // Renovar token de acceso
+    // Verificar token - NUEVO ENDPOINT para frontend
+    static async verify(req, res) {
+        try {
+            const user = req.user;
+            
+            return success(res, 'Token válido', {
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    nombre: user.nombre,
+                    role: user.rol,
+                    rol: user.rol
+                },
+                isValid: true
+            });
+
+        } catch (err) {
+            logger.error('Error verificando token:', err);
+            return error(res, 'Token inválido', 401);
+        }
+    }
+
+    // Renovar token - CORREGIDO
     static async refreshToken(req, res) {
         try {
             const { refreshToken } = req.cookies;
@@ -120,43 +155,48 @@ class AuthController {
                 return error(res, 'Token de renovación requerido', 401);
             }
 
-            // Verificar refresh token
             const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
 
-            // Buscar usuario
             const connection = await pool.getConnection();
             const [users] = await connection.execute(
                 'SELECT * FROM sistema_usuarios WHERE id = ? AND activo = 1',
-                [decoded.id]
+                [decoded.userId || decoded.id]
             );
 
             if (users.length === 0) {
+                connection.release();
                 return error(res, 'Usuario no encontrado', 404);
             }
 
             const user = users[0];
 
-            // Generar nuevo access token
+            // Generar nuevo access token con estructura correcta
             const newAccessToken = jwt.sign(
                 {
+                    userId: user.id,
                     id: user.id,
                     email: user.email,
+                    role: user.rol,
                     rol: user.rol,
                     nombre: user.nombre
                 },
                 process.env.JWT_SECRET,
-                { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
+                { expiresIn: process.env.JWT_EXPIRE || '24h' }
             );
 
-            await connection.end();
+            connection.release();
 
             logger.info(`Token renovado para usuario: ${user.email}`, {
                 userId: user.id
             });
 
-            return success(res, 'Token renovado exitosamente', {
+            // CORREGIDO: Estructura compatible con frontend
+            return res.status(200).json({
+                success: true,
+                message: 'Token renovado exitosamente',
+                token: newAccessToken,
                 accessToken: newAccessToken,
-                expiresIn: process.env.JWT_EXPIRES_IN || '15m'
+                expiresIn: process.env.JWT_EXPIRE || '24h'
             });
 
         } catch (err) {
@@ -174,7 +214,6 @@ class AuthController {
         try {
             const user = req.user;
 
-            // Limpiar cookie del refresh token
             res.clearCookie('refreshToken');
 
             logger.info(`Logout exitoso: ${user.email}`, {
@@ -194,20 +233,33 @@ class AuthController {
         try {
             const user = req.user;
 
-            // Buscar información completa del usuario
             const connection = await pool.getConnection();
             const [users] = await connection.execute(
                 'SELECT id, email, nombre, telefono, rol, activo, ultimo_acceso, created_at FROM sistema_usuarios WHERE id = ?',
                 [user.id]
             );
 
-            await connection.end();
+            connection.release();
 
             if (users.length === 0) {
                 return error(res, 'Usuario no encontrado', 404);
             }
 
-            return success(res, 'Información del usuario', users[0]);
+            const userData = users[0];
+
+            return success(res, 'Información del usuario', {
+                user: {
+                    id: userData.id,
+                    email: userData.email,
+                    nombre: userData.nombre,
+                    telefono: userData.telefono,
+                    role: userData.rol,  // Frontend espera 'role'
+                    rol: userData.rol,   // Backend usa 'rol'
+                    activo: userData.activo,
+                    ultimo_acceso: userData.ultimo_acceso,
+                    created_at: userData.created_at
+                }
+            });
 
         } catch (err) {
             logger.error('Error obteniendo información del usuario:', err);
@@ -226,7 +278,6 @@ class AuthController {
             const { currentPassword, newPassword } = req.body;
             const user = req.user;
 
-            // Buscar usuario
             const connection = await pool.getConnection();
             const [users] = await connection.execute(
                 'SELECT * FROM sistema_usuarios WHERE id = ?',
@@ -234,29 +285,28 @@ class AuthController {
             );
 
             if (users.length === 0) {
+                connection.release();
                 return error(res, 'Usuario no encontrado', 404);
             }
 
             const userRecord = users[0];
 
-            // Verificar contraseña actual
             const isValidPassword = await bcrypt.compare(currentPassword, userRecord.password);
 
             if (!isValidPassword) {
+                connection.release();
                 return error(res, 'Contraseña actual incorrecta', 400);
             }
 
-            // Encriptar nueva contraseña
             const saltRounds = 12;
             const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
 
-            // Actualizar contraseña
             await connection.execute(
                 'UPDATE sistema_usuarios SET password = ?, updated_at = NOW() WHERE id = ?',
                 [hashedNewPassword, user.id]
             );
 
-            await connection.end();
+            connection.release();
 
             logger.info(`Contraseña actualizada para usuario: ${user.email}`, {
                 userId: user.id
@@ -269,21 +319,19 @@ class AuthController {
             return error(res, 'Error interno del servidor', 500);
         }
     }
-    // Agregar este método a tu clase AuthController
 
+    // Registro - CORREGIDO
     static async register(req, res) {
         try {
-            // Verificar errores de validación
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
                 return error(res, 'Datos de entrada inválidos', 400, errors.array());
             }
 
-            const { email, password, nombre, telefono, rol = 'usuario' } = req.body;
+            const { email, password, nombre, telefono, rol = 'supervisor' } = req.body;
             const clientIP = req.ip || req.connection.remoteAddress;
             const userAgent = req.get('User-Agent');
 
-            // Verificar si el usuario ya existe
             const connection = await pool.getConnection();
 
             const [existingUsers] = await connection.execute(
@@ -292,24 +340,21 @@ class AuthController {
             );
 
             if (existingUsers.length > 0) {
-                await connection.end();
+                connection.release();
                 return error(res, 'El usuario ya existe con este email', 409);
             }
 
-            // Encriptar contraseña
             const saltRounds = 12;
             const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-            // Crear nuevo usuario
             const [result] = await connection.execute(
                 `INSERT INTO sistema_usuarios (email, password, nombre, telefono, rol, activo, created_at) 
-       VALUES (?, ?, ?, ?, ?, 1, NOW())`,
+                 VALUES (?, ?, ?, ?, ?, 1, NOW())`,
                 [email, hashedPassword, nombre, telefono, rol]
             );
 
             const userId = result.insertId;
 
-            // Log del registro exitoso
             logger.info(`Usuario registrado exitosamente: ${email}`, {
                 userId: userId,
                 rol: rol,
@@ -317,16 +362,16 @@ class AuthController {
                 userAgent: userAgent
             });
 
-            await connection.end();
+            connection.release();
 
-            // Retornar respuesta exitosa
             return success(res, 'Usuario registrado exitosamente', {
                 user: {
                     id: userId,
                     email,
                     nombre,
                     telefono,
-                    rol,
+                    role: rol,
+                    rol: rol,
                     activo: 1
                 }
             }, 201);

@@ -1,8 +1,9 @@
-// frontend/src/components/Login.js
+// frontend/src/components/Login.js - VERSIÓN MEJORADA
+
 import React, { useState, useEffect } from 'react';
-import { LogIn, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { LogIn, Eye, EyeOff, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 
 const LoginComponent = () => {
   const [formData, setFormData] = useState({
@@ -13,18 +14,23 @@ const LoginComponent = () => {
   const [isHovered, setIsHovered] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+  const [successMessage, setSuccessMessage] = useState('');
 
   const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Obtener la ruta de destino después del login
+  const from = location.state?.from?.pathname || '/dashboard';
 
   // Redirigir si ya está autenticado
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      navigate(from, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, from]);
 
-  // Limpiar errores al cambiar los campos
+  // Limpiar errores y mensajes después de un tiempo
   useEffect(() => {
     if (error) {
       const timer = setTimeout(() => {
@@ -33,6 +39,15 @@ const LoginComponent = () => {
       return () => clearTimeout(timer);
     }
   }, [error, clearError]);
+
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
 
   // Validar formulario
   const validateForm = () => {
@@ -71,6 +86,11 @@ const LoginComponent = () => {
         [name]: null
       }));
     }
+
+    // Limpiar error general si existe
+    if (error) {
+      clearError();
+    }
   };
 
   // Manejar envío del formulario
@@ -83,11 +103,36 @@ const LoginComponent = () => {
 
     try {
       await login(formData.email, formData.password);
-      // La redirección se maneja en el useEffect
+      setSuccessMessage('¡Inicio de sesión exitoso! Redirigiendo...');
+      
+      // La redirección se maneja en el useEffect cuando cambia isAuthenticated
     } catch (error) {
       console.error('Error en login:', error);
-      // El error se maneja en el contexto
+      // El error se maneja automáticamente en el contexto
     }
+  };
+
+  // Determinar el tipo de error para mostrar mensaje apropiado
+  const getErrorMessage = (error) => {
+    if (typeof error === 'string') return error;
+    
+    // Mapear errores comunes a mensajes amigables
+    const errorMap = {
+      'Credenciales inválidas': 'Email o contraseña incorrectos',
+      'Usuario no encontrado o inactivo': 'Tu cuenta no está activa. Contacta al administrador.',
+      'Token expirado': 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.',
+      'Error interno del servidor': 'Problema del servidor. Intenta nuevamente.',
+      'Network Error': 'Error de conexión. Verifica tu internet.',
+      'fetch': 'Error de conexión con el servidor'
+    };
+
+    for (const [key, message] of Object.entries(errorMap)) {
+      if (error.includes(key)) {
+        return message;
+      }
+    }
+
+    return error;
   };
 
   return (
@@ -118,11 +163,22 @@ const LoginComponent = () => {
             <p className="text-gray-600/90 backdrop-blur-sm">Acceso Seguro</p>
           </div>
 
+          {/* Mensaje de éxito */}
+          {successMessage && (
+            <div className="mb-6 p-4 bg-green-100/80 backdrop-blur-sm border border-green-300/50 text-green-800 rounded-lg flex items-center space-x-2">
+              <CheckCircle size={20} />
+              <span className="text-sm">{successMessage}</span>
+            </div>
+          )}
+
           {/* Mensaje de error general */}
           {error && (
             <div className="mb-6 p-4 bg-red-100/80 backdrop-blur-sm border border-red-300/50 text-red-800 rounded-lg flex items-center space-x-2">
               <AlertCircle size={20} />
-              <span className="text-sm">{error}</span>
+              <div>
+                <p className="text-sm font-medium">Error de autenticación</p>
+                <p className="text-sm">{getErrorMessage(error)}</p>
+              </div>
             </div>
           )}
 
@@ -181,6 +237,7 @@ const LoginComponent = () => {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-11 text-[#0e6493] hover:text-[#e21f25] transition"
                 disabled={isLoading}
+                tabIndex={-1}
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -211,6 +268,7 @@ const LoginComponent = () => {
                 <Link
                   to="/forgot-password"
                   className="text-sm text-[#e21f25] hover:text-[#e21f25]/80 transition drop-shadow-sm"
+                  tabIndex={isLoading ? -1 : 0}
                 >
                   ¿Olvidaste tu contraseña?
                 </Link>
@@ -223,29 +281,64 @@ const LoginComponent = () => {
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
               disabled={isLoading}
-              className="w-full flex justify-center items-center py-3 px-4 border border-[#0e6493]/30 rounded-xl shadow-lg text-sm font-medium text-white bg-[#0e6493]/80 backdrop-blur-md hover:bg-[#0e6493]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0e6493] transition duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              className={`w-full flex justify-center items-center py-3 px-4 border border-[#0e6493]/30 rounded-xl shadow-lg text-sm font-medium text-white bg-[#0e6493]/80 backdrop-blur-md hover:bg-[#0e6493]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0e6493] transition duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
+                isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
+              }`}
             >
               {isLoading ? (
-                <Loader2 className="mr-2 animate-spin" size={20} />
+                <>
+                  <Loader2 className="mr-2 animate-spin" size={20} />
+                  <span>Iniciando sesión...</span>
+                </>
               ) : (
-                <LogIn className={`mr-2 transition-transform ${isHovered ? 'animate-bounce' : ''}`} size={20} />
+                <>
+                  <LogIn className={`mr-2 transition-transform ${isHovered ? 'animate-bounce' : ''}`} size={20} />
+                  <span>Iniciar Sesión</span>
+                </>
               )}
-              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
           </form>
 
-          {/* Enlace de registro */}
-          <div className="mt-6 text-center relative z-10">
-            <p className="text-sm text-gray-600/90 backdrop-blur-sm">
-              ¿No tienes una cuenta?{' '}
-              <Link
-                to="/register"
-                className="font-medium text-[#e21f25] hover:text-[#e21f25]/80 transition drop-shadow-sm"
-              >
-                Regístrate
-              </Link>
-            </p>
+          {/* Enlaces adicionales */}
+          <div className="mt-6 space-y-3 text-center relative z-10">
+            {/* Enlace de registro */}
+            {process.env.REACT_APP_ENABLE_REGISTRATION === 'true' && (
+              <p className="text-sm text-gray-600/90 backdrop-blur-sm">
+                ¿No tienes una cuenta?{' '}
+                <Link
+                  to="/register"
+                  className="font-medium text-[#e21f25] hover:text-[#e21f25]/80 transition drop-shadow-sm"
+                  tabIndex={isLoading ? -1 : 0}
+                >
+                  Regístrate
+                </Link>
+              </p>
+            )}
+
+            {/* Información de soporte */}
+            <div className="border-t border-white/20 pt-3">
+              <p className="text-xs text-gray-500/80">
+                ¿Necesitas ayuda?{' '}
+                <a 
+                  href={process.env.REACT_APP_SUPPORT_URL || 'mailto:soporte@tuisp.com'}
+                  className="text-[#0e6493] hover:text-[#0e6493]/80 transition"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Contacta soporte
+                </a>
+              </p>
+            </div>
           </div>
+
+          {/* Información de desarrollo (solo en desarrollo) */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-6 p-3 bg-yellow-100/80 rounded-lg text-xs text-yellow-800">
+              <p className="font-medium">Modo Desarrollo</p>
+              <p>Usuario: admin@empresa.com</p>
+              <p>Contraseña: [establecida en base de datos]</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

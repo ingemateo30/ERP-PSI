@@ -1,3 +1,5 @@
+// backend/config/database.js - VERSIÓN CORREGIDA
+
 const mysql = require('mysql2/promise');
 const logger = require('../utils/logger');
 
@@ -8,24 +10,40 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'base_psi',
   connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
-  acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true,
   charset: 'utf8mb4',
-   acquireTimeout: 10000,
-  timezone: '+00:00'
-  
+  timezone: '+00:00',
+  // Configuraciones válidas para mysql2
+  waitForConnections: true,
+  queueLimit: 0,
+  // Configuraciones de timeout válidas para el pool
+  idleTimeout: 60000,
+  maxIdle: 10
 };
+
+console.log('Configuración de base de datos:', {
+  host: dbConfig.host,
+  port: dbConfig.port,
+  user: dbConfig.user,
+  database: dbConfig.database
+});
 
 const pool = mysql.createPool(dbConfig);
 
-pool.getConnection()
-  .then(connection => {
-    logger.info('Conexión a MySQL establecida correctamente');
+// Función para probar la conexión
+async function testConnection() {
+  try {
+    const connection = await pool.getConnection();
+    console.log('✅ Conexión a MySQL establecida correctamente');
+    await connection.ping();
     connection.release();
-  })
-  .catch(error => {
-    logger.error('Error conectando a MySQL:', error.message);
-  });
+    return true;
+  } catch (error) {
+    console.error('❌ Error conectando a MySQL:', error.message);
+    return false;
+  }
+}
+
+// Probar conexión al inicializar
+testConnection();
 
 module.exports = pool;

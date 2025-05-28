@@ -1,4 +1,5 @@
-// frontend/src/services/authService.js
+// frontend/src/services/authService.js - VERSIÓN SIMPLIFICADA
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1';
 
 class AuthService {
@@ -8,17 +9,29 @@ class AuthService {
 
   // Obtener token del localStorage
   getToken() {
-    return localStorage.getItem('token');
+    return localStorage.getItem('accessToken');
   }
 
   // Guardar token en localStorage
   setToken(token) {
-    localStorage.setItem('token', token);
+    localStorage.setItem('accessToken', token);
   }
 
   // Eliminar token del localStorage
   removeToken() {
-    localStorage.removeItem('token');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('user');
+  }
+
+  // Guardar información del usuario
+  setUser(user) {
+    localStorage.setItem('user', JSON.stringify(user));
+  }
+
+  // Obtener información del usuario
+  getUser() {
+    const user = localStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
   }
 
   // Verificar si el usuario está autenticado
@@ -27,16 +40,16 @@ class AuthService {
     if (!token) return false;
 
     try {
-      // Verificar si el token no ha expirado
       const payload = JSON.parse(atob(token.split('.')[1]));
       const currentTime = Date.now() / 1000;
       return payload.exp > currentTime;
     } catch (error) {
+      console.error('Error verificando token:', error);
       return false;
     }
   }
 
-  // Realizar petición HTTP con headers de autenticación
+  // Realizar petición HTTP básica
   async makeRequest(url, options = {}) {
     const token = this.getToken();
     const headers = {
@@ -49,15 +62,19 @@ class AuthService {
     }
 
     try {
+      console.log('Haciendo petición a:', url);
+      
       const response = await fetch(url, {
         ...options,
         headers,
+        credentials: 'include',
       });
 
       const data = await response.json();
+      console.log('Respuesta recibida:', data);
 
       if (!response.ok) {
-        throw new Error(data.message || 'Error en la petición');
+        throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
       }
 
       return data;
@@ -70,48 +87,46 @@ class AuthService {
   // Iniciar sesión
   async login(email, password) {
     try {
+      console.log('Intentando login con:', email);
+      
       const data = await this.makeRequest(`${this.baseURL}/login`, {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
 
-      if (data.token) {
-        this.setToken(data.token);
+      console.log('Datos de login recibidos:', data);
+
+      // El backend devuelve tanto 'token' como 'accessToken'
+      const token = data.token || data.accessToken;
+      
+      if (token) {
+        this.setToken(token);
+        console.log('Token guardado:', token);
+      }
+
+      if (data.data && data.data.user) {
+        this.setUser(data.data.user);
+        console.log('Usuario guardado:', data.data.user);
       }
 
       return data;
     } catch (error) {
+      console.error('Error en login:', error);
       throw new Error(error.message || 'Error al iniciar sesión');
-    }
-  }
-
-  // Registrar usuario
-  async register(userData) {
-    try {
-      const data = await this.makeRequest(`${this.baseURL}/register`, {
-        method: 'POST',
-        body: JSON.stringify(userData),
-      });
-
-      if (data.token) {
-        this.setToken(data.token);
-      }
-
-      return data;
-    } catch (error) {
-      throw new Error(error.message || 'Error al registrar usuario');
     }
   }
 
   // Cerrar sesión
   async logout() {
     try {
+      // Intentar llamar al endpoint de logout del backend
       await this.makeRequest(`${this.baseURL}/logout`, {
         method: 'POST',
       });
     } catch (error) {
-      console.error('Error al cerrar sesión:', error);
+      console.error('Error al cerrar sesión en el servidor:', error);
     } finally {
+      // Siempre limpiar datos locales
       this.removeToken();
     }
   }
@@ -120,70 +135,16 @@ class AuthService {
   async verifyToken() {
     try {
       const data = await this.makeRequest(`${this.baseURL}/verify`);
-      return data;
-    } catch (error) {
-      this.removeToken();
-      throw error;
-    }
-  }
-
-  // Refrescar token
-  async refreshToken() {
-    try {
-      const data = await this.makeRequest(`${this.baseURL}/refresh`, {
-        method: 'POST',
-      });
-
-      if (data.token) {
-        this.setToken(data.token);
+      
+      if (data.data && data.data.user) {
+        this.setUser(data.data.user);
       }
-
+      
       return data;
     } catch (error) {
+      console.error('Error verificando token:', error);
       this.removeToken();
       throw error;
-    }
-  }
-
-  // Solicitar restablecimiento de contraseña
-  async forgotPassword(email) {
-    try {
-      const data = await this.makeRequest(`${this.baseURL}/forgot-password`, {
-        method: 'POST',
-        body: JSON.stringify({ email }),
-      });
-
-      return data;
-    } catch (error) {
-      throw new Error(error.message || 'Error al solicitar restablecimiento');
-    }
-  }
-
-  // Restablecer contraseña
-  async resetPassword(token, password) {
-    try {
-      const data = await this.makeRequest(`${this.baseURL}/reset-password`, {
-        method: 'POST',
-        body: JSON.stringify({ token, password }),
-      });
-
-      return data;
-    } catch (error) {
-      throw new Error(error.message || 'Error al restablecer contraseña');
-    }
-  }
-
-  // Cambiar contraseña
-  async changePassword(currentPassword, newPassword) {
-    try {
-      const data = await this.makeRequest(`${this.baseURL}/change-password`, {
-        method: 'POST',
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-
-      return data;
-    } catch (error) {
-      throw new Error(error.message || 'Error al cambiar contraseña');
     }
   }
 
@@ -197,12 +158,24 @@ class AuthService {
       return {
         id: payload.userId || payload.id,
         email: payload.email,
-        role: payload.role,
+        nombre: payload.nombre,
+        role: payload.role || payload.rol,
         exp: payload.exp
       };
     } catch (error) {
+      console.error('Error extrayendo usuario del token:', error);
       return null;
     }
+  }
+
+  // Obtener información del usuario (prioriza localStorage, luego token)
+  getCurrentUserInfo() {
+    // Primero intentar desde localStorage
+    const userFromStorage = this.getUser();
+    if (userFromStorage) return userFromStorage;
+    
+    // Si no hay en localStorage, extraer del token
+    return this.getUserFromToken();
   }
 }
 
