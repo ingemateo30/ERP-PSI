@@ -1,4 +1,22 @@
-// backend/index.js - VERSIÓN SIMPLIFICADA PARA DEBUGGING
+// Importar y usar rutas
+try {
+  console.log('📂 Cargando rutas de autenticación...');
+  const authRoutes = require('./routes/auth');
+  app.use('/api/v1/auth', authRoutes);
+  console.log('✅ Rutas de autenticación cargadas');
+
+  console.log('📂 Cargando rutas de usuarios...');
+  const userRoutes = require('./routes/users');
+  app.use('/api/v1/users', userRoutes);
+  console.log('✅ Rutas de usuarios cargadas');
+
+  console.log('📂 Cargando rutas de configuración...');
+  const configRoutes = require('./routes/config');
+  app.use('/api/v1/config', configRoutes);
+  console.log('✅ Rutas de configuración cargadas');
+  
+} catch (error) {
+  console.error('❌ Error cargando rutas:', error.message);// backend/index.js - VERSIÓN SIMPLIFICADA PARA DEBUGGING
 
 require('dotenv').config();
 const express = require('express');
@@ -79,15 +97,8 @@ app.get('/test-db', async (req, res) => {
   }
 });
 
-// Importar y usar rutas
-try {
-  console.log('📂 Cargando rutas de autenticación...');
-  const authRoutes = require('./routes/auth');
-  app.use('/api/v1/auth', authRoutes);
-  console.log('✅ Rutas de autenticación cargadas');
-} catch (error) {
-  console.error('❌ Error cargando rutas de autenticación:', error.message);
-}
+  console.log('✅ Rutas de configuración cargadas');
+  
 
 // Ruta base de la API
 app.get('/api/v1', (req, res) => {
@@ -156,6 +167,8 @@ async function startServer() {
       console.log(`   GET  http://localhost:${PORT}/api/v1`);
       console.log(`   POST http://localhost:${PORT}/api/v1/auth/login`);
       console.log(`   POST http://localhost:${PORT}/api/v1/auth/register`);
+      console.log(`   GET  http://localhost:${PORT}/api/v1/config/overview`);
+      console.log(`   GET  http://localhost:${PORT}/api/v1/config/company`);
       console.log('\n✨ Servidor listo para recibir peticiones!');
     });
 
@@ -187,4 +200,4 @@ process.on('uncaughtException', (error) => {
 });
 
 // Iniciar servidor
-startServer();
+startServer();}
