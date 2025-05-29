@@ -22,6 +22,25 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Estilos CSS para ocultar scrollbar
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .scrollbar-hide {
+        -ms-overflow-style: none;  /* Internet Explorer 10+ */
+        scrollbar-width: none;  /* Firefox */
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;  /* Safari and Chrome */
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -146,23 +165,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
           </button>
         )}
         
-        {/* Logo/Brand */}
-        {sidebarOpen && (
-          <div className="p-4 border-b border-white/10">
-            <div className="flex items-center">
-              <img
-                src="/logo2.png"
-                alt="Logo"
-                className="h-8 w-auto object-contain"
-              />
-              <span className="ml-2 text-lg font-semibold text-white">
-                ISP Admin
-              </span>
-            </div>
-          </div>
-        )}
-        
-        <nav className="mt-4 flex-1 px-2">
+        <nav className="mt-16 flex-1 px-2 overflow-y-auto scrollbar-hide">
           {menuItems.map((item, index) => (
             <div
               key={index}
@@ -181,16 +184,29 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
           ))}
         </nav>
         
-        {/* Notificaciones de configuración */}
+        {/* Notificaciones de configuración - Solo cuando sidebar está abierto */}
         {sidebarOpen && hasPermission('administrador') && (
-          <ConfigSidebarNotification />
-        )}
-        
-        {sidebarOpen && (
-          <div className="p-4 border-t border-white/10 mt-auto">
-            <LogoutButton variant="ghost" className="text-white hover:bg-white/20 w-full justify-start" />
+          <div className="px-2 pb-2">
+            <ConfigSidebarNotification />
           </div>
         )}
+        
+        {/* Botón de logout - Siempre visible en la parte inferior */}
+        <div className="p-4 border-t border-white/10 mt-auto flex-shrink-0">
+          {sidebarOpen ? (
+            <LogoutButton variant="ghost" className="text-white hover:bg-white/20 w-full justify-start" />
+          ) : (
+            <div className="flex justify-center">
+              <button
+                onClick={logout}
+                className="p-2 rounded-lg text-white hover:bg-white/20 transition-colors"
+                title="Cerrar sesión"
+              >
+                <LogOut size={20} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main content */}
@@ -207,23 +223,14 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
               </button>
 
               <div className="flex items-center">
-                {!sidebarOpen && (
-                  <img
-                    src="/logo2.png"
-                    alt="Logo"
-                    className="h-8 w-auto object-contain mr-2"
-                  />
-                )}
-                <div>
-                  {title && (
-                    <h1 className="text-xl font-semibold text-[#0e6493]">
-                      {title}
-                    </h1>
-                  )}
-                  {subtitle && (
-                    <p className="text-sm text-gray-600">{subtitle}</p>
-                  )}
-                </div>
+                <img
+                  src="/logo2.png"
+                  alt="Logo"
+                  className="h-14 w-auto object-contain scale-x-105"
+                />
+                <span className="ml-2 text-xl font-semibold text-[#0e6493] hidden sm:block">
+                  Administrativo
+                </span>
               </div>
             </div>
 

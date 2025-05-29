@@ -1,5 +1,3 @@
-// backend/config/database.js - VERSIÓN CORREGIDA
-
 const mysql = require('mysql2/promise');
 const logger = require('../utils/logger');
 
@@ -12,10 +10,8 @@ const dbConfig = {
   connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
   charset: 'utf8mb4',
   timezone: '+00:00',
-  // Configuraciones válidas para mysql2
   waitForConnections: true,
   queueLimit: 0,
-  // Configuraciones de timeout válidas para el pool
   idleTimeout: 60000,
   maxIdle: 10
 };
@@ -29,7 +25,6 @@ console.log('Configuración de base de datos:', {
 
 const pool = mysql.createPool(dbConfig);
 
-// Función para probar la conexión
 async function testConnection() {
   try {
     const connection = await pool.getConnection();
@@ -43,7 +38,6 @@ async function testConnection() {
   }
 }
 
-// Probar conexión al inicializar
 testConnection();
 
 module.exports = pool;

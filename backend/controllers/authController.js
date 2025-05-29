@@ -1,5 +1,3 @@
-// backend/controllers/authController.js - VERSIÓN CORREGIDA
-
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
@@ -8,7 +6,6 @@ const { success, error } = require('../utils/responses');
 const pool = require('../config/database');
 
 class AuthController {
-    // Iniciar sesión - CORREGIDO para compatibilidad con frontend
     static async login(req, res) {
         try {
             const errors = validationResult(req);
@@ -49,7 +46,6 @@ class AuthController {
                 return error(res, 'Credenciales inválidas', 401);
             }
 
-            // CORREGIDO: Estructura de token compatible con frontend
             const tokenPayload = {
                 userId: user.id,
                 id: user.id,              // Frontend espera 'id'
@@ -59,7 +55,6 @@ class AuthController {
                 nombre: user.nombre
             };
 
-            // Generar token con estructura correcta
             const accessToken = jwt.sign(
                 tokenPayload,
                 process.env.JWT_SECRET,
@@ -72,7 +67,7 @@ class AuthController {
                 { expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d' }
             );
 
-            // Actualizar último acceso
+        
             await connection.execute(
                 'UPDATE sistema_usuarios SET ultimo_acceso = NOW() WHERE id = ?',
                 [user.id]
@@ -85,7 +80,7 @@ class AuthController {
                 userAgent: userAgent
             });
 
-            // CORREGIDO: Configurar cookie para refresh token
+            
             res.cookie('refreshToken', refreshToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
@@ -97,7 +92,7 @@ class AuthController {
 
             connection.release();
 
-            // CORREGIDO: Estructura de respuesta compatible con frontend
+            
             return res.status(200).json({
                 success: true,
                 message: 'Login exitoso',
@@ -113,8 +108,8 @@ class AuthController {
                         ultimo_acceso: user.ultimo_acceso
                     }
                 },
-                token: accessToken,        // Frontend espera 'token' en raíz
-                accessToken: accessToken,  // Mantener para consistencia
+                token: accessToken,        
+                accessToken: accessToken, 
                 expiresIn: process.env.JWT_EXPIRE || '24h'
             });
 
@@ -124,7 +119,6 @@ class AuthController {
         }
     }
 
-    // Verificar token - NUEVO ENDPOINT para frontend
     static async verify(req, res) {
         try {
             const user = req.user;
@@ -146,7 +140,7 @@ class AuthController {
         }
     }
 
-    // Renovar token - CORREGIDO
+
     static async refreshToken(req, res) {
         try {
             const { refreshToken } = req.cookies;
