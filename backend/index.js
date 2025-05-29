@@ -6,7 +6,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const compression = require('compression');
 
-console.log('🚀 Iniciando Sistema ISP - Backend...');
+console.log('🚀 Iniciando Sistema - Backend...');
 console.log('📅 Fecha:', new Date().toLocaleString());
 
 // Verificar variables de entorno críticas
@@ -180,7 +180,7 @@ app.get('/test-db', async (req, res) => {
 // Endpoint de información del sistema
 app.get('/system-info', (req, res) => {
   res.json({
-    service: 'Sistema ISP',
+    service: 'Sistema PSI',
     version: '1.0.0',
     node_version: process.version,
     platform: process.platform,
