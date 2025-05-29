@@ -1,20 +1,28 @@
 // frontend/src/components/Config/ServicePlansConfig.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Wifi, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Search,
   ArrowLeft, Loader2, AlertCircle, CheckCircle, X, Tv, Package
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import configService from '../../services/configService';
 
 const ServicePlansConfig = () => {
+  const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  
+  // Estados principales
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Estados para filtros y búsqueda
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
+  
+  // Estados para modal
   const [showModal, setShowModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
   const [formData, setFormData] = useState({
@@ -22,16 +30,12 @@ const ServicePlansConfig = () => {
     nombre: '',
     tipo: 'internet',
     precio: '',
-    velocidad_subida: '',
     velocidad_bajada: '',
+    velocidad_subida: '',
     canales_tv: '',
     descripcion: '',
     aplica_iva: true
   });
-  const [submitting, setSubmitting] = useState(false);
-
-  const navigate = useNavigate();
-  const { hasPermission } = useAuth();
 
   // Verificar permisos
   useEffect(() => {
@@ -41,147 +45,96 @@ const ServicePlansConfig = () => {
     }
   }, [hasPermission, navigate]);
 
-  // Cargar planes
-  useEffect(() => {
-    loadPlans();
-  }, []);
-
+  // ✅ FUNCIÓN CORREGIDA: loadPlans
   const loadPlans = async () => {
+    console.log('🔄 Iniciando carga de planes...');
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      setError(null);
+      const response = await fetch('/api/planes', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('📡 Respuesta completa de la API:', data);
       
-      const response = await configService.getServicePlans();
-      setPlans(response.data || []);
+      // ✅ FIX: Los planes están en data.message según tu estructura
+      if (data.success && Array.isArray(data.message)) {
+        const processedPlanes = data.message.map(plan => ({
+          ...plan,
+          precio: parseFloat(plan.precio), // Convertir string a número
+          aplica_iva: Boolean(plan.aplica_iva), // Convertir 1/0 a boolean
+          activo: Boolean(plan.activo), // Convertir 1/0 a boolean
+        }));
+        setPlans(processedPlanes);
+        console.log('✅ Planes cargados correctamente:', processedPlanes.length);
+      } else if (Array.isArray(data)) {
+        // Fallback por si la estructura cambia
+        setPlans(data);
+        console.log('✅ Planes cargados (estructura directa):', data.length);
+      } else if (data.planes && Array.isArray(data.planes)) {
+        // Otro fallback
+        
+        console.log('✅ Planes cargados (en data.planes):', data.planes.length);
+      } else {
+        console.error('❌ Estructura de datos inesperada:', data);
+        setError('Estructura de respuesta no reconocida del servidor');
+      }
+      
     } catch (err) {
-      console.error('Error cargando planes:', err);
-      setError(err.message);
+      console.error('❌ Error cargando planes:', err);
+      setError(err.message || 'Error desconocido al cargar planes');
     } finally {
       setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      codigo: '',
-      nombre: '',
-      tipo: 'internet',
-      precio: '',
-      velocidad_subida: '',
-      velocidad_bajada: '',
-      canales_tv: '',
-      descripcion: '',
-      aplica_iva: true
-    });
-  };
-
-  const handleCreate = () => {
-    setEditingPlan(null);
-    resetForm();
-    setShowModal(true);
-  };
-
-  const handleEdit = (plan) => {
-    setEditingPlan(plan);
-    setFormData({
-      codigo: plan.codigo,
-      nombre: plan.nombre,
-      tipo: plan.tipo,
-      precio: plan.precio.toString(),
-      velocidad_subida: plan.velocidad_subida?.toString() || '',
-      velocidad_bajada: plan.velocidad_bajada?.toString() || '',
-      canales_tv: plan.canales_tv?.toString() || '',
-      descripcion: plan.descripcion || '',
-      aplica_iva: Boolean(plan.aplica_iva)
-    });
-    setShowModal(true);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!formData.codigo.trim() || !formData.nombre.trim() || !formData.precio) {
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      
-      const submitData = {
-        codigo: formData.codigo.trim(),
-        nombre: formData.nombre.trim(),
-        tipo: formData.tipo,
-        precio: parseFloat(formData.precio),
-        velocidad_subida: formData.velocidad_subida ? parseInt(formData.velocidad_subida) : null,
-        velocidad_bajada: formData.velocidad_bajada ? parseInt(formData.velocidad_bajada) : null,
-        canales_tv: formData.canales_tv ? parseInt(formData.canales_tv) : null,
-        descripcion: formData.descripcion.trim() || null,
-        aplica_iva: formData.aplica_iva
-      };
-      
-      if (editingPlan) {
-        await configService.updateServicePlan(editingPlan.id, submitData);
-        setPlans(prev => prev.map(plan => 
-          plan.id === editingPlan.id 
-            ? { ...plan, ...submitData }
-            : plan
-        ));
-      } else {
-        const response = await configService.createServicePlan(submitData);
-        setPlans(prev => [response.data, ...prev]);
-      }
-      
-      setShowModal(false);
-      resetForm();
-      setEditingPlan(null);
-      
-    } catch (err) {
-      console.error('Error guardando plan:', err);
-      alert(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleToggleStatus = async (plan) => {
-    try {
-      await configService.toggleServicePlan(plan.id);
-      setPlans(prev => prev.map(p => 
-        p.id === plan.id 
-          ? { ...p, activo: !p.activo }
-          : p
-      ));
-    } catch (err) {
-      console.error('Error cambiando estado:', err);
-      alert(err.message);
-    }
-  };
-
-  const handleDelete = async (plan) => {
-    if (!window.confirm(`¿Estás seguro de eliminar el plan "${plan.nombre}"?`)) {
-      return;
-    }
-
-    try {
-      await configService.deleteServicePlan(plan.id);
-      setPlans(prev => prev.filter(p => p.id !== plan.id));
-    } catch (err) {
-      console.error('Error eliminando plan:', err);
-      alert(err.message);
-    }
-  };
+  // Cargar planes al montar el componente
+  useEffect(() => {
+    loadPlans();
+  }, []);
 
   // Filtrar planes
-  const filteredPlans = plans.filter(plan => {
-    const matchesSearch = plan.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         plan.codigo.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = !filterType || plan.tipo === filterType;
-    return matchesSearch && matchesType;
-  });
+  const filteredPlans = useMemo(() => {
+    if (!Array.isArray(plans)) {
+      return [];
+    }
 
-  // Obtener icono según tipo
-  const getTypeIcon = (type) => {
-    switch (type) {
+    return plans.filter(plan => {
+      const matchesSearch = !searchTerm || 
+        (plan.nombre && plan.nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (plan.codigo && plan.codigo.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesType = !filterType || plan.tipo === filterType;
+      
+      return matchesSearch && matchesType;
+    });
+  }, [plans, searchTerm, filterType]);
+
+  // Funciones auxiliares para UI
+  const getTypeColor = (tipo) => {
+    switch (tipo) {
+      case 'internet':
+        return 'border-blue-500 bg-blue-50';
+      case 'television':
+        return 'border-purple-500 bg-purple-50';
+      case 'combo':
+        return 'border-green-500 bg-green-50';
+      default:
+        return 'border-gray-500 bg-gray-50';
+    }
+  };
+
+  const getTypeIcon = (tipo) => {
+    switch (tipo) {
       case 'internet':
         return <Wifi size={20} className="text-blue-600" />;
       case 'television':
@@ -193,17 +146,128 @@ const ServicePlansConfig = () => {
     }
   };
 
-  // Obtener color según tipo
-  const getTypeColor = (type) => {
-    switch (type) {
-      case 'internet':
-        return 'border-blue-500 bg-blue-50';
-      case 'television':
-        return 'border-purple-500 bg-purple-50';
-      case 'combo':
-        return 'border-green-500 bg-green-50';
-      default:
-        return 'border-gray-500 bg-gray-50';
+  // Handlers para acciones
+  const handleCreate = () => {
+    setEditingPlan(null);
+    setFormData({
+      codigo: '',
+      nombre: '',
+      tipo: 'internet',
+      precio: '',
+      velocidad_bajada: '',
+      velocidad_subida: '',
+      canales_tv: '',
+      descripcion: '',
+      aplica_iva: true
+    });
+    setShowModal(true);
+  };
+
+  const handleEdit = (plan) => {
+    setEditingPlan(plan);
+    setFormData({
+      codigo: plan.codigo || '',
+      nombre: plan.nombre || '',
+      tipo: plan.tipo || 'internet',
+      precio: plan.precio?.toString() || '',
+      velocidad_bajada: plan.velocidad_bajada?.toString() || '',
+      velocidad_subida: plan.velocidad_subida?.toString() || '',
+      canales_tv: plan.canales_tv?.toString() || '',
+      descripcion: plan.descripcion || '',
+      aplica_iva: Boolean(plan.aplica_iva)
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (plan) => {
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar el plan "${plan.nombre}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/planes/${plan.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al eliminar el plan');
+      }
+
+      await loadPlans(); // Recargar la lista
+    } catch (err) {
+      console.error('Error eliminando plan:', err);
+      setError(err.message);
+    }
+  };
+
+  const handleToggleStatus = async (plan) => {
+    try {
+      const response = await fetch(`/api/planes/${plan.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...plan,
+          activo: !plan.activo
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al cambiar el estado del plan');
+      }
+
+      await loadPlans(); // Recargar la lista
+    } catch (err) {
+      console.error('Error cambiando estado:', err);
+      setError(err.message);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      const url = editingPlan ? `/api/planes/${editingPlan.id}` : '/api/planes';
+      const method = editingPlan ? 'PUT' : 'POST';
+
+      const planData = {
+        codigo: formData.codigo.trim(),
+        nombre: formData.nombre.trim(),
+        tipo: formData.tipo,
+        precio: parseFloat(formData.precio),
+        velocidad_bajada: formData.velocidad_bajada ? parseInt(formData.velocidad_bajada) : null,
+        velocidad_subida: formData.velocidad_subida ? parseInt(formData.velocidad_subida) : null,
+        canales_tv: formData.canales_tv ? parseInt(formData.canales_tv) : null,
+        descripcion: formData.descripcion.trim() || null,
+        aplica_iva: formData.aplica_iva,
+        activo: true
+      };
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(planData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al guardar el plan');
+      }
+
+      setShowModal(false);
+      await loadPlans(); // Recargar la lista
+    } catch (err) {
+      console.error('Error guardando plan:', err);
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -238,6 +302,10 @@ const ServicePlansConfig = () => {
                 <p className="text-gray-600">
                   Administra los planes de internet, TV y combos
                 </p>
+                {/* Debug info */}
+                <p className="text-xs text-gray-400 mt-1">
+                  Debug: {plans.length} planes cargados, {filteredPlans.length} filtrados
+                </p>
               </div>
             </div>
             <button
@@ -266,6 +334,25 @@ const ServicePlansConfig = () => {
             </button>
           </div>
         )}
+
+        {/* Debug Panel */}
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <h3 className="font-medium text-yellow-800 mb-2">🐛 Información de Debug</h3>
+          <div className="text-sm text-yellow-700 space-y-1">
+            <p><strong>Loading:</strong> {loading.toString()}</p>
+            <p><strong>Error:</strong> {error || 'Ninguno'}</p>
+            <p><strong>Plans array length:</strong> {plans.length}</p>
+            <p><strong>Filtered plans length:</strong> {filteredPlans.length}</p>
+            <p><strong>Search term:</strong> "{searchTerm}"</p>
+            <p><strong>Filter type:</strong> "{filterType}"</p>
+            <button 
+              onClick={loadPlans}
+              className="mt-2 px-3 py-1 bg-yellow-200 hover:bg-yellow-300 rounded text-yellow-800"
+            >
+              🔄 Recargar Planes
+            </button>
+          </div>
+        </div>
 
         {/* Search and Filters */}
         <div className="mb-6 bg-white rounded-lg shadow-md p-4">
@@ -412,7 +499,7 @@ const ServicePlansConfig = () => {
         </div>
 
         {/* Empty State */}
-        {filteredPlans.length === 0 && !loading && (
+        {filteredPlans.length === 0 && (
           <div className="text-center py-12">
             <Wifi size={48} className="mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">

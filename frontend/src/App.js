@@ -1,4 +1,4 @@
-// frontend/src/App.js - VERSIÓN ACTUALIZADA CON MAINLAYOUT
+// frontend/src/App.js - VERSIÓN CORREGIDA CON MAINLAYOUT EN TODAS LAS RUTAS
 
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
@@ -34,191 +34,187 @@ const LoadingFallback = ({ message = "Cargando..." }) => (
 
 // Componente temporal para páginas no implementadas
 const ComingSoon = ({ pageName }) => (
-  <MainLayout title={pageName} subtitle="Esta funcionalidad está en desarrollo">
-    <div className="text-center py-12">
-      <div className="w-24 h-24 mx-auto mb-4 bg-[#0e6493]/10 rounded-full flex items-center justify-center">
-        <svg
-          className="w-12 h-12 text-[#0e6493]"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-          />
-        </svg>
-      </div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">
-        {pageName} - Próximamente
-      </h2>
-      <p className="text-gray-600 mb-4">
-        Esta funcionalidad está en desarrollo
-      </p>
-      <div className="space-x-4">
-        <button 
-          onClick={() => window.history.back()}
-          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-        >
-          Volver
-        </button>
-        <button 
-          onClick={() => window.location.href = '/dashboard'}
-          className="px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90 transition-colors"
-        >
-          Ir al Dashboard
-        </button>
-      </div>
+  <div className="text-center py-12">
+    <div className="w-24 h-24 mx-auto mb-4 bg-[#0e6493]/10 rounded-full flex items-center justify-center">
+      <svg
+        className="w-12 h-12 text-[#0e6493]"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+        />
+      </svg>
     </div>
-  </MainLayout>
+    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+      {pageName} - Próximamente
+    </h2>
+    <p className="text-gray-600 mb-4">
+      Esta funcionalidad está en desarrollo
+    </p>
+    <div className="space-x-4">
+      <button
+        onClick={() => window.history.back()}
+        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+      >
+        Volver
+      </button>
+      <button
+        onClick={() => window.location.href = '/dashboard'}
+        className="px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90 transition-colors"
+      >
+        Ir al Dashboard
+      </button>
+    </div>
+  </div>
 );
 
-// Componente AdminPanel mejorado
-const AdminPanel = () => (
-  <MainLayout title="Panel de Administración" subtitle="Gestión avanzada del sistema">
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {/* Configuración del Sistema */}
-      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-        <div className="flex items-center mb-4">
-          <div className="w-12 h-12 bg-[#0e6493]/10 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6 text-[#0e6493]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </div>
+// Componente AdminPanel como contenido
+const AdminPanelContent = () => (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {/* Configuración del Sistema */}
+    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+      <div className="flex items-center mb-4">
+        <div className="w-12 h-12 bg-[#0e6493]/10 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-[#0e6493]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Configuración del Sistema
-        </h3>
-        <p className="text-gray-600 mb-4">
-          Configurar empresa, bancos, sectores y parámetros generales
-        </p>
-        <button 
-          onClick={() => window.location.href = '/config'}
-          className="w-full px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90 transition-colors"
-        >
-          Acceder
-        </button>
       </div>
-      
-      {/* Gestión de Usuarios */}
-      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-        <div className="flex items-center mb-4">
-          <div className="w-12 h-12 bg-[#e21f25]/10 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6 text-[#e21f25]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-            </svg>
-          </div>
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Gestión de Usuarios
-        </h3>
-        <p className="text-gray-600 mb-4">
-          Administrar usuarios del sistema y sus permisos
-        </p>
-        <button 
-          onClick={() => alert('Funcionalidad en desarrollo')}
-          className="w-full px-4 py-2 bg-[#e21f25] text-white rounded-lg hover:bg-[#e21f25]/90 transition-colors"
-        >
-          Acceder
-        </button>
-      </div>
-      
-      {/* Logs del Sistema */}
-      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-        <div className="flex items-center mb-4">
-          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Logs del Sistema
-        </h3>
-        <p className="text-gray-600 mb-4">
-          Revisar actividad y eventos del sistema
-        </p>
-        <button 
-          onClick={() => alert('Funcionalidad en desarrollo')}
-          className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-        >
-          Acceder
-        </button>
-      </div>
-
-      {/* Reportes Avanzados */}
-      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-        <div className="flex items-center mb-4">
-          <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          </div>
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Reportes Avanzados
-        </h3>
-        <p className="text-gray-600 mb-4">
-          Generar reportes detallados y análisis
-        </p>
-        <button 
-          onClick={() => window.location.href = '/reports'}
-          className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-        >
-          Acceder
-        </button>
-      </div>
-
-      {/* Backup y Seguridad */}
-      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-        <div className="flex items-center mb-4">
-          <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-          </div>
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Backup y Seguridad
-        </h3>
-        <p className="text-gray-600 mb-4">
-          Gestionar copias de seguridad y configuración de seguridad
-        </p>
-        <button 
-          onClick={() => alert('Funcionalidad en desarrollo')}
-          className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
-        >
-          Acceder
-        </button>
-      </div>
-
-      {/* Monitoreo del Sistema */}
-      <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-        <div className="flex items-center mb-4">
-          <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          </div>
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Monitoreo del Sistema
-        </h3>
-        <p className="text-gray-600 mb-4">
-          Supervisar rendimiento y estado del sistema
-        </p>
-        <button 
-          onClick={() => alert('Funcionalidad en desarrollo')}
-          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          Acceder
-        </button>
-      </div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        Configuración del Sistema
+      </h3>
+      <p className="text-gray-600 mb-4">
+        Configurar empresa, bancos, sectores y parámetros generales
+      </p>
+      <button
+        onClick={() => window.location.href = '/config'}
+        className="w-full px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90 transition-colors"
+      >
+        Acceder
+      </button>
     </div>
-  </MainLayout>
+
+    {/* Gestión de Usuarios */}
+    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+      <div className="flex items-center mb-4">
+        <div className="w-12 h-12 bg-[#e21f25]/10 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-[#e21f25]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+          </svg>
+        </div>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        Gestión de Usuarios
+      </h3>
+      <p className="text-gray-600 mb-4">
+        Administrar usuarios del sistema y sus permisos
+      </p>
+      <button
+        onClick={() => alert('Funcionalidad en desarrollo')}
+        className="w-full px-4 py-2 bg-[#e21f25] text-white rounded-lg hover:bg-[#e21f25]/90 transition-colors"
+      >
+        Acceder
+      </button>
+    </div>
+
+    {/* Logs del Sistema */}
+    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+      <div className="flex items-center mb-4">
+        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        Logs del Sistema
+      </h3>
+      <p className="text-gray-600 mb-4">
+        Revisar actividad y eventos del sistema
+      </p>
+      <button
+        onClick={() => alert('Funcionalidad en desarrollo')}
+        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+      >
+        Acceder
+      </button>
+    </div>
+
+    {/* Reportes Avanzados */}
+    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+      <div className="flex items-center mb-4">
+        <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        Reportes Avanzados
+      </h3>
+      <p className="text-gray-600 mb-4">
+        Generar reportes detallados y análisis
+      </p>
+      <button
+        onClick={() => window.location.href = '/reports'}
+        className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+      >
+        Acceder
+      </button>
+    </div>
+
+    {/* Backup y Seguridad */}
+    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+      <div className="flex items-center mb-4">
+        <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        </div>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        Backup y Seguridad
+      </h3>
+      <p className="text-gray-600 mb-4">
+        Gestionar copias de seguridad y configuración de seguridad
+      </p>
+      <button
+        onClick={() => alert('Funcionalidad en desarrollo')}
+        className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+      >
+        Acceder
+      </button>
+    </div>
+
+    {/* Monitoreo del Sistema */}
+    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+      <div className="flex items-center mb-4">
+        <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+        </div>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        Monitoreo del Sistema
+      </h3>
+      <p className="text-gray-600 mb-4">
+        Supervisar rendimiento y estado del sistema
+      </p>
+      <button
+        onClick={() => alert('Funcionalidad en desarrollo')}
+        className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+      >
+        Acceder
+      </button>
+    </div>
+  </div>
 );
 
 function App() {
@@ -231,218 +227,262 @@ function App() {
               {/* ================================ */}
               {/* RUTAS PÚBLICAS */}
               {/* ================================ */}
-              
-              <Route 
-                path="/login" 
-                element={<LoginComponent />} 
+
+              <Route
+                path="/login"
+                element={<LoginComponent />}
               />
-              
-              <Route 
-                path="/register" 
-                element={<ComingSoon pageName="Registro de Usuario" />} 
+
+              <Route
+                path="/register"
+                element={
+                  <MainLayout title="Registro de Usuario" subtitle="Esta funcionalidad está en desarrollo">
+                    <ComingSoon pageName="Registro de Usuario" />
+                  </MainLayout>
+                }
               />
-              
-              <Route 
-                path="/forgot-password" 
-                element={<ComingSoon pageName="Recuperar Contraseña" />} 
+
+              <Route
+                path="/forgot-password"
+                element={
+                  <MainLayout title="Recuperar Contraseña" subtitle="Esta funcionalidad está en desarrollo">
+                    <ComingSoon pageName="Recuperar Contraseña" />
+                  </MainLayout>
+                }
               />
-              
-              <Route 
-                path="/reset-password" 
-                element={<ComingSoon pageName="Restablecer Contraseña" />} 
+
+              <Route
+                path="/reset-password"
+                element={
+                  <MainLayout title="Restablecer Contraseña" subtitle="Esta funcionalidad está en desarrollo">
+                    <ComingSoon pageName="Restablecer Contraseña" />
+                  </MainLayout>
+                }
               />
 
               {/* ================================ */}
               {/* RUTAS PROTEGIDAS GENERALES */}
               {/* ================================ */}
-              
-              <Route 
-                path="/dashboard" 
+
+              <Route
+                path="/dashboard"
                 element={
                   <ProtectedRoute>
                     <SimpleDashboard />
                   </ProtectedRoute>
-                } 
+                }
               />
 
-              <Route 
-                path="/profile" 
+              <Route
+                path="/profile"
                 element={
                   <ProtectedRoute>
                     <MainLayout title="Mi Perfil" subtitle="Gestiona tu información personal">
                       <UserProfile />
                     </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
               {/* ================================ */}
               {/* RUTAS DE CONFIGURACIÓN */}
               {/* ================================ */}
-              
-              <Route 
-                path="/config" 
+
+              <Route
+                path="/config"
                 element={
                   <ProtectedRoute requiredRole="administrador">
-                    <ConfigMain />
+                    <MainLayout title="Configuración" subtitle="Configuración general del sistema">
+                      <ConfigMain />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
-              <Route 
-                path="/config/company" 
+              <Route
+                path="/config/company"
                 element={
                   <ProtectedRoute requiredRole="administrador">
-                    <CompanyConfig />
+                    <MainLayout title="Configuración de Empresa" subtitle="Datos de la empresa">
+                      <CompanyConfig />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
-              <Route 
-                path="/config/banks" 
+              <Route
+                path="/config/banks"
                 element={
                   <ProtectedRoute requiredRole="administrador">
-                    <BanksConfig />
+                    <MainLayout title="Configuración de Bancos" subtitle="Gestión de entidades bancarias">
+                      <BanksConfig />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
-              <Route 
-                path="/config/geography" 
+              <Route
+                path="/config/geography"
                 element={
                   <ProtectedRoute requiredRole="administrador">
-                    <GeographyConfig />
+                    <MainLayout title="Configuración Geográfica" subtitle="Departamentos, ciudades y sectores">
+                      <GeographyConfig />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
-              <Route 
-                path="/config/service-plans" 
+              <Route
+                path="/config/service-plans"
                 element={
                   <ProtectedRoute requiredRole="administrador">
-                    <ServicePlansConfig />
+                    <MainLayout title="Planes de Servicio" subtitle="Configuración de planes y servicios">
+                      <ServicePlansConfig />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
               {/* ================================ */}
               {/* RUTAS DE GESTIÓN PRINCIPAL */}
               {/* ================================ */}
-              
-              <Route 
-                path="/clients" 
+
+              <Route
+                path="/clients"
                 element={
                   <ProtectedRoute requiredRole="supervisor">
-                    <ClientsManagement />
+                    <MainLayout title="Gestión de Clientes" subtitle="Administrar clientes del sistema">
+                      <ClientsManagement />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
-              />
-              
-              <Route 
-                path="/clients/:id" 
-                element={
-                  <ProtectedRoute requiredRole="supervisor">
-                    <ComingSoon pageName="Detalle de Cliente" />
-                  </ProtectedRoute>
-                } 
+                }
               />
 
-              <Route 
-                path="/invoices" 
+              <Route
+                path="/clients/:id"
                 element={
                   <ProtectedRoute requiredRole="supervisor">
-                    <ComingSoon pageName="Gestión de Facturas" />
+                    <MainLayout title="Detalle de Cliente" subtitle="Esta funcionalidad está en desarrollo">
+                      <ComingSoon pageName="Detalle de Cliente" />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
-              />
-              
-              <Route 
-                path="/invoices/:id" 
-                element={
-                  <ProtectedRoute requiredRole="supervisor">
-                    <ComingSoon pageName="Detalle de Factura" />
-                  </ProtectedRoute>
-                } 
+                }
               />
 
-              <Route 
-                path="/services" 
+              <Route
+                path="/invoices"
                 element={
                   <ProtectedRoute requiredRole="supervisor">
-                    <ComingSoon pageName="Gestión de Servicios" />
+                    <MainLayout title="Gestión de Facturas" subtitle="Esta funcionalidad está en desarrollo">
+                      <ComingSoon pageName="Gestión de Facturas" />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
-              <Route 
-                path="/installations" 
+              <Route
+                path="/invoices/:id"
+                element={
+                  <ProtectedRoute requiredRole="supervisor">
+                    <MainLayout title="Detalle de Factura" subtitle="Esta funcionalidad está en desarrollo">
+                      <ComingSoon pageName="Detalle de Factura" />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/services"
+                element={
+                  <ProtectedRoute requiredRole="supervisor">
+                    <MainLayout title="Gestión de Servicios" subtitle="Esta funcionalidad está en desarrollo">
+                      <ComingSoon pageName="Gestión de Servicios" />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/installations"
                 element={
                   <ProtectedRoute requiredRole="instalador">
-                    <ComingSoon pageName="Gestión de Instalaciones" />
+                    <MainLayout title="Gestión de Instalaciones" subtitle="Esta funcionalidad está en desarrollo">
+                      <ComingSoon pageName="Gestión de Instalaciones" />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
-              <Route 
-                path="/inventory" 
+              <Route
+                path="/inventory"
                 element={
                   <ProtectedRoute requiredRole="supervisor">
-                    <ComingSoon pageName="Gestión de Inventario" />
+                    <MainLayout title="Gestión de Inventario" subtitle="Esta funcionalidad está en desarrollo">
+                      <ComingSoon pageName="Gestión de Inventario" />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
-              <Route 
-                path="/reports" 
+              <Route
+                path="/reports"
                 element={
                   <ProtectedRoute requiredRole="supervisor">
-                    <ComingSoon pageName="Reportes y Estadísticas" />
+                    <MainLayout title="Reportes y Estadísticas" subtitle="Esta funcionalidad está en desarrollo">
+                      <ComingSoon pageName="Reportes y Estadísticas" />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
-              <Route 
-                path="/calendar" 
+              <Route
+                path="/calendar"
                 element={
                   <ProtectedRoute>
-                    <ComingSoon pageName="Calendario de Actividades" />
+                    <MainLayout title="Calendario de Actividades" subtitle="Esta funcionalidad está en desarrollo">
+                      <ComingSoon pageName="Calendario de Actividades" />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
               {/* ================================ */}
               {/* RUTAS DE ADMINISTRACIÓN */}
               {/* ================================ */}
-              
-              <Route 
-                path="/admin" 
+
+              <Route
+                path="/admin"
                 element={
                   <ProtectedRoute requiredRole="administrador">
-                    <AdminPanel />
+                    <MainLayout title="Panel de Administración" subtitle="Gestión avanzada del sistema">
+                      <AdminPanelContent />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              
-              <Route 
-                path="/admin/users" 
+
+              <Route
+                path="/admin/users"
                 element={
                   <ProtectedRoute requiredRole="administrador">
-                    <ComingSoon pageName="Gestión de Usuarios del Sistema" />
+                    <MainLayout title="Gestión de Usuarios del Sistema" subtitle="Esta funcionalidad está en desarrollo">
+                      <ComingSoon pageName="Gestión de Usuarios del Sistema" />
+                    </MainLayout>
                   </ProtectedRoute>
-                } 
+                }
               />
 
               {/* ================================ */}
               {/* RUTAS ESPECIALES */}
               {/* ================================ */}
-              
-              <Route 
-                path="/" 
-                element={<Navigate to="/dashboard" replace />} 
+
+              <Route
+                path="/"
+                element={<Navigate to="/dashboard" replace />}
               />
-              
-              <Route 
-                path="*" 
+
+              <Route
+                path="*"
                 element={
                   <MainLayout title="Página no encontrada" subtitle="Error 404">
                     <div className="text-center py-12">
@@ -466,13 +506,13 @@ function App() {
                         Lo sentimos, la página que buscas no existe.
                       </p>
                       <div className="space-x-4">
-                        <button 
+                        <button
                           onClick={() => window.history.back()}
                           className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                         >
                           Volver
                         </button>
-                        <button 
+                        <button
                           onClick={() => window.location.href = '/dashboard'}
                           className="px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90 transition-colors"
                         >
@@ -481,7 +521,7 @@ function App() {
                       </div>
                     </div>
                   </MainLayout>
-                } 
+                }
               />
             </Routes>
           </Suspense>

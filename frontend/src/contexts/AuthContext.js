@@ -191,75 +191,110 @@ export const AuthProvider = ({ children }) => {
   }, [state.status, state.token]);
 
   // Función para iniciar sesión
-  const login = async (email, password) => {
-    dispatch({ type: AuthActions.SET_LOADING });
+ const login = async (email, password) => {
+  dispatch({ type: AuthActions.SET_LOADING });
 
-    try {
-      const response = await authService.login(email, password);
-      
-      // Extraer token y usuario de la respuesta
-      const token = response.token || response.accessToken;
-      let user = response.data?.user || response.user;
-
-      // Si no viene usuario en la respuesta, extraer del token
-      if (!user && token) {
-        user = authService.getUserFromToken();
-      }
-
-      if (user && token) {
-        dispatch({
-          type: AuthActions.SET_AUTHENTICATED,
-          payload: { user, token }
-        });
-      } else {
-        throw new Error('Respuesta de login inválida');
-      }
-
-      return response;
-    } catch (error) {
-      const errorMessage = error.message || 'Error al iniciar sesión';
-      dispatch({
-        type: AuthActions.SET_ERROR,
-        payload: errorMessage
-      });
-      throw error;
+  try {
+    const response = await authService.login(email, password);
+    
+    console.log('🔍 AuthContext - Respuesta recibida:', response);
+    
+    // Extraer token y usuario de la respuesta correctamente
+    let token, user;
+    
+    if (response.success && response.data) {
+      // Estructura del backend: { success: true, data: { user: {...}, tokens: {...} } }
+      token = response.data.tokens?.accessToken;
+      user = response.data.user;
+    } else {
+      // Fallback para otras estructuras
+      token = response.token || response.accessToken;
+      user = response.data?.user || response.user;
     }
-  };
+
+    console.log('🔍 AuthContext - Token extraído:', token ? 'EXISTS' : 'MISSING');
+    console.log('🔍 AuthContext - User extraído:', user ? 'EXISTS' : 'MISSING');
+
+    // Si no viene usuario en la respuesta, extraer del token
+    if (!user && token) {
+      user = authService.getUserFromToken();
+      console.log('🔍 AuthContext - User del token:', user);
+    }
+
+    if (user && token) {
+      console.log('✅ AuthContext - Login exitoso, actualizando estado');
+      dispatch({
+        type: AuthActions.SET_AUTHENTICATED,
+        payload: { user, token }
+      });
+    } else {
+      console.error('❌ AuthContext - Faltan datos: user=', !!user, 'token=', !!token);
+      throw new Error('Respuesta de login inválida');
+    }
+
+    return response;
+  } catch (error) {
+    console.error('❌ AuthContext - Error en login:', error);
+    const errorMessage = error.message || 'Error al iniciar sesión';
+    dispatch({
+      type: AuthActions.SET_ERROR,
+      payload: errorMessage
+    });
+    throw error;
+  }
+};
 
   // Función para registrar usuario
-  const register = async (userData) => {
-    dispatch({ type: AuthActions.SET_LOADING });
+  // En tu AuthContext.js - REEMPLAZA el método register
 
-    try {
-      const response = await authService.register(userData);
-      
-      const token = response.token || response.accessToken;
-      let user = response.data?.user || response.user;
+const register = async (userData) => {
+  dispatch({ type: AuthActions.SET_LOADING });
 
-      if (!user && token) {
-        user = authService.getUserFromToken();
-      }
-
-      if (user && token) {
-        dispatch({
-          type: AuthActions.SET_AUTHENTICATED,
-          payload: { user, token }
-        });
+  try {
+    const response = await authService.register(userData);
+    
+    // Extraer token y usuario de la respuesta correctamente
+    let token, user;
+    
+    if (response.success && response.data) {
+      // Si incluye auto-login
+      if (response.data.tokens) {
+        token = response.data.tokens.accessToken;
+        user = response.data.user;
       } else {
-        // Si no devuelve token (registro sin auto-login)
-        dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
+        // Solo registro, sin auto-login
+        user = response.data.user || response.data;
       }
-
-      return response;
-    } catch (error) {
-      const errorMessage = error.message || 'Error al registrar usuario';
-      dispatch({
-        type: AuthActions.SET_ERROR,
-        payload: errorMessage
-      });
-      throw error;
+    } else {
+      // Fallback para otras estructuras
+      token = response.token || response.accessToken;
+      user = response.data?.user || response.user;
     }
-  };
+
+    if (!user && token) {
+      user = authService.getUserFromToken();
+    }
+
+    if (user && token) {
+      dispatch({
+        type: AuthActions.SET_AUTHENTICATED,
+        payload: { user, token }
+      });
+    } else {
+      // Si no devuelve token (registro sin auto-login)
+      dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
+    }
+
+    return response;
+  } catch (error) {
+    const errorMessage = error.message || 'Error al registrar usuario';
+    dispatch({
+      type: AuthActions.SET_ERROR,
+      payload: errorMessage
+    });
+    throw error;
+  }
+};
 
   // Función para cerrar sesión
   const logout = async () => {
@@ -334,26 +369,36 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Función para refrescar token
-  const refreshToken = async () => {
-    try {
-      const response = await authService.refreshToken();
-      const token = response.token || response.accessToken;
-      
-      if (token) {
-        // Mantener usuario actual, solo actualizar token
-        dispatch({
-          type: AuthActions.SET_AUTHENTICATED,
-          payload: { user: state.user, token }
-        });
-      }
-      
-      return response;
-    } catch (error) {
-      console.error('Error refrescando token:', error);
-      dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
-      throw error;
+  // En tu AuthContext.js - REEMPLAZA el método refreshToken
+
+const refreshToken = async () => {
+  try {
+    const response = await authService.refreshToken();
+    
+    // Extraer token de la respuesta correctamente
+    let token;
+    
+    if (response.success && response.data && response.data.tokens) {
+      token = response.data.tokens.accessToken;
+    } else {
+      token = response.token || response.accessToken;
     }
-  };
+    
+    if (token) {
+      // Mantener usuario actual, solo actualizar token
+      dispatch({
+        type: AuthActions.SET_AUTHENTICATED,
+        payload: { user: state.user, token }
+      });
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error refrescando token:', error);
+    dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
+    throw error;
+  }
+};
 
   // Función para actualizar información del usuario
   const updateUser = async (userData) => {

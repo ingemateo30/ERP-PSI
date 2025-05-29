@@ -35,16 +35,65 @@ const BanksConfig = () => {
     loadBanks();
   }, []);
 
+  // FUNCIÓN CORREGIDA - Manejo seguro de la respuesta de la API
   const loadBanks = async () => {
     try {
       setLoading(true);
       setError(null);
       
+      console.log('🔄 Iniciando carga de bancos...');
       const response = await configService.getBanks();
-      setBanks(response.data || []);
+      
+      // Debug detallado
+      console.log('✅ Respuesta completa de la API:', response);
+      console.log('📊 response.data:', response.data);
+      console.log('📊 response.message:', response.message);
+      console.log('🔍 Tipo de response:', typeof response);
+      console.log('🔍 Tipo de response.data:', typeof response.data);
+      console.log('🔍 Tipo de response.message:', typeof response.message);
+      console.log('📋 ¿Es response.data un array?:', Array.isArray(response.data));
+      console.log('📋 ¿Es response.message un array?:', Array.isArray(response.message));
+      console.log('📋 ¿Es response un array?:', Array.isArray(response));
+      
+      // Manejo seguro de diferentes estructuras de respuesta
+      let banksData = [];
+      
+      // CORRECCIÓN: Los bancos están en response.message según tu debug
+      if (response && response.message && Array.isArray(response.message)) {
+        banksData = response.message;
+        console.log('✅ Usando response.message como array');
+      } else if (response && response.data && Array.isArray(response.data)) {
+        banksData = response.data;
+        console.log('✅ Usando response.data como array');
+      } else if (response && response.data && response.data.banks && Array.isArray(response.data.banks)) {
+        banksData = response.data.banks;
+        console.log('✅ Usando response.data.banks como array');
+      } else if (Array.isArray(response)) {
+        banksData = response;
+        console.log('✅ Usando response directamente como array');
+      } else if (response && response.banks && Array.isArray(response.banks)) {
+        banksData = response.banks;
+        console.log('✅ Usando response.banks como array');
+      } else {
+        console.log('❌ No se encontró estructura de array válida');
+        console.log('❌ Estructura de respuesta:', response);
+      }
+      
+      console.log('📈 Datos finales de bancos:', banksData);
+      console.log('🔢 Cantidad de bancos:', banksData.length);
+      
+      // Verificación final de seguridad
+      if (!Array.isArray(banksData)) {
+        console.error('❌ Estructura de respuesta inesperada:', response);
+        banksData = [];
+      }
+      
+      setBanks(banksData);
     } catch (err) {
-      console.error('Error cargando bancos:', err);
+      console.error('❌ Error cargando bancos:', err);
+      console.error('❌ Error completo:', err.response || err);
       setError(err.message);
+      setBanks([]);
     } finally {
       setLoading(false);
     }
@@ -74,14 +123,24 @@ const BanksConfig = () => {
       
       if (editingBank) {
         await configService.updateBank(editingBank.id, formData);
-        setBanks(prev => prev.map(bank => 
+        setBanks(prev => Array.isArray(prev) ? prev.map(bank => 
           bank.id === editingBank.id 
             ? { ...bank, ...formData }
             : bank
-        ));
+        ) : []);
       } else {
         const response = await configService.createBank(formData);
-        setBanks(prev => [response.data, ...prev]);
+        // CORRECCIÓN: Manejar la estructura de respuesta para nuevos bancos
+        let newBank;
+        if (response && response.message && typeof response.message === 'object') {
+          newBank = response.message;
+        } else if (response && response.data && typeof response.data === 'object') {
+          newBank = response.data;
+        } else {
+          newBank = response;
+        }
+        
+        setBanks(prev => Array.isArray(prev) ? [newBank, ...prev] : [newBank]);
       }
       
       setShowModal(false);
@@ -99,11 +158,11 @@ const BanksConfig = () => {
   const handleToggleStatus = async (bank) => {
     try {
       await configService.toggleBank(bank.id);
-      setBanks(prev => prev.map(b => 
+      setBanks(prev => Array.isArray(prev) ? prev.map(b => 
         b.id === bank.id 
           ? { ...b, activo: !b.activo }
           : b
-      ));
+      ) : []);
     } catch (err) {
       console.error('Error cambiando estado:', err);
       alert(err.message);
@@ -117,18 +176,27 @@ const BanksConfig = () => {
 
     try {
       await configService.deleteBank(bank.id);
-      setBanks(prev => prev.filter(b => b.id !== bank.id));
+      setBanks(prev => Array.isArray(prev) ? prev.filter(b => b.id !== bank.id) : []);
     } catch (err) {
       console.error('Error eliminando banco:', err);
       alert(err.message);
     }
   };
 
-  // Filtrar bancos
-  const filteredBanks = banks.filter(bank =>
-    bank.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bank.codigo.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // FILTRADO SEGURO - Verificación de que banks sea un array y manejo seguro de propiedades
+  const filteredBanks = Array.isArray(banks) 
+    ? banks.filter(bank => {
+        // Verificar que el banco y sus propiedades existan
+        if (!bank) return false;
+        
+        const nombre = bank.nombre || '';
+        const codigo = bank.codigo || '';
+        const searchLower = searchTerm.toLowerCase();
+        
+        return nombre.toLowerCase().includes(searchLower) ||
+               codigo.toLowerCase().includes(searchLower);
+      })
+    : [];
 
   if (loading) {
     return (
@@ -227,8 +295,8 @@ const BanksConfig = () => {
                     } />
                   </div>
                   <div className="ml-3">
-                    <h3 className="font-semibold text-gray-900">{bank.nombre}</h3>
-                    <p className="text-sm text-gray-500">Código: {bank.codigo}</p>
+                    <h3 className="font-semibold text-gray-900">{bank.nombre || 'Sin nombre'}</h3>
+                    <p className="text-sm text-gray-500">Código: {bank.codigo || 'Sin código'}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-1">

@@ -9,7 +9,7 @@ const PasswordUtils = require('../utils/password');
 const pool = require('../config/database');
 
 class AuthController {
-    
+
     // Login de usuario
     static async login(req, res) {
         try {
@@ -69,7 +69,7 @@ class AuthController {
             const accessToken = jwt.sign(
                 tokenPayload,
                 process.env.JWT_SECRET,
-                { 
+                {
                     expiresIn: process.env.JWT_EXPIRE || '24h',
                     issuer: 'isp-system',
                     audience: 'isp-users'
@@ -77,13 +77,13 @@ class AuthController {
             );
 
             const refreshToken = jwt.sign(
-                { 
-                    userId: user.id, 
-                    id: user.id, 
-                    email: user.email 
+                {
+                    userId: user.id,
+                    id: user.id,
+                    email: user.email
                 },
                 process.env.JWT_REFRESH_SECRET,
-                { 
+                {
                     expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d',
                     issuer: 'isp-system',
                     audience: 'isp-users'
@@ -115,19 +115,23 @@ class AuthController {
             });
 
             // Respuesta exitosa
-            return ApiResponse.loginSuccess(res, {
-                id: user.id,
-                email: user.email,
-                nombre: user.nombre,
-                telefono: user.telefono,
-                rol: user.rol,
-                activo: user.activo,
-                ultimo_acceso: user.ultimo_acceso
-            }, {
-                accessToken,
-                refreshToken,
-                expiresIn: process.env.JWT_EXPIRE || '24h'
-            });
+            return ApiResponse.loginSuccess(res,
+                // Objeto user (exactamente como lo espera ApiResponse.loginSuccess)
+                {
+                    id: user.id,
+                    email: user.email,
+                    nombre: user.nombre,
+                    telefono: user.telefono,
+                    rol: user.rol,
+                    ultimo_acceso: user.ultimo_acceso
+                },
+                // Objeto tokens (exactamente como lo espera ApiResponse.loginSuccess)
+                {
+                    accessToken,
+                    refreshToken,
+                    expiresIn: process.env.JWT_EXPIRE || '24h'
+                }
+            );
 
         } catch (error) {
             logger.error('Error en login:', error);
@@ -226,7 +230,7 @@ class AuthController {
             });
 
             const connection = await pool.getConnection();
-            
+
             const [users] = await connection.execute(
                 'SELECT * FROM sistema_usuarios WHERE id = ? AND activo = 1',
                 [decoded.userId || decoded.id]
@@ -250,7 +254,7 @@ class AuthController {
                     nombre: user.nombre
                 },
                 process.env.JWT_SECRET,
-                { 
+                {
                     expiresIn: process.env.JWT_EXPIRE || '24h',
                     issuer: 'isp-system',
                     audience: 'isp-users'
@@ -259,13 +263,13 @@ class AuthController {
 
             // Generar nuevo refresh token
             const newRefreshToken = jwt.sign(
-                { 
-                    userId: user.id, 
-                    id: user.id, 
-                    email: user.email 
+                {
+                    userId: user.id,
+                    id: user.id,
+                    email: user.email
                 },
                 process.env.JWT_REFRESH_SECRET,
-                { 
+                {
                     expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d',
                     issuer: 'isp-system',
                     audience: 'isp-users'
@@ -330,7 +334,7 @@ class AuthController {
             const user = req.user;
 
             const connection = await pool.getConnection();
-            
+
             const [users] = await connection.execute(`
                 SELECT id, email, nombre, telefono, rol, activo, ultimo_acceso, created_at, updated_at
                 FROM sistema_usuarios 
@@ -372,7 +376,7 @@ class AuthController {
             }
 
             const connection = await pool.getConnection();
-            
+
             const [users] = await connection.execute(
                 'SELECT * FROM sistema_usuarios WHERE id = ?',
                 [user.id]
@@ -421,7 +425,7 @@ class AuthController {
     static async verify(req, res) {
         try {
             const user = req.user;
-            
+
             return ApiResponse.success(res, {
                 user: {
                     id: user.id,
