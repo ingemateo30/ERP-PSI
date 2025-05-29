@@ -1,34 +1,44 @@
-// backend/routes/users.js - VERSIÓN CORREGIDA Y FUNCIONAL
+// backend/routes/users.js - RUTAS DE USUARIOS COMPLETAS
 
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const Joi = require('joi');
 
 // Middleware
 const { authenticateToken, requireRole } = require('../middleware/auth');
-const { rateLimiter } = require('../middleware/rateLimiter');
 const logger = require('../utils/logger');
 const ApiResponse = require('../utils/responses');
+const PasswordUtils = require('../utils/password');
 const pool = require('../config/database');
 
-// Función de validación simple usando Joi
+// Función de validación
 const validate = (schema) => {
   return (req, res, next) => {
-    const { error } = schema.validate(req.body);
+    const { error, value } = schema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true
+    });
+
     if (error) {
-      return ApiResponse.validationError(res, error.details.map(detail => ({
+      const errors = error.details.map(detail => ({
         field: detail.path.join('.'),
         message: detail.message
-      })));
+      }));
+      return ApiResponse.validationError(res, errors);
     }
+    req.body = value;
     next();
   };
 };
 
 // Esquemas de validación
 const updateProfileSchema = Joi.object({
-  nombre: Joi.string().min(2).max(100).trim().required(),
+  nombre: Joi.string().min(2).max(100).trim().required()
+    .pattern(/^[a-zA-ZÀ-ÿ\s]+$/)
+    .messages({
+      'string.pattern.base': 'El nombre solo puede contener letras y espacios'
+    }),
   telefono: Joi.string().pattern(/^[0-9+\-\s()]+$/).min(10).max(20).optional().allow(''),
   email: Joi.string().email().max(255).optional()
 });
@@ -42,14 +52,16 @@ const changePasswordSchema = Joi.object({
 const createUserSchema = Joi.object({
   email: Joi.string().email().max(255).required(),
   password: Joi.string().min(8).max(128).required(),
-  nombre: Joi.string().min(2).max(100).required(),
+  nombre: Joi.string().min(2).max(100).required()
+    .pattern(/^[a-zA-ZÀ-ÿ\s]+$/),
   telefono: Joi.string().pattern(/^[0-9+\-\s()]+$/).min(10).max(20).optional().allow(''),
   rol: Joi.string().valid('administrador', 'supervisor', 'instalador').default('supervisor')
 });
 
 const updateUserSchema = Joi.object({
   email: Joi.string().email().max(255).optional(),
-  nombre: Joi.string().min(2).max(100).optional(),
+  nombre: Joi.string().min(2).max(100).optional()
+    .pattern(/^[a-zA-ZÀ-ÿ\s]+$/),
   telefono: Joi.string().pattern(/^[0-9+\-\s()]+$/).min(10).max(20).optional().allow(''),
   rol: Joi.string().valid('administrador', 'supervisor', 'instalador').optional(),
   activo: Joi.boolean().optional()
@@ -157,6 +169,15 @@ router.post('/change-password',
       const userId = req.user.id;
       const { currentPassword, newPassword } = req.body;
 
+      // Validar nueva contraseña
+      const passwordValidation = PasswordUtils.validatePassword(newPassword);
+      if (!passwordValidation.isValid) {
+        return ApiResponse.validationError(res, passwordValidation.errors.map(error => ({
+          field: 'newPassword',
+          message: error
+        })));
+      }
+
       const connection = await pool.getConnection();
 
       // Obtener usuario con contraseña
@@ -180,8 +201,7 @@ router.post('/change-password',
       }
 
       // Encriptar nueva contraseña
-      const saltRounds = 12;
-      const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+      const hashedNewPassword = await PasswordUtils.hashPassword(newPassword);
 
       // Actualizar contraseña
       await connection.execute(
@@ -191,8 +211,9 @@ router.post('/change-password',
 
       connection.release();
 
-      logger.info(`Contraseña cambiada: ${user.email}`, {
-        userId: userId
+      logger.logSecurity('info', 'Contraseña cambiada por el usuario', {
+        userId: userId,
+        email: user.email
       });
 
       return ApiResponse.success(res, null, 'Contraseña actualizada exitosamente');
@@ -289,6 +310,61 @@ router.get('/',
 );
 
 /**
+ * @route GET /api/v1/users/stats
+ * @desc Obtener estadísticas de usuarios
+ * @access Private (Admin)
+ */
+router.get('/stats',
+  authenticateToken,
+  requireRole('administrador'),
+  async (req, res) => {
+    try {
+      const connection = await pool.getConnection();
+
+      // Estadísticas generales
+      const [stats] = await connection.execute(`
+        SELECT 
+          COUNT(*) as total_usuarios,
+          SUM(CASE WHEN activo = 1 THEN 1 ELSE 0 END) as usuarios_activos,
+          SUM(CASE WHEN activo = 0 THEN 1 ELSE 0 END) as usuarios_inactivos,
+          SUM(CASE WHEN rol = 'administrador' THEN 1 ELSE 0 END) as administradores,
+          SUM(CASE WHEN rol = 'supervisor' THEN 1 ELSE 0 END) as supervisores,
+          SUM(CASE WHEN rol = 'instalador' THEN 1 ELSE 0 END) as instaladores
+        FROM sistema_usuarios
+      `);
+
+      // Usuarios creados en los últimos 30 días
+      const [recentUsers] = await connection.execute(`
+        SELECT COUNT(*) as usuarios_recientes
+        FROM sistema_usuarios 
+        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      `);
+
+      // Último acceso promedio
+      const [lastAccess] = await connection.execute(`
+        SELECT 
+          COUNT(CASE WHEN ultimo_acceso >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 END) as activos_ultima_semana,
+          COUNT(CASE WHEN ultimo_acceso >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as activos_ultimo_mes
+        FROM sistema_usuarios 
+        WHERE ultimo_acceso IS NOT NULL
+      `);
+
+      connection.release();
+
+      return ApiResponse.success(res, {
+        ...stats[0],
+        usuarios_recientes: recentUsers[0].usuarios_recientes,
+        actividad: lastAccess[0]
+      }, 'Estadísticas de usuarios obtenidas exitosamente');
+
+    } catch (error) {
+      logger.error('Error obteniendo estadísticas de usuarios:', error);
+      return ApiResponse.error(res, 'Error interno del servidor', 500);
+    }
+  }
+);
+
+/**
  * @route GET /api/v1/users/:id
  * @desc Obtener usuario por ID (solo administradores)
  * @access Private (Admin)
@@ -336,6 +412,15 @@ router.post('/',
       const { email, password, nombre, telefono, rol } = req.body;
       const createdBy = req.user.id;
 
+      // Validar contraseña
+      const passwordValidation = PasswordUtils.validatePassword(password);
+      if (!passwordValidation.isValid) {
+        return ApiResponse.validationError(res, passwordValidation.errors.map(error => ({
+          field: 'password',
+          message: error
+        })));
+      }
+
       const connection = await pool.getConnection();
 
       // Verificar si el email ya existe
@@ -350,8 +435,7 @@ router.post('/',
       }
 
       // Encriptar contraseña
-      const saltRounds = 12;
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
+      const hashedPassword = await PasswordUtils.hashPassword(password);
 
       // Insertar nuevo usuario
       const [result] = await connection.execute(`
@@ -494,6 +578,15 @@ router.post('/:id/change-password',
         }]);
       }
 
+      // Validar nueva contraseña
+      const passwordValidation = PasswordUtils.validatePassword(newPassword);
+      if (!passwordValidation.isValid) {
+        return ApiResponse.validationError(res, passwordValidation.errors.map(error => ({
+          field: 'newPassword',
+          message: error
+        })));
+      }
+
       const connection = await pool.getConnection();
 
       // Verificar si el usuario existe
@@ -508,8 +601,7 @@ router.post('/:id/change-password',
       }
 
       // Encriptar nueva contraseña
-      const saltRounds = 12;
-      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+      const hashedPassword = await PasswordUtils.hashPassword(newPassword);
 
       // Actualizar contraseña
       await connection.execute(
@@ -519,8 +611,9 @@ router.post('/:id/change-password',
 
       connection.release();
 
-      logger.info(`Contraseña cambiada para usuario: ${users[0].email}`, {
+      logger.logSecurity('info', 'Contraseña cambiada por administrador', {
         userId: id,
+        targetEmail: users[0].email,
         changedBy: changedBy
       });
 
@@ -642,61 +735,6 @@ router.delete('/:id',
 
     } catch (error) {
       logger.error('Error eliminando usuario:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
-    }
-  }
-);
-
-/**
- * @route GET /api/v1/users/stats
- * @desc Obtener estadísticas de usuarios
- * @access Private (Admin)
- */
-router.get('/stats',
-  authenticateToken,
-  requireRole('administrador'),
-  async (req, res) => {
-    try {
-      const connection = await pool.getConnection();
-
-      // Estadísticas generales
-      const [stats] = await connection.execute(`
-        SELECT 
-          COUNT(*) as total_usuarios,
-          SUM(CASE WHEN activo = 1 THEN 1 ELSE 0 END) as usuarios_activos,
-          SUM(CASE WHEN activo = 0 THEN 1 ELSE 0 END) as usuarios_inactivos,
-          SUM(CASE WHEN rol = 'administrador' THEN 1 ELSE 0 END) as administradores,
-          SUM(CASE WHEN rol = 'supervisor' THEN 1 ELSE 0 END) as supervisores,
-          SUM(CASE WHEN rol = 'instalador' THEN 1 ELSE 0 END) as instaladores
-        FROM sistema_usuarios
-      `);
-
-      // Usuarios creados en los últimos 30 días
-      const [recentUsers] = await connection.execute(`
-        SELECT COUNT(*) as usuarios_recientes
-        FROM sistema_usuarios 
-        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-      `);
-
-      // Último acceso promedio
-      const [lastAccess] = await connection.execute(`
-        SELECT 
-          COUNT(CASE WHEN ultimo_acceso >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 END) as activos_ultima_semana,
-          COUNT(CASE WHEN ultimo_acceso >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as activos_ultimo_mes
-        FROM sistema_usuarios 
-        WHERE ultimo_acceso IS NOT NULL
-      `);
-
-      connection.release();
-
-      return ApiResponse.success(res, {
-        ...stats[0],
-        usuarios_recientes: recentUsers[0].usuarios_recientes,
-        actividad: lastAccess[0]
-      }, 'Estadísticas de usuarios obtenidas exitosamente');
-
-    } catch (error) {
-      logger.error('Error obteniendo estadísticas de usuarios:', error);
       return ApiResponse.error(res, 'Error interno del servidor', 500);
     }
   }
