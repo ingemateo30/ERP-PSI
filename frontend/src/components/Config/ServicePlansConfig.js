@@ -1,5 +1,3 @@
-// frontend/src/components/Config/ServicePlansConfig.js
-
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Wifi, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Search,
