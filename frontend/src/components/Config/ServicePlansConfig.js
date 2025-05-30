@@ -1,3 +1,5 @@
+// frontend/src/components/Config/ServicePlansConfig.js - VERSIÓN CORREGIDA
+
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Wifi, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Search,
@@ -5,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import configService from '../../services/configService'; // ✅ USAR EL SERVICIO CORRECTO
 
 const ServicePlansConfig = () => {
   const navigate = useNavigate();
@@ -50,46 +53,50 @@ const ServicePlansConfig = () => {
     setError(null);
     
     try {
-      const response = await fetch('/api/planes', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('📡 Respuesta completa de la API:', data);
+      // ✅ USAR LA RUTA CORRECTA DEL BACKEND
+      const response = await configService.getServicePlans();
       
-      // ✅ FIX: Los planes están en data.message según tu estructura
-      if (data.success && Array.isArray(data.message)) {
-        const processedPlanes = data.message.map(plan => ({
-          ...plan,
-          precio: parseFloat(plan.precio), // Convertir string a número
-          aplica_iva: Boolean(plan.aplica_iva), // Convertir 1/0 a boolean
-          activo: Boolean(plan.activo), // Convertir 1/0 a boolean
-        }));
-        setPlans(processedPlanes);
-        console.log('✅ Planes cargados correctamente:', processedPlanes.length);
-      } else if (Array.isArray(data)) {
-        // Fallback por si la estructura cambia
-        setPlans(data);
-        console.log('✅ Planes cargados (estructura directa):', data.length);
-      } else if (data.planes && Array.isArray(data.planes)) {
-        // Otro fallback
-        
-        console.log('✅ Planes cargados (en data.planes):', data.planes.length);
+      console.log('📡 Respuesta completa de la API:', response);
+      console.log('📊 response.data:', response.data);
+      console.log('📊 response.message:', response.message);
+      
+      // ✅ MANEJO CORRECTO DE LA ESTRUCTURA DE RESPUESTA
+      let plansData = [];
+      
+      if (response && response.success && Array.isArray(response.data)) {
+        plansData = response.data;
+        console.log('✅ Usando response.data como array');
+      } else if (response && Array.isArray(response.message)) {
+        plansData = response.message;
+        console.log('✅ Usando response.message como array');
+      } else if (Array.isArray(response)) {
+        plansData = response;
+        console.log('✅ Usando response directamente como array');
       } else {
-        console.error('❌ Estructura de datos inesperada:', data);
+        console.error('❌ Estructura de datos inesperada:', response);
         setError('Estructura de respuesta no reconocida del servidor');
+        plansData = [];
       }
+      
+      // ✅ PROCESAR DATOS CORRECTAMENTE
+      const processedPlanes = plansData.map(plan => ({
+        ...plan,
+        precio: parseFloat(plan.precio) || 0,
+        aplica_iva: Boolean(plan.aplica_iva),
+        activo: Boolean(plan.activo),
+        velocidad_bajada: plan.velocidad_bajada ? parseInt(plan.velocidad_bajada) : null,
+        velocidad_subida: plan.velocidad_subida ? parseInt(plan.velocidad_subida) : null,
+        canales_tv: plan.canales_tv ? parseInt(plan.canales_tv) : null,
+        clientes_suscritos: plan.clientes_suscritos || 0
+      }));
+      
+      setPlans(processedPlanes);
+      console.log('✅ Planes cargados correctamente:', processedPlanes.length);
       
     } catch (err) {
       console.error('❌ Error cargando planes:', err);
       setError(err.message || 'Error desconocido al cargar planes');
+      setPlans([]);
     } finally {
       setLoading(false);
     }
@@ -177,23 +184,14 @@ const ServicePlansConfig = () => {
     setShowModal(true);
   };
 
+  // ✅ FUNCIÓN CORREGIDA: handleDelete
   const handleDelete = async (plan) => {
     if (!window.confirm(`¿Estás seguro de que quieres eliminar el plan "${plan.nombre}"?`)) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/planes/${plan.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al eliminar el plan');
-      }
-
+      await configService.deleteServicePlan(plan.id);
       await loadPlans(); // Recargar la lista
     } catch (err) {
       console.error('Error eliminando plan:', err);
@@ -201,23 +199,10 @@ const ServicePlansConfig = () => {
     }
   };
 
+  // ✅ FUNCIÓN CORREGIDA: handleToggleStatus
   const handleToggleStatus = async (plan) => {
     try {
-      const response = await fetch(`/api/planes/${plan.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...plan,
-          activo: !plan.activo
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al cambiar el estado del plan');
-      }
-
+      await configService.toggleServicePlan(plan.id);
       await loadPlans(); // Recargar la lista
     } catch (err) {
       console.error('Error cambiando estado:', err);
@@ -225,14 +210,12 @@ const ServicePlansConfig = () => {
     }
   };
 
+  // ✅ FUNCIÓN CORREGIDA: handleSubmit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
     try {
-      const url = editingPlan ? `/api/planes/${editingPlan.id}` : '/api/planes';
-      const method = editingPlan ? 'PUT' : 'POST';
-
       const planData = {
         codigo: formData.codigo.trim(),
         nombre: formData.nombre.trim(),
@@ -242,21 +225,13 @@ const ServicePlansConfig = () => {
         velocidad_subida: formData.velocidad_subida ? parseInt(formData.velocidad_subida) : null,
         canales_tv: formData.canales_tv ? parseInt(formData.canales_tv) : null,
         descripcion: formData.descripcion.trim() || null,
-        aplica_iva: formData.aplica_iva,
-        activo: true
+        aplica_iva: formData.aplica_iva
       };
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(planData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al guardar el plan');
+      if (editingPlan) {
+        await configService.updateServicePlan(editingPlan.id, planData);
+      } else {
+        await configService.createServicePlan(planData);
       }
 
       setShowModal(false);
@@ -300,9 +275,8 @@ const ServicePlansConfig = () => {
                 <p className="text-gray-600">
                   Administra los planes de internet, TV y combos
                 </p>
-                {/* Debug info */}
                 <p className="text-xs text-gray-400 mt-1">
-                  Debug: {plans.length} planes cargados, {filteredPlans.length} filtrados
+                  {plans.length} planes cargados, {filteredPlans.length} filtrados
                 </p>
               </div>
             </div>
@@ -332,25 +306,6 @@ const ServicePlansConfig = () => {
             </button>
           </div>
         )}
-
-        {/* Debug Panel */}
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <h3 className="font-medium text-yellow-800 mb-2">🐛 Información de Debug</h3>
-          <div className="text-sm text-yellow-700 space-y-1">
-            <p><strong>Loading:</strong> {loading.toString()}</p>
-            <p><strong>Error:</strong> {error || 'Ninguno'}</p>
-            <p><strong>Plans array length:</strong> {plans.length}</p>
-            <p><strong>Filtered plans length:</strong> {filteredPlans.length}</p>
-            <p><strong>Search term:</strong> "{searchTerm}"</p>
-            <p><strong>Filter type:</strong> "{filterType}"</p>
-            <button 
-              onClick={loadPlans}
-              className="mt-2 px-3 py-1 bg-yellow-200 hover:bg-yellow-300 rounded text-yellow-800"
-            >
-              🔄 Recargar Planes
-            </button>
-          </div>
-        </div>
 
         {/* Search and Filters */}
         <div className="mb-6 bg-white rounded-lg shadow-md p-4">
@@ -446,7 +401,7 @@ const ServicePlansConfig = () => {
 
               {/* Detalles del plan */}
               <div className="space-y-2 text-sm">
-                {plan.tipo === 'internet' || plan.tipo === 'combo' ? (
+                {(plan.tipo === 'internet' || plan.tipo === 'combo') && (
                   <>
                     {plan.velocidad_bajada && (
                       <div className="flex justify-between">
@@ -461,7 +416,7 @@ const ServicePlansConfig = () => {
                       </div>
                     )}
                   </>
-                ) : null}
+                )}
 
                 {(plan.tipo === 'television' || plan.tipo === 'combo') && plan.canales_tv && (
                   <div className="flex justify-between">
@@ -521,7 +476,7 @@ const ServicePlansConfig = () => {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal - Mismo código del modal que ya tienes */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
