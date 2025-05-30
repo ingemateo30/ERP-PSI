@@ -1,4 +1,4 @@
-// frontend/src/services/apiService.js
+// frontend/src/services/apiService.js - SERVICIOS CORREGIDOS
 
 import authService from './authService';
 
@@ -48,6 +48,12 @@ class ApiService {
       const data = await response.json();
 
       if (!response.ok) {
+        // Mejor manejo de errores de validación
+        if (data.validationErrors) {
+          const error = new Error(data.message || 'Error de validación');
+          error.validationErrors = data.validationErrors;
+          throw error;
+        }
         throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
       }
 
@@ -153,7 +159,69 @@ class ApiService {
 // Crear instancia del servicio
 const apiService = new ApiService();
 
-// Servicios específicos para cada módulo
+// SERVICIOS CORREGIDOS PARA USUARIOS
+export const usersService = {
+  // CORREGIDO: Función para obtener todos los usuarios
+  getAll: (params) => {
+    console.log('🔍 Obteniendo usuarios con parámetros:', params);
+    return apiService.get('/users', params);
+  },
+  
+  getById: (id) => {
+    console.log('🔍 Obteniendo usuario por ID:', id);
+    return apiService.get(`/users/${id}`);
+  },
+  
+  create: (data) => {
+    console.log('➕ Creando usuario:', data);
+    return apiService.post('/users', data);
+  },
+  
+  update: (id, data) => {
+    console.log('✏️ Actualizando usuario:', id, data);
+    return apiService.put(`/users/${id}`, data);
+  },
+  
+  delete: (id) => {
+    console.log('🗑️ Eliminando usuario:', id);
+    return apiService.delete(`/users/${id}`);
+  },
+  
+  // CORREGIDO: Función para cambiar contraseña
+  changePassword: (id, passwordData) => {
+    console.log('🔑 Cambiando contraseña para usuario:', id);
+    return apiService.post(`/users/${id}/change-password`, passwordData);
+  },
+  
+  // CORREGIDO: Función para cambiar estado
+  toggleStatus: (id) => {
+    console.log('🔄 Cambiando estado de usuario:', id);
+    return apiService.post(`/users/${id}/toggle-status`);
+  },
+  
+  getStats: () => {
+    console.log('📊 Obteniendo estadísticas de usuarios');
+    return apiService.get('/users/stats');
+  },
+  
+  // Perfil del usuario actual
+  getProfile: () => {
+    console.log('👤 Obteniendo perfil del usuario actual');
+    return apiService.get('/users/profile');
+  },
+  
+  updateProfile: (data) => {
+    console.log('👤 Actualizando perfil:', data);
+    return apiService.put('/users/profile', data);
+  },
+  
+  // CORREGIDO: Función para cambiar contraseña propia
+  changeOwnPassword: (passwordData) => {
+    console.log('🔑 Cambiando contraseña propia');
+    return apiService.post('/users/profile/change-password', passwordData);
+  }
+};
+
 export const clientsService = {
   getAll: (params) => apiService.get('/clients', params),
   getById: (id) => apiService.get(`/clients/${id}`),
@@ -196,22 +264,6 @@ export const servicesService = {
   updateService: (serviceId, data) => apiService.put(`/services/${serviceId}`, data),
   suspendService: (serviceId, reason) => apiService.patch(`/services/${serviceId}/suspend`, { reason }),
   reactivateService: (serviceId) => apiService.patch(`/services/${serviceId}/reactivate`),
-};
-
-export const usersService = {
-  getAll: (params) => apiService.get('/users', params),
-  getById: (id) => apiService.get(`/users/${id}`),
-  create: (data) => apiService.post('/users', data),
-  update: (id, data) => apiService.put(`/users/${id}`, data),
-  delete: (id) => apiService.delete(`/users/${id}`),
-  changePassword: (id, passwordData) => apiService.patch(`/users/${id}/password`, passwordData),
-  toggleStatus: (id) => apiService.patch(`/users/${id}/toggle-status`),
-  getStats: () => apiService.get('/users/stats'),
-  
-  // Perfil del usuario actual
-  getProfile: () => apiService.get('/users/profile'),
-  updateProfile: (data) => apiService.put('/users/profile', data),
-  deleteAccount: () => apiService.delete('/users/profile'),
 };
 
 export const reportsService = {

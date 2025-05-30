@@ -70,8 +70,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     },
     { 
       icon: <Users size={22} />, 
-      label: 'Clientes', 
-      path: '/clients',
+      label: 'Usuarios', 
+      path: '/admin/users',
       permission: 'supervisor' 
     },
     { 

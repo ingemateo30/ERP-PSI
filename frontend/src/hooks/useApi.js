@@ -1,15 +1,10 @@
-// frontend/src/hooks/useApi.js
+// frontend/src/hooks/useApi.js - Hook personalizado para API
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
-/**
- * Hook personalizado para manejar peticiones API con estados de carga, error y datos
- * @param {Function} apiFunction - Función que realiza la petición API
- * @param {*} initialData - Datos iniciales
- * @param {boolean} executeOnMount - Si ejecutar la función al montar el componente
- */
-export const useApi = (apiFunction, initialData = null, executeOnMount = false) => {
-  const [data, setData] = useState(initialData);
+// Hook básico para llamadas a API
+export const useApi = (apiFunction) => {
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -18,350 +13,149 @@ export const useApi = (apiFunction, initialData = null, executeOnMount = false) 
       setLoading(true);
       setError(null);
       
-      const result = await apiFunction(...args);
+      let result;
+      if (typeof apiFunction === 'function') {
+        result = await apiFunction(...args);
+      } else if (typeof args[0] === 'function') {
+        // Si se pasa la función como primer argumento
+        result = await args[0]();
+      } else {
+        throw new Error('No se proporcionó función API válida');
+      }
       
-      // Extraer datos de la respuesta según la estructura del backend
-      const responseData = result.data || result;
-      setData(responseData);
-      
-      return responseData;
+      if (result.success) {
+        setData(result.data);
+        return result;
+      } else {
+        setError(result.message || 'Error desconocido');
+        return result;
+      }
     } catch (err) {
-      const errorMessage = err.message || 'Error desconocido';
-      setError(errorMessage);
       console.error('Error en useApi:', err);
+      setError(err.message || 'Error de conexión');
       throw err;
     } finally {
       setLoading(false);
     }
   }, [apiFunction]);
 
-  // Ejecutar en mount si se especifica
-  useEffect(() => {
-    if (executeOnMount) {
-      execute();
-    }
-  }, [execute, executeOnMount]);
-
   const reset = useCallback(() => {
-    setData(initialData);
-    setError(null);
+    setData(null);
     setLoading(false);
-  }, [initialData]);
+    setError(null);
+  }, []);
 
   return {
     data,
     loading,
     error,
     execute,
-    reset,
-    setData,
-    setError
+    reset
   };
 };
 
-/**
- * Hook para manejo de listas con paginación
- * @param {Function} apiFunction - Función que obtiene la lista
- * @param {Object} initialParams - Parámetros iniciales de búsqueda
- */
-export const useApiList = (apiFunction, initialParams = {}) => {
+// Hook para listas con paginación
+export const useApiList = (apiFunction, autoLoad = true) => {
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({
     currentPage: 1,
-    totalPages: 0,
+    totalPages: 1,
     totalItems: 0,
     itemsPerPage: 10,
     hasNextPage: false,
     hasPrevPage: false
   });
-  const [params, setParams] = useState({
-    page: 1,
-    limit: 10,
-    ...initialParams
-  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({});
 
-  const fetchData = useCallback(async (newParams = {}) => {
+  const loadData = useCallback(async (params = {}) => {
     try {
       setLoading(true);
       setError(null);
       
-      const finalParams = { ...params, ...newParams };
-      const result = await apiFunction(finalParams);
+      const searchParams = {
+        page: pagination.currentPage,
+        limit: pagination.itemsPerPage,
+        ...filters,
+        ...params
+      };
+
+      // Filtrar parámetros vacíos
+      Object.keys(searchParams).forEach(key => {
+        if (searchParams[key] === '' || searchParams[key] === null || searchParams[key] === undefined) {
+          delete searchParams[key];
+        }
+      });
+
+      console.log('🔍 Cargando datos con parámetros:', searchParams);
+      const result = await apiFunction(searchParams);
       
-      // Estructura esperada del backend: { data: items, pagination: {...} }
-      if (result.data && Array.isArray(result.data)) {
-        setData(result.data);
-      } else if (Array.isArray(result)) {
-        setData(result);
-      } else if (result.data && Array.isArray(result.data.items)) {
-        setData(result.data.items);
+      if (result.success && result.data) {
+        setData(result.data.users || result.data.items || result.data || []);
+        setPagination(result.data.pagination || pagination);
+        return result;
+      } else {
+        setError(result.message || 'Error cargando datos');
+        setData([]);
+        return result;
       }
-      
-      // Actualizar paginación si existe
-      if (result.pagination) {
-        setPagination(result.pagination);
-      } else if (result.data && result.data.pagination) {
-        setPagination(result.data.pagination);
-      }
-      
-      setParams(finalParams);
-      
     } catch (err) {
-      const errorMessage = err.message || 'Error cargando datos';
-      setError(errorMessage);
       console.error('Error en useApiList:', err);
+      setError(err.message || 'Error de conexión');
+      setData([]);
+      throw err;
     } finally {
       setLoading(false);
     }
-  }, [apiFunction, params]);
+  }, [apiFunction, pagination.currentPage, pagination.itemsPerPage, filters]);
 
-  // Cargar datos iniciales
-  useEffect(() => {
-    fetchData();
+  const search = useCallback((newFilters) => {
+    setFilters(prev => ({ ...prev, ...newFilters }));
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  const changePage = useCallback((newPage) => {
+    setPagination(prev => ({ ...prev, currentPage: newPage }));
+  }, []);
+
+  const changeLimit = useCallback((newLimit) => {
+    setPagination(prev => ({ 
+      ...prev, 
+      itemsPerPage: newLimit, 
+      currentPage: 1 
+    }));
   }, []);
 
   const refresh = useCallback(() => {
-    fetchData(params);
-  }, [fetchData, params]);
-
-  const changePage = useCallback((page) => {
-    fetchData({ ...params, page });
-  }, [fetchData, params]);
-
-  const changeLimit = useCallback((limit) => {
-    fetchData({ ...params, limit, page: 1 });
-  }, [fetchData, params]);
-
-  const search = useCallback((searchParams) => {
-    fetchData({ ...params, ...searchParams, page: 1 });
-  }, [fetchData, params]);
+    loadData();
+  }, [loadData]);
 
   const reset = useCallback(() => {
-    const resetParams = { page: 1, limit: 10, ...initialParams };
-    fetchData(resetParams);
-  }, [fetchData, initialParams]);
+    setData([]);
+    setPagination({
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 10,
+      hasNextPage: false,
+      hasPrevPage: false
+    });
+    setFilters({});
+    setError(null);
+  }, []);
 
   return {
     data,
     pagination,
-    params,
     loading,
     error,
-    refresh,
+    search,
     changePage,
     changeLimit,
-    search,
+    refresh,
     reset,
-    setData
-  };
-};
-
-/**
- * Hook para operaciones CRUD
- * @param {Object} service - Objeto con métodos del servicio (getAll, create, update, delete)
- */
-export const useCrud = (service) => {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const loadItems = useCallback(async (params = {}) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const result = await service.getAll(params);
-      const data = result.data || result;
-      
-      setItems(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err.message || 'Error cargando elementos');
-      console.error('Error en loadItems:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [service]);
-
-  const createItem = useCallback(async (itemData) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const result = await service.create(itemData);
-      const newItem = result.data || result;
-      
-      setItems(prev => [newItem, ...prev]);
-      return newItem;
-    } catch (err) {
-      setError(err.message || 'Error creando elemento');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [service]);
-
-  const updateItem = useCallback(async (id, itemData) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const result = await service.update(id, itemData);
-      const updatedItem = result.data || result;
-      
-      setItems(prev => prev.map(item => 
-        item.id === id ? { ...item, ...updatedItem } : item
-      ));
-      
-      return updatedItem;
-    } catch (err) {
-      setError(err.message || 'Error actualizando elemento');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [service]);
-
-  const deleteItem = useCallback(async (id) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      await service.delete(id);
-      
-      setItems(prev => prev.filter(item => item.id !== id));
-    } catch (err) {
-      setError(err.message || 'Error eliminando elemento');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [service]);
-
-  const getItem = useCallback(async (id) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const result = await service.getById(id);
-      return result.data || result;
-    } catch (err) {
-      setError(err.message || 'Error obteniendo elemento');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [service]);
-
-  useEffect(() => {
-    if (service && service.getAll) {
-      loadItems();
-    }
-  }, [loadItems, service]);
-
-  return {
-    items,
-    loading,
-    error,
-    loadItems,
-    createItem,
-    updateItem,
-    deleteItem,
-    getItem,
-    setItems,
-    setError
-  };
-};
-
-/**
- * Hook para manejar formularios con validación
- * @param {Object} initialValues - Valores iniciales del formulario
- * @param {Function} onSubmit - Función a ejecutar en submit
- * @param {Function} validate - Función de validación opcional
- */
-export const useForm = (initialValues, onSubmit, validate) => {
-  const [values, setValues] = useState(initialValues);
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [touched, setTouched] = useState({});
-
-  const handleChange = useCallback((name, value) => {
-    setValues(prev => ({ ...prev, [name]: value }));
-    
-    // Limpiar error del campo si existe
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: null }));
-    }
-  }, [errors]);
-
-  const handleBlur = useCallback((name) => {
-    setTouched(prev => ({ ...prev, [name]: true }));
-    
-    // Validar campo individual si existe función de validación
-    if (validate && touched[name]) {
-      const fieldErrors = validate(values);
-      if (fieldErrors[name]) {
-        setErrors(prev => ({ ...prev, [name]: fieldErrors[name] }));
-      }
-    }
-  }, [validate, values, touched]);
-
-  const handleSubmit = useCallback(async (e) => {
-    if (e) e.preventDefault();
-    
-    // Validar formulario completo
-    if (validate) {
-      const validationErrors = validate(values);
-      if (Object.keys(validationErrors).length > 0) {
-        setErrors(validationErrors);
-        return;
-      }
-    }
-    
-    try {
-      setLoading(true);
-      setErrors({});
-      await onSubmit(values);
-    } catch (err) {
-      if (err.validationErrors) {
-        setErrors(err.validationErrors);
-      } else {
-        setErrors({ submit: err.message || 'Error en el formulario' });
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [values, validate, onSubmit]);
-
-  const reset = useCallback(() => {
-    setValues(initialValues);
-    setErrors({});
-    setTouched({});
-    setLoading(false);
-  }, [initialValues]);
-
-  const setFieldValue = useCallback((name, value) => {
-    setValues(prev => ({ ...prev, [name]: value }));
-  }, []);
-
-  const setFieldError = useCallback((name, error) => {
-    setErrors(prev => ({ ...prev, [name]: error }));
-  }, []);
-
-  return {
-    values,
-    errors,
-    loading,
-    touched,
-    handleChange,
-    handleBlur,
-    handleSubmit,
-    reset,
-    setFieldValue,
-    setFieldError,
-    setValues,
-    setErrors
+    loadData
   };
 };
 

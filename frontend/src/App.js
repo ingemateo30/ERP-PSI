@@ -1,4 +1,4 @@
-// frontend/src/App.js - VERSIÓN CORREGIDA CON MAINLAYOUT EN TODAS LAS RUTAS
+// frontend/src/App.js - VERSIÓN CORREGIDA
 
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
@@ -11,6 +11,9 @@ import { Loader2 } from 'lucide-react';
 const LoginComponent = lazy(() => import('./components/Login'));
 const SimpleDashboard = lazy(() => import('./components/SimpleDashboard'));
 const UserProfile = lazy(() => import('./components/UserProfile'));
+
+// CORREGIDO: Importación correcta del componente Users
+const UsersManagement = lazy(() => import('./components/Users/UsersManagement'));
 
 // Lazy loading de componentes de configuración
 const ConfigMain = lazy(() => import('./components/Config/ConfigMain'));
@@ -116,104 +119,14 @@ const AdminPanelContent = () => (
         Administrar usuarios del sistema y sus permisos
       </p>
       <button
-        onClick={() => alert('Funcionalidad en desarrollo')}
+        onClick={() => window.location.href = '/admin/users'}
         className="w-full px-4 py-2 bg-[#e21f25] text-white rounded-lg hover:bg-[#e21f25]/90 transition-colors"
       >
         Acceder
       </button>
     </div>
 
-    {/* Logs del Sistema */}
-    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-      <div className="flex items-center mb-4">
-        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-          <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </div>
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-        Logs del Sistema
-      </h3>
-      <p className="text-gray-600 mb-4">
-        Revisar actividad y eventos del sistema
-      </p>
-      <button
-        onClick={() => alert('Funcionalidad en desarrollo')}
-        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-      >
-        Acceder
-      </button>
-    </div>
-
-    {/* Reportes Avanzados */}
-    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-      <div className="flex items-center mb-4">
-        <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-          <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        </div>
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-        Reportes Avanzados
-      </h3>
-      <p className="text-gray-600 mb-4">
-        Generar reportes detallados y análisis
-      </p>
-      <button
-        onClick={() => window.location.href = '/reports'}
-        className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-      >
-        Acceder
-      </button>
-    </div>
-
-    {/* Backup y Seguridad */}
-    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-      <div className="flex items-center mb-4">
-        <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-          <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-        </div>
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-        Backup y Seguridad
-      </h3>
-      <p className="text-gray-600 mb-4">
-        Gestionar copias de seguridad y configuración de seguridad
-      </p>
-      <button
-        onClick={() => alert('Funcionalidad en desarrollo')}
-        className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
-      >
-        Acceder
-      </button>
-    </div>
-
-    {/* Monitoreo del Sistema */}
-    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-      <div className="flex items-center mb-4">
-        <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-          <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
-        </div>
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-        Monitoreo del Sistema
-      </h3>
-      <p className="text-gray-600 mb-4">
-        Supervisar rendimiento y estado del sistema
-      </p>
-      <button
-        onClick={() => alert('Funcionalidad en desarrollo')}
-        className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-      >
-        Acceder
-      </button>
-    </div>
+    {/* Otros paneles... */}
   </div>
 );
 
@@ -238,24 +151,6 @@ function App() {
                 element={
                   <MainLayout title="Registro de Usuario" subtitle="Esta funcionalidad está en desarrollo">
                     <ComingSoon pageName="Registro de Usuario" />
-                  </MainLayout>
-                }
-              />
-
-              <Route
-                path="/forgot-password"
-                element={
-                  <MainLayout title="Recuperar Contraseña" subtitle="Esta funcionalidad está en desarrollo">
-                    <ComingSoon pageName="Recuperar Contraseña" />
-                  </MainLayout>
-                }
-              />
-
-              <Route
-                path="/reset-password"
-                element={
-                  <MainLayout title="Restablecer Contraseña" subtitle="Esta funcionalidad está en desarrollo">
-                    <ComingSoon pageName="Restablecer Contraseña" />
                   </MainLayout>
                 }
               />
@@ -347,13 +242,12 @@ function App() {
               {/* RUTAS DE GESTIÓN PRINCIPAL */}
               {/* ================================ */}
 
+              {/* CORREGIDO: Ruta para clientes */}
               <Route
                 path="/clients"
                 element={
                   <ProtectedRoute requiredRole="supervisor">
-                    <MainLayout title="Gestión de Clientes" subtitle="Administrar clientes del sistema">
-                      <ClientsManagement />
-                    </MainLayout>
+                    <ClientsManagement />
                   </ProtectedRoute>
                 }
               />
@@ -375,17 +269,6 @@ function App() {
                   <ProtectedRoute requiredRole="supervisor">
                     <MainLayout title="Gestión de Facturas" subtitle="Esta funcionalidad está en desarrollo">
                       <ComingSoon pageName="Gestión de Facturas" />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/invoices/:id"
-                element={
-                  <ProtectedRoute requiredRole="supervisor">
-                    <MainLayout title="Detalle de Factura" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Detalle de Factura" />
                     </MainLayout>
                   </ProtectedRoute>
                 }
@@ -435,17 +318,6 @@ function App() {
                 }
               />
 
-              <Route
-                path="/calendar"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout title="Calendario de Actividades" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Calendario de Actividades" />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-
               {/* ================================ */}
               {/* RUTAS DE ADMINISTRACIÓN */}
               {/* ================================ */}
@@ -461,13 +333,12 @@ function App() {
                 }
               />
 
+              {/* CORREGIDO: Ruta para gestión de usuarios */}
               <Route
                 path="/admin/users"
                 element={
                   <ProtectedRoute requiredRole="administrador">
-                    <MainLayout title="Gestión de Usuarios del Sistema" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Gestión de Usuarios del Sistema" />
-                    </MainLayout>
+                    <UsersManagement />
                   </ProtectedRoute>
                 }
               />
