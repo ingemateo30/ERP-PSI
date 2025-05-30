@@ -1,5 +1,3 @@
-// backend/controllers/authController.js - VERSIÓN CORREGIDA Y COMPLETA
-
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
@@ -116,7 +114,6 @@ class AuthController {
 
             // Respuesta exitosa
             return ApiResponse.loginSuccess(res,
-                // Objeto user (exactamente como lo espera ApiResponse.loginSuccess)
                 {
                     id: user.id,
                     email: user.email,
@@ -125,7 +122,6 @@ class AuthController {
                     rol: user.rol,
                     ultimo_acceso: user.ultimo_acceso
                 },
-                // Objeto tokens (exactamente como lo espera ApiResponse.loginSuccess)
                 {
                     accessToken,
                     refreshToken,
@@ -151,7 +147,6 @@ class AuthController {
             const clientIP = req.ip || req.connection.remoteAddress;
             const userAgent = req.get('User-Agent');
 
-            // Validar fortaleza de contraseña
             const passwordValidation = PasswordUtils.validatePassword(password);
             if (!passwordValidation.isValid) {
                 return ApiResponse.validationError(res, passwordValidation.errors.map(error => ({
@@ -162,7 +157,6 @@ class AuthController {
 
             const connection = await pool.getConnection();
 
-            // Verificar si el email ya existe
             const [existingUsers] = await connection.execute(
                 'SELECT id FROM sistema_usuarios WHERE email = ?',
                 [email.toLowerCase().trim()]
@@ -311,8 +305,7 @@ class AuthController {
     static async logout(req, res) {
         try {
             const user = req.user;
-
-            // Limpiar cookie
+            
             res.clearCookie('refreshToken');
 
             logger.logAuth('info', 'Logout exitoso', {

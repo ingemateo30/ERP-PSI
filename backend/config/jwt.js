@@ -10,7 +10,6 @@ const jwtConfig = {
   audience: 'isp-users'
 };
 
-// Validar que los secrets estén configurados
 if (!jwtConfig.secret || !jwtConfig.refreshSecret) {
   logger.error('JWT secrets no configurados en variables de entorno');
   process.exit(1);
