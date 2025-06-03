@@ -90,7 +90,7 @@ const SimpleDashboard = () => {
         ></div>
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar para mostrar */}
       <div className={`fixed md:relative z-30 backdrop-blur-xl bg-gradient-to-b from-[#0e6493]/95 to-[#0e6493]/85 border border-white/10 shadow-lg transition-all duration-300 ease-in-out h-screen flex flex-col ${
         sidebarOpen ? 'translate-x-0 w-64' : 'translate-x-0 md:translate-x-0 w-0 md:w-20'
       } overflow-hidden`}>

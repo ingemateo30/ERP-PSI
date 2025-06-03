@@ -73,26 +73,28 @@ const UsersManagement = () => {
             });
 
             console.log('📤 Parámetros de petición:', params);
-
             const response = await usersService.getAll(params);
             console.log('📥 Respuesta completa del backend:', response);
 
             if (response && response.success) {
                 console.log('✅ Petición exitosa');
 
-                // 🔧 CORRECIÓN FINAL: La estructura real es response.data directamente
-                const usersData = response.data?.users || [];
-                const paginationData = response.data?.pagination || null;
+                // 🔧 CORRECCIÓN: Acceder directamente a response.message
+                const usersData = response.message?.users || [];
+                const paginationData = response.message?.pagination || null;
+
                 console.log('👥 Usuarios extraídos:', usersData.length);
                 console.log('📄 Paginación extraída:', paginationData);
-                console.log('📋 Claves en response.data:', Object.keys(response.data || {}));
+                console.log('📋 Estructura de response:', {
+                    hasMessage: !!response.message,
+                    hasUsers: !!(response.message?.users),
+                    hasPagination: !!(response.message?.pagination)
+                });
 
                 setUsers(usersData);
-
                 if (paginationData) {
                     setPagination(paginationData);
                 }
-
                 setError(null);
             } else {
                 console.log('❌ Respuesta sin éxito:', response);
@@ -107,28 +109,36 @@ const UsersManagement = () => {
             setLoading(false);
         }
     };
-
-    const loadStats = async () => {
-        console.log('📈 Cargando estadísticas...');
-        setStatsLoading(true);
-
-        try {
-            const response = await usersService.getStats();
-            console.log('📈 Estadísticas recibidas:', response);
-
-            if (response && response.success) {
-                // 🔧 CORRECIÓN FINAL: Acceder directamente a response.data sin anidamiento
-                const statsData = response.data;
-                setStats(statsData);
-            } else {
-                console.warn('⚠️ Error cargando estadísticas:', response?.message);
-            }
-        } catch (err) {
-            console.error('💥 Error cargando estadísticas:', err);
-        } finally {
-            setStatsLoading(false);
+   const loadStats = async () => {
+    console.log('📈 Cargando estadísticas...');
+    setStatsLoading(true);
+    
+    try {
+        const response = await usersService.getStats();
+        console.log('📈 Estadísticas recibidas:', response);
+        
+        if (response && response.success) {
+            // 🔧 CORRECCIÓN: Acceder a response.message directamente
+            const statsData = response.message || response.data;
+            
+            console.log('📊 Datos de estadísticas extraídos:', statsData);
+            console.log('🔍 Estructura de respuesta:', {
+                hasMessage: !!response.message,
+                hasData: !!response.data,
+                messageType: typeof response.message,
+                dataType: typeof response.data
+            });
+            
+            setStats(statsData);
+        } else {
+            console.warn('⚠️ Error cargando estadísticas:', response?.message);
         }
-    };
+    } catch (err) {
+        console.error('💥 Error cargando estadísticas:', err);
+    } finally {
+        setStatsLoading(false);
+    }
+};
 
     const handleSearch = (searchParams) => {
         console.log('🔍 Aplicando nuevos filtros:', searchParams);
@@ -479,8 +489,8 @@ const UsersManagement = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.activo
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : 'bg-red-100 text-red-800'
+                                                ? 'bg-green-100 text-green-800'
+                                                : 'bg-red-100 text-red-800'
                                                 }`}>
                                                 {user.activo ? 'Activo' : 'Inactivo'}
                                             </span>
@@ -512,8 +522,8 @@ const UsersManagement = () => {
                                                         <button
                                                             onClick={() => handleToggleStatus(user)}
                                                             className={`transition-colors ${user.activo
-                                                                    ? 'text-gray-600 hover:text-red-600'
-                                                                    : 'text-gray-600 hover:text-green-600'
+                                                                ? 'text-gray-600 hover:text-red-600'
+                                                                : 'text-gray-600 hover:text-green-600'
                                                                 }`}
                                                             title={user.activo ? 'Desactivar' : 'Activar'}
                                                             disabled={user.id === currentUser.id}
@@ -613,8 +623,8 @@ const UsersManagement = () => {
                                                     key={page}
                                                     onClick={() => changePage(page)}
                                                     className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === pagination.currentPage
-                                                            ? 'z-10 bg-[#0e6493] border-[#0e6493] text-white'
-                                                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                                        ? 'z-10 bg-[#0e6493] border-[#0e6493] text-white'
+                                                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
                                                         }`}
                                                 >
                                                     {page}

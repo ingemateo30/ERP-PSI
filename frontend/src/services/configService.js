@@ -483,6 +483,61 @@ class ConfigService {
       throw error;
     }
   }
+  async getConceptos(tipo = null, activo = null) {
+    let url = `${this.baseURL}/conceptos`;
+    const params = new URLSearchParams();
+    
+    if (tipo) params.append('tipo', tipo);
+    if (activo !== null) params.append('activo', activo);
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    return this.makeRequest(url);
+  }
+
+  async getConceptoById(id) {
+    return this.makeRequest(`${this.baseURL}/conceptos/${id}`);
+  }
+
+  async createConcepto(concepto) {
+    return this.makeRequest(`${this.baseURL}/conceptos`, {
+      method: 'POST',
+      body: JSON.stringify(concepto),
+    });
+  }
+
+  async updateConcepto(id, concepto) {
+    return this.makeRequest(`${this.baseURL}/conceptos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(concepto),
+    });
+  }
+
+  async toggleConcepto(id) {
+    return this.makeRequest(`${this.baseURL}/conceptos/${id}/toggle`, {
+      method: 'POST',
+    });
+  }
+
+  async deleteConcepto(id) {
+    return this.makeRequest(`${this.baseURL}/conceptos/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getConceptosByType(tipo) {
+    return this.makeRequest(`${this.baseURL}/conceptos/tipo/${tipo}`);
+  }
+
+  async getConceptosStats() {
+    return this.makeRequest(`${this.baseURL}/conceptos/stats`);
+  }
+
+  async getConceptosTipos() {
+    return this.makeRequest(`${this.baseURL}/conceptos/tipos`);
+  }
 }
 
 export default new ConfigService();

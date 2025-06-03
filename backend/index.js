@@ -11,10 +11,10 @@ console.log('📅 Fecha:', new Date().toLocaleString());
 
 // Verificar variables de entorno críticas
 const requiredEnvVars = [
-  'JWT_SECRET', 
-  'JWT_REFRESH_SECRET', 
-  'DB_HOST', 
-  'DB_USER', 
+  'JWT_SECRET',
+  'JWT_REFRESH_SECRET',
+  'DB_HOST',
+  'DB_USER',
   'DB_NAME'
 ];
 
@@ -74,13 +74,13 @@ const corsOptions = require('./config/cors');
 app.use(cors(corsOptions));
 
 // Parsers con límites ajustados
-app.use(express.json({ 
+app.use(express.json({
   limit: '10mb',
   type: ['application/json', 'text/plain']
 }));
-app.use(express.urlencoded({ 
-  extended: true, 
-  limit: '10mb' 
+app.use(express.urlencoded({
+  extended: true,
+  limit: '10mb'
 }));
 app.use(cookieParser());
 
@@ -89,12 +89,12 @@ app.use((req, res, next) => {
   // Solo validar Content-Type en métodos que lo requieren
   if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
     const contentType = req.get('Content-Type');
-    
+
     // Permitir requests sin body o con Content-Type válido
-    if (req.path.includes('/api/') && 
-        contentType && 
-        !contentType.includes('application/json') && 
-        !contentType.includes('multipart/form-data')) {
+    if (req.path.includes('/api/') &&
+      contentType &&
+      !contentType.includes('application/json') &&
+      !contentType.includes('multipart/form-data')) {
       return res.status(400).json({
         success: false,
         message: 'Content-Type debe ser application/json',
@@ -112,14 +112,14 @@ app.use((req, res, next) => {
   const url = req.originalUrl;
   const ip = req.ip || req.connection.remoteAddress || 'unknown';
   const userAgent = req.get('User-Agent') || 'unknown';
-  
+
   console.log(`${timestamp} - ${method} ${url} - IP: ${ip}`);
-  
+
   // Log adicional para requests de autenticación
   if (url.includes('/auth/')) {
     console.log(`🔐 Auth request: ${method} ${url}`);
   }
-  
+
   next();
 });
 
@@ -146,18 +146,18 @@ app.get('/test-db', async (req, res) => {
   try {
     const pool = require('./config/database');
     const connection = await pool.getConnection();
-    
+
     // Test básico de conexión
     await connection.ping();
-    
+
     // Test de lectura
     const [result] = await connection.execute('SELECT NOW() as current_time, VERSION() as mysql_version');
-    
+
     // Test de tabla principal
     const [tables] = await connection.execute("SHOW TABLES LIKE 'sistema_usuarios'");
-    
+
     connection.release();
-    
+
     res.json({
       status: 'OK',
       message: 'Conexión a base de datos exitosa',
@@ -196,6 +196,10 @@ app.get('/system-info', (req, res) => {
 // ============================================
 // CARGAR RUTAS PRINCIPALES
 // ============================================
+console.log('👤 Cargando rutas de clientes...');
+const clientRoutes = require('./routes/clients');
+app.use('/api/v1/clients', clientRoutes);
+console.log('✅ Rutas de clientes cargadas: /api/v1/clients');
 
 try {
   console.log('📂 Cargando rutas del sistema...');
@@ -233,9 +237,9 @@ try {
   } catch (error) {
     console.log('⚠️ Rutas de reportes no disponibles (opcional)');
   }
-  
+
   console.log('✅ Todas las rutas cargadas exitosamente');
-  
+
 } catch (error) {
   console.error('❌ Error cargando rutas:', error.message);
   console.error('Stack trace:', error.stack);
@@ -297,6 +301,20 @@ app.get('/api/v1', (req, res) => {
           'POST /api/v1/clients',
           'PUT /api/v1/clients/:id',
           'GET /api/v1/clients/stats'
+        ]
+      },
+      conceptos: {
+        base: '/api/v1/conceptos',
+        endpoints: [
+          'GET /api/v1/conceptos',
+          'GET /api/v1/conceptos/:id', 
+          'POST /api/v1/conceptos',
+          'PUT /api/v1/conceptos/:id',
+          'DELETE /api/v1/conceptos/:id',
+          'GET /api/v1/conceptos/stats',
+          'GET /api/v1/conceptos/tipos',
+          'GET /api/v1/conceptos/tipo/:tipo',
+          'POST /api/v1/conceptos/:id/toggle'
         ]
       },
       system: {
@@ -361,7 +379,7 @@ app.use((error, req, res, next) => {
   // Determinar código de estado
   let statusCode = error.status || error.statusCode || 500;
   let message = error.message || 'Error interno del servidor';
-  
+
   // Errores específicos de base de datos
   if (error.code === 'ER_DUP_ENTRY') {
     statusCode = 409;
@@ -416,18 +434,18 @@ app.use((error, req, res, next) => {
 async function startServer() {
   try {
     console.log('🔗 Verificando conexión a base de datos...');
-    
+
     // Probar conexión a base de datos
     const pool = require('./config/database');
     const connection = await pool.getConnection();
     await connection.ping();
-    
+
     // Verificar estructura de base de datos básica
     console.log('🔍 Verificando estructura de base de datos...');
-    
+
     const requiredTables = [
       'sistema_usuarios',
-      'configuracion_empresa', 
+      'configuracion_empresa',
       'departamentos',
       'ciudades',
       'sectores',
@@ -436,14 +454,14 @@ async function startServer() {
     ];
 
     const missingTables = [];
-    
+
     for (const table of requiredTables) {
       const [tables] = await connection.execute(`SHOW TABLES LIKE '${table}'`);
       if (tables.length === 0) {
         missingTables.push(table);
       }
     }
-    
+
     if (missingTables.length > 0) {
       console.log('⚠️  Tablas faltantes en la base de datos:', missingTables.join(', '));
       console.log('📝 Ejecuta el script basededatos.sql para crear las tablas necesarias');
@@ -456,7 +474,7 @@ async function startServer() {
     const [adminUsers] = await connection.execute(
       "SELECT id, email FROM sistema_usuarios WHERE rol = 'administrador' AND activo = 1 LIMIT 1"
     );
-    
+
     if (adminUsers.length === 0) {
       console.log('⚠️  No se encontró usuario administrador activo');
       console.log('💡 Puedes crear uno usando POST /api/v1/auth/register con rol "administrador"');
@@ -474,14 +492,14 @@ async function startServer() {
       const [companyConfig] = await testConnection.execute(
         'SELECT empresa_nombre, empresa_nit FROM configuracion_empresa LIMIT 1'
       );
-      
+
       if (companyConfig.length === 0 || !companyConfig[0].empresa_nombre) {
         console.log('⚠️  Configuración de empresa pendiente');
         console.log('⚙️  Configura la empresa en /api/v1/config/company');
       } else {
         console.log('✅ Empresa configurada:', companyConfig[0].empresa_nombre);
       }
-      
+
       testConnection.release();
     } catch (configError) {
       console.log('⚠️  No se pudo verificar configuración de empresa:', configError.message);
@@ -489,7 +507,7 @@ async function startServer() {
 
     // Iniciar servidor HTTP
     console.log('🚀 Iniciando servidor HTTP...');
-    
+
     const server = app.listen(PORT, () => {
       console.log('\n🎉 ¡Servidor iniciado exitosamente!');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -499,25 +517,25 @@ async function startServer() {
       console.log(`💾 Memoria: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
       console.log(`⏰ Zona horaria: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
+
       console.log('\n📋 Endpoints principales:');
       console.log('   🔍 Estado del sistema:');
       console.log(`      GET  http://localhost:${PORT}/health`);
       console.log(`      GET  http://localhost:${PORT}/test-db`);
       console.log(`      GET  http://localhost:${PORT}/system-info`);
-      
+
       console.log('   📡 API Principal:');
       console.log(`      GET  http://localhost:${PORT}/api/v1`);
-      
+
       console.log('   🔐 Autenticación:');
       console.log(`      POST http://localhost:${PORT}/api/v1/auth/login`);
       console.log(`      POST http://localhost:${PORT}/api/v1/auth/register`);
       console.log(`      GET  http://localhost:${PORT}/api/v1/auth/me`);
-      
+
       console.log('   👥 Gestión de usuarios:');
       console.log(`      GET  http://localhost:${PORT}/api/v1/users/profile`);
       console.log(`      GET  http://localhost:${PORT}/api/v1/users/stats`);
-      
+
       console.log('   ⚙️ Configuración:');
       console.log(`      GET  http://localhost:${PORT}/api/v1/config/overview`);
       console.log(`      GET  http://localhost:${PORT}/api/v1/config/company`);
@@ -526,20 +544,20 @@ async function startServer() {
       console.log(`      GET  http://localhost:${PORT}/api/v1/config/sectors`);
       console.log(`      GET  http://localhost:${PORT}/api/v1/config/banks`);
       console.log(`      GET  http://localhost:${PORT}/api/v1/config/service-plans`);
-      
+
       console.log('   👤 Clientes:');
       console.log(`      GET  http://localhost:${PORT}/api/v1/clients`);
       console.log(`      GET  http://localhost:${PORT}/api/v1/clients/stats`);
-      
+
       console.log('\n🛠️ Para desarrollo:');
       console.log('   • Variables de entorno: verificar archivo .env');
       console.log('   • Base de datos: ejecutar basededatos.sql si es necesario');
       console.log('   • CORS configurado para:', process.env.CORS_ORIGIN || 'localhost');
-      
+
       console.log('\n🔑 Credenciales por defecto:');
       console.log('   • Email: admin@empresa.com');
       console.log('   • Contraseña: (configurar en registro inicial)');
-      
+
       console.log('\n✨ ¡Sistema listo para recibir peticiones!');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     });
@@ -548,10 +566,10 @@ async function startServer() {
     server.timeout = 30000; // 30 segundos
     server.keepAliveTimeout = 65000; // 65 segundos
     server.headersTimeout = 66000; // 66 segundos
-    
+
     // Manejar conexiones activas para cierre graceful
     const connections = new Set();
-    
+
     server.on('connection', (connection) => {
       connections.add(connection);
       connection.on('close', () => {
@@ -562,20 +580,20 @@ async function startServer() {
     // Función de cierre graceful
     const gracefulShutdown = (signal) => {
       console.log(`\n🛑 Señal ${signal} recibida. Iniciando cierre graceful...`);
-      
+
       server.close((err) => {
         if (err) {
           console.error('❌ Error cerrando servidor:', err);
           process.exit(1);
         }
-        
+
         console.log('✅ Servidor HTTP cerrado');
-        
+
         // Cerrar conexiones activas
         connections.forEach((connection) => {
           connection.destroy();
         });
-        
+
         // Cerrar pool de base de datos
         if (pool) {
           pool.end().then(() => {
@@ -596,14 +614,14 @@ async function startServer() {
     // Registrar manejadores de señales
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-    
+
     return server;
 
   } catch (error) {
     console.error('💥 Error fatal al iniciar servidor:');
     console.error('Message:', error.message);
     console.error('Stack:', error.stack);
-    
+
     // Diagnósticos específicos
     if (error.code === 'ECONNREFUSED') {
       console.error('\n🔍 Diagnóstico:');
@@ -628,7 +646,7 @@ async function startServer() {
       console.error('   • DB_PASSWORD');
       console.error('   • DB_HOST');
     }
-    
+
     process.exit(1);
   }
 }
@@ -642,7 +660,7 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('💥 Unhandled Promise Rejection:');
   console.error('Reason:', reason);
   console.error('Promise:', promise);
-  
+
   // En producción, podríamos querer reiniciar el proceso
   if (process.env.NODE_ENV === 'production') {
     console.error('🔄 Reiniciando proceso debido a error crítico...');
@@ -655,7 +673,7 @@ process.on('uncaughtException', (error) => {
   console.error('💥 Uncaught Exception:');
   console.error('Message:', error.message);
   console.error('Stack:', error.stack);
-  
+
   // Las excepciones no capturadas requieren reinicio
   console.error('🔄 Proceso debe reiniciarse debido a excepción no capturada');
   process.exit(1);
@@ -675,7 +693,7 @@ if (process.env.NODE_ENV === 'development') {
   setInterval(() => {
     const memUsage = process.memoryUsage();
     const mbUsed = Math.round(memUsage.heapUsed / 1024 / 1024);
-    
+
     if (mbUsed > 100) { // Solo loggear si usa más de 100MB
       console.log(`📊 Memoria: ${mbUsed}MB usado de ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`);
     }

@@ -24,6 +24,7 @@ const ServicePlansConfig = lazy(() => import('./components/Config/ServicePlansCo
 
 // Lazy loading de componentes de gestión
 const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagement'));
+const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -350,6 +351,17 @@ function App() {
               <Route
                 path="/"
                 element={<Navigate to="/dashboard" replace />}
+              />
+
+              <Route
+                path="/config/conceptos"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Conceptos de Facturación" subtitle="Gestión de conceptos facturables">
+                      <ConceptosConfig />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
               />
 
               <Route

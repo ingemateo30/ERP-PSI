@@ -8,6 +8,7 @@ const Joi = require('joi');
 const CompanyConfigController = require('../controllers/companyConfigController');
 const GeographyController = require('../controllers/geographyController');
 const BanksController = require('../controllers/banksController');
+const conceptosController = require('../controllers/conceptosController');
 const ServicePlansController = require('../controllers/servicePlansController');
 
 // Middleware
@@ -797,7 +798,19 @@ router.get('/health',
         timestamp: new Date().toISOString()
       });
     }
-  }
-);
+  },
+)
+  
+  
+// Rutas para conceptos de facturación
+router.get('/conceptos', conceptosController.getAll);
+router.get('/conceptos/stats', conceptosController.getStats);
+router.get('/conceptos/tipos', conceptosController.getTipos);
+router.get('/conceptos/tipo/:tipo', conceptosController.getByType);
+router.get('/conceptos/:id', conceptosController.getById);
+router.post('/conceptos', conceptosController.create);
+router.put('/conceptos/:id', conceptosController.update);
+router.post('/conceptos/:id/toggle', conceptosController.toggleStatus);
+router.delete('/conceptos/:id', conceptosController.delete);
 
 module.exports = router;
