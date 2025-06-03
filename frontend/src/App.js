@@ -24,7 +24,9 @@ const ServicePlansConfig = lazy(() => import('./components/Config/ServicePlansCo
 
 // Lazy loading de componentes de gestión
 const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagement'));
-const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
+
+// OPCIONAL: Solo importar si existe el componente
+// const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -127,7 +129,28 @@ const AdminPanelContent = () => (
       </button>
     </div>
 
-    {/* Otros paneles... */}
+    {/* Panel de Conceptos de Facturación */}
+    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+      <div className="flex items-center mb-4">
+        <div className="w-12 h-12 bg-green-500/10 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        Conceptos de Facturación
+      </h3>
+      <p className="text-gray-600 mb-4">
+        Gestionar conceptos facturables del sistema
+      </p>
+      <button
+        onClick={() => window.location.href = '/config/conceptos'}
+        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+      >
+        Acceder
+      </button>
+    </div>
   </div>
 );
 
@@ -239,6 +262,18 @@ function App() {
                 }
               />
 
+              {/* Ruta para conceptos de facturación */}
+              <Route
+                path="/config/conceptos"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Conceptos de Facturación" subtitle="Gestión de conceptos facturables">
+                      <ComingSoon pageName="Conceptos de Facturación" />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
               {/* ================================ */}
               {/* RUTAS DE GESTIÓN PRINCIPAL */}
               {/* ================================ */}
@@ -319,6 +354,17 @@ function App() {
                 }
               />
 
+              <Route
+                path="/calendar"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout title="Calendario" subtitle="Esta funcionalidad está en desarrollo">
+                      <ComingSoon pageName="Calendario" />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
               {/* ================================ */}
               {/* RUTAS DE ADMINISTRACIÓN */}
               {/* ================================ */}
@@ -351,17 +397,6 @@ function App() {
               <Route
                 path="/"
                 element={<Navigate to="/dashboard" replace />}
-              />
-
-              <Route
-                path="/config/conceptos"
-                element={
-                  <ProtectedRoute requiredRole="administrador">
-                    <MainLayout title="Conceptos de Facturación" subtitle="Gestión de conceptos facturables">
-                      <ConceptosConfig />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
               />
 
               <Route
