@@ -188,9 +188,9 @@ app.get('/system-info', (req, res) => {
 // CARGAR RUTAS PRINCIPALES
 // ============================================
 console.log('👤 Cargando rutas de clientes...');
-const clientRoutes = require('./routes/clients');
-app.use('/api/v1/clients', clientRoutes);
-console.log('✅ Rutas de clientes cargadas: /api/v1/clients');
+const clientesRoutes = require('./routes/clientes');  // <-- CAMBIO: clientes.js
+app.use('/api/v1/clients', clientesRoutes);           // <-- CAMBIO: usar clientesRoutes
+console.log('✅ Rutas de clientes cargadas: /api/v1/clients')
 
 try {
   console.log('📂 Cargando rutas del sistema...');
@@ -215,7 +215,7 @@ try {
 
   // Rutas de clientes
   console.log('👤 Cargando rutas de clientes...');
-  const clientRoutes = require('./routes/clients');
+  const clientRoutes = require('./routes/clientes');
   app.use('/api/v1/clients', clientRoutes);
   console.log('✅ Rutas de clientes cargadas: /api/v1/clients');
 
@@ -305,7 +305,7 @@ app.get('/api/v1', (req, res) => {
         base: '/api/v1/conceptos',
         endpoints: [
           'GET /api/v1/conceptos',
-          'GET /api/v1/conceptos/:id', 
+          'GET /api/v1/conceptos/:id',
           'POST /api/v1/conceptos',
           'PUT /api/v1/conceptos/:id',
           'DELETE /api/v1/conceptos/:id',

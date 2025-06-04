@@ -9,6 +9,7 @@ import EquipmentFilters from './EquipmentFilters';
 import EquipmentStats from './EquipmentStats';
 import AssignmentModal from './AssignmentModal';
 import HistoryModal from './HistoryModal';
+import { Package, Plus, CheckCircle, AlertCircle } from 'lucide-react';
 
 const InventoryManagement = () => {
   const { user } = useAuth();
@@ -238,64 +239,85 @@ const InventoryManagement = () => {
   }, [error, success]);
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestión de Inventarios</h1>
-          <p className="text-gray-600">Administra equipos, asignaciones e instalaciones</p>
+    <div className="p-4 md:p-6 space-y-6 bg-gray-50 min-h-screen">
+      {/* Header con gradiente similar al dashboard */}
+      <div className="bg-gradient-to-r from-[#0e6493] to-[#0e6493]/80 rounded-xl p-5 shadow-lg text-white overflow-hidden relative">
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+        
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center relative z-10">
+          <div className="mb-4 lg:mb-0">
+            <div className="flex items-center space-x-3 mb-2">
+              <Package size={32} className="text-white" />
+              <h1 className="text-2xl md:text-3xl font-bold">Gestión de Inventarios</h1>
+            </div>
+            <p className="text-lg opacity-90">Administra equipos, asignaciones e instalaciones</p>
+          </div>
+          
+          {user.rol !== 'instalador' && (
+            <button
+              onClick={handleCreate}
+              className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-4 md:px-6 backdrop-blur-sm flex items-center space-x-2 font-medium"
+            >
+              <Plus size={20} />
+              <span>Nuevo Equipo</span>
+            </button>
+          )}
         </div>
-        {user.rol !== 'instalador' && (
-          <button
-            onClick={handleCreate}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-            </svg>
-            <span>Nuevo Equipo</span>
-          </button>
-        )}
       </div>
 
-      {/* Mensajes */}
+      {/* Mensajes de estado con diseño mejorado */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 shadow-sm">
+          <div className="flex items-center space-x-2">
+            <AlertCircle size={20} className="text-red-500 flex-shrink-0" />
+            <span className="text-red-700 font-medium">{error}</span>
+          </div>
         </div>
       )}
 
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-          {success}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 shadow-sm">
+          <div className="flex items-center space-x-2">
+            <CheckCircle size={20} className="text-green-500 flex-shrink-0" />
+            <span className="text-green-700 font-medium">{success}</span>
+          </div>
         </div>
       )}
 
-      {/* Estadísticas */}
-      {stats && <EquipmentStats stats={stats} />}
+      {/* Estadísticas con el estilo del dashboard */}
+      {stats && (
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <EquipmentStats stats={stats} />
+        </div>
+      )}
 
-      {/* Filtros */}
-      <EquipmentFilters
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        userRole={user.rol}
-      />
+      {/* Filtros con fondo blanco y sombra */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <EquipmentFilters
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          userRole={user.rol}
+        />
+      </div>
 
-      {/* Lista de equipos */}
-      <EquipmentList
-        equipos={equipos}
-        pagination={pagination}
-        loading={loading}
-        userRole={user.rol}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onAssign={handleAssign}
-        onReturn={handleReturn}
-        onHistory={handleHistory}
-        onPageChange={handlePageChange}
-      />
+      {/* Lista de equipos con fondo blanco y sombra */}
+      <div className="bg-white rounded-lg shadow-md">
+        <EquipmentList
+          equipos={equipos}
+          pagination={pagination}
+          loading={loading}
+          userRole={user.rol}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onAssign={handleAssign}
+          onReturn={handleReturn}
+          onHistory={handleHistory}
+          onPageChange={handlePageChange}
+        />
+      </div>
 
-      {/* Modal de formulario */}
+      {/* Modales */}
       {showForm && (
         <EquipmentForm
           equipo={selectedEquipo}
@@ -304,7 +326,6 @@ const InventoryManagement = () => {
         />
       )}
 
-      {/* Modal de asignación */}
       {showAssignment && (
         <AssignmentModal
           equipo={selectedEquipo}
@@ -313,7 +334,6 @@ const InventoryManagement = () => {
         />
       )}
 
-      {/* Modal de historial */}
       {showHistory && (
         <HistoryModal
           equipo={selectedEquipo}

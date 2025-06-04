@@ -294,8 +294,10 @@ function App() {
               <Route
                 path="/clients"
                 element={
-                  <ProtectedRoute requiredRole="supervisor">
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Detalle de Cliente" subtitle="Esta funcionalidad está en desarrollo">
                     <ClientsManagement />
+                    </MainLayout>
                   </ProtectedRoute>
                 }
               />

@@ -74,6 +74,13 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       path: '/admin/users',
       permission: 'supervisor'
     },
+     {
+    icon: <Users size={22} />,
+      label: 'Clientes',
+      path: '/clients',
+      permission: 'administrador'
+    
+  },
     {
       icon: <DollarSign size={22} />,
       label: 'Facturación',
