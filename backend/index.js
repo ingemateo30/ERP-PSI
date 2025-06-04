@@ -239,6 +239,11 @@ try {
 const plantillasCorreoRoutes = require('./routes/plantillasCorreo');
 app.use('/api/v1/config/plantillas-correo', plantillasCorreoRoutes);
 
+console.log('📦 Cargando rutas de inventario...');
+const inventoryRoutes = require('./routes/inventario');
+app.use('/api/v1/inventory', inventoryRoutes);
+console.log('✅ Rutas de inventario cargadas: /api/v1/inventory');
+
 // Ruta base de la API con información completa
 app.get('/api/v1', (req, res) => {
   res.json({
@@ -308,6 +313,31 @@ app.get('/api/v1', (req, res) => {
           'GET /api/v1/conceptos/tipos',
           'GET /api/v1/conceptos/tipo/:tipo',
           'POST /api/v1/conceptos/:id/toggle'
+        ]
+      },
+      inventory: {
+        base: '/api/v1/inventory',
+        endpoints: [
+          'GET /api/v1/inventory/equipment',
+          'GET /api/v1/inventory/equipment/:id',
+          'POST /api/v1/inventory/equipment',
+          'PUT /api/v1/inventory/equipment/:id',
+          'DELETE /api/v1/inventory/equipment/:id',
+          'POST /api/v1/inventory/equipment/:id/assign',
+          'POST /api/v1/inventory/equipment/:id/return',
+          'POST /api/v1/inventory/equipment/:id/install',
+          'PUT /api/v1/inventory/equipment/:id/location',
+          'GET /api/v1/inventory/installer/:instaladorId/equipment',
+          'GET /api/v1/inventory/equipment/:id/history',
+          'GET /api/v1/inventory/installer/:instaladorId/history',
+          'GET /api/v1/inventory/stats',
+          'GET /api/v1/inventory/reports/date-range',
+          'GET /api/v1/inventory/available',
+          'GET /api/v1/inventory/installers',
+          'GET /api/v1/inventory/search',
+          'GET /api/v1/inventory/types',
+          'GET /api/v1/inventory/types/:tipo/brands',
+          'GET /api/v1/inventory/check-code/:codigo'
         ]
       },
       system: {

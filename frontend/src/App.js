@@ -22,6 +22,7 @@ const BanksConfig = lazy(() => import('./components/Config/BanksConfig'));
 const GeographyConfig = lazy(() => import('./components/Config/GeographyConfig'));
 const ServicePlansConfig = lazy(() => import('./components/Config/ServicePlansConfig'));
 const PlantillasCorreoConfig = lazy(() => import('./components/Config/PlantillasCorreoConfig'));
+const InventoryManagement = lazy(() => import('./components/Inventory/InventoryManagement')); // CORREGIDO: Importación correcta del componente InventoryManagement'./components/Inventory/InventoryManagement';
 
 // Lazy loading de componentes de gestión
 const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagement'));
@@ -346,9 +347,9 @@ function App() {
               <Route
                 path="/inventory"
                 element={
-                  <ProtectedRoute requiredRole="supervisor">
-                    <MainLayout title="Gestión de Inventario" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Gestión de Inventario" />
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Gestión de Inventario" subtitle="">
+                      <InventoryManagement />
                     </MainLayout>
                   </ProtectedRoute>
                 }
