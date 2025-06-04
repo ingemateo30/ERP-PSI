@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 26-05-2025 a las 16:58:16
+-- Tiempo de generación: 04-06-2025 a las 17:54:58
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.1.25
 
@@ -20,6 +20,79 @@ SET time_zone = "+00:00";
 --
 -- Base de datos: `base_psi`
 --
+
+DELIMITER $$
+--
+-- Procedimientos
+--
+CREATE DEFINER=`root`@`localhost` PROCEDURE `AsignarEquipoInstalador` (IN `p_equipo_id` INT, IN `p_instalador_id` INT, IN `p_ubicacion` VARCHAR(255), IN `p_notas` TEXT, IN `p_asignado_por` INT)   BEGIN
+  DECLARE v_estado_actual VARCHAR(50);
+  DECLARE v_instalador_actual INT;
+  
+  -- Verificar estado actual del equipo
+  SELECT estado, instalador_id INTO v_estado_actual, v_instalador_actual
+  FROM inventario_equipos 
+  WHERE id = p_equipo_id;
+  
+  -- Verificar que el equipo esté disponible
+  IF v_estado_actual != 'disponible' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'El equipo no está disponible para asignación';
+  END IF;
+  
+  -- Verificar que el usuario sea instalador
+  IF NOT EXISTS (SELECT 1 FROM sistema_usuarios WHERE id = p_instalador_id AND rol = 'instalador') THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'El usuario especificado no es un instalador';
+  END IF;
+  
+  -- Actualizar el equipo
+  UPDATE inventario_equipos 
+  SET 
+    estado = 'asignado',
+    instalador_id = p_instalador_id,
+    fecha_asignacion = NOW(),
+    fecha_devolucion = NULL,
+    ubicacion_actual = p_ubicacion,
+    notas_instalador = p_notas,
+    updated_at = NOW()
+  WHERE id = p_equipo_id;
+  
+  -- Registrar en historial
+  INSERT INTO inventario_historial (
+    equipo_id, instalador_id, accion, ubicacion, notas, created_by
+  ) VALUES (
+    p_equipo_id, p_instalador_id, 'asignado', p_ubicacion, p_notas, p_asignado_por
+  );
+  
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `DevolverEquipo` (IN `p_equipo_id` INT, IN `p_ubicacion_devolucion` VARCHAR(255), IN `p_notas` TEXT, IN `p_devuelto_por` INT)   BEGIN
+  DECLARE v_instalador_actual INT;
+  
+  -- Obtener instalador actual
+  SELECT instalador_id INTO v_instalador_actual
+  FROM inventario_equipos 
+  WHERE id = p_equipo_id;
+  
+  -- Actualizar el equipo
+  UPDATE inventario_equipos 
+  SET 
+    estado = 'disponible',
+    fecha_devolucion = NOW(),
+    ubicacion_actual = p_ubicacion_devolucion,
+    notas_instalador = CONCAT(IFNULL(notas_instalador, ''), '\n--- DEVUELTO ---\n', IFNULL(p_notas, '')),
+    updated_at = NOW()
+  WHERE id = p_equipo_id;
+  
+  -- Registrar en historial
+  INSERT INTO inventario_historial (
+    equipo_id, instalador_id, accion, ubicacion, notas, created_by
+  ) VALUES (
+    p_equipo_id, v_instalador_actual, 'devuelto', p_ubicacion_devolucion, p_notas, p_devuelto_por
+  );
+  
+END$$
+
+DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -159,8 +232,8 @@ CREATE TABLE `conceptos_facturacion` (
 --
 
 INSERT INTO `conceptos_facturacion` (`id`, `codigo`, `nombre`, `valor_base`, `aplica_iva`, `porcentaje_iva`, `descripcion`, `tipo`, `activo`, `created_at`, `updated_at`) VALUES
-(1, 'INT', 'Servicio Internet', 0.00, 1, 0.00, NULL, 'internet', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
-(2, 'TV', 'Servicio Televisión', 0.00, 1, 0.00, NULL, 'television', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
+(1, 'INT', 'Servicio Internet', 0.00, 1, 0.00, NULL, 'internet', 1, '2025-05-23 13:44:46', '2025-06-03 13:58:34'),
+(2, 'TV', 'Servicio Televisión basico', 0.00, 1, 0.00, NULL, 'television', 1, '2025-05-23 13:44:46', '2025-06-03 13:58:50'),
 (3, 'REC', 'Reconexión', 0.00, 1, 0.00, NULL, 'reconexion', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
 (4, 'INT_M', 'Intereses por Mora', 0.00, 0, 0.00, NULL, 'interes', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
 (5, 'DESC', 'Descuento', 0.00, 0, 0.00, NULL, 'descuento', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
@@ -206,7 +279,7 @@ CREATE TABLE `configuracion_empresa` (
 --
 
 INSERT INTO `configuracion_empresa` (`id`, `licencia`, `empresa_nombre`, `empresa_nit`, `empresa_direccion`, `empresa_ciudad`, `empresa_departamento`, `empresa_telefono`, `empresa_email`, `resolucion_facturacion`, `licencia_internet`, `vigilado`, `vigilado_internet`, `comentario`, `prefijo_factura`, `codigo_gs1`, `fecha_actualizacion`, `consecutivo_factura`, `consecutivo_contrato`, `consecutivo_recibo`, `valor_reconexion`, `dias_mora_corte`, `porcentaje_iva`, `porcentaje_interes`, `updated_at`) VALUES
-(1, 'DEMO2024', 'Mi Empresa ISP', '900123456-1', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'FAC', NULL, NULL, 1, 1, 1, 15000.00, 30, 19.00, 0.00, '2025-05-23 13:44:46');
+(1, 'DEMO2024', 'Mi Empresa PSI', '900123456-1', 'DFD', 'SANGIL', 'SANTANDER', '44478787', 'PSI@PSI.COM.CO', 'SDSDFSDFDSFSD', 'DFSDFSDFS', 'DFSDFSF', 'DFSDFSDF', 'DFSDF', 'FAC', 'GS1', '2025-05-29', 1, 1, 1, 15000.00, 30, 19.00, 15.00, '2025-05-29 20:17:16');
 
 -- --------------------------------------------------------
 
@@ -249,7 +322,6 @@ INSERT INTO `departamentos` (`id`, `codigo`, `nombre`) VALUES
 (3, '76', 'Valle del Cauca'),
 (4, '08', 'Atlántico'),
 (5, '13', 'Bolívar');
-
 
 -- --------------------------------------------------------
 
@@ -363,14 +435,56 @@ CREATE TABLE `inventario_equipos` (
   `marca` varchar(100) DEFAULT NULL,
   `modelo` varchar(100) DEFAULT NULL,
   `numero_serie` varchar(100) DEFAULT NULL,
-  `estado` enum('disponible','instalado','dañado','perdido','mantenimiento') DEFAULT 'disponible',
+  `estado` enum('disponible','asignado','instalado','dañado','perdido','mantenimiento','devuelto') DEFAULT 'disponible',
+  `instalador_id` int(11) DEFAULT NULL,
+  `fecha_asignacion` datetime DEFAULT NULL,
+  `fecha_devolucion` datetime DEFAULT NULL,
   `precio_compra` decimal(10,2) DEFAULT NULL,
   `fecha_compra` date DEFAULT NULL,
   `proveedor` varchar(255) DEFAULT NULL,
   `ubicacion` varchar(255) DEFAULT NULL,
+  `ubicacion_actual` varchar(255) DEFAULT NULL,
+  `coordenadas_lat` decimal(10,8) DEFAULT NULL,
+  `coordenadas_lng` decimal(11,8) DEFAULT NULL,
   `observaciones` text DEFAULT NULL,
+  `notas_instalador` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `inventario_equipos`
+--
+
+INSERT INTO `inventario_equipos` (`id`, `codigo`, `nombre`, `tipo`, `marca`, `modelo`, `numero_serie`, `estado`, `instalador_id`, `fecha_asignacion`, `fecha_devolucion`, `precio_compra`, `fecha_compra`, `proveedor`, `ubicacion`, `ubicacion_actual`, `coordenadas_lat`, `coordenadas_lng`, `observaciones`, `notas_instalador`, `created_at`, `updated_at`) VALUES
+(1, 'RTR001', 'Router WiFi AC1200', 'router', 'TP-Link', 'Archer C6', 'TPL2024001', 'disponible', NULL, NULL, NULL, 75000.00, '2024-01-15', 'Distribuidora Tech', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
+(2, 'RTR002', 'Router WiFi AX1800', 'router', 'Asus', 'AX1800', 'ASU2024001', 'disponible', NULL, NULL, NULL, 120000.00, '2024-02-01', 'Distribuidora Tech', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
+(3, 'CBL001', 'Cable UTP Cat6 305m', 'cable', 'Panduit', 'Cat6-305', 'PAN2024001', 'disponible', NULL, NULL, NULL, 450000.00, '2024-01-20', 'Cables y Más', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
+(4, 'CBL002', 'Cable Coaxial RG6 305m', 'cable', 'CommScope', 'RG6-305', 'CS2024001', 'disponible', NULL, NULL, NULL, 280000.00, '2024-01-25', 'Cables y Más', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
+(5, 'ANT001', 'Antena Sectorial 2.4GHz', 'antena', 'Ubiquiti', 'AM-2G15-120', 'UBI2024001', 'disponible', NULL, NULL, NULL, 85000.00, '2024-02-10', 'Wireless Solutions', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
+(6, 'SPL001', 'Splitter 1x8 5-1000MHz', 'splitter', 'Antronix', 'CMC2008H', 'ANT2024001', 'disponible', NULL, NULL, NULL, 15000.00, '2024-02-15', 'Electrónicos del Valle', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
+(7, 'AMP001', 'Amplificador de Señal 30dB', 'amplificador', 'Antronix', 'CMA2030', 'ANT2024002', 'disponible', NULL, NULL, NULL, 45000.00, '2024-03-01', 'Electrónicos del Valle', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
+(8, 'DEC001', 'Decodificador TDT HD', 'decodificador', 'Samsung', 'GX-SM530SH', 'SAM2024001', 'disponible', NULL, NULL, NULL, 95000.00, '2024-03-05', 'Samsung Colombia', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `inventario_historial`
+--
+
+CREATE TABLE `inventario_historial` (
+  `id` int(11) NOT NULL,
+  `equipo_id` int(11) NOT NULL,
+  `instalador_id` int(11) NOT NULL,
+  `accion` enum('asignado','devuelto','instalado','retirado','dañado') NOT NULL,
+  `fecha_accion` datetime NOT NULL DEFAULT current_timestamp(),
+  `ubicacion` varchar(255) DEFAULT NULL,
+  `coordenadas_lat` decimal(10,8) DEFAULT NULL,
+  `coordenadas_lng` decimal(11,8) DEFAULT NULL,
+  `notas` text DEFAULT NULL,
+  `cliente_id` int(11) DEFAULT NULL,
+  `instalacion_id` int(11) DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -444,8 +558,8 @@ INSERT INTO `planes_servicio` (`id`, `codigo`, `nombre`, `tipo`, `precio`, `velo
 (1, 'INT10', 'Internet 10MB', 'internet', 45000.00, 2, 10, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
 (2, 'INT30', 'Internet 30MB', 'internet', 65000.00, 5, 30, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
 (3, 'INT50', 'Internet 50MB', 'internet', 85000.00, 10, 50, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
-(4, 'TV_BAS', 'TV Básica', 'television', 25000.00, NULL, NULL, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
-(5, 'TV_PREM', 'TV Premium', 'television', 45000.00, NULL, NULL, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
+(4, 'TV_BAS', 'TV Básica', 'television', 25000.00, NULL, NULL, 80, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-29 22:23:56'),
+(5, 'TV_PREM', 'TV Premium', 'television', 45000.00, NULL, NULL, 100, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-29 22:24:00'),
 (6, 'COMBO1', 'Combo Internet 30MB + TV', 'combo', 75000.00, 5, 30, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46');
 
 -- --------------------------------------------------------
@@ -472,7 +586,12 @@ CREATE TABLE `plantillas_correo` (
 INSERT INTO `plantillas_correo` (`id`, `titulo`, `asunto`, `contenido`, `tipo`, `activo`, `created_at`, `updated_at`) VALUES
 (1, 'Bienvenida', 'Bienvenido a nuestros servicios', 'Estimado cliente, le damos la bienvenida...', 'bienvenida', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
 (2, 'Facturación', 'Su factura está disponible', 'Su factura del mes está lista para descargar...', 'facturacion', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
-(3, 'Aviso de Corte', 'Aviso de suspensión de servicio', 'Le informamos que su servicio será suspendido...', 'corte', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46');
+(3, 'Aviso de Corte', 'Aviso de suspensión de servicio', 'Le informamos que su servicio será suspendido...', 'corte', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
+(4, 'Factura Vencida', 'Su factura {{numero_factura}} está vencida', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <h2 style=\"color: #0e6493;\">{{empresa_nombre}}</h2>\r\n    \r\n    <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n    \r\n    <p>Le informamos que su factura número <strong>{{numero_factura}}</strong> con fecha de vencimiento <strong>{{fecha_vencimiento}}</strong> por valor de <strong>{{valor_factura}}</strong> se encuentra vencida.</p>\r\n    \r\n    <div style=\"background-color: #f8f9fa; padding: 15px; border-left: 4px solid #0e6493; margin: 20px 0;\">\r\n        <h3 style=\"margin: 0; color: #0e6493;\">Información de Pago</h3>\r\n        <p style=\"margin: 10px 0 0 0;\">Para realizar su pago, comuníquese con nosotros al <strong>{{telefono_soporte}}</strong> o visite nuestras oficinas.</p>\r\n    </div>\r\n    \r\n    <p>Evite la suspensión de su servicio realizando el pago a la mayor brevedad posible.</p>\r\n    \r\n    <p style=\"margin-top: 30px;\">\r\n        Atentamente,<br>\r\n        <strong>{{empresa_nombre}}</strong><br>\r\n        Fecha: {{fecha_actual}}\r\n    </p>\r\n</div>', 'facturacion', 1, '2025-06-04 13:36:32', '2025-06-04 13:36:32'),
+(5, 'Aviso Corte por Mora', 'URGENTE: Suspensión de servicio programada', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <div style=\"background-color: #dc3545; color: white; padding: 15px; text-align: center; margin-bottom: 20px;\">\r\n        <h2 style=\"margin: 0;\">⚠️ AVISO URGENTE ⚠️</h2>\r\n    </div>\r\n    \r\n    <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n    \r\n    <p>Le informamos que debido a mora en el pago de sus servicios, <strong>su servicio será suspendido en las próximas 24 horas</strong>.</p>\r\n    \r\n    <div style=\"background-color: #fff3cd; padding: 15px; border: 1px solid #ffeaa7; border-radius: 5px; margin: 20px 0;\">\r\n        <h3 style=\"margin: 0 0 10px 0; color: #856404;\">Para evitar la suspensión:</h3>\r\n        <ul style=\"margin: 0; padding-left: 20px;\">\r\n            <li>Realice su pago inmediatamente</li>\r\n            <li>Comuníquese con nosotros al <strong>{{telefono_soporte}}</strong></li>\r\n            <li>Presente comprobante de pago</li>\r\n        </ul>\r\n    </div>\r\n    \r\n    <p><strong>Factura pendiente:</strong> {{numero_factura}}<br>\r\n    <strong>Valor:</strong> {{valor_factura}}<br>\r\n    <strong>Vencimiento:</strong> {{fecha_vencimiento}}</p>\r\n    \r\n    <p style=\"margin-top: 30px;\">\r\n        {{empresa_nombre}}<br>\r\n        {{fecha_actual}}\r\n    </p>\r\n</div>', 'corte', 1, '2025-06-04 13:36:32', '2025-06-04 13:54:32'),
+(6, 'Servicio Restablecido', '✅ Su servicio ha sido restablecido', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <div style=\"background-color: #28a745; color: white; padding: 15px; text-align: center; margin-bottom: 20px;\">\r\n        <h2 style=\"margin: 0;\">✅ SERVICIO RESTABLECIDO</h2>\r\n    </div>\r\n    \r\n    <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n    \r\n    <p>Nos complace informarle que su servicio ha sido <strong>restablecido exitosamente</strong>.</p>\r\n    \r\n    <div style=\"background-color: #d4edda; padding: 15px; border: 1px solid #c3e6cb; border-radius: 5px; margin: 20px 0;\">\r\n        <h3 style=\"margin: 0 0 10px 0; color: #155724;\">Su servicio ya está activo</h3>\r\n        <p style=\"margin: 0;\">Puede comenzar a utilizar todos nuestros servicios normalmente.</p>\r\n    </div>\r\n    \r\n    <p>Agradecemos su pago y confianza en nuestros servicios.</p>\r\n    \r\n    <p>Si experimenta algún inconveniente técnico, no dude en contactarnos al <strong>{{telefono_soporte}}</strong>.</p>\r\n    \r\n    <p style=\"margin-top: 30px;\">\r\n        Atentamente,<br>\r\n        <strong>{{empresa_nombre}}</strong><br>\r\n        {{fecha_actual}}\r\n    </p>\r\n</div>', 'reconexion', 1, '2025-06-04 13:36:32', '2025-06-04 13:36:32'),
+(7, 'Bienvenida Nuevo Cliente', '¡Bienvenido a {{empresa_nombre}}!', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <div style=\"background-color: #0e6493; color: white; padding: 20px; text-align: center;\">\r\n        <h1 style=\"margin: 0;\">¡Bienvenido a {{empresa_nombre}}!</h1>\r\n    </div>\r\n    \r\n    <div style=\"padding: 20px;\">\r\n        <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n        \r\n        <p>¡Nos complace darle la bienvenida a nuestra familia de clientes!</p>\r\n        \r\n        <div style=\"background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;\">\r\n            <h3 style=\"margin: 0 0 15px 0; color: #0e6493;\">Sus servicios incluyen:</h3>\r\n            <ul style=\"margin: 0; padding-left: 20px;\">\r\n                <li>Conexión de internet de alta velocidad</li>\r\n                <li>Soporte técnico especializado</li>\r\n                <li>Atención al cliente 24/7</li>\r\n                <li>Facturación electrónica</li>\r\n            </ul>\r\n        </div>\r\n        \r\n        <div style=\"background-color: #e7f3ff; padding: 15px; border-left: 4px solid #0e6493; margin: 20px 0;\">\r\n            <h3 style=\"margin: 0 0 10px 0;\">Información de contacto:</h3>\r\n            <p style=\"margin: 0;\"><strong>Soporte técnico:</strong> {{telefono_soporte}}</p>\r\n        </div>\r\n        \r\n        <p>Estamos aquí para brindarle el mejor servicio. No dude en contactarnos si tiene alguna pregunta.</p>\r\n        \r\n        <p style=\"margin-top: 30px;\">\r\n            ¡Gracias por elegirnos!<br>\r\n            <strong>{{empresa_nombre}}</strong><br>\r\n            {{fecha_actual}}\r\n        </p>\r\n    </div>\r\n</div>', 'bienvenida', 1, '2025-06-04 13:36:32', '2025-06-04 13:36:32'),
+(8, 'Mantenimiento Programado', 'Mantenimiento programado - {{fecha_mantenimiento}}', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <div style=\"background-color: #ffc107; color: #212529; padding: 15px; text-align: center; margin-bottom: 20px;\">\r\n        <h2 style=\"margin: 0;\">🔧 MANTENIMIENTO PROGRAMADO</h2>\r\n    </div>\r\n    \r\n    <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n    \r\n    <p>Le informamos que realizaremos un mantenimiento programado en nuestros sistemas para mejorar la calidad del servicio.</p>\r\n    \r\n    <div style=\"background-color: #fff3cd; padding: 15px; border: 1px solid #ffeaa7; border-radius: 5px; margin: 20px 0;\">\r\n        <h3 style=\"margin: 0 0 10px 0; color: #856404;\">Detalles del mantenimiento:</h3>\r\n        <p style=\"margin: 5px 0;\"><strong>Fecha:</strong> {{fecha_mantenimiento}}</p>\r\n        <p style=\"margin: 5px 0;\"><strong>Hora:</strong> {{hora_mantenimiento}}</p>\r\n        <p style=\"margin: 5px 0;\"><strong>Duración estimada:</strong> {{duracion_mantenimiento}}</p>\r\n    </div>\r\n    \r\n    <p>Durante este período, es posible que experimente interrupciones temporales en el servicio.</p>\r\n    \r\n    <p>Agradecemos su comprensión y disculpas por las molestias ocasionadas.</p>\r\n    \r\n    <p style=\"margin-top: 30px;\">\r\n        Atentamente,<br>\r\n        <strong>{{empresa_nombre}}</strong><br>\r\n        {{fecha_actual}}\r\n    </p>\r\n</div>', 'general', 1, '2025-06-04 13:36:32', '2025-06-04 13:36:32');
 
 -- --------------------------------------------------------
 
@@ -503,6 +622,13 @@ CREATE TABLE `sectores` (
   `ciudad_id` int(11) DEFAULT NULL,
   `activo` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `sectores`
+--
+
+INSERT INTO `sectores` (`id`, `codigo`, `nombre`, `ciudad_id`, `activo`) VALUES
+(1, '001', 'CENTRO', 5, 1);
 
 -- --------------------------------------------------------
 
@@ -548,7 +674,9 @@ CREATE TABLE `sistema_usuarios` (
 --
 
 INSERT INTO `sistema_usuarios` (`id`, `email`, `password`, `nombre`, `telefono`, `rol`, `activo`, `ultimo_acceso`, `created_at`, `updated_at`) VALUES
-(1, 'admin@empresa.com', '$2b$10$ejemplo_hash_password', 'Administrador Sistema', NULL, 'administrador', 1, NULL, '2025-05-23 13:44:46', '2025-05-23 13:44:46');
+(1, 'admin@empresa.com', '$2b$10$G79aY18UGoMa8iEa65GvieeQi74v7DkXCmQs4sVxuuhNCdWUBjcGO', 'Mateo salazar ortiz', '3007015239', 'administrador', 1, '2025-06-03 19:10:59', '2025-05-23 13:44:46', '2025-06-03 19:10:59'),
+(2, 'super@empresa.com', '$2b$12$f1Vvth/hYSUD7VHtfmZKmOuNXrHowf0Fy2T7MtxdhRAZdIOQR8MCa', 'mateo salazar ortiz', '3007015239', 'supervisor', 1, '2025-06-03 16:18:19', '2025-05-30 14:32:41', '2025-06-03 16:18:19'),
+(3, 'instalador@empresa.com', '$2b$12$FCgmtglWlgNJPwNmNbX3fOp8eRnvpeaSgKdteS0mKYtKHq1/qq6Ri', 'mateo salazar ortiz', '3007015239', 'instalador', 1, '2025-06-03 14:21:23', '2025-05-30 15:00:25', '2025-06-03 14:21:23');
 
 -- --------------------------------------------------------
 
@@ -591,6 +719,42 @@ CREATE TABLE `vista_clientes_activos` (
 -- --------------------------------------------------------
 
 --
+-- Estructura Stand-in para la vista `vista_equipos_instaladores`
+-- (Véase abajo para la vista actual)
+--
+CREATE TABLE `vista_equipos_instaladores` (
+`id` int(11)
+,`codigo` varchar(50)
+,`nombre` varchar(255)
+,`tipo` enum('router','decodificador','cable','antena','splitter','amplificador','otro')
+,`marca` varchar(100)
+,`modelo` varchar(100)
+,`numero_serie` varchar(100)
+,`estado` enum('disponible','asignado','instalado','dañado','perdido','mantenimiento','devuelto')
+,`precio_compra` decimal(10,2)
+,`fecha_compra` date
+,`proveedor` varchar(255)
+,`ubicacion` varchar(255)
+,`ubicacion_actual` varchar(255)
+,`coordenadas_lat` decimal(10,8)
+,`coordenadas_lng` decimal(11,8)
+,`observaciones` text
+,`notas_instalador` text
+,`instalador_id` int(11)
+,`fecha_asignacion` datetime
+,`fecha_devolucion` datetime
+,`instalador_nombre` varchar(255)
+,`instalador_telefono` varchar(20)
+,`instalador_email` varchar(255)
+,`created_at` timestamp
+,`updated_at` timestamp
+,`dias_asignado` int(7)
+,`estado_descriptivo` varchar(269)
+);
+
+-- --------------------------------------------------------
+
+--
 -- Estructura para la vista `vista_cartera_vencida`
 --
 DROP TABLE IF EXISTS `vista_cartera_vencida`;
@@ -605,6 +769,15 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 DROP TABLE IF EXISTS `vista_clientes_activos`;
 
 CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vista_clientes_activos`  AS SELECT `c`.`id` AS `id`, `c`.`identificacion` AS `identificacion`, `c`.`nombre` AS `nombre`, `c`.`telefono` AS `telefono`, `c`.`direccion` AS `direccion`, `c`.`estado` AS `estado`, `s`.`nombre` AS `sector`, `sc`.`estado` AS `estado_servicio`, `ps`.`nombre` AS `plan_nombre`, `ps`.`precio` AS `precio_plan` FROM (((`clientes` `c` left join `sectores` `s` on(`c`.`sector_id` = `s`.`id`)) left join `servicios_cliente` `sc` on(`c`.`id` = `sc`.`cliente_id`)) left join `planes_servicio` `ps` on(`sc`.`plan_id` = `ps`.`id`)) WHERE `c`.`estado` = 'activo' AND `sc`.`estado` = 'activo' ;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura para la vista `vista_equipos_instaladores`
+--
+DROP TABLE IF EXISTS `vista_equipos_instaladores`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vista_equipos_instaladores`  AS SELECT `e`.`id` AS `id`, `e`.`codigo` AS `codigo`, `e`.`nombre` AS `nombre`, `e`.`tipo` AS `tipo`, `e`.`marca` AS `marca`, `e`.`modelo` AS `modelo`, `e`.`numero_serie` AS `numero_serie`, `e`.`estado` AS `estado`, `e`.`precio_compra` AS `precio_compra`, `e`.`fecha_compra` AS `fecha_compra`, `e`.`proveedor` AS `proveedor`, `e`.`ubicacion` AS `ubicacion`, `e`.`ubicacion_actual` AS `ubicacion_actual`, `e`.`coordenadas_lat` AS `coordenadas_lat`, `e`.`coordenadas_lng` AS `coordenadas_lng`, `e`.`observaciones` AS `observaciones`, `e`.`notas_instalador` AS `notas_instalador`, `e`.`instalador_id` AS `instalador_id`, `e`.`fecha_asignacion` AS `fecha_asignacion`, `e`.`fecha_devolucion` AS `fecha_devolucion`, `u`.`nombre` AS `instalador_nombre`, `u`.`telefono` AS `instalador_telefono`, `u`.`email` AS `instalador_email`, `e`.`created_at` AS `created_at`, `e`.`updated_at` AS `updated_at`, CASE WHEN `e`.`fecha_asignacion` is not null AND `e`.`fecha_devolucion` is null THEN to_days(current_timestamp()) - to_days(`e`.`fecha_asignacion`) WHEN `e`.`fecha_asignacion` is not null AND `e`.`fecha_devolucion` is not null THEN to_days(`e`.`fecha_devolucion`) - to_days(`e`.`fecha_asignacion`) ELSE NULL END AS `dias_asignado`, CASE WHEN `e`.`estado` = 'asignado' AND `e`.`instalador_id` is not null THEN concat('Asignado a ',`u`.`nombre`) WHEN `e`.`estado` = 'instalado' AND `e`.`instalador_id` is not null THEN concat('Instalado por ',`u`.`nombre`) ELSE `e`.`estado` END AS `estado_descriptivo` FROM (`inventario_equipos` `e` left join `sistema_usuarios` `u` on(`e`.`instalador_id` = `u`.`id` and `u`.`rol` = 'instalador')) ;
 
 --
 -- Índices para tablas volcadas
@@ -736,7 +909,23 @@ ALTER TABLE `inventario_equipos`
   ADD KEY `idx_codigo` (`codigo`),
   ADD KEY `idx_tipo` (`tipo`),
   ADD KEY `idx_estado` (`estado`),
-  ADD KEY `idx_numero_serie` (`numero_serie`);
+  ADD KEY `idx_numero_serie` (`numero_serie`),
+  ADD KEY `idx_instalador` (`instalador_id`),
+  ADD KEY `idx_estado_instalador` (`estado`,`instalador_id`),
+  ADD KEY `idx_fecha_asignacion` (`fecha_asignacion`);
+
+--
+-- Indices de la tabla `inventario_historial`
+--
+ALTER TABLE `inventario_historial`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_equipo` (`equipo_id`),
+  ADD KEY `idx_instalador` (`instalador_id`),
+  ADD KEY `idx_fecha` (`fecha_accion`),
+  ADD KEY `idx_accion` (`accion`),
+  ADD KEY `fk_historial_cliente` (`cliente_id`),
+  ADD KEY `fk_historial_instalacion` (`instalacion_id`),
+  ADD KEY `fk_historial_created_by` (`created_by`);
 
 --
 -- Indices de la tabla `logs_sistema`
@@ -894,6 +1083,12 @@ ALTER TABLE `instalaciones`
 -- AUTO_INCREMENT de la tabla `inventario_equipos`
 --
 ALTER TABLE `inventario_equipos`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
+-- AUTO_INCREMENT de la tabla `inventario_historial`
+--
+ALTER TABLE `inventario_historial`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -918,7 +1113,7 @@ ALTER TABLE `planes_servicio`
 -- AUTO_INCREMENT de la tabla `plantillas_correo`
 --
 ALTER TABLE `plantillas_correo`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT de la tabla `rutas_cobranza`
@@ -930,7 +1125,7 @@ ALTER TABLE `rutas_cobranza`
 -- AUTO_INCREMENT de la tabla `sectores`
 --
 ALTER TABLE `sectores`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT de la tabla `servicios_cliente`
@@ -942,7 +1137,7 @@ ALTER TABLE `servicios_cliente`
 -- AUTO_INCREMENT de la tabla `sistema_usuarios`
 --
 ALTER TABLE `sistema_usuarios`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- Restricciones para tablas volcadas
@@ -999,6 +1194,22 @@ ALTER TABLE `instalaciones`
   ADD CONSTRAINT `instalaciones_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `instalaciones_ibfk_2` FOREIGN KEY (`servicio_cliente_id`) REFERENCES `servicios_cliente` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `instalaciones_ibfk_3` FOREIGN KEY (`instalador_id`) REFERENCES `sistema_usuarios` (`id`) ON DELETE SET NULL;
+
+--
+-- Filtros para la tabla `inventario_equipos`
+--
+ALTER TABLE `inventario_equipos`
+  ADD CONSTRAINT `fk_inventario_instalador` FOREIGN KEY (`instalador_id`) REFERENCES `sistema_usuarios` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Filtros para la tabla `inventario_historial`
+--
+ALTER TABLE `inventario_historial`
+  ADD CONSTRAINT `fk_historial_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_historial_created_by` FOREIGN KEY (`created_by`) REFERENCES `sistema_usuarios` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_historial_equipo` FOREIGN KEY (`equipo_id`) REFERENCES `inventario_equipos` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_historial_instalacion` FOREIGN KEY (`instalacion_id`) REFERENCES `instalaciones` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_historial_instalador` FOREIGN KEY (`instalador_id`) REFERENCES `sistema_usuarios` (`id`) ON DELETE CASCADE;
 
 --
 -- Filtros para la tabla `logs_sistema`
