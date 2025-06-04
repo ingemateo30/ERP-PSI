@@ -84,13 +84,9 @@ app.use(express.urlencoded({
 }));
 app.use(cookieParser());
 
-// Validar Content-Type en requests críticos
 app.use((req, res, next) => {
-  // Solo validar Content-Type en métodos que lo requieren
   if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
     const contentType = req.get('Content-Type');
-
-    // Permitir requests sin body o con Content-Type válido
     if (req.path.includes('/api/') &&
       contentType &&
       !contentType.includes('application/json') &&
@@ -105,7 +101,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Logging mejorado
 app.use((req, res, next) => {
   const timestamp = new Date().toISOString();
   const method = req.method;
@@ -123,15 +118,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// ============================================
-// RUTAS DE SALUD Y TESTING
-// ============================================
 
-// Health check básico
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
-    service: 'ISP Management System API',
+    service: 'PSI sistema gestion',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
@@ -245,13 +236,15 @@ try {
   console.error('Stack trace:', error.stack);
   process.exit(1);
 }
+const plantillasCorreoRoutes = require('./routes/plantillasCorreo');
+app.use('/api/v1/config/plantillas-correo', plantillasCorreoRoutes);
 
 // Ruta base de la API con información completa
 app.get('/api/v1', (req, res) => {
   res.json({
-    message: 'Sistema de Gestión ISP - API REST',
+    message: 'Sistema de Gestión PSI - API REST',
     version: 'v1.0.0',
-    description: 'API para gestión integral de empresas de servicios de internet y televisión',
+    description: 'API para gestión integral de PSI',
     timestamp: new Date().toISOString(),
     endpoints: {
       authentication: {
@@ -336,7 +329,7 @@ app.get('/api/v1', (req, res) => {
 // Ruta raíz
 app.get('/', (req, res) => {
   res.json({
-    message: '🌐 Sistema de Gestión ISP',
+    message: '🌐 Sistema de Gestión PSI',
     status: 'Operativo',
     version: '1.0.0',
     api_base: '/api/v1',

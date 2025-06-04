@@ -21,12 +21,13 @@ const CompanyConfig = lazy(() => import('./components/Config/CompanyConfig'));
 const BanksConfig = lazy(() => import('./components/Config/BanksConfig'));
 const GeographyConfig = lazy(() => import('./components/Config/GeographyConfig'));
 const ServicePlansConfig = lazy(() => import('./components/Config/ServicePlansConfig'));
+const PlantillasCorreoConfig = lazy(() => import('./components/Config/PlantillasCorreoConfig'));
 
 // Lazy loading de componentes de gestión
 const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagement'));
 
-// OPCIONAL: Solo importar si existe el componente
-// const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
+
+const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -268,7 +269,17 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="administrador">
                     <MainLayout title="Conceptos de Facturación" subtitle="Gestión de conceptos facturables">
-                      <ComingSoon pageName="Conceptos de Facturación" />
+                      <ConceptosConfig />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/config/plantillas-correo"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Plantillas de Correo" subtitle="Gestión de plantillas de correo electrónico">
+                      <PlantillasCorreoConfig />
                     </MainLayout>
                   </ProtectedRoute>
                 }

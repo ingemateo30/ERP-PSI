@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Settings, Building2, MapPin, CreditCard, Wifi,
     PieChart, CheckCircle, AlertCircle, Users,
-    Loader2, RefreshCw, ChevronRight,FileText
+    Loader2, RefreshCw, ChevronRight, FileText, Mail
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import configService from '../../services/configService';
@@ -146,6 +146,19 @@ const ConfigMain = () => {
             count: overview?.contadores?.conceptos_activos || 0,
             total: 'Variable',
             permission: 'administrador'
+        },
+        {
+            id: 'plantillas-correo',
+            title: 'Plantillas de Correo',
+            description: 'Configuración de plantillas de correo electrónico para el sistema',
+            icon: <Mail size={24} />,
+            color: '#06b6d4',
+            bgColor: 'bg-cyan-50',
+            borderColor: 'border-cyan-200',
+            completed: (overview?.contadores?.plantillas_activas || 0) > 0,
+            count: overview?.contadores?.plantillas_activas || 0,
+            total: 'Variable',
+            permission: 'administrador'
         }
     ];
 
@@ -158,7 +171,7 @@ const ConfigMain = () => {
     const totalSections = allowedSections.length;
     const progressPercentage = totalSections > 0 ? (completedSections / totalSections) * 100 : 0;
 
-    
+
 
     return (
         <div className="min-h-screen bg-gray-50 p-4">

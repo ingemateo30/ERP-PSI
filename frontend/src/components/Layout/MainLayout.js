@@ -1,12 +1,12 @@
 // frontend/src/components/Layout/MainLayout.js
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Bell, Menu, Search, Settings, User, Activity, 
+import {
+  Bell, Menu, Search, Settings, User, Activity,
   Users, Calendar, ChevronUp, LogOut, ChevronDown, X,
   DollarSign, TrendingUp, UserCheck, Wifi, Loader2,
   Building2, CreditCard, MapPin, PieChart as PieChartIcon,
-  Package, FileText, Wrench, BarChart3, Home
+  Package, FileText, Wrench, BarChart3, Home, Mail
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -35,7 +35,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       }
     `;
     document.head.appendChild(style);
-    
+
     return () => {
       document.head.removeChild(style);
     };
@@ -62,59 +62,65 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
   // Items del menú lateral según permisos
   const menuItems = [
-    { 
-      icon: <Home size={22} />, 
-      label: 'Dashboard', 
+    {
+      icon: <Home size={22} />,
+      label: 'Dashboard',
       path: '/dashboard',
-      permission: null 
+      permission: null
     },
-    { 
-      icon: <Users size={22} />, 
-      label: 'Usuarios', 
+    {
+      icon: <Users size={22} />,
+      label: 'Usuarios sistema',
       path: '/admin/users',
-      permission: 'supervisor' 
+      permission: 'supervisor'
     },
-    { 
-      icon: <DollarSign size={22} />, 
-      label: 'Facturación', 
+    {
+      icon: <DollarSign size={22} />,
+      label: 'Facturación',
       path: '/invoices',
-      permission: 'supervisor' 
+      permission: 'supervisor'
     },
-    { 
-      icon: <Wifi size={22} />, 
-      label: 'Servicios', 
-      path: '/services',
-      permission: 'supervisor' 
+    {
+      icon: <Wifi size={22} />,
+      label: 'Servicios',
+      path: '/config/service-plans',
+      permission: 'supervisor'
     },
-    { 
-      icon: <PieChartIcon size={22} />, 
-      label: 'Reportes', 
+    {
+      icon: <Mail size={22} />,
+      label: 'Plantillas',
+      path: '/config/plantillas-correo',
+      permission: 'supervisor'
+    },
+    {
+      icon: <PieChartIcon size={22} />,
+      label: 'Reportes',
       path: '/reports',
-      permission: 'supervisor' 
+      permission: 'supervisor'
     },
-    { 
-      icon: <Wrench size={22} />, 
-      label: 'Instalaciones', 
+    {
+      icon: <Wrench size={22} />,
+      label: 'Instalaciones',
       path: '/installations',
-      permission: 'instalador' 
+      permission: 'instalador'
     },
-    { 
-      icon: <Package size={22} />, 
-      label: 'Inventario', 
+    {
+      icon: <Package size={22} />,
+      label: 'Inventario',
       path: '/inventory',
-      permission: 'supervisor' 
+      permission: 'supervisor'
     },
-    { 
-      icon: <Calendar size={22} />, 
-      label: 'Calendario', 
+    {
+      icon: <Calendar size={22} />,
+      label: 'Calendario',
       path: '/calendar',
-      permission: null 
+      permission: null
     },
-    { 
-      icon: <Settings size={22} />, 
-      label: 'Configuración', 
+    {
+      icon: <Settings size={22} />,
+      label: 'Configuración',
       path: '/config',
-      permission: 'administrador' 
+      permission: 'administrador'
     }
   ].filter(item => !item.permission || hasPermission(item.permission));
 
@@ -153,9 +159,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       )}
 
       {/* Sidebar */}
-      <div className={`fixed md:relative z-30 backdrop-blur-xl bg-gradient-to-b from-[#0e6493]/95 to-[#0e6493]/85 border border-white/10 shadow-lg transition-all duration-300 ease-in-out h-screen flex flex-col ${
-        sidebarOpen ? 'translate-x-0 w-64' : 'translate-x-0 md:translate-x-0 w-0 md:w-20'
-      } overflow-hidden`}>
+      <div className={`fixed md:relative z-30 backdrop-blur-xl bg-gradient-to-b from-[#0e6493]/95 to-[#0e6493]/85 border border-white/10 shadow-lg transition-all duration-300 ease-in-out h-screen flex flex-col ${sidebarOpen ? 'translate-x-0 w-64' : 'translate-x-0 md:translate-x-0 w-0 md:w-20'
+        } overflow-hidden`}>
         {isMobile && sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(false)}
@@ -164,16 +169,15 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
             <X size={18} />
           </button>
         )}
-        
+
         <nav className="mt-16 flex-1 px-2 overflow-y-auto scrollbar-hide">
           {menuItems.map((item, index) => (
             <div
               key={index}
-              className={`flex items-center px-4 py-3 my-1 rounded-xl transition duration-300 cursor-pointer ${
-                isActivePath(item.path)
+              className={`flex items-center px-4 py-3 my-1 rounded-xl transition duration-300 cursor-pointer ${isActivePath(item.path)
                   ? 'bg-white/20 text-white'
                   : 'hover:bg-[#0e6493]/50 hover:text-white text-white/80'
-              }`}
+                }`}
               onClick={() => handleMenuClick(item.path)}
             >
               <div className="flex items-center justify-center">
@@ -183,14 +187,14 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
             </div>
           ))}
         </nav>
-        
+
         {/* Notificaciones de configuración - Solo cuando sidebar está abierto */}
         {sidebarOpen && hasPermission('administrador') && (
           <div className="px-2 pb-2">
             <ConfigSidebarNotification />
           </div>
         )}
-        
+
         {/* Botón de logout - Siempre visible en la parte inferior */}
         <div className="p-4 border-t border-white/10 mt-auto flex-shrink-0">
           {sidebarOpen ? (
@@ -279,14 +283,14 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                       <p className="text-sm font-medium text-gray-900">{currentUser?.nombre}</p>
                       <p className="text-xs text-gray-500">{currentUser?.email}</p>
                     </div>
-                    <button 
+                    <button
                       onClick={() => navigate('/profile')}
                       className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                     >
                       <User size={16} className="mr-2" />
                       Ver perfil
                     </button>
-                    <button 
+                    <button
                       onClick={() => navigate('/config')}
                       className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                     >
@@ -294,7 +298,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                       Configuración
                     </button>
                     <div className="border-t border-gray-100 my-1"></div>
-                    <button 
+                    <button
                       onClick={logout}
                       className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
                     >
@@ -320,10 +324,10 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
             <p className="text-lg md:text-xl mb-4 md:mb-6 opacity-90">
               ¿Qué quieres hacer hoy?
             </p>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
               {hasPermission('supervisor') && (
-                <button 
+                <button
                   onClick={() => navigate('/clients')}
                   className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
                 >
@@ -332,7 +336,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                 </button>
               )}
               {hasPermission('supervisor') && (
-                <button 
+                <button
                   onClick={() => navigate('/invoices')}
                   className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
                 >
@@ -341,7 +345,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                 </button>
               )}
               {hasPermission('supervisor') && (
-                <button 
+                <button
                   onClick={() => navigate('/reports')}
                   className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
                 >

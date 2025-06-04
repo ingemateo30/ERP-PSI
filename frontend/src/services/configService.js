@@ -38,7 +38,6 @@ class ConfigService {
     } catch (error) {
       console.error('Error en ConfigService:', error);
       
-      // Si es error 401, intentar refresh del token
       if (error.message.includes('401')) {
         try {
           await authService.refreshToken();
@@ -538,6 +537,86 @@ class ConfigService {
   async getConceptosTipos() {
     return this.makeRequest(`${this.baseURL}/conceptos/tipos`);
   }
+  // Agregar estos métodos al archivo frontend/src/services/configService.js existente
+
+// ==========================================
+// PLANTILLAS DE CORREO
+// ==========================================
+
+// Obtener todas las plantillas
+async getPlantillasCorreo(tipo = null, activo = null) {
+  let url = `${this.baseURL}/plantillas-correo`;
+  const params = new URLSearchParams();
+  
+  if (tipo) params.append('tipo', tipo);
+  if (activo !== null) params.append('activo', activo);
+  
+  if (params.toString()) {
+    url += `?${params.toString()}`;
+  }
+  
+  return this.makeRequest(url);
+}
+
+// Obtener plantilla por ID
+async getPlantillaCorreoById(id) {
+  return this.makeRequest(`${this.baseURL}/plantillas-correo/${id}`);
+}
+
+// Crear nueva plantilla
+async createPlantillaCorreo(plantilla) {
+  return this.makeRequest(`${this.baseURL}/plantillas-correo`, {
+    method: 'POST',
+    body: JSON.stringify(plantilla),
+  });
+}
+
+// Actualizar plantilla
+async updatePlantillaCorreo(id, plantilla) {
+  return this.makeRequest(`${this.baseURL}/plantillas-correo/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(plantilla),
+  });
+}
+
+// Eliminar plantilla
+async deletePlantillaCorreo(id) {
+  return this.makeRequest(`${this.baseURL}/plantillas-correo/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+// Cambiar estado de plantilla
+async togglePlantillaCorreo(id) {
+  return this.makeRequest(`${this.baseURL}/plantillas-correo/${id}/toggle`, {
+    method: 'POST',
+  });
+}
+
+// Obtener plantillas por tipo
+async getPlantillasCorreoPorTipo(tipo) {
+  return this.makeRequest(`${this.baseURL}/plantillas-correo/tipo/${tipo}`);
+}
+
+// Obtener estadísticas de plantillas
+async getPlantillasCorreoStats() {
+  return this.makeRequest(`${this.baseURL}/plantillas-correo/stats`);
+}
+
+// Duplicar plantilla
+async duplicatePlantillaCorreo(id) {
+  return this.makeRequest(`${this.baseURL}/plantillas-correo/${id}/duplicate`, {
+    method: 'POST',
+  });
+}
+
+// Preview de plantilla
+async previewPlantillaCorreo(id, datosEjemplo = {}) {
+  return this.makeRequest(`${this.baseURL}/plantillas-correo/${id}/preview`, {
+    method: 'POST',
+    body: JSON.stringify(datosEjemplo),
+  });
+}
 }
 
 export default new ConfigService();
