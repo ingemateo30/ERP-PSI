@@ -74,13 +74,13 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       path: '/admin/users',
       permission: 'supervisor'
     },
-     {
-    icon: <Users size={22} />,
+    {
+      icon: <Users size={22} />,
       label: 'Clientes',
       path: '/clients',
       permission: 'administrador'
-    
-  },
+
+    },
     {
       icon: <DollarSign size={22} />,
       label: 'Facturación',
@@ -182,8 +182,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
             <div
               key={index}
               className={`flex items-center px-4 py-3 my-1 rounded-xl transition duration-300 cursor-pointer ${isActivePath(item.path)
-                  ? 'bg-white/20 text-white'
-                  : 'hover:bg-[#0e6493]/50 hover:text-white text-white/80'
+                ? 'bg-white/20 text-white'
+                : 'hover:bg-[#0e6493]/50 hover:text-white text-white/80'
                 }`}
               onClick={() => handleMenuClick(item.path)}
             >

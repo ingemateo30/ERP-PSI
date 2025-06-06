@@ -24,7 +24,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
     updateClient
   } = useClientForm(client);
 
-  const { sectors, cities, loading: configLoading } = useConfig();
+  const { sectors = [], cities = [], loading: configLoading } = useConfig();
   const [saving, setSaving] = useState(false);
   const [validatingId, setValidatingId] = useState(false);
   const [idValidation, setIdValidation] = useState(null);
@@ -62,7 +62,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
   // Manejar envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -120,7 +120,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Información Básica
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Tipo de documento */}
                 <div>
@@ -151,12 +151,11 @@ const ClientForm = ({ client, onClose, onSave }) => {
                       type="text"
                       value={formData.identificacion}
                       onChange={(e) => updateField('identificacion', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.identificacion ? 'border-red-300' : 
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.identificacion ? 'border-red-300' :
                         idValidation === 'exists' ? 'border-red-300' :
-                        idValidation === 'available' ? 'border-green-300' : 
-                        'border-gray-300'
-                      }`}
+                          idValidation === 'available' ? 'border-green-300' :
+                            'border-gray-300'
+                        }`}
                       placeholder="Número de identificación"
                       required
                     />
@@ -191,9 +190,8 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     type="text"
                     value={formData.nombre}
                     onChange={(e) => updateField('nombre', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.nombre ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.nombre ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="Nombre completo del cliente"
                     required
                   />
@@ -209,7 +207,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Información de Contacto
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Teléfono principal */}
                 <div>
@@ -220,9 +218,8 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     type="tel"
                     value={formData.telefono}
                     onChange={(e) => handlePhoneChange('telefono', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.telefono ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.telefono ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="3001234567"
                     maxLength="10"
                   />
@@ -255,9 +252,8 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     type="email"
                     value={formData.correo}
                     onChange={(e) => updateField('correo', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.correo ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.correo ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="cliente@email.com"
                   />
                   {errors.correo && (
@@ -272,7 +268,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Información de Ubicación
               </h3>
-              
+
               <div className="space-y-4">
                 {/* Dirección */}
                 <div>
@@ -283,9 +279,8 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     value={formData.direccion}
                     onChange={(e) => updateField('direccion', e.target.value)}
                     rows="2"
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.direccion ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.direccion ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="Dirección completa de instalación"
                     required
                   />
@@ -307,7 +302,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                     >
                       <option value="">Seleccionar ciudad</option>
-                      {cities.map((city) => (
+                      {cities && cities.length > 0 && cities.map((city) => (
                         <option key={city.id} value={city.id}>
                           {city.nombre} ({city.departamento_nombre})
                         </option>
@@ -327,7 +322,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                     >
                       <option value="">Seleccionar sector</option>
-                      {sectors.map((sector) => (
+                      {sectors && sectors.length > 0 && sectors.map((sector) => (
                         <option key={sector.id} value={sector.id}>
                           {sector.codigo} - {sector.nombre}
                         </option>
@@ -376,7 +371,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Información Técnica
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Estado */}
                 <div>
@@ -405,9 +400,8 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     type="text"
                     value={formData.mac_address}
                     onChange={(e) => updateField('mac_address', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.mac_address ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.mac_address ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="AA:BB:CC:DD:EE:FF"
                   />
                   {errors.mac_address && (
@@ -424,9 +418,8 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     type="text"
                     value={formData.ip_asignada}
                     onChange={(e) => updateField('ip_asignada', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.ip_asignada ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.ip_asignada ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="192.168.1.100"
                   />
                   {errors.ip_asignada && (
