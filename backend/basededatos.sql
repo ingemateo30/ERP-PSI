@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 04-06-2025 a las 17:54:58
+-- Tiempo de generación: 09-06-2025 a las 16:29:12
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.1.25
 
@@ -123,7 +123,8 @@ INSERT INTO `bancos` (`id`, `codigo`, `nombre`, `activo`) VALUES
 (9, '031', 'Banco Agrario', 1),
 (10, '040', 'Banco Unión', 1),
 (11, '052', 'Banco AV Villas', 1),
-(12, '053', 'Banco Davivienda', 1);
+(12, '053', 'Banco Davivienda', 1),
+(13, '010', 'Efectivo', 1);
 
 -- --------------------------------------------------------
 
@@ -184,6 +185,22 @@ CREATE TABLE `clientes` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `clientes`
+--
+
+INSERT INTO `clientes` (`id`, `identificacion`, `tipo_documento`, `nombre`, `direccion`, `sector_id`, `estrato`, `barrio`, `ciudad_id`, `telefono`, `telefono_2`, `correo`, `fecha_registro`, `fecha_hasta`, `estado`, `mac_address`, `ip_asignada`, `tap`, `poste`, `contrato`, `ruta`, `requiere_reconexion`, `codigo_usuario`, `observaciones`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, '12345678', 'cedula', 'Juan Carlos Rodríguez Méndez', 'Calle 15 # 23-45, Barrio Centro', 1, '3', 'Centro', 5, '3001234567', '6012345678', 'juan.rodriguez@email.com', '2024-01-15', '2025-01-15', 'activo', 'AA:BB:CC:DD:EE:01', '192.168.1.101', 'TAP001', 'P-001', 'CT-00001', 'R001', 0, 'USR00001', 'Cliente preferencial, pago puntual', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
+(2, '87654321', 'cedula', 'María Isabel García López', 'Carrera 10 # 45-67, Barrio Los Pinos', 1, '4', 'Los Pinos', 5, '3109876543', NULL, 'maria.garcia@gmail.com', '2024-02-01', '2025-02-01', 'activo', 'AA:BB:CC:DD:EE:02', '192.168.1.102', 'TAP002', 'P-002', 'CT-00002', 'R001', 0, 'USR00002', 'Servicio de internet y TV', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
+(3, '23456789', 'cedula', 'Carlos Alberto Ruiz Vargas', 'Calle 8 # 12-34, Barrio San José', 1, '2', 'San José', 5, '3201234567', '6078901234', 'carlos.ruiz@hotmail.com', '2024-01-20', '2025-01-20', 'suspendido', 'AA:BB:CC:DD:EE:03', '192.168.1.103', 'TAP003', 'P-003', 'CT-00003', 'R002', 1, 'USR00003', 'Suspendido por mora - Requiere reconexión', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
+(4, '34567890', 'cedula', 'Ana Patricia Morales Castellanos', 'Transversal 5 # 78-90, Barrio Villa Nueva', 1, '3', 'Villa Nueva', 5, '3156789012', NULL, 'ana.morales@empresa.com', '2024-03-01', '2025-03-01', 'activo', 'AA:BB:CC:DD:EE:04', '192.168.1.104', 'TAP004', 'P-004', 'CT-00004', 'R001', 0, 'USR00004', 'Cliente empresarial', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
+(5, '45678901', 'cedula', 'Luis Fernando Torres Jiménez', 'Avenida Principal # 100-25, Barrio El Progreso', 1, '5', 'El Progreso', 5, '3012345678', '6075432109', 'luis.torres@correo.co', '2024-02-15', '2025-02-15', 'activo', 'AA:BB:CC:DD:EE:05', '192.168.1.105', 'TAP005', 'P-005', 'CT-00005', 'R002', 0, 'USR00005', 'Plan premium, servicio completo', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
+(6, '56789012', 'cedula', 'Sandra Milena Castro Romero', 'Calle 25 # 15-80, Barrio La Esperanza', 1, '2', 'La Esperanza', 5, '3178901234', NULL, 'sandra.castro@yahoo.com', '2024-03-10', '2025-03-10', 'activo', 'AA:BB:CC:DD:EE:06', '192.168.1.106', 'TAP006', 'P-006', 'CT-00006', 'R001', 0, 'USR00006', 'Solo servicio de internet', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
+(7, '67890123', 'cedula', 'Roberto Andrés Silva Peña', 'Carrera 20 # 30-45, Barrio Las Flores', 1, '3', 'Las Flores', 5, '3023456789', '6012987654', 'roberto.silva@outlook.com', '2023-12-01', '2024-12-01', 'cortado', 'AA:BB:CC:DD:EE:07', '192.168.1.107', 'TAP007', 'P-007', 'CT-00007', 'R002', 1, 'USR00007', 'Cortado por mora prolongada', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
+(8, '78901234', 'cedula', 'Claudia Elena Vargas Muñoz', 'Diagonal 12 # 56-78, Barrio Nuevo Horizonte', 1, '4', 'Nuevo Horizonte', 5, '3134567890', NULL, 'claudia.vargas@gmail.com', '2024-01-30', '2025-01-30', 'activo', 'AA:BB:CC:DD:EE:08', '192.168.1.108', 'TAP008', 'P-008', 'CT-00008', 'R001', 0, 'USR00008', 'Excelente historial de pagos', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
+(9, '900123456', 'nit', 'Empresa XYZ Servicios Ltda', 'Calle 50 # 100-200, Zona Industrial', 1, '6', 'Zona Industrial', 5, '6017654321', '3001111111', 'info@empresaxyz.com', '2024-02-20', '2025-02-20', 'activo', 'AA:BB:CC:DD:EE:09', '192.168.1.109', 'TAP009', 'P-009', 'CT-00009', 'R003', 0, 'USR00009', 'Cliente corporativo - Plan empresarial', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
+(10, '89012345', 'cedula', 'Pedro José Hernández Rueda', 'Calle 35 # 67-89, Barrio El Recuerdo', 1, '3', 'El Recuerdo', 5, '3187654321', '6013456789', 'pedro.hernandez@correo.com', '2024-03-05', '2025-03-05', 'activo', 'AA:BB:CC:DD:EE:10', '192.168.1.110', 'TAP010', 'P-010', 'CT-00010', 'R002', 0, 'USR00010', 'Cliente nuevo - Plan básico', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55');
 
 -- --------------------------------------------------------
 
@@ -279,7 +296,7 @@ CREATE TABLE `configuracion_empresa` (
 --
 
 INSERT INTO `configuracion_empresa` (`id`, `licencia`, `empresa_nombre`, `empresa_nit`, `empresa_direccion`, `empresa_ciudad`, `empresa_departamento`, `empresa_telefono`, `empresa_email`, `resolucion_facturacion`, `licencia_internet`, `vigilado`, `vigilado_internet`, `comentario`, `prefijo_factura`, `codigo_gs1`, `fecha_actualizacion`, `consecutivo_factura`, `consecutivo_contrato`, `consecutivo_recibo`, `valor_reconexion`, `dias_mora_corte`, `porcentaje_iva`, `porcentaje_interes`, `updated_at`) VALUES
-(1, 'DEMO2024', 'Mi Empresa PSI', '900123456-1', 'DFD', 'SANGIL', 'SANTANDER', '44478787', 'PSI@PSI.COM.CO', 'SDSDFSDFDSFSD', 'DFSDFSDFS', 'DFSDFSF', 'DFSDFSDF', 'DFSDF', 'FAC', 'GS1', '2025-05-29', 1, 1, 1, 15000.00, 30, 19.00, 15.00, '2025-05-29 20:17:16');
+(1, 'DEMO2024', 'Mi Empresa PSI', '900123456-1', 'DFD', 'SANGIL', 'SANTANDER', '44478787', 'PSI@PSI.COM.CO', 'SDSDFSDFDSFSD', 'DFSDFSDFS', 'DFSDFSF', 'DFSDFSDF', 'DFSDF', 'FAC', 'GS1', '2025-05-29', 6, 1, 1, 15000.00, 30, 19.00, 15.00, '2025-06-09 13:29:15');
 
 -- --------------------------------------------------------
 
@@ -394,6 +411,17 @@ CREATE TABLE `facturas` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Volcado de datos para la tabla `facturas`
+--
+
+INSERT INTO `facturas` (`id`, `numero_factura`, `cliente_id`, `identificacion_cliente`, `nombre_cliente`, `periodo_facturacion`, `fecha_emision`, `fecha_vencimiento`, `fecha_desde`, `fecha_hasta`, `fecha_pago`, `internet`, `television`, `saldo_anterior`, `interes`, `reconexion`, `descuento`, `varios`, `publicidad`, `s_internet`, `s_television`, `s_interes`, `s_reconexion`, `s_descuento`, `s_varios`, `s_publicidad`, `s_iva`, `subtotal`, `iva`, `total`, `estado`, `metodo_pago`, `referencia_pago`, `banco_id`, `ruta`, `resolucion`, `consignacion`, `activo`, `observaciones`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 'FAC000001', 1, '1005450340', 'MATEO SALAZAR ORTIZ', '2025-06', '2025-06-01', '2025-06-16', '2025-06-01', '2025-06-30', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 59900.00, 'pendiente', NULL, NULL, NULL, 'R01', 'Facturación desde 10.001 hasta 37600 prefijo 10 del 26-SEP-2022', NULL, '1', 'Factura de internet mensual', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
+(2, 'FAC000002', 2, '1234567890', 'JUAN PÉREZ LÓPEZ', '2025-06', '2025-06-01', '2025-06-16', '2025-06-01', '2025-06-30', '2025-06-10', 45000.00, 25000.00, 10000.00, 1500.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 25000.00, 1500.00, 0.00, 0.00, 0.00, 0.00, 0.00, 81500.00, 0.00, 81500.00, 'pagada', 'efectivo', NULL, NULL, 'R02', NULL, NULL, '1', 'Internet + TV + saldo anterior + intereses', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
+(3, 'FAC000003', 3, '9876543210', 'MARÍA GARCÍA RUIZ', '2025-05', '2025-05-01', '2025-05-16', '2025-05-01', '2025-05-31', NULL, 39900.00, 15000.00, 0.00, 0.00, 11900.00, 0.00, 0.00, 0.00, 39900.00, 15000.00, 0.00, 11900.00, 0.00, 0.00, 0.00, 0.00, 66800.00, 0.00, 66800.00, 'pendiente', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Internet + TV + reconexión', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
+(4, 'FAC000004', 1, '1005450340', 'MATEO SALAZAR ORTIZ', '2025-05', '2025-05-01', '2025-05-16', '2025-05-01', '2025-05-31', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 10000.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 10000.00, 0.00, 0.00, 0.00, 49900.00, 0.00, 49900.00, 'pagada', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Internet con descuento promocional', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
+(5, 'FAC000005', 2, '1234567890', 'JUAN PÉREZ LÓPEZ', '2025-04', '2025-04-01', '2025-04-16', '2025-04-01', '2025-04-30', NULL, 45000.00, 25000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 25000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 70000.00, 0.00, 70000.00, 'anulada', NULL, NULL, NULL, 'R02', NULL, NULL, '1', 'Factura anulada por error en facturación', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14');
+
 -- --------------------------------------------------------
 
 --
@@ -463,8 +491,8 @@ INSERT INTO `inventario_equipos` (`id`, `codigo`, `nombre`, `tipo`, `marca`, `mo
 (4, 'CBL002', 'Cable Coaxial RG6 305m', 'cable', 'CommScope', 'RG6-305', 'CS2024001', 'disponible', NULL, NULL, NULL, 280000.00, '2024-01-25', 'Cables y Más', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
 (5, 'ANT001', 'Antena Sectorial 2.4GHz', 'antena', 'Ubiquiti', 'AM-2G15-120', 'UBI2024001', 'disponible', NULL, NULL, NULL, 85000.00, '2024-02-10', 'Wireless Solutions', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
 (6, 'SPL001', 'Splitter 1x8 5-1000MHz', 'splitter', 'Antronix', 'CMC2008H', 'ANT2024001', 'disponible', NULL, NULL, NULL, 15000.00, '2024-02-15', 'Electrónicos del Valle', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
-(7, 'AMP001', 'Amplificador de Señal 30dB', 'amplificador', 'Antronix', 'CMA2030', 'ANT2024002', 'disponible', NULL, NULL, NULL, 45000.00, '2024-03-01', 'Electrónicos del Valle', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
-(8, 'DEC001', 'Decodificador TDT HD', 'decodificador', 'Samsung', 'GX-SM530SH', 'SAM2024001', 'disponible', NULL, NULL, NULL, 95000.00, '2024-03-05', 'Samsung Colombia', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48');
+(7, 'AMP001', 'Amplificador de Señal 30dB', 'otro', 'Antronix', 'CMA2030', 'ANT2024002', 'disponible', NULL, NULL, NULL, 45000.00, '2025-06-04', 'Electrónicos del Valle', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 19:36:26'),
+(8, 'DEC001', 'Decodificador TDT HD', 'decodificador', 'Samsung', 'GX-SM530SH', 'SAM2024001', 'disponible', NULL, NULL, NULL, 45000.00, '2024-03-05', 'Samsung Colombia', 'San Gil', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 19:27:17');
 
 -- --------------------------------------------------------
 
@@ -591,7 +619,8 @@ INSERT INTO `plantillas_correo` (`id`, `titulo`, `asunto`, `contenido`, `tipo`, 
 (5, 'Aviso Corte por Mora', 'URGENTE: Suspensión de servicio programada', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <div style=\"background-color: #dc3545; color: white; padding: 15px; text-align: center; margin-bottom: 20px;\">\r\n        <h2 style=\"margin: 0;\">⚠️ AVISO URGENTE ⚠️</h2>\r\n    </div>\r\n    \r\n    <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n    \r\n    <p>Le informamos que debido a mora en el pago de sus servicios, <strong>su servicio será suspendido en las próximas 24 horas</strong>.</p>\r\n    \r\n    <div style=\"background-color: #fff3cd; padding: 15px; border: 1px solid #ffeaa7; border-radius: 5px; margin: 20px 0;\">\r\n        <h3 style=\"margin: 0 0 10px 0; color: #856404;\">Para evitar la suspensión:</h3>\r\n        <ul style=\"margin: 0; padding-left: 20px;\">\r\n            <li>Realice su pago inmediatamente</li>\r\n            <li>Comuníquese con nosotros al <strong>{{telefono_soporte}}</strong></li>\r\n            <li>Presente comprobante de pago</li>\r\n        </ul>\r\n    </div>\r\n    \r\n    <p><strong>Factura pendiente:</strong> {{numero_factura}}<br>\r\n    <strong>Valor:</strong> {{valor_factura}}<br>\r\n    <strong>Vencimiento:</strong> {{fecha_vencimiento}}</p>\r\n    \r\n    <p style=\"margin-top: 30px;\">\r\n        {{empresa_nombre}}<br>\r\n        {{fecha_actual}}\r\n    </p>\r\n</div>', 'corte', 1, '2025-06-04 13:36:32', '2025-06-04 13:54:32'),
 (6, 'Servicio Restablecido', '✅ Su servicio ha sido restablecido', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <div style=\"background-color: #28a745; color: white; padding: 15px; text-align: center; margin-bottom: 20px;\">\r\n        <h2 style=\"margin: 0;\">✅ SERVICIO RESTABLECIDO</h2>\r\n    </div>\r\n    \r\n    <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n    \r\n    <p>Nos complace informarle que su servicio ha sido <strong>restablecido exitosamente</strong>.</p>\r\n    \r\n    <div style=\"background-color: #d4edda; padding: 15px; border: 1px solid #c3e6cb; border-radius: 5px; margin: 20px 0;\">\r\n        <h3 style=\"margin: 0 0 10px 0; color: #155724;\">Su servicio ya está activo</h3>\r\n        <p style=\"margin: 0;\">Puede comenzar a utilizar todos nuestros servicios normalmente.</p>\r\n    </div>\r\n    \r\n    <p>Agradecemos su pago y confianza en nuestros servicios.</p>\r\n    \r\n    <p>Si experimenta algún inconveniente técnico, no dude en contactarnos al <strong>{{telefono_soporte}}</strong>.</p>\r\n    \r\n    <p style=\"margin-top: 30px;\">\r\n        Atentamente,<br>\r\n        <strong>{{empresa_nombre}}</strong><br>\r\n        {{fecha_actual}}\r\n    </p>\r\n</div>', 'reconexion', 1, '2025-06-04 13:36:32', '2025-06-04 13:36:32'),
 (7, 'Bienvenida Nuevo Cliente', '¡Bienvenido a {{empresa_nombre}}!', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <div style=\"background-color: #0e6493; color: white; padding: 20px; text-align: center;\">\r\n        <h1 style=\"margin: 0;\">¡Bienvenido a {{empresa_nombre}}!</h1>\r\n    </div>\r\n    \r\n    <div style=\"padding: 20px;\">\r\n        <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n        \r\n        <p>¡Nos complace darle la bienvenida a nuestra familia de clientes!</p>\r\n        \r\n        <div style=\"background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;\">\r\n            <h3 style=\"margin: 0 0 15px 0; color: #0e6493;\">Sus servicios incluyen:</h3>\r\n            <ul style=\"margin: 0; padding-left: 20px;\">\r\n                <li>Conexión de internet de alta velocidad</li>\r\n                <li>Soporte técnico especializado</li>\r\n                <li>Atención al cliente 24/7</li>\r\n                <li>Facturación electrónica</li>\r\n            </ul>\r\n        </div>\r\n        \r\n        <div style=\"background-color: #e7f3ff; padding: 15px; border-left: 4px solid #0e6493; margin: 20px 0;\">\r\n            <h3 style=\"margin: 0 0 10px 0;\">Información de contacto:</h3>\r\n            <p style=\"margin: 0;\"><strong>Soporte técnico:</strong> {{telefono_soporte}}</p>\r\n        </div>\r\n        \r\n        <p>Estamos aquí para brindarle el mejor servicio. No dude en contactarnos si tiene alguna pregunta.</p>\r\n        \r\n        <p style=\"margin-top: 30px;\">\r\n            ¡Gracias por elegirnos!<br>\r\n            <strong>{{empresa_nombre}}</strong><br>\r\n            {{fecha_actual}}\r\n        </p>\r\n    </div>\r\n</div>', 'bienvenida', 1, '2025-06-04 13:36:32', '2025-06-04 13:36:32'),
-(8, 'Mantenimiento Programado', 'Mantenimiento programado - {{fecha_mantenimiento}}', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <div style=\"background-color: #ffc107; color: #212529; padding: 15px; text-align: center; margin-bottom: 20px;\">\r\n        <h2 style=\"margin: 0;\">🔧 MANTENIMIENTO PROGRAMADO</h2>\r\n    </div>\r\n    \r\n    <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n    \r\n    <p>Le informamos que realizaremos un mantenimiento programado en nuestros sistemas para mejorar la calidad del servicio.</p>\r\n    \r\n    <div style=\"background-color: #fff3cd; padding: 15px; border: 1px solid #ffeaa7; border-radius: 5px; margin: 20px 0;\">\r\n        <h3 style=\"margin: 0 0 10px 0; color: #856404;\">Detalles del mantenimiento:</h3>\r\n        <p style=\"margin: 5px 0;\"><strong>Fecha:</strong> {{fecha_mantenimiento}}</p>\r\n        <p style=\"margin: 5px 0;\"><strong>Hora:</strong> {{hora_mantenimiento}}</p>\r\n        <p style=\"margin: 5px 0;\"><strong>Duración estimada:</strong> {{duracion_mantenimiento}}</p>\r\n    </div>\r\n    \r\n    <p>Durante este período, es posible que experimente interrupciones temporales en el servicio.</p>\r\n    \r\n    <p>Agradecemos su comprensión y disculpas por las molestias ocasionadas.</p>\r\n    \r\n    <p style=\"margin-top: 30px;\">\r\n        Atentamente,<br>\r\n        <strong>{{empresa_nombre}}</strong><br>\r\n        {{fecha_actual}}\r\n    </p>\r\n</div>', 'general', 1, '2025-06-04 13:36:32', '2025-06-04 13:36:32');
+(8, 'Mantenimiento Programado', 'Mantenimiento programado - {{fecha_mantenimiento}}', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <div style=\"background-color: #ffc107; color: #212529; padding: 15px; text-align: center; margin-bottom: 20px;\">\r\n        <h2 style=\"margin: 0;\">🔧 MANTENIMIENTO PROGRAMADO</h2>\r\n    </div>\r\n    \r\n    <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n    \r\n    <p>Le informamos que realizaremos un mantenimiento programado en nuestros sistemas para mejorar la calidad del servicio.</p>\r\n    \r\n    <div style=\"background-color: #fff3cd; padding: 15px; border: 1px solid #ffeaa7; border-radius: 5px; margin: 20px 0;\">\r\n        <h3 style=\"margin: 0 0 10px 0; color: #856404;\">Detalles del mantenimiento:</h3>\r\n        <p style=\"margin: 5px 0;\"><strong>Fecha:</strong> {{fecha_mantenimiento}}</p>\r\n        <p style=\"margin: 5px 0;\"><strong>Hora:</strong> {{hora_mantenimiento}}</p>\r\n        <p style=\"margin: 5px 0;\"><strong>Duración estimada:</strong> {{duracion_mantenimiento}}</p>\r\n    </div>\r\n    \r\n    <p>Durante este período, es posible que experimente interrupciones temporales en el servicio.</p>\r\n    \r\n    <p>Agradecemos su comprensión y disculpas por las molestias ocasionadas.</p>\r\n    \r\n    <p style=\"margin-top: 30px;\">\r\n        Atentamente,<br>\r\n        <strong>{{empresa_nombre}}</strong><br>\r\n        {{fecha_actual}}\r\n    </p>\r\n</div>', 'general', 1, '2025-06-04 13:36:32', '2025-06-04 13:36:32'),
+(9, 'prueba', 'esto es una prueba', 'pruena{{nombre_cliente}}', 'general', 1, '2025-06-04 19:25:58', '2025-06-04 19:25:58');
 
 -- --------------------------------------------------------
 
@@ -674,9 +703,9 @@ CREATE TABLE `sistema_usuarios` (
 --
 
 INSERT INTO `sistema_usuarios` (`id`, `email`, `password`, `nombre`, `telefono`, `rol`, `activo`, `ultimo_acceso`, `created_at`, `updated_at`) VALUES
-(1, 'admin@empresa.com', '$2b$10$G79aY18UGoMa8iEa65GvieeQi74v7DkXCmQs4sVxuuhNCdWUBjcGO', 'Mateo salazar ortiz', '3007015239', 'administrador', 1, '2025-06-03 19:10:59', '2025-05-23 13:44:46', '2025-06-03 19:10:59'),
+(1, 'admin@empresa.com', '$2b$10$G79aY18UGoMa8iEa65GvieeQi74v7DkXCmQs4sVxuuhNCdWUBjcGO', 'Mateo salazar ortiz', '3007015239', 'administrador', 1, '2025-06-09 13:18:25', '2025-05-23 13:44:46', '2025-06-09 13:18:25'),
 (2, 'super@empresa.com', '$2b$12$f1Vvth/hYSUD7VHtfmZKmOuNXrHowf0Fy2T7MtxdhRAZdIOQR8MCa', 'mateo salazar ortiz', '3007015239', 'supervisor', 1, '2025-06-03 16:18:19', '2025-05-30 14:32:41', '2025-06-03 16:18:19'),
-(3, 'instalador@empresa.com', '$2b$12$FCgmtglWlgNJPwNmNbX3fOp8eRnvpeaSgKdteS0mKYtKHq1/qq6Ri', 'mateo salazar ortiz', '3007015239', 'instalador', 1, '2025-06-03 14:21:23', '2025-05-30 15:00:25', '2025-06-03 14:21:23');
+(3, 'instalador@empresa.com', '$2b$12$FCgmtglWlgNJPwNmNbX3fOp8eRnvpeaSgKdteS0mKYtKHq1/qq6Ri', 'mateo salazar ortiz', '3007015239', 'instalador', 1, '2025-06-04 16:44:35', '2025-05-30 15:00:25', '2025-06-04 16:44:35');
 
 -- --------------------------------------------------------
 
@@ -1017,7 +1046,7 @@ ALTER TABLE `sistema_usuarios`
 -- AUTO_INCREMENT de la tabla `bancos`
 --
 ALTER TABLE `bancos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT de la tabla `ciudades`
@@ -1029,7 +1058,7 @@ ALTER TABLE `ciudades`
 -- AUTO_INCREMENT de la tabla `clientes`
 --
 ALTER TABLE `clientes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT de la tabla `clientes_inactivos`
@@ -1071,7 +1100,7 @@ ALTER TABLE `detalle_facturas`
 -- AUTO_INCREMENT de la tabla `facturas`
 --
 ALTER TABLE `facturas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT de la tabla `instalaciones`
@@ -1083,7 +1112,7 @@ ALTER TABLE `instalaciones`
 -- AUTO_INCREMENT de la tabla `inventario_equipos`
 --
 ALTER TABLE `inventario_equipos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT de la tabla `inventario_historial`
@@ -1113,7 +1142,7 @@ ALTER TABLE `planes_servicio`
 -- AUTO_INCREMENT de la tabla `plantillas_correo`
 --
 ALTER TABLE `plantillas_correo`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT de la tabla `rutas_cobranza`
