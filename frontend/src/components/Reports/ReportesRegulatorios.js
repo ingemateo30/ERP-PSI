@@ -1,6 +1,7 @@
-
+// components/Reports/ReportesRegulatorios.js - VERSIÓN CORREGIDA
 import React, { useState, useEffect } from 'react';
-import { Download, FileSpreadsheet, Calendar, AlertCircle } from 'lucide-react';
+import { Download, FileSpreadsheet, Calendar, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import reportesService from '../../services/reportesService';
 
 const ReportesRegulatorios = () => {
     const [reportes, setReportes] = useState([]);
@@ -8,6 +9,7 @@ const ReportesRegulatorios = () => {
     const [selectedReport, setSelectedReport] = useState('');
     const [parameters, setParameters] = useState({});
     const [errors, setErrors] = useState({});
+    const [notification, setNotification] = useState(null);
 
     useEffect(() => {
         cargarReportesDisponibles();
@@ -15,44 +17,30 @@ const ReportesRegulatorios = () => {
 
     const cargarReportesDisponibles = async () => {
         try {
-            const token = localStorage.getItem('token');
-            console.log('Token presente:', !!token);
+            console.log('🔄 Cargando reportes disponibles...');
+            setLoading(true);
             
-            const response = await fetch('/api/reportes-regulatorios/disponibles', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
+            const resultado = await reportesService.getReportesDisponibles();
+            
+            if (resultado.success) {
+                console.log('✅ Reportes cargados exitosamente:', resultado.data);
+                setReportes(resultado.data);
+                
+                if (resultado.data.length > 0) {
+                    showNotification('Reportes cargados exitosamente', 'success');
                 }
-            });
-            
-            console.log('Response status:', response.status);
-            console.log('Response URL:', response.url);
-            
-            // Verificar que la respuesta sea JSON válido
-            const contentType = response.headers.get('content-type');
-            console.log('Content-Type:', contentType);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Error response:', errorText);
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            } else {
+                console.warn('⚠️ Error cargando reportes, usando fallback:', resultado.error);
+                setReportes(resultado.data); // Los datos de fallback
+                showNotification('Usando datos de respaldo. Verifica la conexión con el servidor.', 'warning');
             }
-            
-            if (!contentType || !contentType.includes('application/json')) {
-                const responseText = await response.text();
-                console.error('Respuesta no JSON:', responseText.substring(0, 200));
-                throw new Error('El endpoint devolvió HTML en lugar de JSON - posible error 404');
-            }
-            
-            const data = await response.json();
-            console.log('Datos recibidos:', data);
-            setReportes(data.reportes || []);
             
         } catch (error) {
-            console.error('Error cargando reportes:', error);
+            console.error('❌ Error cargando reportes:', error);
+            showNotification(`Error cargando reportes: ${error.message}`, 'error');
             
-            // Fallback con datos estáticos
-            const reportesEstaticos = [
+            // Datos de respaldo en caso de error total
+            setReportes([
                 {
                     id: 'suscriptores_tv',
                     nombre: 'Suscriptores y Asociados de TV Cerrada',
@@ -68,45 +56,21 @@ const ReportesRegulatorios = () => {
                     parametros: ['anno', 'semestre']
                 },
                 {
-                    id: 'lineas_valores',
-                    nombre: 'Líneas y Valores Facturados',
-                    descripcion: 'Res. 6333 - T.1.3',
-                    periodicidad: 'Trimestral',
-                    parametros: ['anno', 'trimestre']
-                },
-                {
-                    id: 'disponibilidad_qos',
-                    nombre: 'Disponibilidad del Servicio QoS',
-                    descripcion: 'Res. 6333 - T.2.1.B',
-                    periodicidad: 'Semestral',
-                    parametros: ['anno', 'semestre']
-                },
-                {
-                    id: 'monitoreo_quejas',
-                    nombre: 'Monitoreo de Quejas',
-                    descripcion: 'Res. 6755 - T.4.2',
-                    periodicidad: 'Trimestral',
-                    parametros: ['anno', 'trimestre']
-                },
-                {
-                    id: 'indicadores_quejas',
-                    nombre: 'Indicadores de Quejas y Peticiones',
-                    descripcion: 'Res. 6755 - T.4.3',
-                    periodicidad: 'Trimestral',
-                    parametros: ['anno', 'trimestre']
-                },
-                {
                     id: 'facturas_ventas',
                     nombre: 'Facturas de Ventas (Modelo Contable)',
                     descripcion: 'Reporte para importación contable',
                     periodicidad: 'Según rango de fechas',
                     parametros: ['fechaInicio', 'fechaFin']
                 }
-            ];
-            
-            setReportes(reportesEstaticos);
-            console.warn('Usando datos estáticos debido al error. Verifica que el endpoint /api/reportes-regulatorios/disponibles exista en el backend.');
+            ]);
+        } finally {
+            setLoading(false);
         }
+    };
+
+    const showNotification = (message, type = 'info') => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification(null), 5000);
     };
 
     const handleParameterChange = (param, value) => {
@@ -124,131 +88,65 @@ const ReportesRegulatorios = () => {
     };
 
     const validateParameters = (reporte) => {
-        const newErrors = {};
-        
-        reporte.parametros.forEach(param => {
-            if (!parameters[param]) {
-                newErrors[param] = `${param} es requerido`;
-            }
-        });
-
-        if (parameters.anno && (parameters.anno < 2020 || parameters.anno > new Date().getFullYear())) {
-            newErrors.anno = 'Año debe estar entre 2020 y el año actual';
-        }
-
-        if (parameters.trimestre && (parameters.trimestre < 1 || parameters.trimestre > 4)) {
-            newErrors.trimestre = 'Trimestre debe estar entre 1 y 4';
-        }
-
-        if (parameters.semestre && (parameters.semestre < 1 || parameters.semestre > 2)) {
-            newErrors.semestre = 'Semestre debe ser 1 o 2';
-        }
-
-        if (parameters.fechaInicio && parameters.fechaFin) {
-            if (new Date(parameters.fechaInicio) > new Date(parameters.fechaFin)) {
-                newErrors.fechaFin = 'Fecha fin debe ser posterior a fecha inicio';
-            }
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        const validation = reportesService.validateParameters(reporte.id, parameters);
+        setErrors(validation.errors);
+        return validation.isValid;
     };
 
     const generarReporte = async () => {
         const reporte = reportes.find(r => r.id === selectedReport);
         if (!reporte) {
-            alert('Por favor selecciona un reporte');
+            showNotification('Por favor selecciona un reporte', 'error');
             return;
         }
 
         if (!validateParameters(reporte)) {
-            alert('Por favor completa todos los parámetros requeridos');
+            showNotification('Por favor completa todos los parámetros requeridos correctamente', 'error');
             return;
         }
 
         setLoading(true);
         try {
-            const queryParams = new URLSearchParams(parameters);
-            const url = `/api/reportes-regulatorios/${selectedReport.replace('_', '-')}?${queryParams}`;
+            console.log(`🎯 Generando reporte: ${selectedReport} con parámetros:`, parameters);
             
-            console.log('Generando reporte:', url);
-            
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                }
-            });
-
-            console.log('Response status:', response.status);
-            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-            if (!response.ok) {
-                // Intentar leer el error como JSON, si no como texto
-                let errorMessage;
-                try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.error || errorData.message || `Error ${response.status}`;
-                } catch {
-                    errorMessage = await response.text();
-                }
-                throw new Error(errorMessage);
+            let resultado;
+            switch (selectedReport) {
+                case 'suscriptores_tv':
+                    resultado = await reportesService.generarReporteSuscriptoresTv(parameters);
+                    break;
+                case 'planes_tarifarios':
+                    resultado = await reportesService.generarReportePlanesTarifarios(parameters);
+                    break;
+                case 'lineas_valores':
+                    resultado = await reportesService.generarReporteLineasValores(parameters);
+                    break;
+                case 'disponibilidad_qos':
+                    resultado = await reportesService.generarReporteDisponibilidad(parameters);
+                    break;
+                case 'monitoreo_quejas':
+                    resultado = await reportesService.generarReporteQuejas(parameters);
+                    break;
+                case 'indicadores_quejas':
+                    resultado = await reportesService.generarReporteIndicadoresQuejas(parameters);
+                    break;
+                case 'facturas_ventas':
+                    resultado = await reportesService.generarReporteFacturasVentas(parameters);
+                    break;
+                default:
+                    // Usar método genérico
+                    resultado = await reportesService.generarReporte(selectedReport, parameters);
+                    break;
             }
 
-            // Verificar que sea un archivo Excel
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('spreadsheetml')) {
-                console.warn('Tipo de contenido inesperado:', contentType);
+            if (resultado.success) {
+                showNotification(`Reporte "${reporte.nombre}" generado y descargado exitosamente`, 'success');
+            } else {
+                throw new Error(resultado.error || 'Error desconocido');
             }
-
-            // Obtener el blob del archivo
-            const blob = await response.blob();
-            console.log('Blob size:', blob.size, 'bytes');
-            
-            if (blob.size === 0) {
-                throw new Error('El archivo generado está vacío');
-            }
-            
-            // Crear URL de descarga con tipo MIME correcto
-            const downloadUrl = window.URL.createObjectURL(new Blob([blob], {
-                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            }));
-            
-            // Obtener nombre del archivo
-            const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = `${reporte.nombre.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
-            
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                if (filenameMatch && filenameMatch[1]) {
-                    filename = filenameMatch[1].replace(/['"]/g, '');
-                }
-            }
-            
-            console.log('Descargando archivo:', filename);
-            
-            // Crear enlace de descarga
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = filename;
-            link.style.display = 'none';
-            
-            // Agregar al DOM, hacer clic y remover
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            // Limpiar URL después de un momento
-            setTimeout(() => {
-                window.URL.revokeObjectURL(downloadUrl);
-            }, 100);
-
-            alert('Reporte generado y descargado exitosamente');
 
         } catch (error) {
-            console.error('Error generando reporte:', error);
-            alert(`Error generando el reporte: ${error.message}`);
+            console.error('❌ Error generando reporte:', error);
+            showNotification(`Error generando el reporte: ${error.message}`, 'error');
         } finally {
             setLoading(false);
         }
@@ -256,8 +154,8 @@ const ReportesRegulatorios = () => {
 
     const renderParameterInput = (param, reporte) => {
         const hasError = errors[param];
-        const baseClasses = `w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-            hasError ? 'border-red-500' : 'border-gray-300'
+        const baseClasses = `w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+            hasError ? 'border-red-500 bg-red-50' : 'border-gray-300'
         }`;
 
         switch (param) {
@@ -274,9 +172,12 @@ const ReportesRegulatorios = () => {
                             value={parameters[param] || ''}
                             onChange={(e) => handleParameterChange(param, e.target.value)}
                             className={baseClasses}
-                            placeholder="Ej: 2024"
+                            placeholder={`Ej: ${new Date().getFullYear()}`}
                         />
-                        {hasError && <p className="text-sm text-red-600">{errors[param]}</p>}
+                        {hasError && <p className="text-sm text-red-600 flex items-center">
+                            <XCircle className="w-4 h-4 mr-1" />
+                            {errors[param]}
+                        </p>}
                     </div>
                 );
 
@@ -292,12 +193,15 @@ const ReportesRegulatorios = () => {
                             className={baseClasses}
                         >
                             <option value="">Seleccionar trimestre</option>
-                            <option value="1">1 (Enero - Marzo)</option>
-                            <option value="2">2 (Abril - Junio)</option>
-                            <option value="3">3 (Julio - Septiembre)</option>
-                            <option value="4">4 (Octubre - Diciembre)</option>
+                            <option value="1">1er Trimestre (Enero - Marzo)</option>
+                            <option value="2">2do Trimestre (Abril - Junio)</option>
+                            <option value="3">3er Trimestre (Julio - Septiembre)</option>
+                            <option value="4">4to Trimestre (Octubre - Diciembre)</option>
                         </select>
-                        {hasError && <p className="text-sm text-red-600">{errors[param]}</p>}
+                        {hasError && <p className="text-sm text-red-600 flex items-center">
+                            <XCircle className="w-4 h-4 mr-1" />
+                            {errors[param]}
+                        </p>}
                     </div>
                 );
 
@@ -313,10 +217,13 @@ const ReportesRegulatorios = () => {
                             className={baseClasses}
                         >
                             <option value="">Seleccionar semestre</option>
-                            <option value="1">1 (Enero - Junio)</option>
-                            <option value="2">2 (Julio - Diciembre)</option>
+                            <option value="1">1er Semestre (Enero - Junio)</option>
+                            <option value="2">2do Semestre (Julio - Diciembre)</option>
                         </select>
-                        {hasError && <p className="text-sm text-red-600">{errors[param]}</p>}
+                        {hasError && <p className="text-sm text-red-600 flex items-center">
+                            <XCircle className="w-4 h-4 mr-1" />
+                            {errors[param]}
+                        </p>}
                     </div>
                 );
 
@@ -331,8 +238,12 @@ const ReportesRegulatorios = () => {
                             value={parameters[param] || ''}
                             onChange={(e) => handleParameterChange(param, e.target.value)}
                             className={baseClasses}
+                            max={new Date().toISOString().split('T')[0]}
                         />
-                        {hasError && <p className="text-sm text-red-600">{errors[param]}</p>}
+                        {hasError && <p className="text-sm text-red-600 flex items-center">
+                            <XCircle className="w-4 h-4 mr-1" />
+                            {errors[param]}
+                        </p>}
                     </div>
                 );
 
@@ -347,8 +258,13 @@ const ReportesRegulatorios = () => {
                             value={parameters[param] || ''}
                             onChange={(e) => handleParameterChange(param, e.target.value)}
                             className={baseClasses}
+                            max={new Date().toISOString().split('T')[0]}
+                            min={parameters.fechaInicio || ''}
                         />
-                        {hasError && <p className="text-sm text-red-600">{errors[param]}</p>}
+                        {hasError && <p className="text-sm text-red-600 flex items-center">
+                            <XCircle className="w-4 h-4 mr-1" />
+                            {errors[param]}
+                        </p>}
                     </div>
                 );
 
@@ -356,7 +272,7 @@ const ReportesRegulatorios = () => {
                 return (
                     <div key={param} className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
-                            {param} *
+                            {param.charAt(0).toUpperCase() + param.slice(1)} *
                         </label>
                         <input
                             type="text"
@@ -364,7 +280,10 @@ const ReportesRegulatorios = () => {
                             onChange={(e) => handleParameterChange(param, e.target.value)}
                             className={baseClasses}
                         />
-                        {hasError && <p className="text-sm text-red-600">{errors[param]}</p>}
+                        {hasError && <p className="text-sm text-red-600 flex items-center">
+                            <XCircle className="w-4 h-4 mr-1" />
+                            {errors[param]}
+                        </p>}
                     </div>
                 );
         }
@@ -373,7 +292,23 @@ const ReportesRegulatorios = () => {
     const selectedReportData = reportes.find(r => r.id === selectedReport);
 
     return (
-                    <div className="p-6">
+        <div className="p-6">
+            {/* Notificación */}
+            {notification && (
+                <div className={`mb-6 p-4 rounded-lg border flex items-center ${
+                    notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
+                    notification.type === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
+                    notification.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
+                    'bg-blue-50 border-blue-200 text-blue-800'
+                }`}>
+                    {notification.type === 'success' && <CheckCircle className="w-5 h-5 mr-3" />}
+                    {notification.type === 'warning' && <AlertCircle className="w-5 h-5 mr-3" />}
+                    {notification.type === 'error' && <XCircle className="w-5 h-5 mr-3" />}
+                    {notification.type === 'info' && <AlertCircle className="w-5 h-5 mr-3" />}
+                    <span>{notification.message}</span>
+                </div>
+            )}
+
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900 mb-2">
                     Reportes Regulatorios
@@ -381,19 +316,6 @@ const ReportesRegulatorios = () => {
                 <p className="text-gray-600">
                     Generación de reportes para entidades regulatorias (CRC) y contabilidad
                 </p>
-                
-                {/* Debug info temporal */}
-                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                    <strong>Estado:</strong> Token {localStorage.getItem('token') ? '🟢' : '🔴'} | 
-                    Reportes cargados: {reportes.length} | 
-                    Seleccionado: {selectedReport || 'ninguno'} |
-                    <button 
-                        onClick={() => window.open('/api/reportes-regulatorios/disponibles', '_blank')}
-                        className="ml-2 px-2 py-1 bg-blue-500 text-white text-xs rounded"
-                    >
-                        Probar Endpoint
-                    </button>
-                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -405,30 +327,48 @@ const ReportesRegulatorios = () => {
                             Reportes Disponibles
                         </h2>
                         
-                        <div className="space-y-3">
-                            {reportes.map((reporte) => (
-                                <div
-                                    key={reporte.id}
-                                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                                        selectedReport === reporte.id
-                                            ? 'border-blue-500 bg-blue-50'
-                                            : 'border-gray-200 hover:border-gray-300'
-                                    }`}
-                                    onClick={() => {
-                                        setSelectedReport(reporte.id);
-                                        setParameters({});
-                                        setErrors({});
-                                    }}
-                                >
-                                    <h3 className="font-medium text-sm">{reporte.nombre}</h3>
-                                    <p className="text-xs text-gray-600 mt-1">{reporte.descripcion}</p>
-                                    <div className="flex items-center mt-2 text-xs text-gray-500">
-                                        <Calendar className="w-3 h-3 mr-1" />
-                                        {reporte.periodicidad}
+                        {loading ? (
+                            <div className="text-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                                <p className="text-gray-600 mt-2">Cargando reportes...</p>
+                            </div>
+                        ) : reportes.length > 0 ? (
+                            <div className="space-y-3">
+                                {reportes.map((reporte) => (
+                                    <div
+                                        key={reporte.id}
+                                        className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                                            selectedReport === reporte.id
+                                                ? 'border-blue-500 bg-blue-50 shadow-sm'
+                                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                        }`}
+                                        onClick={() => {
+                                            setSelectedReport(reporte.id);
+                                            setParameters({});
+                                            setErrors({});
+                                        }}
+                                    >
+                                        <h3 className="font-medium text-sm">{reporte.nombre}</h3>
+                                        <p className="text-xs text-gray-600 mt-1">{reporte.descripcion}</p>
+                                        <div className="flex items-center mt-2 text-xs text-gray-500">
+                                            <Calendar className="w-3 h-3 mr-1" />
+                                            {reporte.periodicidad}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-8">
+                                <FileSpreadsheet className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                <p className="text-gray-600">No hay reportes disponibles</p>
+                                <button 
+                                    onClick={cargarReportesDisponibles}
+                                    className="mt-2 text-blue-600 hover:text-blue-800"
+                                >
+                                    Intentar cargar nuevamente
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -443,13 +383,16 @@ const ReportesRegulatorios = () => {
                                 
                                 <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                                     <div className="flex items-start">
-                                        <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5" />
+                                        <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
                                         <div>
                                             <h3 className="font-medium text-blue-900 mb-1">
                                                 {selectedReportData.descripcion}
                                             </h3>
                                             <p className="text-sm text-blue-700">
                                                 Periodicidad: {selectedReportData.periodicidad}
+                                            </p>
+                                            <p className="text-xs text-blue-600 mt-1">
+                                                Los reportes se generan en formato Excel (.xlsx) compatible con el SUI de la CRC
                                             </p>
                                         </div>
                                     </div>
@@ -470,12 +413,12 @@ const ReportesRegulatorios = () => {
                                         {loading ? (
                                             <>
                                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                                Generando...
+                                                Generando Reporte...
                                             </>
                                         ) : (
                                             <>
                                                 <Download className="w-4 h-4 mr-2" />
-                                                Generar Reporte
+                                                Generar y Descargar
                                             </>
                                         )}
                                     </button>
@@ -488,7 +431,7 @@ const ReportesRegulatorios = () => {
                                     Selecciona un Reporte
                                 </h3>
                                 <p className="text-gray-600">
-                                    Escoge un reporte de la lista para configurar sus parámetros
+                                    Escoge un reporte de la lista para configurar sus parámetros y generarlo
                                 </p>
                             </div>
                         )}
@@ -501,23 +444,32 @@ const ReportesRegulatorios = () => {
                 <h3 className="text-lg font-semibold mb-4">Información Importante</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <h4 className="font-medium text-gray-900 mb-2">Reportes CRC</h4>
+                        <h4 className="font-medium text-gray-900 mb-2">📊 Reportes CRC</h4>
                         <ul className="text-sm text-gray-600 space-y-1">
-                            <li>• Los reportes se generan según las resoluciones vigentes</li>
-                            <li>• Formato Excel compatible con el SUI</li>
-                            <li>• Datos extraídos directamente del sistema</li>
-                            <li>• Validación automática de períodos</li>
+                            <li>• Los reportes se generan según las resoluciones vigentes de la CRC</li>
+                            <li>• Formato Excel compatible con el SUI (Sistema Único de Información)</li>
+                            <li>• Datos extraídos directamente del sistema en tiempo real</li>
+                            <li>• Validación automática de períodos y parámetros</li>
+                            <li>• Incluye hoja de información de control requerida</li>
                         </ul>
                     </div>
                     <div>
-                        <h4 className="font-medium text-gray-900 mb-2">Reportes Contables</h4>
+                        <h4 className="font-medium text-gray-900 mb-2">💼 Reportes Contables</h4>
                         <ul className="text-sm text-gray-600 space-y-1">
-                            <li>• Formato compatible con sistemas contables</li>
-                            <li>• Incluye todos los detalles de facturación</li>
-                            <li>• Separación por conceptos e impuestos</li>
-                            <li>• Exportación por rangos de fechas</li>
+                            <li>• Formato compatible con sistemas contables estándar</li>
+                            <li>• Incluye todos los detalles de facturación y pagos</li>
+                            <li>• Separación por conceptos, descuentos e impuestos</li>
+                            <li>• Exportación por rangos de fechas personalizables</li>
+                            <li>• Códigos de terceros y centros de costo incluidos</li>
                         </ul>
                     </div>
+                </div>
+                
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                        <strong>Nota:</strong> Los reportes se descargan automáticamente al generarse. 
+                        Asegúrate de permitir las descargas en tu navegador.
+                    </p>
                 </div>
             </div>
         </div>

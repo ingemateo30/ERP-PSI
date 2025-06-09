@@ -1,4 +1,4 @@
-// backend/index.js - SERVIDOR PRINCIPAL COMPLETO Y FUNCIONAL
+// backend/index.js - SERVIDOR PRINCIPAL COMPLETO Y FUNCIONAL - VERSIÓN CORREGIDA
 
 require('dotenv').config();
 const express = require('express');
@@ -118,7 +118,6 @@ app.use((req, res, next) => {
   next();
 });
 
-
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
@@ -187,10 +186,6 @@ app.get('/system-info', (req, res) => {
 // ============================================
 // CARGAR RUTAS PRINCIPALES
 // ============================================
-console.log('👤 Cargando rutas de clientes...');
-const clientesRoutes = require('./routes/clientes');  // <-- CAMBIO: clientes.js
-app.use('/api/v1/clients', clientesRoutes);           // <-- CAMBIO: usar clientesRoutes
-console.log('✅ Rutas de clientes cargadas: /api/v1/clients')
 
 try {
   console.log('📂 Cargando rutas del sistema...');
@@ -219,14 +214,50 @@ try {
   app.use('/api/v1/clients', clientRoutes);
   console.log('✅ Rutas de clientes cargadas: /api/v1/clients');
 
+  // Rutas de inventario
+  console.log('📦 Cargando rutas de inventario...');
+  const inventoryRoutes = require('./routes/inventario');
+  app.use('/api/v1/inventory', inventoryRoutes);
+  console.log('✅ Rutas de inventario cargadas: /api/v1/inventory');
+
+  // Rutas de plantillas de correo
+  console.log('📧 Cargando rutas de plantillas de correo...');
+  const plantillasCorreoRoutes = require('./routes/plantillasCorreo');
+  app.use('/api/v1/config/plantillas-correo', plantillasCorreoRoutes);
+  console.log('✅ Rutas de plantillas de correo cargadas: /api/v1/config/plantillas-correo');
+
+  // Rutas de facturas
+  console.log('💰 Cargando rutas de facturas...');
+  const facturasRoutes = require('./routes/factura');
+  app.use('/api/v1/facturas', facturasRoutes);
+  console.log('✅ Rutas de facturas cargadas: /api/v1/facturas');
+
+  // CORREGIDO: Rutas de reportes regulatorios
+  console.log('📊 Cargando rutas de reportes regulatorios...');
+  const reportesRegulatoriosRoutes = require('./routes/reportesRegulatorios');
+  app.use('/api/reportes-regulatorios', reportesRegulatoriosRoutes);
+  console.log('✅ Rutas de reportes regulatorios cargadas: /api/reportes-regulatorios');
+
+  // Rutas de PQR
+  console.log('📝 Cargando rutas de PQR...');
+  const pqrRoutes = require('./routes/pqr');
+  app.use('/api/pqr', pqrRoutes);
+  console.log('✅ Rutas de PQR cargadas: /api/pqr');
+
+  // Rutas de incidencias
+  console.log('🚨 Cargando rutas de incidencias...');
+  const incidenciasRoutes = require('./routes/incidencias');
+  app.use('/api/incidencias', incidenciasRoutes);
+  console.log('✅ Rutas de incidencias cargadas: /api/incidencias');
+
   // Rutas de reportes (si existe)
   try {
-    console.log('📊 Cargando rutas de reportes...');
+    console.log('📈 Cargando rutas de reportes generales...');
     const reportRoutes = require('./routes/reports');
     app.use('/api/v1/reports', reportRoutes);
-    console.log('✅ Rutas de reportes cargadas: /api/v1/reports');
+    console.log('✅ Rutas de reportes generales cargadas: /api/v1/reports');
   } catch (error) {
-    console.log('⚠️ Rutas de reportes no disponibles (opcional)');
+    console.log('⚠️ Rutas de reportes generales no disponibles (opcional)');
   }
 
   console.log('✅ Todas las rutas cargadas exitosamente');
@@ -236,24 +267,6 @@ try {
   console.error('Stack trace:', error.stack);
   process.exit(1);
 }
-const plantillasCorreoRoutes = require('./routes/plantillasCorreo');
-app.use('/api/v1/config/plantillas-correo', plantillasCorreoRoutes);
-
-const facturasRoutes = require('./routes/factura');
-app.use('/api/v1/facturas', facturasRoutes);
-
-const reportesRegulatoriosRoutes = require('./routes/reportesRegulatorios');
-const pqrRoutes = require('./routes/pqr');
-const incidenciasRoutes = require('./routes/incidencias')
-
-app.use('/api/reportes-regulatorios', reportesRegulatoriosRoutes);
-app.use('/api/pqr', pqrRoutes);
-app.use('/api/incidencias', incidenciasRoutes);
-
-console.log('📦 Cargando rutas de inventario...');
-const inventoryRoutes = require('./routes/inventario');
-app.use('/api/v1/inventory', inventoryRoutes);
-console.log('✅ Rutas de inventario cargadas: /api/v1/inventory');
 
 // Ruta base de la API con información completa
 app.get('/api/v1', (req, res) => {
@@ -312,20 +325,6 @@ app.get('/api/v1', (req, res) => {
           'GET /api/v1/clients/stats'
         ]
       },
-      conceptos: {
-        base: '/api/v1/conceptos',
-        endpoints: [
-          'GET /api/v1/conceptos',
-          'GET /api/v1/conceptos/:id',
-          'POST /api/v1/conceptos',
-          'PUT /api/v1/conceptos/:id',
-          'DELETE /api/v1/conceptos/:id',
-          'GET /api/v1/conceptos/stats',
-          'GET /api/v1/conceptos/tipos',
-          'GET /api/v1/conceptos/tipo/:tipo',
-          'POST /api/v1/conceptos/:id/toggle'
-        ]
-      },
       inventory: {
         base: '/api/v1/inventory',
         endpoints: [
@@ -349,6 +348,45 @@ app.get('/api/v1', (req, res) => {
           'GET /api/v1/inventory/types',
           'GET /api/v1/inventory/types/:tipo/brands',
           'GET /api/v1/inventory/check-code/:codigo'
+        ]
+      },
+      reportes_regulatorios: {
+        base: '/api/reportes-regulatorios',
+        endpoints: [
+          'GET /api/reportes-regulatorios/disponibles',
+          'GET /api/reportes-regulatorios/suscriptores-tv',
+          'GET /api/reportes-regulatorios/planes-tarifarios',
+          'GET /api/reportes-regulatorios/lineas-valores',
+          'GET /api/reportes-regulatorios/disponibilidad-qos',
+          'GET /api/reportes-regulatorios/monitoreo-quejas',
+          'GET /api/reportes-regulatorios/indicadores-quejas',
+          'GET /api/reportes-regulatorios/facturas-ventas'
+        ]
+      },
+      pqr: {
+        base: '/api/pqr',
+        endpoints: [
+          'GET /api/pqr',
+          'GET /api/pqr/:id',
+          'POST /api/pqr',
+          'PUT /api/pqr/:id',
+          'DELETE /api/pqr/:id',
+          'GET /api/pqr/estadisticas',
+          'POST /api/pqr/:id/asignar',
+          'GET /api/pqr/cliente/:clienteId',
+          'GET /api/pqr/reportes/crc'
+        ]
+      },
+      incidencias: {
+        base: '/api/incidencias',
+        endpoints: [
+          'GET /api/incidencias',
+          'GET /api/incidencias/:id',
+          'POST /api/incidencias',
+          'PUT /api/incidencias/:id',
+          'POST /api/incidencias/:id/cerrar',
+          'GET /api/incidencias/estadisticas',
+          'GET /api/incidencias/activas/resumen'
         ]
       },
       system: {
@@ -395,7 +433,8 @@ app.use('*', (req, res) => {
       api_info: 'GET /api/v1',
       health: 'GET /health',
       auth: 'POST /api/v1/auth/login',
-      config: 'GET /api/v1/config/overview'
+      config: 'GET /api/v1/config/overview',
+      reportes_regulatorios: 'GET /api/reportes-regulatorios/disponibles'
     },
     timestamp: new Date().toISOString()
   });
@@ -565,6 +604,11 @@ async function startServer() {
       console.log(`      POST http://localhost:${PORT}/api/v1/auth/login`);
       console.log(`      POST http://localhost:${PORT}/api/v1/auth/register`);
       console.log(`      GET  http://localhost:${PORT}/api/v1/auth/me`);
+
+      console.log('   📊 Reportes Regulatorios:');
+      console.log(`      GET  http://localhost:${PORT}/api/reportes-regulatorios/disponibles`);
+      console.log(`      GET  http://localhost:${PORT}/api/reportes-regulatorios/suscriptores-tv`);
+      console.log(`      GET  http://localhost:${PORT}/api/reportes-regulatorios/planes-tarifarios`);
 
       console.log('   👥 Gestión de usuarios:');
       console.log(`      GET  http://localhost:${PORT}/api/v1/users/profile`);
@@ -739,9 +783,8 @@ if (process.env.NODE_ENV === 'development') {
 // ============================================
 
 // Mensaje de bienvenida
-console.log('🌟 Sistema de Gestión ISP v1.0.0');
-console.log('🏢 Para empresas de servicios de internet y televisión');
-console.log('⚡ Desarrollado con Node.js + Express + MySQL\n');
+console.log('🌟 Sistema de Gestión PSI v1.0.0');
+
 
 // Iniciar servidor
 startServer().catch((error) => {
