@@ -26,6 +26,7 @@ const InventoryManagement = lazy(() => import('./components/Inventory/InventoryM
 
 // Lazy loading de componentes de gestión
 const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagement'));
+const FacturasManagement =lazy(() => import('./components/Facturas/FacturasManagement'));// CORREGIDO: Importación correcta del componente FacturasManagement'./components/Facturas/FacturasManagement';from './components/Facturas/FacturasManagement';
 
 
 const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
@@ -314,11 +315,11 @@ function App() {
               />
 
               <Route
-                path="/invoices"
+                path="/facturas"
                 element={
-                  <ProtectedRoute requiredRole="supervisor">
+                  <ProtectedRoute requiredRole="administrador">
                     <MainLayout title="Gestión de Facturas" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Gestión de Facturas" />
+                      <FacturasManagement  />
                     </MainLayout>
                   </ProtectedRoute>
                 }

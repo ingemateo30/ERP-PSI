@@ -1,336 +1,495 @@
-// Validaciones para el módulo de clientes
+// middleware/validations.js
+const { body, validationResult } = require('express-validator');
 
-/**
- * Validar cédula colombiana
- */
-function validarCedulaColombiana(cedula) {
-  if (!cedula || typeof cedula !== 'string') return false;
-  
-  // Remover puntos y comas
-  cedula = cedula.replace(/[.,]/g, '');
-  
-  // Verificar que solo contenga números
-  if (!/^\d+$/.test(cedula)) return false;
-  
-  // Verificar longitud (6-10 dígitos)
-  if (cedula.length < 6 || cedula.length > 10) return false;
-  
-  return true;
-}
-
-/**
- * Validar NIT colombiano
- */
-function validarNitColombiano(nit) {
-  if (!nit || typeof nit !== 'string') return false;
-  
-  // Remover puntos, comas y guiones
-  nit = nit.replace(/[.,-]/g, '');
-  
-  // Verificar formato básico
-  if (!/^\d{9,10}$/.test(nit)) return false;
-  
-  return true;
-}
-
-/**
- * Validar teléfono colombiano
- */
-function validarTelefonoColombiano(telefono) {
-  if (!telefono || typeof telefono !== 'string') return false;
-  
-  // Remover espacios, guiones y paréntesis
-  telefono = telefono.replace(/[\s\-()]/g, '');
-  
-  // Verificar que solo contenga números
-  if (!/^\d+$/.test(telefono)) return false;
-  
-  // Verificar formatos válidos para Colombia
-  // Móvil: 10 dígitos (3xxxxxxxxx)
-  // Fijo: 7 dígitos (xxxxxxx) o 10 dígitos con indicativo
-  if (telefono.length === 10 && telefono.startsWith('3')) return true;
-  if (telefono.length === 7) return true;
-  if (telefono.length === 10 && /^[1-8]/.test(telefono)) return true;
-  
-  return false;
-}
-
-/**
- * Validar email
- */
-function validarEmail(email) {
-  if (!email) return true; // Email es opcional
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-/**
- * Validar dirección MAC
- */
-function validarMAC(mac) {
-  if (!mac) return true; // MAC es opcional
-  return /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(mac);
-}
-
-/**
- * Validar dirección IP
- */
-function validarIP(ip) {
-  if (!ip) return true; // IP es opcional
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  
-  if (!ipv4Regex.test(ip)) return false;
-  
-  const parts = ip.split('.');
-  return parts.every(part => {
-    const num = parseInt(part, 10);
-    return num >= 0 && num <= 255;
-  });
-}
-
-/**
- * Middleware de validación para crear cliente
- */
-function validarCrearCliente(req, res, next) {
-  const errores = [];
-  const { 
-    identificacion, 
-    tipo_documento, 
-    nombre, 
-    direccion,
-    telefono,
-    telefono_2,
-    correo,
-    estrato,
-    mac_address,
-    ip_asignada,
-    estado
-  } = req.body;
-
-  // Validaciones requeridas
-  if (!identificacion || identificacion.trim().length === 0) {
-    errores.push('La identificación es requerida');
-  } else if (identificacion.length < 5 || identificacion.length > 20) {
-    errores.push('La identificación debe tener entre 5 y 20 caracteres');
-  } else if (!/^[0-9A-Za-z-]+$/.test(identificacion)) {
-    errores.push('La identificación solo puede contener números, letras y guiones');
-  }
-
-  if (!nombre || nombre.trim().length === 0) {
-    errores.push('El nombre es requerido');
-  } else if (nombre.length < 2 || nombre.length > 255) {
-    errores.push('El nombre debe tener entre 2 y 255 caracteres');
-  } else if (!/^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]+$/.test(nombre)) {
-    errores.push('El nombre solo puede contener letras y espacios');
-  }
-
-  if (!direccion || direccion.trim().length === 0) {
-    errores.push('La dirección es requerida');
-  } else if (direccion.length < 5 || direccion.length > 500) {
-    errores.push('La dirección debe tener entre 5 y 500 caracteres');
-  }
-
-  // Validaciones opcionales
-  if (tipo_documento && !['cedula', 'nit', 'pasaporte', 'extranjeria'].includes(tipo_documento)) {
-    errores.push('Tipo de documento inválido');
-  }
-
-  if (telefono && !validarTelefonoColombiano(telefono)) {
-    errores.push('Número de teléfono principal inválido para Colombia');
-  }
-
-  if (telefono_2 && !validarTelefonoColombiano(telefono_2)) {
-    errores.push('Número de teléfono secundario inválido para Colombia');
-  }
-
-  if (correo && !validarEmail(correo)) {
-    errores.push('Correo electrónico inválido');
-  }
-
-  if (estrato && !['1', '2', '3', '4', '5', '6'].includes(estrato)) {
-    errores.push('Estrato inválido (debe ser 1-6)');
-  }
-
-  if (mac_address && !validarMAC(mac_address)) {
-    errores.push('Dirección MAC inválida');
-  }
-
-  if (ip_asignada && !validarIP(ip_asignada)) {
-    errores.push('Dirección IP inválida');
-  }
-
-  if (estado && !['activo', 'suspendido', 'cortado', 'retirado', 'inactivo'].includes(estado)) {
-    errores.push('Estado inválido');
-  }
-
-  // Validaciones de negocio
-  if (ip_asignada && !mac_address) {
-    errores.push('Si se asigna IP, también se debe proporcionar la dirección MAC');
-  }
-
-  // Validar tipo de documento vs identificación
-  if (tipo_documento === 'cedula' && identificacion && !validarCedulaColombiana(identificacion)) {
-    errores.push('Número de cédula inválido');
-  }
-
-  if (tipo_documento === 'nit' && identificacion && !validarNitColombiano(identificacion)) {
-    errores.push('Número de NIT inválido');
-  }
-
-  if (errores.length > 0) {
+// Función para manejar errores de validación
+const handleValidationErrors = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      message: 'Errores de validación',
-      errors: errores
+      message: 'Datos de entrada inválidos',
+      errors: errors.array(),
+      timestamp: new Date().toISOString()
     });
   }
-
-  // Limpiar y normalizar datos
-  if (req.body.identificacion) {
-    req.body.identificacion = req.body.identificacion.trim();
-  }
-  if (req.body.nombre) {
-    req.body.nombre = req.body.nombre.trim();
-  }
-  if (req.body.direccion) {
-    req.body.direccion = req.body.direccion.trim();
-  }
-  if (req.body.telefono) {
-    req.body.telefono = req.body.telefono.replace(/\D/g, '');
-  }
-  if (req.body.telefono_2) {
-    req.body.telefono_2 = req.body.telefono_2.replace(/\D/g, '');
-  }
-  if (req.body.correo) {
-    req.body.correo = req.body.correo.toLowerCase().trim();
-  }
-
   next();
-}
+};
 
-/**
- * Middleware de validación para actualizar cliente
- */
-function validarActualizarCliente(req, res, next) {
-  const errores = [];
-  const { 
-    identificacion, 
-    tipo_documento, 
-    nombre, 
-    direccion,
-    telefono,
-    telefono_2,
-    correo,
-    estrato,
-    mac_address,
-    ip_asignada,
-    estado
-  } = req.body;
+// ========== VALIDACIONES PARA CLIENTES ==========
 
-  // Validaciones opcionales (solo si se proporcionan)
-  if (identificacion !== undefined) {
-    if (!identificacion || identificacion.trim().length === 0) {
-      errores.push('La identificación no puede estar vacía');
-    } else if (identificacion.length < 5 || identificacion.length > 20) {
-      errores.push('La identificación debe tener entre 5 y 20 caracteres');
-    } else if (!/^[0-9A-Za-z-]+$/.test(identificacion)) {
-      errores.push('La identificación solo puede contener números, letras y guiones');
-    }
-  }
+// Validación para crear cliente
+const validarCrearCliente = [
+  body('identificacion')
+    .notEmpty()
+    .withMessage('La identificación es requerida')
+    .isLength({ min: 5, max: 20 })
+    .withMessage('La identificación debe tener entre 5 y 20 caracteres')
+    .matches(/^[0-9A-Za-z-]+$/)
+    .withMessage('La identificación solo puede contener números, letras y guiones'),
+    
+  body('tipo_documento')
+    .optional()
+    .isIn(['cedula', 'nit', 'pasaporte', 'extranjeria'])
+    .withMessage('Tipo de documento inválido'),
+    
+  body('nombre')
+    .notEmpty()
+    .withMessage('El nombre es requerido')
+    .isLength({ min: 2, max: 255 })
+    .withMessage('El nombre debe tener entre 2 y 255 caracteres')
+    .matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/)
+    .withMessage('El nombre solo puede contener letras y espacios'),
+    
+  body('direccion')
+    .notEmpty()
+    .withMessage('La dirección es requerida')
+    .isLength({ min: 5, max: 255 })
+    .withMessage('La dirección debe tener entre 5 y 255 caracteres'),
+    
+  body('sector_id')
+    .optional()
+    .isNumeric()
+    .withMessage('El ID del sector debe ser numérico'),
+    
+  body('estrato')
+    .optional()
+    .isIn(['1', '2', '3', '4', '5', '6'])
+    .withMessage('El estrato debe estar entre 1 y 6'),
+    
+  body('barrio')
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage('El barrio no puede exceder 100 caracteres'),
+    
+  body('ciudad_id')
+    .optional()
+    .isNumeric()
+    .withMessage('El ID de la ciudad debe ser numérico'),
+    
+  body('telefono')
+    .optional()
+    .matches(/^[0-9+\-\s()]+$/)
+    .withMessage('El teléfono debe contener solo números, espacios, paréntesis, + y -')
+    .isLength({ max: 30 })
+    .withMessage('El teléfono no puede exceder 30 caracteres'),
+    
+  body('telefono_2')
+    .optional()
+    .matches(/^[0-9+\-\s()]+$/)
+    .withMessage('El teléfono 2 debe contener solo números, espacios, paréntesis, + y -')
+    .isLength({ max: 30 })
+    .withMessage('El teléfono 2 no puede exceder 30 caracteres'),
+    
+  body('correo')
+    .optional()
+    .isEmail()
+    .withMessage('El correo debe tener un formato válido')
+    .isLength({ max: 100 })
+    .withMessage('El correo no puede exceder 100 caracteres'),
+    
+  body('fecha_registro')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha de registro debe ser válida'),
+    
+  body('fecha_hasta')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha hasta debe ser válida'),
+    
+  body('estado')
+    .optional()
+    .isIn(['activo', 'suspendido', 'cortado', 'retirado', 'inactivo'])
+    .withMessage('Estado inválido'),
+    
+  body('mac_address')
+    .optional()
+    .matches(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/)
+    .withMessage('La dirección MAC debe tener un formato válido'),
+    
+  body('ip_asignada')
+    .optional()
+    .isIP()
+    .withMessage('La IP asignada debe ser válida'),
+    
+  body('tap')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('El TAP no puede exceder 20 caracteres'),
+    
+  body('poste')
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage('El poste no puede exceder 50 caracteres'),
+    
+  body('contrato')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('El contrato no puede exceder 20 caracteres'),
+    
+  body('ruta')
+    .optional()
+    .isLength({ max: 10 })
+    .withMessage('La ruta no puede exceder 10 caracteres'),
+    
+  body('codigo_usuario')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('El código de usuario no puede exceder 20 caracteres'),
+    
+  body('observaciones')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Las observaciones no pueden exceder 1000 caracteres'),
 
-  if (nombre !== undefined) {
-    if (!nombre || nombre.trim().length === 0) {
-      errores.push('El nombre no puede estar vacío');
-    } else if (nombre.length < 2 || nombre.length > 255) {
-      errores.push('El nombre debe tener entre 2 y 255 caracteres');
-    } else if (!/^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]+$/.test(nombre)) {
-      errores.push('El nombre solo puede contener letras y espacios');
-    }
-  }
+  handleValidationErrors
+];
 
-  if (direccion !== undefined) {
-    if (!direccion || direccion.trim().length === 0) {
-      errores.push('La dirección no puede estar vacía');
-    } else if (direccion.length < 5 || direccion.length > 500) {
-      errores.push('La dirección debe tener entre 5 y 500 caracteres');
-    }
-  }
+// Validación para actualizar cliente
+const validarActualizarCliente = [
+  body('identificacion')
+    .optional()
+    .isLength({ min: 5, max: 20 })
+    .withMessage('La identificación debe tener entre 5 y 20 caracteres')
+    .matches(/^[0-9A-Za-z-]+$/)
+    .withMessage('La identificación solo puede contener números, letras y guiones'),
+    
+  body('tipo_documento')
+    .optional()
+    .isIn(['cedula', 'nit', 'pasaporte', 'extranjeria'])
+    .withMessage('Tipo de documento inválido'),
+    
+  body('nombre')
+    .optional()
+    .isLength({ min: 2, max: 255 })
+    .withMessage('El nombre debe tener entre 2 y 255 caracteres')
+    .matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/)
+    .withMessage('El nombre solo puede contener letras y espacios'),
+    
+  body('direccion')
+    .optional()
+    .isLength({ min: 5, max: 255 })
+    .withMessage('La dirección debe tener entre 5 y 255 caracteres'),
+    
+  body('sector_id')
+    .optional()
+    .isNumeric()
+    .withMessage('El ID del sector debe ser numérico'),
+    
+  body('estrato')
+    .optional()
+    .isIn(['1', '2', '3', '4', '5', '6'])
+    .withMessage('El estrato debe estar entre 1 y 6'),
+    
+  body('barrio')
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage('El barrio no puede exceder 100 caracteres'),
+    
+  body('ciudad_id')
+    .optional()
+    .isNumeric()
+    .withMessage('El ID de la ciudad debe ser numérico'),
+    
+  body('telefono')
+    .optional()
+    .matches(/^[0-9+\-\s()]+$/)
+    .withMessage('El teléfono debe contener solo números, espacios, paréntesis, + y -')
+    .isLength({ max: 30 })
+    .withMessage('El teléfono no puede exceder 30 caracteres'),
+    
+  body('telefono_2')
+    .optional()
+    .matches(/^[0-9+\-\s()]+$/)
+    .withMessage('El teléfono 2 debe contener solo números, espacios, paréntesis, + y -')
+    .isLength({ max: 30 })
+    .withMessage('El teléfono 2 no puede exceder 30 caracteres'),
+    
+  body('correo')
+    .optional()
+    .isEmail()
+    .withMessage('El correo debe tener un formato válido')
+    .isLength({ max: 100 })
+    .withMessage('El correo no puede exceder 100 caracteres'),
+    
+  body('fecha_registro')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha de registro debe ser válida'),
+    
+  body('fecha_hasta')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha hasta debe ser válida'),
+    
+  body('estado')
+    .optional()
+    .isIn(['activo', 'suspendido', 'cortado', 'retirado', 'inactivo'])
+    .withMessage('Estado inválido'),
+    
+  body('mac_address')
+    .optional()
+    .matches(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/)
+    .withMessage('La dirección MAC debe tener un formato válido'),
+    
+  body('ip_asignada')
+    .optional()
+    .isIP()
+    .withMessage('La IP asignada debe ser válida'),
+    
+  body('tap')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('El TAP no puede exceder 20 caracteres'),
+    
+  body('poste')
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage('El poste no puede exceder 50 caracteres'),
+    
+  body('contrato')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('El contrato no puede exceder 20 caracteres'),
+    
+  body('ruta')
+    .optional()
+    .isLength({ max: 10 })
+    .withMessage('La ruta no puede exceder 10 caracteres'),
+    
+  body('codigo_usuario')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('El código de usuario no puede exceder 20 caracteres'),
+    
+  body('observaciones')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Las observaciones no pueden exceder 1000 caracteres'),
 
-  if (tipo_documento && !['cedula', 'nit', 'pasaporte', 'extranjeria'].includes(tipo_documento)) {
-    errores.push('Tipo de documento inválido');
-  }
+  handleValidationErrors
+];
 
-  if (telefono && !validarTelefonoColombiano(telefono)) {
-    errores.push('Número de teléfono principal inválido para Colombia');
-  }
+// ========== VALIDACIONES PARA FACTURAS ==========
 
-  if (telefono_2 && !validarTelefonoColombiano(telefono_2)) {
-    errores.push('Número de teléfono secundario inválido para Colombia');
-  }
+// Validación para crear factura
+const validarCrearFactura = [
+  body('cliente_id')
+    .notEmpty()
+    .withMessage('El ID del cliente es requerido')
+    .isNumeric()
+    .withMessage('El ID del cliente debe ser numérico'),
+    
+  body('periodo_facturacion')
+    .notEmpty()
+    .withMessage('El período de facturación es requerido')
+    .matches(/^\d{4}-\d{2}$/)
+    .withMessage('El formato del período debe ser YYYY-MM'),
+    
+  body('fecha_vencimiento')
+    .notEmpty()
+    .withMessage('La fecha de vencimiento es requerida')
+    .isISO8601()
+    .withMessage('La fecha de vencimiento debe ser válida'),
+    
+  body('fecha_desde')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha desde debe ser válida'),
+    
+  body('fecha_hasta')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha hasta debe ser válida'),
+    
+  body('internet')
+    .optional()
+    .isDecimal({ decimal_digits: '0,2' })
+    .withMessage('El valor de internet debe ser decimal válido'),
+    
+  body('television')
+    .optional()
+    .isDecimal({ decimal_digits: '0,2' })
+    .withMessage('El valor de televisión debe ser decimal válido'),
+    
+  body('saldo_anterior')
+    .optional()
+    .isDecimal({ decimal_digits: '0,2' })
+    .withMessage('El saldo anterior debe ser decimal válido'),
+    
+  body('ruta')
+    .optional()
+    .isLength({ max: 10 })
+    .withMessage('La ruta no puede exceder 10 caracteres'),
+    
+  body('observaciones')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Las observaciones no pueden exceder 1000 caracteres'),
 
-  if (correo && !validarEmail(correo)) {
-    errores.push('Correo electrónico inválido');
-  }
+  handleValidationErrors
+];
 
-  if (estrato && !['1', '2', '3', '4', '5', '6'].includes(estrato)) {
-    errores.push('Estrato inválido (debe ser 1-6)');
-  }
+// Validación para actualizar factura
+const validarActualizarFactura = [
+  body('periodo_facturacion')
+    .optional()
+    .matches(/^\d{4}-\d{2}$/)
+    .withMessage('El formato del período debe ser YYYY-MM'),
+    
+  body('fecha_vencimiento')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha de vencimiento debe ser válida'),
+    
+  body('estado')
+    .optional()
+    .isIn(['pendiente', 'pagada', 'vencida', 'anulada'])
+    .withMessage('Estado inválido'),
+    
+  body('observaciones')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Las observaciones no pueden exceder 1000 caracteres'),
 
-  if (mac_address && !validarMAC(mac_address)) {
-    errores.push('Dirección MAC inválida');
-  }
+  handleValidationErrors
+];
 
-  if (ip_asignada && !validarIP(ip_asignada)) {
-    errores.push('Dirección IP inválida');
-  }
+// Validación para marcar factura como pagada
+const validarPagarFactura = [
+  body('metodo_pago')
+    .notEmpty()
+    .withMessage('El método de pago es requerido')
+    .isIn(['efectivo', 'transferencia', 'tarjeta', 'cheque', 'consignacion'])
+    .withMessage('Método de pago inválido'),
+    
+  body('fecha_pago')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha de pago debe ser válida'),
+    
+  body('referencia_pago')
+    .optional()
+    .isLength({ max: 255 })
+    .withMessage('La referencia de pago no puede exceder 255 caracteres'),
+    
+  body('banco_id')
+    .optional()
+    .isNumeric()
+    .withMessage('El ID del banco debe ser numérico'),
 
-  if (estado && !['activo', 'suspendido', 'cortado', 'retirado', 'inactivo'].includes(estado)) {
-    errores.push('Estado inválido');
-  }
+  handleValidationErrors
+];
 
-  // Validaciones de negocio
-  if (ip_asignada && !mac_address && !req.body.mac_address) {
-    errores.push('Si se asigna IP, también se debe proporcionar la dirección MAC');
-  }
+// ========== VALIDACIONES PARA USUARIOS ==========
 
-  if (errores.length > 0) {
-    return res.status(400).json({
-      success: false,
-      message: 'Errores de validación',
-      errors: errores
-    });
-  }
+// Validación para crear usuario
+const validarCrearUsuario = [
+  body('email')
+    .notEmpty()
+    .withMessage('El email es requerido')
+    .isEmail()
+    .withMessage('El email debe tener un formato válido')
+    .isLength({ max: 255 })
+    .withMessage('El email no puede exceder 255 caracteres'),
+    
+  body('password')
+    .notEmpty()
+    .withMessage('La contraseña es requerida')
+    .isLength({ min: 6 })
+    .withMessage('La contraseña debe tener al menos 6 caracteres'),
+    
+  body('nombre')
+    .notEmpty()
+    .withMessage('El nombre es requerido')
+    .isLength({ min: 2, max: 255 })
+    .withMessage('El nombre debe tener entre 2 y 255 caracteres'),
+    
+  body('telefono')
+    .optional()
+    .matches(/^[0-9+\-\s()]+$/)
+    .withMessage('El teléfono debe contener solo números, espacios, paréntesis, + y -')
+    .isLength({ max: 20 })
+    .withMessage('El teléfono no puede exceder 20 caracteres'),
+    
+  body('rol')
+    .notEmpty()
+    .withMessage('El rol es requerido')
+    .isIn(['administrador', 'instalador', 'supervisor'])
+    .withMessage('Rol inválido'),
 
-  // Limpiar y normalizar datos
-  if (req.body.identificacion) {
-    req.body.identificacion = req.body.identificacion.trim();
-  }
-  if (req.body.nombre) {
-    req.body.nombre = req.body.nombre.trim();
-  }
-  if (req.body.direccion) {
-    req.body.direccion = req.body.direccion.trim();
-  }
-  if (req.body.telefono) {
-    req.body.telefono = req.body.telefono.replace(/\D/g, '');
-  }
-  if (req.body.telefono_2) {
-    req.body.telefono_2 = req.body.telefono_2.replace(/\D/g, '');
-  }
-  if (req.body.correo) {
-    req.body.correo = req.body.correo.toLowerCase().trim();
-  }
+  handleValidationErrors
+];
 
-  next();
-}
+// Validación para actualizar usuario
+const validarActualizarUsuario = [
+  body('email')
+    .optional()
+    .isEmail()
+    .withMessage('El email debe tener un formato válido')
+    .isLength({ max: 255 })
+    .withMessage('El email no puede exceder 255 caracteres'),
+    
+  body('password')
+    .optional()
+    .isLength({ min: 6 })
+    .withMessage('La contraseña debe tener al menos 6 caracteres'),
+    
+  body('nombre')
+    .optional()
+    .isLength({ min: 2, max: 255 })
+    .withMessage('El nombre debe tener entre 2 y 255 caracteres'),
+    
+  body('telefono')
+    .optional()
+    .matches(/^[0-9+\-\s()]+$/)
+    .withMessage('El teléfono debe contener solo números, espacios, paréntesis, + y -')
+    .isLength({ max: 20 })
+    .withMessage('El teléfono no puede exceder 20 caracteres'),
+    
+  body('rol')
+    .optional()
+    .isIn(['administrador', 'instalador', 'supervisor'])
+    .withMessage('Rol inválido'),
+
+  handleValidationErrors
+];
+
+// ========== VALIDACIONES PARA LOGIN ==========
+
+const validarLogin = [
+  body('email')
+    .notEmpty()
+    .withMessage('El email es requerido')
+    .isEmail()
+    .withMessage('El email debe tener un formato válido'),
+    
+  body('password')
+    .notEmpty()
+    .withMessage('La contraseña es requerida'),
+
+  handleValidationErrors
+];
+
+// ========== EXPORTAR TODAS LAS VALIDACIONES ==========
 
 module.exports = {
+  // Clientes
   validarCrearCliente,
   validarActualizarCliente,
-  validarCedulaColombiana,
-  validarNitColombiano,
-  validarTelefonoColombiano,
-  validarEmail,
-  validarMAC,
-  validarIP
+  
+  // Facturas
+  validarCrearFactura,
+  validarActualizarFactura,
+  validarPagarFactura,
+  
+  // Usuarios
+  validarCrearUsuario,
+  validarActualizarUsuario,
+  
+  // Auth
+  validarLogin,
+  
+  // Utilidad
+  handleValidationErrors
 };

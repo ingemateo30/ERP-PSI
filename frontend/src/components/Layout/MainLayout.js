@@ -84,8 +84,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     {
       icon: <DollarSign size={22} />,
       label: 'Facturación',
-      path: '/invoices',
-      permission: 'supervisor'
+      path: '/facturas',
+      permission: 'supervisor,administrador'
     },
     {
       icon: <Wifi size={22} />,
