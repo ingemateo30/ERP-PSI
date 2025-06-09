@@ -102,8 +102,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     {
       icon: <PieChartIcon size={22} />,
       label: 'Reportes',
-      path: '/reports',
-      permission: 'supervisor'
+      path: '/reportes-regulatorios',
+      permission: 'supervisor,administrador'
     },
     {
       icon: <Wrench size={22} />,

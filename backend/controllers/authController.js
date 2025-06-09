@@ -305,7 +305,7 @@ class AuthController {
     static async logout(req, res) {
         try {
             const user = req.user;
-            
+
             res.clearCookie('refreshToken');
 
             logger.logAuth('info', 'Logout exitoso', {

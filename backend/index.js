@@ -242,6 +242,13 @@ app.use('/api/v1/config/plantillas-correo', plantillasCorreoRoutes);
 const facturasRoutes = require('./routes/factura');
 app.use('/api/v1/facturas', facturasRoutes);
 
+const reportesRegulatoriosRoutes = require('./routes/reportesRegulatorios');
+const pqrRoutes = require('./routes/pqr');
+const incidenciasRoutes = require('./routes/incidencias')
+
+app.use('/api/reportes-regulatorios', reportesRegulatoriosRoutes);
+app.use('/api/pqr', pqrRoutes);
+app.use('/api/incidencias', incidenciasRoutes);
 
 console.log('📦 Cargando rutas de inventario...');
 const inventoryRoutes = require('./routes/inventario');

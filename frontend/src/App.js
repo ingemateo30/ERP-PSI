@@ -26,9 +26,11 @@ const InventoryManagement = lazy(() => import('./components/Inventory/InventoryM
 
 // Lazy loading de componentes de gestión
 const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagement'));
-const FacturasManagement =lazy(() => import('./components/Facturas/FacturasManagement'));// CORREGIDO: Importación correcta del componente FacturasManagement'./components/Facturas/FacturasManagement';from './components/Facturas/FacturasManagement';
+const FacturasManagement = lazy(() => import('./components/Facturas/FacturasManagement'));// CORREGIDO: Importación correcta del componente FacturasManagement'./components/Facturas/FacturasManagement';from './components/Facturas/FacturasManagement';
 
-
+const ReportesRegulatorios = lazy(() => import('./components/Reports/ReportesRegulatorios'));// CORREGIDO: Importación correcta del componente ReportesRegulatorios'from './components/Reports/ReportesRegulatorios';
+const PQRManagement = lazy(() => import('./components/PQR/PQRManagement'));// CORREGIDO: Importación correcta del componente PQRManagement' from './components/PQR/PQRManagement';
+const IncidenciasManagement = lazy(() => import('./components/Incidencias/IncidenciasManagement'));
 const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
 
 // Componente de carga
@@ -319,7 +321,7 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="administrador">
                     <MainLayout title="Gestión de Facturas" subtitle="Esta funcionalidad está en desarrollo">
-                      <FacturasManagement  />
+                      <FacturasManagement />
                     </MainLayout>
                   </ProtectedRoute>
                 }
@@ -357,7 +359,31 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route path="pqr" element={<PQRManagement />} />
 
+              {/* Incidencias */}
+              <Route
+                path="incidencias"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Gestión de Incidencias" subtitle="">
+                    <IncidenciasManagement />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Reportes Regulatorios */}
+              <Route
+                path="reportes-regulatorios"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Gestión de Reportes" subtitle="">
+                    <ReportesRegulatorios />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/reports"
                 element={
