@@ -359,7 +359,15 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="pqr" element={<PQRManagement />} />
+              <Route
+                path="pqr"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Gestión de Incidencias" subtitle="">
+                      <PQRManagement />
+                    </MainLayout>
+                  </ProtectedRoute>
+                } />
 
               {/* Incidencias */}
               <Route
@@ -367,7 +375,7 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="administrador">
                     <MainLayout title="Gestión de Incidencias" subtitle="">
-                    <IncidenciasManagement />
+                      <IncidenciasManagement />
                     </MainLayout>
                   </ProtectedRoute>
                 }
@@ -379,7 +387,7 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="administrador">
                     <MainLayout title="Gestión de Reportes" subtitle="">
-                    <ReportesRegulatorios />
+                      <ReportesRegulatorios />
                     </MainLayout>
                   </ProtectedRoute>
                 }

@@ -89,7 +89,7 @@ const AdminDashboard = () => {
                         <span className="text-sm md:text-base">Usuarios</span>
                     </button>
                     <button
-                        onClick={() => navigate('/reports')}
+                        onClick={() => navigate('/reportes-regulatorios')}
                         className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
                     >
                         <BarChart3 size={18} className="mr-2" />

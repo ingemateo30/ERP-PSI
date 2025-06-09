@@ -19,13 +19,13 @@ const ReportesRegulatorios = () => {
         try {
             console.log('🔄 Cargando reportes disponibles...');
             setLoading(true);
-            
+
             const resultado = await reportesService.getReportesDisponibles();
-            
+
             if (resultado.success) {
                 console.log('✅ Reportes cargados exitosamente:', resultado.data);
                 setReportes(resultado.data);
-                
+
                 if (resultado.data.length > 0) {
                     showNotification('Reportes cargados exitosamente', 'success');
                 }
@@ -34,11 +34,11 @@ const ReportesRegulatorios = () => {
                 setReportes(resultado.data); // Los datos de fallback
                 showNotification('Usando datos de respaldo. Verifica la conexión con el servidor.', 'warning');
             }
-            
+
         } catch (error) {
             console.error('❌ Error cargando reportes:', error);
             showNotification(`Error cargando reportes: ${error.message}`, 'error');
-            
+
             // Datos de respaldo en caso de error total
             setReportes([
                 {
@@ -78,7 +78,7 @@ const ReportesRegulatorios = () => {
             ...prev,
             [param]: value
         }));
-        
+
         if (errors[param]) {
             setErrors(prev => ({
                 ...prev,
@@ -108,7 +108,7 @@ const ReportesRegulatorios = () => {
         setLoading(true);
         try {
             console.log(`🎯 Generando reporte: ${selectedReport} con parámetros:`, parameters);
-            
+
             let resultado;
             switch (selectedReport) {
                 case 'suscriptores_tv':
@@ -154,9 +154,8 @@ const ReportesRegulatorios = () => {
 
     const renderParameterInput = (param, reporte) => {
         const hasError = errors[param];
-        const baseClasses = `w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-            hasError ? 'border-red-500 bg-red-50' : 'border-gray-300'
-        }`;
+        const baseClasses = `w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${hasError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+            }`;
 
         switch (param) {
             case 'anno':
@@ -295,12 +294,11 @@ const ReportesRegulatorios = () => {
         <div className="p-6">
             {/* Notificación */}
             {notification && (
-                <div className={`mb-6 p-4 rounded-lg border flex items-center ${
-                    notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
-                    notification.type === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
-                    notification.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
-                    'bg-blue-50 border-blue-200 text-blue-800'
-                }`}>
+                <div className={`mb-6 p-4 rounded-lg border flex items-center ${notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
+                        notification.type === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
+                            notification.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
+                                'bg-blue-50 border-blue-200 text-blue-800'
+                    }`}>
                     {notification.type === 'success' && <CheckCircle className="w-5 h-5 mr-3" />}
                     {notification.type === 'warning' && <AlertCircle className="w-5 h-5 mr-3" />}
                     {notification.type === 'error' && <XCircle className="w-5 h-5 mr-3" />}
@@ -326,7 +324,7 @@ const ReportesRegulatorios = () => {
                             <FileSpreadsheet className="w-5 h-5 mr-2" />
                             Reportes Disponibles
                         </h2>
-                        
+
                         {loading ? (
                             <div className="text-center py-8">
                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -337,11 +335,10 @@ const ReportesRegulatorios = () => {
                                 {reportes.map((reporte) => (
                                     <div
                                         key={reporte.id}
-                                        className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                                            selectedReport === reporte.id
+                                        className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedReport === reporte.id
                                                 ? 'border-blue-500 bg-blue-50 shadow-sm'
                                                 : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                        }`}
+                                            }`}
                                         onClick={() => {
                                             setSelectedReport(reporte.id);
                                             setParameters({});
@@ -361,7 +358,7 @@ const ReportesRegulatorios = () => {
                             <div className="text-center py-8">
                                 <FileSpreadsheet className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                                 <p className="text-gray-600">No hay reportes disponibles</p>
-                                <button 
+                                <button
                                     onClick={cargarReportesDisponibles}
                                     className="mt-2 text-blue-600 hover:text-blue-800"
                                 >
@@ -380,7 +377,7 @@ const ReportesRegulatorios = () => {
                                 <h2 className="text-lg font-semibold mb-4">
                                     {selectedReportData.nombre}
                                 </h2>
-                                
+
                                 <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                                     <div className="flex items-start">
                                         <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
@@ -399,7 +396,7 @@ const ReportesRegulatorios = () => {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                    {selectedReportData.parametros.map(param => 
+                                    {selectedReportData.parametros.map(param =>
                                         renderParameterInput(param, selectedReportData)
                                     )}
                                 </div>
@@ -464,10 +461,10 @@ const ReportesRegulatorios = () => {
                         </ul>
                     </div>
                 </div>
-                
+
                 <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-sm text-yellow-800">
-                        <strong>Nota:</strong> Los reportes se descargan automáticamente al generarse. 
+                        <strong>Nota:</strong> Los reportes se descargan automáticamente al generarse.
                         Asegúrate de permitir las descargas en tu navegador.
                     </p>
                 </div>

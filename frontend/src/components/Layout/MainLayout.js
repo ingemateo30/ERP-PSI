@@ -106,6 +106,18 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       permission: 'supervisor,administrador'
     },
     {
+      icon: <FileText size={22} />,
+      label: 'PQR',
+      path: '/pqr',
+      permission: 'supervisor,administrador'
+    },
+    {
+      icon: <Loader2 size={22} />,
+      label: 'Incidencias',
+      path: '/incidencias',
+      permission: 'supervisor,administrador'
+    },
+    {
       icon: <Wrench size={22} />,
       label: 'Instalaciones',
       path: '/installations',
