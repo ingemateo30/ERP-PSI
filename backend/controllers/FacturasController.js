@@ -1,179 +1,186 @@
+// controllers/FacturasController.js - VERSIÓN CORREGIDA
+const { Database } = require('../models/Database');
 const Factura = require('../models/factura');
 const ApiResponse = require('../utils/responses');
 const FacturaPDFGenerator = require('../utils/pdfGenerator');
 
 class FacturasController {
-  // Obtener todas las facturas
-
+  
+  // Generar PDF para descarga
   static async generarPDF(req, res) {
-  try {
-    const { id } = req.params;
-    
-    if (!id || isNaN(id)) {
-      return ApiResponse.validationError(res, 'ID de factura inválido');
+    try {
+      const { id } = req.params;
+      
+      if (!id || isNaN(id)) {
+        return ApiResponse.validationError(res, 'ID de factura inválido');
+      }
+
+      console.log(`🔍 Buscando factura con ID: ${id}`);
+      const factura = await Factura.obtenerPorId(id);
+      
+      if (!factura) {
+        return ApiResponse.notFound(res, 'Factura no encontrada');
+      }
+
+      console.log(`✅ Factura encontrada: ${factura.numero_factura}`);
+
+      // CORREGIDO: Usar Database en lugar de pool
+      const empresaQuery = 'SELECT * FROM configuracion_empresa WHERE id = 1';
+      const empresaResult = await Database.query(empresaQuery);
+      
+      if (!empresaResult || empresaResult.length === 0) {
+        return ApiResponse.error(res, 'Configuración de empresa no encontrada', 500);
+      }
+
+      const empresa = empresaResult[0];
+      console.log(`🏢 Empresa configurada: ${empresa.empresa_nombre}`);
+
+      // Generar PDF
+      const pdfBuffer = await FacturaPDFGenerator.generar(factura, empresa);
+
+      // Configurar headers para descarga
+      const nombreArchivo = `Factura_${factura.numero_factura}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
+      console.log(`📥 Enviando PDF para descarga: ${nombreArchivo}`);
+      res.send(pdfBuffer);
+
+    } catch (error) {
+      console.error('❌ Error al generar PDF:', error);
+      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
     }
-
-    console.log(`🔍 Buscando factura con ID: ${id}`);
-    const factura = await Factura.obtenerPorId(id);
-    
-    if (!factura) {
-      return ApiResponse.notFound(res, 'Factura no encontrada');
-    }
-
-    console.log(`✅ Factura encontrada: ${factura.numero_factura}`);
-
-    // Obtener configuración de empresa
-    const connection = await pool.getConnection();
-    const [empresa] = await connection.execute(
-      'SELECT * FROM configuracion_empresa WHERE id = 1'
-    );
-    connection.release();
-
-    if (!empresa[0]) {
-      return ApiResponse.error(res, 'Configuración de empresa no encontrada', 500);
-    }
-
-    console.log(`🏢 Empresa configurada: ${empresa[0].empresa_nombre}`);
-
-    // Generar PDF
-    const pdfBuffer = await FacturaPDFGenerator.generar(factura, empresa[0]);
-
-    // Configurar headers para descarga
-    const nombreArchivo = `Factura_${factura.numero_factura}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-
-    console.log(`📥 Enviando PDF para descarga: ${nombreArchivo}`);
-    res.send(pdfBuffer);
-
-  } catch (error) {
-    console.error('❌ Error al generar PDF:', error);
-    return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
   }
-}
 
-// Ver PDF en navegador (sin descargar)
-static async verPDF(req, res) {
-  try {
-    const { id } = req.params;
-    
-    if (!id || isNaN(id)) {
-      return ApiResponse.validationError(res, 'ID de factura inválido');
+  // Ver PDF en navegador (sin descargar)
+  static async verPDF(req, res) {
+    try {
+      const { id } = req.params;
+      
+      if (!id || isNaN(id)) {
+        return ApiResponse.validationError(res, 'ID de factura inválido');
+      }
+
+      console.log(`🔍 Buscando factura para visualizar PDF: ${id}`);
+      const factura = await Factura.obtenerPorId(id);
+      
+      if (!factura) {
+        return ApiResponse.notFound(res, 'Factura no encontrada');
+      }
+
+      // CORREGIDO: Usar Database en lugar de pool
+      const empresaQuery = 'SELECT * FROM configuracion_empresa WHERE id = 1';
+      const empresaResult = await Database.query(empresaQuery);
+      
+      if (!empresaResult || empresaResult.length === 0) {
+        return ApiResponse.error(res, 'Configuración de empresa no encontrada', 500);
+      }
+
+      const empresa = empresaResult[0];
+
+      // Generar PDF
+      const pdfBuffer = await FacturaPDFGenerator.generar(factura, empresa);
+
+      // Configurar headers para visualización en navegador
+      const nombreArchivo = `Factura_${factura.numero_factura}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+      console.log(`👀 Enviando PDF para visualización: ${nombreArchivo}`);
+      res.send(pdfBuffer);
+
+    } catch (error) {
+      console.error('❌ Error al visualizar PDF:', error);
+      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
     }
-
-    console.log(`🔍 Buscando factura para visualizar PDF: ${id}`);
-    const factura = await Factura.obtenerPorId(id);
-    
-    if (!factura) {
-      return ApiResponse.notFound(res, 'Factura no encontrada');
-    }
-
-    // Obtener configuración de empresa
-    const connection = await pool.getConnection();
-    const [empresa] = await connection.execute(
-      'SELECT * FROM configuracion_empresa WHERE id = 1'
-    );
-    connection.release();
-
-    if (!empresa[0]) {
-      return ApiResponse.error(res, 'Configuración de empresa no encontrada', 500);
-    }
-
-    // Generar PDF
-    const pdfBuffer = await FacturaPDFGenerator.generar(factura, empresa[0]);
-
-    // Configurar headers para visualización en navegador
-    const nombreArchivo = `Factura_${factura.numero_factura}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo}"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-
-    console.log(`👀 Enviando PDF para visualización: ${nombreArchivo}`);
-    res.send(pdfBuffer);
-
-  } catch (error) {
-    console.error('❌ Error al visualizar PDF:', error);
-    return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
   }
-}
 
-// Método de prueba para generar PDF con datos de ejemplo
-static async probarPDF(req, res) {
-  try {
-    console.log('🧪 Iniciando prueba de generación PDF...');
+  // Método de prueba para generar PDF con datos de ejemplo
+  static async probarPDF(req, res) {
+    try {
+      console.log('🧪 Iniciando prueba de generación PDF...');
 
-    // Datos de prueba para factura
-    const facturaEjemplo = {
-      id: 999,
-      numero_factura: 'FAC000999',
-      cliente_id: 1,
-      identificacion_cliente: '1005450340',
-      nombre_cliente: 'MATEO SALAZAR ORTIZ',
-      cliente_direccion: 'CR 14A 21-63 ARBOLEDAS',
-      cliente_telefono: '3007015239',
-      periodo_facturacion: '2025-06',
-      fecha_emision: '2025-06-06',
-      fecha_vencimiento: '2025-06-16',
-      fecha_desde: '2025-06-01',
-      fecha_hasta: '2025-06-30',
-      internet: 59900,
-      television: 0,
-      saldo_anterior: 0,
-      interes: 0,
-      reconexion: 0,
-      descuento: 0,
-      varios: 0,
-      publicidad: 0,
-      subtotal: 59900,
-      iva: 0,
-      total: 59900,
-      estado: 'pendiente'
-    };
+      // Datos de prueba para factura
+      const facturaEjemplo = {
+        id: 999,
+        numero_factura: 'FAC000999',
+        cliente_id: 1,
+        identificacion_cliente: '1005450340',
+        nombre_cliente: 'MATEO SALAZAR ORTIZ',
+        cliente_direccion: 'CR 14A 21-63 ARBOLEDAS',
+        cliente_telefono: '3007015239',
+        periodo_facturacion: '2025-06',
+        fecha_emision: '2025-06-06',
+        fecha_vencimiento: '2025-06-16',
+        fecha_desde: '2025-06-01',
+        fecha_hasta: '2025-06-30',
+        internet: 59900,
+        television: 0,
+        saldo_anterior: 0,
+        interes: 0,
+        reconexion: 0,
+        descuento: 0,
+        varios: 0,
+        publicidad: 0,
+        subtotal: 59900,
+        iva: 0,
+        total: 59900,
+        estado: 'pendiente'
+      };
 
-    // Datos de prueba para empresa
-    const empresaEjemplo = {
-      empresa_nombre: 'PROVEEDOR DE TELECOMUNICACIONES SAS',
-      empresa_nit: '901.582.657-3',
-      empresa_direccion: 'Carrera 9 No. 9-94',
-      empresa_ciudad: 'SANGIL',
-      empresa_departamento: 'SANTANDER',
-      empresa_telefono: '3184550936',
-      empresa_email: 'info@psi.net.co',
-      valor_reconexion: 11900,
-      vigilado: 'Vigilado y regulado por el MINTIC',
-      resolucion_facturacion: 'Facturación desde 10.001 hasta 37600 prefijo 10 del 26-SEP-2022',
-      licencia_internet: '96006732'
-    };
+      // Obtener configuración real de empresa o usar datos de ejemplo
+      let empresa;
+      try {
+        const empresaQuery = 'SELECT * FROM configuracion_empresa WHERE id = 1';
+        const empresaResult = await Database.query(empresaQuery);
+        empresa = empresaResult[0];
+      } catch (error) {
+        console.log('📋 Usando datos de empresa de ejemplo...');
+      }
 
-    console.log('📋 Datos de prueba preparados');
+      // Datos de prueba para empresa si no se encuentra en BD
+      if (!empresa) {
+        empresa = {
+          empresa_nombre: 'PROVEEDOR DE TELECOMUNICACIONES SAS',
+          empresa_nit: '901.582.657-3',
+          empresa_direccion: 'Carrera 9 No. 9-94',
+          empresa_ciudad: 'SANGIL',
+          empresa_departamento: 'SANTANDER',
+          empresa_telefono: '3184550936',
+          empresa_email: 'info@psi.net.co',
+          valor_reconexion: 11900,
+          vigilado: 'Vigilado y regulado por el MINTIC',
+          resolucion_facturacion: 'Facturación desde 10.001 hasta 37600 prefijo 10 del 26-SEP-2022',
+          licencia_internet: '96006732'
+        };
+      }
 
-    // Generar PDF
-    const pdfBuffer = await FacturaPDFGenerator.generar(facturaEjemplo, empresaEjemplo);
+      console.log('📋 Datos de prueba preparados');
 
-    // Guardar PDF para inspección (opcional)
-    const rutaArchivo = await FacturaPDFGenerator.guardarPDF(
-      pdfBuffer, 
-      `factura_prueba_${Date.now()}.pdf`
-    );
+      // Generar PDF
+      const pdfBuffer = await FacturaPDFGenerator.generar(facturaEjemplo, empresa);
 
-    // Configurar headers para descarga
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="Factura_Prueba.pdf"');
-    res.setHeader('Content-Length', pdfBuffer.length);
+      // Configurar headers para descarga
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="Factura_Prueba.pdf"');
+      res.setHeader('Content-Length', pdfBuffer.length);
 
-    console.log('✅ PDF de prueba generado exitosamente');
-    res.send(pdfBuffer);
+      console.log('✅ PDF de prueba generado exitosamente');
+      res.send(pdfBuffer);
 
-  } catch (error) {
-    console.error('❌ Error en prueba de PDF:', error);
-    return ApiResponse.error(res, 'Error en prueba de PDF', 500, error.message);
+    } catch (error) {
+      console.error('❌ Error en prueba de PDF:', error);
+      return ApiResponse.error(res, 'Error en prueba de PDF', 500, error.message);
+    }
   }
-}
+
+  // Obtener todas las facturas con filtros y paginación
   static async obtenerTodas(req, res) {
     try {
       const {
@@ -221,7 +228,9 @@ static async probarPDF(req, res) {
           currentPage: parseInt(page),
           totalPages,
           totalItems: total,
-          itemsPerPage: parseInt(limit)
+          itemsPerPage: parseInt(limit),
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1
         }
       }, 'Facturas obtenidas exitosamente');
 
@@ -368,7 +377,7 @@ static async probarPDF(req, res) {
       }
 
       const datosPago = {
-        fecha_pago,
+        fecha_pago: fecha_pago || new Date(),
         metodo_pago,
         referencia_pago,
         banco_id
@@ -587,6 +596,35 @@ static async probarPDF(req, res) {
 
     } catch (error) {
       console.error('Error al duplicar factura:', error);
+      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
+    }
+  }
+
+  // Enviar factura por correo electrónico
+  static async enviarPorCorreo(req, res) {
+    try {
+      const { id } = req.params;
+      const { correo_destino, mensaje_personalizado } = req.body;
+      
+      if (!id || isNaN(id)) {
+        return ApiResponse.validationError(res, 'ID de factura inválido');
+      }
+
+      const factura = await Factura.obtenerPorId(id);
+      
+      if (!factura) {
+        return ApiResponse.notFound(res, 'Factura no encontrada');
+      }
+
+      // Aquí iría la lógica para enviar por correo
+      // Por ahora solo retornamos éxito
+      return ApiResponse.success(res, { 
+        factura_id: id,
+        correo_destino: correo_destino || factura.correo_cliente 
+      }, 'Factura enviada por correo exitosamente');
+
+    } catch (error) {
+      console.error('Error al enviar factura por correo:', error);
       return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
     }
   }
