@@ -1,4 +1,4 @@
-import apiService  from './apiService';
+import apiService from './apiService';
 
 const CLIENT_ENDPOINTS = {
   LIST: '/clients',
@@ -17,11 +17,11 @@ export const clientService = {
   getClients: async (params = {}) => {
     try {
       const queryParams = new URLSearchParams();
-      
+
       // Parámetros de paginación
       if (params.page) queryParams.append('page', params.page);
       if (params.limit) queryParams.append('limit', params.limit);
-      
+
       // Filtros
       if (params.estado) queryParams.append('estado', params.estado);
       if (params.identificacion) queryParams.append('identificacion', params.identificacion);
@@ -29,10 +29,10 @@ export const clientService = {
       if (params.sector_id) queryParams.append('sector_id', params.sector_id);
       if (params.ciudad_id) queryParams.append('ciudad_id', params.ciudad_id);
       if (params.telefono) queryParams.append('telefono', params.telefono);
-      
+
       const url = `${CLIENT_ENDPOINTS.LIST}?${queryParams.toString()}`;
       const response = await apiService.get(url);
-      
+
       return {
         success: true,
         data: response.data || [],
@@ -74,12 +74,12 @@ export const clientService = {
     try {
       const queryParams = new URLSearchParams();
       queryParams.append('q', searchTerm);
-      
+
       if (filters.estado) queryParams.append('estado', filters.estado);
-      
+
       const url = `${CLIENT_ENDPOINTS.SEARCH}?${queryParams.toString()}`;
       const response = await apiService.get(url);
-      
+
       return {
         success: true,
         data: response.data || [],

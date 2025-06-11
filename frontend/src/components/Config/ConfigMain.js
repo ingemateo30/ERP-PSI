@@ -122,19 +122,6 @@ const ConfigMain = () => {
             permission: 'administrador'
         },
         {
-            id: 'reports',
-            title: 'Configuración de Reportes',
-            description: 'Configuración de reportes y métricas del sistema',
-            icon: <PieChart size={24} />,
-            color: '#06b6d4',
-            bgColor: 'bg-cyan-50',
-            borderColor: 'border-cyan-200',
-            completed: false,
-            count: 0,
-            total: 'Pendiente',
-            permission: 'supervisor'
-        },
-        {
             id: 'conceptos',
             title: 'Conceptos de Facturación',
             description: 'Configura los conceptos que se pueden facturar a los clientes',
@@ -184,7 +171,7 @@ const ConfigMain = () => {
                                 Configuración del Sistema
                             </h1>
                             <p className="text-gray-600">
-                                Gestiona la configuración básica del sistema ISP
+                                Gestiona la configuración básica del sistema PSI
                             </p>
                         </div>
                         <button

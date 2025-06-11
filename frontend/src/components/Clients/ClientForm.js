@@ -1,3 +1,5 @@
+// frontend/src/components/Clients/ClientForm.js - CORREGIDO
+
 import React, { useState, useEffect } from 'react';
 import { X, Save, AlertCircle, Check } from 'lucide-react';
 import { useClientForm } from '../../hooks/useClients';
@@ -24,10 +26,27 @@ const ClientForm = ({ client, onClose, onSave }) => {
     updateClient
   } = useClientForm(client);
 
-  const { sectors = [], cities = [], loading: configLoading } = useConfig();
+  // Usar el hook de configuración corregido
+  const { 
+    sectors, 
+    cities, 
+    departments, 
+    loading: configLoading, 
+    loadCities, 
+    loadSectors 
+  } = useConfig();
+
   const [saving, setSaving] = useState(false);
   const [validatingId, setValidatingId] = useState(false);
   const [idValidation, setIdValidation] = useState(null);
+
+  // Debug - mostrar en consola lo que está cargando
+  useEffect(() => {
+    console.log('🏛️ Departamentos cargados:', departments?.length || 0, departments);
+    console.log('🏙️ Ciudades cargadas:', cities?.length || 0, cities);
+    console.log('🏘️ Sectores cargados:', sectors?.length || 0, sectors);
+    console.log('⏳ Config loading:', configLoading);
+  }, [departments, cities, sectors, configLoading]);
 
   // Validar identificación cuando cambie
   useEffect(() => {
@@ -58,6 +77,27 @@ const ClientForm = ({ client, onClose, onSave }) => {
     const timeoutId = setTimeout(validateIdentification, 500);
     return () => clearTimeout(timeoutId);
   }, [formData.identificacion, isEditing, client?.identificacion]);
+
+  // Manejar cambio de departamento (opcional si quieres filtrar ciudades)
+  const handleDepartmentChange = (departamentoId) => {
+    updateField('departamento_id', departamentoId);
+    updateField('ciudad_id', ''); // Limpiar ciudad seleccionada
+    updateField('sector_id', ''); // Limpiar sector seleccionado
+    
+    if (departamentoId) {
+      loadCities(departamentoId);
+    }
+  };
+
+  // Manejar cambio de ciudad
+  const handleCityChange = (ciudadId) => {
+    updateField('ciudad_id', ciudadId);
+    updateField('sector_id', ''); // Limpiar sector seleccionado
+    
+    if (ciudadId) {
+      loadSectors(ciudadId);
+    }
+  };
 
   // Manejar envío del formulario
   const handleSubmit = async (e) => {
@@ -151,11 +191,12 @@ const ClientForm = ({ client, onClose, onSave }) => {
                       type="text"
                       value={formData.identificacion}
                       onChange={(e) => updateField('identificacion', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.identificacion ? 'border-red-300' :
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        errors.identificacion ? 'border-red-300' :
                         idValidation === 'exists' ? 'border-red-300' :
-                          idValidation === 'available' ? 'border-green-300' :
-                            'border-gray-300'
-                        }`}
+                        idValidation === 'available' ? 'border-green-300' :
+                        'border-gray-300'
+                      }`}
                       placeholder="Número de identificación"
                       required
                     />
@@ -190,8 +231,9 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     type="text"
                     value={formData.nombre}
                     onChange={(e) => updateField('nombre', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.nombre ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.nombre ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="Nombre completo del cliente"
                     required
                   />
@@ -218,8 +260,9 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     type="tel"
                     value={formData.telefono}
                     onChange={(e) => handlePhoneChange('telefono', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.telefono ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.telefono ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="3001234567"
                     maxLength="10"
                   />
@@ -252,8 +295,9 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     type="email"
                     value={formData.correo}
                     onChange={(e) => updateField('correo', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.correo ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.correo ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="cliente@email.com"
                   />
                   {errors.correo && (
@@ -279,8 +323,9 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     value={formData.direccion}
                     onChange={(e) => updateField('direccion', e.target.value)}
                     rows="2"
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.direccion ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.direccion ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="Dirección completa de instalación"
                     required
                   />
@@ -290,24 +335,55 @@ const ClientForm = ({ client, onClose, onSave }) => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Departamento (opcional) */}
+                  {departments && departments.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Departamento
+                      </label>
+                      <select
+                        value={formData.departamento_id || ''}
+                        onChange={(e) => handleDepartmentChange(e.target.value)}
+                        disabled={configLoading}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                      >
+                        <option value="">Seleccionar departamento</option>
+                        {departments.map((dept) => (
+                          <option key={dept.id} value={dept.id}>
+                            {dept.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   {/* Ciudad */}
-                  <div>
+                  <div className={departments && departments.length > 0 ? "" : "md:col-start-1"}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Ciudad
                     </label>
                     <select
-                      value={formData.ciudad_id}
-                      onChange={(e) => updateField('ciudad_id', e.target.value)}
+                      value={formData.ciudad_id || ''}
+                      onChange={(e) => handleCityChange(e.target.value)}
                       disabled={configLoading}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                     >
                       <option value="">Seleccionar ciudad</option>
-                      {cities && cities.length > 0 && cities.map((city) => (
+                      {cities && cities.length > 0 ? cities.map((city) => (
                         <option key={city.id} value={city.id}>
-                          {city.nombre} ({city.departamento_nombre})
+                          {city.nombre} {city.departamento_nombre && `(${city.departamento_nombre})`}
                         </option>
-                      ))}
+                      )) : (
+                        <option value="" disabled>
+                          {configLoading ? 'Cargando ciudades...' : 'No hay ciudades disponibles'}
+                        </option>
+                      )}
                     </select>
+                    {!configLoading && (!cities || cities.length === 0) && (
+                      <p className="text-sm text-amber-600 mt-1">
+                        ⚠️ No hay ciudades configuradas. Ve a Configuración → Geografía para agregar ciudades.
+                      </p>
+                    )}
                   </div>
 
                   {/* Sector */}
@@ -316,18 +392,27 @@ const ClientForm = ({ client, onClose, onSave }) => {
                       Sector
                     </label>
                     <select
-                      value={formData.sector_id}
+                      value={formData.sector_id || ''}
                       onChange={(e) => updateField('sector_id', e.target.value)}
                       disabled={configLoading}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                     >
                       <option value="">Seleccionar sector</option>
-                      {sectors && sectors.length > 0 && sectors.map((sector) => (
+                      {sectors && sectors.length > 0 ? sectors.map((sector) => (
                         <option key={sector.id} value={sector.id}>
                           {sector.codigo} - {sector.nombre}
                         </option>
-                      ))}
+                      )) : (
+                        <option value="" disabled>
+                          {configLoading ? 'Cargando sectores...' : 'No hay sectores disponibles'}
+                        </option>
+                      )}
                     </select>
+                    {!configLoading && (!sectors || sectors.length === 0) && (
+                      <p className="text-sm text-amber-600 mt-1">
+                        ⚠️ No hay sectores configurados. Ve a Configuración → Geografía para agregar sectores.
+                      </p>
+                    )}
                   </div>
 
                   {/* Estrato */}
@@ -336,7 +421,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                       Estrato
                     </label>
                     <select
-                      value={formData.estrato}
+                      value={formData.estrato || ''}
                       onChange={(e) => updateField('estrato', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
@@ -357,7 +442,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="text"
-                    value={formData.barrio}
+                    value={formData.barrio || ''}
                     onChange={(e) => updateField('barrio', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Nombre del barrio"
@@ -398,10 +483,11 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="text"
-                    value={formData.mac_address}
+                    value={formData.mac_address || ''}
                     onChange={(e) => updateField('mac_address', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.mac_address ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.mac_address ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="AA:BB:CC:DD:EE:FF"
                   />
                   {errors.mac_address && (
@@ -416,10 +502,11 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="text"
-                    value={formData.ip_asignada}
+                    value={formData.ip_asignada || ''}
                     onChange={(e) => updateField('ip_asignada', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.ip_asignada ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.ip_asignada ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="192.168.1.100"
                   />
                   {errors.ip_asignada && (
@@ -434,7 +521,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="text"
-                    value={formData.tap}
+                    value={formData.tap || ''}
                     onChange={(e) => updateField('tap', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="TAP001"
@@ -448,7 +535,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="text"
-                    value={formData.poste}
+                    value={formData.poste || ''}
                     onChange={(e) => updateField('poste', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="P-001"
@@ -462,7 +549,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="text"
-                    value={formData.contrato}
+                    value={formData.contrato || ''}
                     onChange={(e) => updateField('contrato', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="CT-001"
@@ -476,7 +563,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="text"
-                    value={formData.ruta}
+                    value={formData.ruta || ''}
                     onChange={(e) => updateField('ruta', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="R001"
@@ -490,7 +577,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="text"
-                    value={formData.codigo_usuario}
+                    value={formData.codigo_usuario || ''}
                     onChange={(e) => updateField('codigo_usuario', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="USR001"
@@ -504,7 +591,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   Observaciones
                 </label>
                 <textarea
-                  value={formData.observaciones}
+                  value={formData.observaciones || ''}
                   onChange={(e) => updateField('observaciones', e.target.value)}
                   rows="3"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -512,6 +599,21 @@ const ClientForm = ({ client, onClose, onSave }) => {
                 />
               </div>
             </div>
+
+            {/* Debug info - Solo en desarrollo */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-yellow-800 mb-2">🔧 Debug Info</h4>
+                <div className="text-xs text-yellow-700 space-y-1">
+                  <p>Departamentos: {departments?.length || 0}</p>
+                  <p>Ciudades: {cities?.length || 0}</p>
+                  <p>Sectores: {sectors?.length || 0}</p>
+                  <p>Config Loading: {configLoading ? 'Sí' : 'No'}</p>
+                  <p>Form Data Ciudad ID: {formData.ciudad_id || 'vacío'}</p>
+                  <p>Form Data Sector ID: {formData.sector_id || 'vacío'}</p>
+                </div>
+              </div>
+            )}
 
             {/* Botones */}
             <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">

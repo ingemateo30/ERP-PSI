@@ -1,4 +1,4 @@
-// frontend/src/hooks/useConfig.js
+// frontend/src/hooks/useConfig.js - CORREGIDO PARA CIUDADES Y SECTORES
 
 import { useState, useEffect, useCallback } from 'react';
 import configService from '../services/configService';
@@ -11,6 +11,13 @@ export const useConfig = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  
+  // Estados adicionales para ciudades y sectores
+  const [cities, setCities] = useState([]);
+  const [sectors, setSectors] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [citiesLoading, setCitiesLoading] = useState(false);
+  const [sectorsLoading, setSectorsLoading] = useState(false);
 
   // Cargar resumen de configuración
   const loadOverview = useCallback(async () => {
@@ -32,10 +39,80 @@ export const useConfig = () => {
     }
   }, []);
 
+  // Cargar ciudades
+  const loadCities = useCallback(async (departamentoId = null) => {
+    try {
+      setCitiesLoading(true);
+      const response = await configService.getCities(departamentoId, false);
+      
+      if (response.success) {
+        setCities(response.data || []);
+      } else {
+        console.error('Error cargando ciudades:', response.message);
+        setCities([]);
+      }
+    } catch (err) {
+      console.error('Error cargando ciudades:', err);
+      setCities([]);
+    } finally {
+      setCitiesLoading(false);
+    }
+  }, []);
+
+  // Cargar sectores
+  const loadSectors = useCallback(async (ciudadId = null) => {
+    try {
+      setSectorsLoading(true);
+      const response = await configService.getSectors(ciudadId, true, false); // ciudadId, activo, includeStats
+      
+      if (response.success) {
+        setSectors(response.data || []);
+      } else {
+        console.error('Error cargando sectores:', response.message);
+        setSectors([]);
+      }
+    } catch (err) {
+      console.error('Error cargando sectores:', err);
+      setSectors([]);
+    } finally {
+      setSectorsLoading(false);
+    }
+  }, []);
+
+  // Cargar departamentos
+  const loadDepartments = useCallback(async () => {
+    try {
+      const response = await configService.getDepartments(false);
+      
+      if (response.success) {
+        setDepartments(response.data || []);
+      } else {
+        console.error('Error cargando departamentos:', response.message);
+        setDepartments([]);
+      }
+    } catch (err) {
+      console.error('Error cargando departamentos:', err);
+      setDepartments([]);
+    }
+  }, []);
+
   // Cargar datos iniciales
   useEffect(() => {
-    loadOverview();
-  }, [loadOverview]);
+    const loadInitialData = async () => {
+      try {
+        await Promise.all([
+          loadOverview(),
+          loadDepartments(),
+          loadCities(), // Cargar todas las ciudades inicialmente
+          loadSectors() // Cargar todos los sectores inicialmente
+        ]);
+      } catch (error) {
+        console.error('Error cargando datos iniciales:', error);
+      }
+    };
+
+    loadInitialData();
+  }, [loadOverview, loadDepartments, loadCities, loadSectors]);
 
   // Función para refrescar la configuración
   const refresh = useCallback(() => {
@@ -193,11 +270,18 @@ export const useConfig = () => {
   }, [getPendingTasks]);
 
   return {
-    // Datos
+    // Datos principales
     overview,
-    loading,
+    loading: loading || citiesLoading || sectorsLoading,
     error,
     lastUpdate,
+    
+    // Datos geográficos específicos
+    cities,
+    sectors,
+    departments,
+    citiesLoading,
+    sectorsLoading,
     
     // Estado de configuración
     isConfigComplete,
@@ -205,6 +289,9 @@ export const useConfig = () => {
     
     // Funciones de utilidad
     refresh,
+    loadCities,
+    loadSectors,
+    loadDepartments,
     getPendingTasks,
     getConfigStats,
     getCounters,

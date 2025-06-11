@@ -1,497 +1,550 @@
-// backend/controllers/companyConfigController.js - CONTROLADOR COMPLETO
+// backend/controllers/companyConfigController.js - CONTROLADOR COMPLETO Y CORREGIDO
 
-const { validationResult } = require('express-validator');
+const { Database } = require('../models/Database');
 const logger = require('../utils/logger');
-const ApiResponse = require('../utils/responses');
-const pool = require('../config/database');
 
 class CompanyConfigController {
-  
+  // ==========================================
+  // CONFIGURACIÓN DE EMPRESA
+  // ==========================================
+
+  // Obtener configuración general
+  static async getConfigOverview(req, res) {
+    try {
+      console.log('📊 Obteniendo resumen de configuración...');
+
+      // Obtener configuración de empresa
+      const [empresaConfig] = await Database.query(
+        'SELECT * FROM configuracion_empresa LIMIT 1'
+      );
+
+      // Obtener contadores
+      const contadores = await CompanyConfigController.getCounters();
+
+      // Verificar si la configuración está completa
+      const empresaConfigurada = empresaConfig && empresaConfig.empresa_nombre && empresaConfig.empresa_nit;
+      
+      const configCompleta = empresaConfigurada && 
+                            contadores.bancos_activos > 0 && 
+                            contadores.sectores_activos > 0 && 
+                            contadores.planes_activos > 0;
+
+      const porcentajeCompletado = CompanyConfigController.calcularPorcentajeCompletado(contadores, empresaConfigurada);
+
+      const overview = {
+        empresa_configurada: empresaConfigurada,
+        configuracion_completa: configCompleta,
+        porcentaje_completado: porcentajeCompletado,
+        contadores,
+        empresa: empresaConfig || null
+      };
+
+      console.log('✅ Resumen de configuración obtenido:', overview);
+
+      res.json({
+        success: true,
+        data: overview
+      });
+    } catch (error) {
+      console.error('❌ Error obteniendo resumen de configuración:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
   // Obtener configuración de empresa
   static async getCompanyConfig(req, res) {
     try {
-      const connection = await pool.getConnection();
-      
-      const [configs] = await connection.execute(
-        'SELECT * FROM configuracion_empresa ORDER BY id ASC LIMIT 1'
+      const [config] = await Database.query(
+        'SELECT * FROM configuracion_empresa LIMIT 1'
       );
-      
-      connection.release();
-      
-      // Si no existe configuración, crear una por defecto
-      if (configs.length === 0) {
-        const defaultConfig = {
-          id: null,
-          licencia: 'DEMO2025',
-          empresa_nombre: '',
-          empresa_nit: '',
-          empresa_direccion: '',
-          empresa_ciudad: '',
-          empresa_departamento: '',
-          empresa_telefono: '',
-          empresa_email: '',
-          resolucion_facturacion: '',
-          licencia_internet: '',
-          vigilado: '',
-          vigilado_internet: '',
-          comentario: '',
-          prefijo_factura: 'FAC',
-          codigo_gs1: '',
-          consecutivo_factura: 1,
-          consecutivo_contrato: 1,
-          consecutivo_recibo: 1,
-          valor_reconexion: 15000.00,
-          dias_mora_corte: 30,
-          porcentaje_iva: 19.00,
-          porcentaje_interes: 0.00,
-          fecha_actualizacion: null,
-          updated_at: null
-        };
 
-        return ApiResponse.success(res, {
-          config: defaultConfig
-        }, 'Configuración por defecto obtenida');
-      }
-      
-      return ApiResponse.success(res, {
-        config: configs[0]
-      }, 'Configuración obtenida exitosamente');
-      
+      res.json({
+        success: true,
+        data: {
+          config: config || null
+        }
+      });
     } catch (error) {
-      logger.error('Error obteniendo configuración de empresa:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error obteniendo configuración de empresa:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
-  
+
   // Actualizar configuración de empresa
   static async updateCompanyConfig(req, res) {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return ApiResponse.validationError(res, errors.array());
-      }
-      
-      const {
-        licencia, empresa_nombre, empresa_nit, empresa_direccion,
-        empresa_ciudad, empresa_departamento, empresa_telefono, empresa_email,
-        resolucion_facturacion, licencia_internet, vigilado, vigilado_internet,
-        comentario, prefijo_factura, codigo_gs1, valor_reconexion,
-        dias_mora_corte, porcentaje_iva, porcentaje_interes
-      } = req.body;
-      
-      const connection = await pool.getConnection();
+      const configData = req.body;
       
       // Verificar si existe configuración
-      const [existing] = await connection.execute(
+      const [existingConfig] = await Database.query(
         'SELECT id FROM configuracion_empresa LIMIT 1'
       );
-      
-      if (existing.length === 0) {
-        // Crear nueva configuración
-        const [result] = await connection.execute(`
-          INSERT INTO configuracion_empresa (
-            licencia, empresa_nombre, empresa_nit, empresa_direccion,
-            empresa_ciudad, empresa_departamento, empresa_telefono, empresa_email,
-            resolucion_facturacion, licencia_internet, vigilado, vigilado_internet,
-            comentario, prefijo_factura, codigo_gs1, valor_reconexion,
-            dias_mora_corte, porcentaje_iva, porcentaje_interes, 
-            fecha_actualizacion, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-        `, [
-          licencia || 'DEMO2025',
-          empresa_nombre || '',
-          empresa_nit || '',
-          empresa_direccion || '',
-          empresa_ciudad || '',
-          empresa_departamento || '',
-          empresa_telefono || '',
-          empresa_email || '',
-          resolucion_facturacion || '',
-          licencia_internet || '',
-          vigilado || '',
-          vigilado_internet || '',
-          comentario || '',
-          prefijo_factura || 'FAC',
-          codigo_gs1 || '',
-          valor_reconexion || 15000.00,
-          dias_mora_corte || 30,
-          porcentaje_iva || 19.00,
-          porcentaje_interes || 0.00
-        ]);
-        
-        logger.info('Configuración de empresa creada', {
-          configId: result.insertId,
-          updatedBy: req.user.id
-        });
-      } else {
+
+      let query;
+      let params;
+
+      if (existingConfig) {
         // Actualizar configuración existente
-        await connection.execute(`
-          UPDATE configuracion_empresa SET
-            licencia = COALESCE(?, licencia),
-            empresa_nombre = COALESCE(?, empresa_nombre),
-            empresa_nit = COALESCE(?, empresa_nit),
-            empresa_direccion = COALESCE(?, empresa_direccion),
-            empresa_ciudad = COALESCE(?, empresa_ciudad),
-            empresa_departamento = COALESCE(?, empresa_departamento),
-            empresa_telefono = COALESCE(?, empresa_telefono),
-            empresa_email = COALESCE(?, empresa_email),
-            resolucion_facturacion = COALESCE(?, resolucion_facturacion),
-            licencia_internet = COALESCE(?, licencia_internet),
-            vigilado = COALESCE(?, vigilado),
-            vigilado_internet = COALESCE(?, vigilado_internet),
-            comentario = COALESCE(?, comentario),
-            prefijo_factura = COALESCE(?, prefijo_factura),
-            codigo_gs1 = COALESCE(?, codigo_gs1),
-            valor_reconexion = COALESCE(?, valor_reconexion),
-            dias_mora_corte = COALESCE(?, dias_mora_corte),
-            porcentaje_iva = COALESCE(?, porcentaje_iva),
-            porcentaje_interes = COALESCE(?, porcentaje_interes),
-            fecha_actualizacion = NOW(),
-            updated_at = NOW()
-          WHERE id = ?
-        `, [
-          licencia, empresa_nombre, empresa_nit, empresa_direccion,
-          empresa_ciudad, empresa_departamento, empresa_telefono, empresa_email,
-          resolucion_facturacion, licencia_internet, vigilado, vigilado_internet,
-          comentario, prefijo_factura, codigo_gs1, valor_reconexion,
-          dias_mora_corte, porcentaje_iva, porcentaje_interes, existing[0].id
-        ]);
-        
-        logger.info('Configuración de empresa actualizada', {
-          configId: existing[0].id,
-          updatedBy: req.user.id
+        const updateFields = [];
+        const updateValues = [];
+
+        Object.keys(configData).forEach(key => {
+          if (configData[key] !== undefined && key !== 'id') {
+            updateFields.push(`${key} = ?`);
+            updateValues.push(configData[key]);
+          }
         });
+
+        if (updateFields.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'No hay campos para actualizar'
+          });
+        }
+
+        updateValues.push(existingConfig.id);
+        query = `UPDATE configuracion_empresa SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`;
+        params = updateValues;
+      } else {
+        // Crear nueva configuración
+        const fields = Object.keys(configData);
+        const values = Object.values(configData);
+        const placeholders = fields.map(() => '?').join(', ');
+
+        query = `INSERT INTO configuracion_empresa (${fields.join(', ')}) VALUES (${placeholders})`;
+        params = values;
       }
-      
+
+      await Database.query(query, params);
+
       // Obtener configuración actualizada
-      const [updated] = await connection.execute(
-        'SELECT * FROM configuracion_empresa ORDER BY id ASC LIMIT 1'
-      );
-      
-      connection.release();
-      
-      return ApiResponse.success(res, {
-        config: updated[0]
-      }, 'Configuración actualizada exitosamente');
-      
-    } catch (error) {
-      logger.error('Error actualizando configuración de empresa:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
-    }
-  }
-  
-  // Obtener estadísticas de configuración
-  static async getConfigStats(req, res) {
-    try {
-      const connection = await pool.getConnection();
-      
-      // Verificar si la configuración está completa
-      const [config] = await connection.execute(
+      const [updatedConfig] = await Database.query(
         'SELECT * FROM configuracion_empresa LIMIT 1'
       );
-      
-      const isConfigured = config.length > 0 && 
-        config[0].empresa_nombre && 
-        config[0].empresa_nit;
-      
-      // Contar registros en tablas de configuración
-      const [counts] = await connection.execute(`
+
+      res.json({
+        success: true,
+        message: 'Configuración actualizada exitosamente',
+        data: {
+          config: updatedConfig
+        }
+      });
+    } catch (error) {
+      console.error('Error actualizando configuración de empresa:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // ==========================================
+  // GESTIÓN GEOGRÁFICA
+  // ==========================================
+
+  // Obtener departamentos
+  static async getDepartments(req, res) {
+    try {
+      const { includeStats = false } = req.query;
+
+      let query = 'SELECT * FROM departamentos ORDER BY nombre ASC';
+      const departamentos = await Database.query(query);
+
+      if (includeStats) {
+        // Agregar estadísticas si se solicita
+        for (let dept of departamentos) {
+          const [ciudadesCount] = await Database.query(
+            'SELECT COUNT(*) as total FROM ciudades WHERE departamento_id = ?',
+            [dept.id]
+          );
+          dept.total_ciudades = ciudadesCount.total;
+        }
+      }
+
+      console.log(`📍 Departamentos obtenidos: ${departamentos.length}`);
+
+      res.json({
+        success: true,
+        data: departamentos
+      });
+    } catch (error) {
+      console.error('Error obteniendo departamentos:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener ciudades
+  static async getCities(req, res) {
+    try {
+      const { departamento_id, includeStats = false } = req.query;
+
+      let query = `
         SELECT 
-          (SELECT COUNT(*) FROM departamentos) as departamentos,
-          (SELECT COUNT(*) FROM ciudades) as ciudades,
-          (SELECT COUNT(*) FROM sectores WHERE activo = 1) as sectores_activos,
-          (SELECT COUNT(*) FROM sectores) as sectores_total,
-          (SELECT COUNT(*) FROM bancos WHERE activo = 1) as bancos_activos,
-          (SELECT COUNT(*) FROM bancos) as bancos_total,
-          (SELECT COUNT(*) FROM planes_servicio WHERE activo = 1) as planes_activos,
-          (SELECT COUNT(*) FROM planes_servicio) as planes_total,
-          (SELECT COUNT(*) FROM conceptos_facturacion WHERE activo = 1) as conceptos_activos,
-          (SELECT COUNT(*) FROM conceptos_facturacion) as conceptos_total,
-          (SELECT COUNT(*) FROM sistema_usuarios WHERE activo = 1) as usuarios_activos,
-          (SELECT COUNT(*) FROM sistema_usuarios) as usuarios_total,
-          (SELECT COUNT(*) FROM clientes WHERE estado = 'activo') as clientes_activos,
-          (SELECT COUNT(*) FROM clientes) as clientes_total
-      `);
+          c.*,
+          d.nombre as departamento_nombre
+        FROM ciudades c
+        LEFT JOIN departamentos d ON c.departamento_id = d.id
+      `;
       
-      connection.release();
+      const params = [];
       
-      const stats = counts[0];
+      if (departamento_id) {
+        query += ' WHERE c.departamento_id = ?';
+        params.push(departamento_id);
+      }
       
-      // Calcular nivel de configuración
-      const configurationLevel = {
-        empresa: isConfigured,
-        geografia: stats.departamentos > 0 && stats.ciudades > 0 && stats.sectores_activos > 0,
-        bancos: stats.bancos_activos > 0,
-        planes: stats.planes_activos > 0,
-        conceptos: stats.conceptos_activos > 0,
-        usuarios: stats.usuarios_activos > 1 // Al menos admin + otro usuario
+      query += ' ORDER BY c.nombre ASC';
+
+      const ciudades = await Database.query(query, params);
+
+      if (includeStats) {
+        // Agregar estadísticas si se solicita
+        for (let ciudad of ciudades) {
+          const [sectoresCount] = await Database.query(
+            'SELECT COUNT(*) as total FROM sectores WHERE ciudad_id = ? AND activo = 1',
+            [ciudad.id]
+          );
+          ciudad.total_sectores = sectoresCount.total;
+        }
+      }
+
+      console.log(`🏙️ Ciudades obtenidas: ${ciudades.length}`);
+
+      res.json({
+        success: true,
+        data: ciudades
+      });
+    } catch (error) {
+      console.error('Error obteniendo ciudades:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener sectores
+  static async getSectors(req, res) {
+    try {
+      const { ciudad_id, activo, includeStats = false } = req.query;
+
+      let query = `
+        SELECT 
+          s.*,
+          c.nombre as ciudad_nombre,
+          d.nombre as departamento_nombre
+        FROM sectores s
+        LEFT JOIN ciudades c ON s.ciudad_id = c.id
+        LEFT JOIN departamentos d ON c.departamento_id = d.id
+        WHERE 1=1
+      `;
+      
+      const params = [];
+      
+      if (ciudad_id) {
+        query += ' AND s.ciudad_id = ?';
+        params.push(ciudad_id);
+      }
+      
+      if (activo !== undefined) {
+        query += ' AND s.activo = ?';
+        params.push(activo === 'true' ? 1 : 0);
+      }
+      
+      query += ' ORDER BY s.codigo ASC';
+
+      const sectores = await Database.query(query, params);
+
+      if (includeStats) {
+        // Agregar estadísticas si se solicita
+        for (let sector of sectores) {
+          const [clientesCount] = await Database.query(
+            'SELECT COUNT(*) as total FROM clientes WHERE sector_id = ?',
+            [sector.id]
+          );
+          sector.total_clientes = clientesCount.total;
+        }
+      }
+
+      console.log(`🏘️ Sectores obtenidos: ${sectores.length}`);
+
+      res.json({
+        success: true,
+        data: sectores
+      });
+    } catch (error) {
+      console.error('Error obteniendo sectores:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // ==========================================
+  // GESTIÓN DE BANCOS
+  // ==========================================
+
+  // Obtener bancos
+  static async getBanks(req, res) {
+    try {
+      const { activo } = req.query;
+
+      let query = 'SELECT * FROM bancos';
+      const params = [];
+      
+      if (activo !== undefined) {
+        query += ' WHERE activo = ?';
+        params.push(activo === 'true' ? 1 : 0);
+      }
+      
+      query += ' ORDER BY nombre ASC';
+
+      const bancos = await Database.query(query, params);
+
+      console.log(`🏦 Bancos obtenidos: ${bancos.length}`);
+
+      res.json({
+        success: true,
+        data: bancos
+      });
+    } catch (error) {
+      console.error('Error obteniendo bancos:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // ==========================================
+  // PLANES DE SERVICIO
+  // ==========================================
+
+  // Obtener planes de servicio
+  static async getServicePlans(req, res) {
+    try {
+      const { tipo, activo } = req.query;
+
+      let query = 'SELECT * FROM planes_servicio WHERE 1=1';
+      const params = [];
+      
+      if (tipo) {
+        query += ' AND tipo = ?';
+        params.push(tipo);
+      }
+      
+      if (activo !== undefined) {
+        query += ' AND activo = ?';
+        params.push(activo === 'true' ? 1 : 0);
+      }
+      
+      query += ' ORDER BY tipo ASC, precio ASC';
+
+      const planes = await Database.query(query, params);
+
+      console.log(`📦 Planes de servicio obtenidos: ${planes.length}`);
+
+      res.json({
+        success: true,
+        data: planes
+      });
+    } catch (error) {
+      console.error('Error obteniendo planes de servicio:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // ==========================================
+  // ESTADÍSTICAS Y CONTADORES
+  // ==========================================
+
+  // Obtener contadores
+  static async getCounters() {
+    try {
+      const queries = await Promise.all([
+        Database.query('SELECT COUNT(*) as total FROM departamentos'),
+        Database.query('SELECT COUNT(*) as total FROM ciudades'),
+        Database.query('SELECT COUNT(*) as total FROM sectores WHERE activo = 1'),
+        Database.query('SELECT COUNT(*) as total FROM bancos WHERE activo = 1'),
+        Database.query('SELECT COUNT(*) as total FROM planes_servicio WHERE activo = 1'),
+        Database.query('SELECT COUNT(*) as total FROM conceptos_facturacion WHERE activo = 1')
+      ]);
+
+      return {
+        departamentos: queries[0][0]?.total || 0,
+        ciudades: queries[1][0]?.total || 0,
+        sectores_activos: queries[2][0]?.total || 0,
+        bancos_activos: queries[3][0]?.total || 0,
+        planes_activos: queries[4][0]?.total || 0,
+        conceptos_activos: queries[5][0]?.total || 0
       };
+    } catch (error) {
+      console.error('Error obteniendo contadores:', error);
+      return {
+        departamentos: 0,
+        ciudades: 0,
+        sectores_activos: 0,
+        bancos_activos: 0,
+        planes_activos: 0,
+        conceptos_activos: 0
+      };
+    }
+  }
+
+  // Obtener estadísticas
+  static async getConfigStats(req, res) {
+    try {
+      const contadores = await CompanyConfigController.getCounters();
+
+      res.json({
+        success: true,
+        data: contadores
+      });
+    } catch (error) {
+      console.error('Error obteniendo estadísticas de configuración:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // ==========================================
+  // UTILIDADES
+  // ==========================================
+
+  // Calcular porcentaje de configuración completado
+  static calcularPorcentajeCompletado(contadores, empresaConfigurada) {
+    const pasos = [
+      empresaConfigurada,
+      contadores.bancos_activos > 0,
+      contadores.sectores_activos > 0,
+      contadores.planes_activos > 0
+    ];
+
+    const pasosCompletados = pasos.filter(Boolean).length;
+    return Math.round((pasosCompletados / pasos.length) * 100);
+  }
+
+  // Verificar salud de la configuración
+  static async getConfigHealth(req, res) {
+    try {
+      const contadores = await CompanyConfigController.getCounters();
+      const [empresaConfig] = await Database.query(
+        'SELECT empresa_nombre, empresa_nit FROM configuracion_empresa LIMIT 1'
+      );
+
+      const empresaConfigurada = empresaConfig && empresaConfig.empresa_nombre && empresaConfig.empresa_nit;
       
-      const completedItems = Object.values(configurationLevel).filter(Boolean).length;
-      const totalItems = Object.keys(configurationLevel).length;
-      const completionPercentage = Math.round((completedItems / totalItems) * 100);
+      const problemas = [];
       
-      return ApiResponse.success(res, {
-        empresa_configurada: isConfigured,
-        nivel_configuracion: configurationLevel,
-        porcentaje_completado: completionPercentage,
-        estadisticas: stats,
-        configuracion_completa: completionPercentage === 100,
-        resumen: {
-          total_departamentos: stats.departamentos,
-          total_ciudades: stats.ciudades,
-          sectores_activos: stats.sectores_activos,
-          bancos_activos: stats.bancos_activos,
-          planes_activos: stats.planes_activos,
-          conceptos_activos: stats.conceptos_activos,
-          usuarios_activos: stats.usuarios_activos,
-          clientes_activos: stats.clientes_activos
+      if (!empresaConfigurada) {
+        problemas.push('Configuración de empresa incompleta');
+      }
+      
+      if (contadores.bancos_activos === 0) {
+        problemas.push('No hay bancos configurados');
+      }
+      
+      if (contadores.sectores_activos === 0) {
+        problemas.push('No hay sectores configurados');
+      }
+      
+      if (contadores.planes_activos === 0) {
+        problemas.push('No hay planes de servicio configurados');
+      }
+
+      const sistemaOperativo = problemas.length === 0;
+
+      res.json({
+        success: true,
+        data: {
+          sistema_operativo: sistemaOperativo,
+          problemas,
+          contadores,
+          empresa_configurada: empresaConfigurada
         }
-      }, 'Estadísticas obtenidas exitosamente');
-      
+      });
     } catch (error) {
-      logger.error('Error obteniendo estadísticas de configuración:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error verificando salud de configuración:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 
-  // Obtener próximos consecutivos
-  static async getNextConsecutives(req, res) {
+  // ==========================================
+  // JERARQUÍA GEOGRÁFICA
+  // ==========================================
+
+  // Obtener jerarquía geográfica completa
+  static async getGeographyHierarchy(req, res) {
     try {
-      const connection = await pool.getConnection();
+      const departamentos = await Database.query('SELECT * FROM departamentos ORDER BY nombre ASC');
       
-      const [config] = await connection.execute(
-        'SELECT consecutivo_factura, consecutivo_contrato, consecutivo_recibo, prefijo_factura FROM configuracion_empresa LIMIT 1'
-      );
+      const hierarchy = [];
       
-      if (config.length === 0) {
-        connection.release();
-        return ApiResponse.success(res, {
-          consecutivos: {
-            factura: 1,
-            contrato: 1,
-            recibo: 1,
-            prefijo_factura: 'FAC'
-          }
-        }, 'Consecutivos por defecto obtenidos');
-      }
-      
-      const consecutivos = config[0];
-      
-      connection.release();
-      
-      return ApiResponse.success(res, {
-        consecutivos: {
-          factura: consecutivos.consecutivo_factura,
-          contrato: consecutivos.consecutivo_contrato,
-          recibo: consecutivos.consecutivo_recibo,
-          prefijo_factura: consecutivos.prefijo_factura || 'FAC'
+      for (let dept of departamentos) {
+        const ciudades = await Database.query(
+          'SELECT * FROM ciudades WHERE departamento_id = ? ORDER BY nombre ASC',
+          [dept.id]
+        );
+        
+        const ciudadesWithSectors = [];
+        
+        for (let ciudad of ciudades) {
+          const sectores = await Database.query(
+            'SELECT * FROM sectores WHERE ciudad_id = ? AND activo = 1 ORDER BY codigo ASC',
+            [ciudad.id]
+          );
+          
+          ciudadesWithSectors.push({
+            ...ciudad,
+            sectores
+          });
         }
-      }, 'Consecutivos obtenidos exitosamente');
-      
-    } catch (error) {
-      logger.error('Error obteniendo consecutivos:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
-    }
-  }
+        
+        hierarchy.push({
+          ...dept,
+          ciudades: ciudadesWithSectors
+        });
+      }
 
-  // Actualizar consecutivos
-  static async updateConsecutives(req, res) {
-    try {
-      const { consecutivo_factura, consecutivo_contrato, consecutivo_recibo } = req.body;
-      
-      // Validaciones básicas
-      if (consecutivo_factura && consecutivo_factura < 1) {
-        return ApiResponse.validationError(res, [{
-          field: 'consecutivo_factura',
-          message: 'El consecutivo de factura debe ser mayor a 0'
-        }]);
-      }
-      
-      if (consecutivo_contrato && consecutivo_contrato < 1) {
-        return ApiResponse.validationError(res, [{
-          field: 'consecutivo_contrato',
-          message: 'El consecutivo de contrato debe ser mayor a 0'
-        }]);
-      }
-      
-      if (consecutivo_recibo && consecutivo_recibo < 1) {
-        return ApiResponse.validationError(res, [{
-          field: 'consecutivo_recibo',
-          message: 'El consecutivo de recibo debe ser mayor a 0'
-        }]);
-      }
-      
-      const connection = await pool.getConnection();
-      
-      // Verificar si existe configuración
-      const [existing] = await connection.execute(
-        'SELECT id FROM configuracion_empresa LIMIT 1'
-      );
-      
-      if (existing.length === 0) {
-        connection.release();
-        return ApiResponse.notFound(res, 'Configuración de empresa no encontrada');
-      }
-      
-      // Construir query dinámicamente
-      const updateFields = [];
-      const updateValues = [];
-      
-      if (consecutivo_factura !== undefined) {
-        updateFields.push('consecutivo_factura = ?');
-        updateValues.push(consecutivo_factura);
-      }
-      
-      if (consecutivo_contrato !== undefined) {
-        updateFields.push('consecutivo_contrato = ?');
-        updateValues.push(consecutivo_contrato);
-      }
-      
-      if (consecutivo_recibo !== undefined) {
-        updateFields.push('consecutivo_recibo = ?');
-        updateValues.push(consecutivo_recibo);
-      }
-      
-      if (updateFields.length === 0) {
-        connection.release();
-        return ApiResponse.error(res, 'No hay consecutivos para actualizar', 400);
-      }
-      
-      updateFields.push('updated_at = NOW()');
-      updateValues.push(existing[0].id);
-      
-      await connection.execute(`
-        UPDATE configuracion_empresa 
-        SET ${updateFields.join(', ')}
-        WHERE id = ?
-      `, updateValues);
-      
-      // Obtener consecutivos actualizados
-      const [updated] = await connection.execute(
-        'SELECT consecutivo_factura, consecutivo_contrato, consecutivo_recibo, prefijo_factura FROM configuracion_empresa WHERE id = ?',
-        [existing[0].id]
-      );
-      
-      connection.release();
-      
-      logger.info('Consecutivos actualizados', {
-        configId: existing[0].id,
-        updatedBy: req.user.id,
-        changes: req.body
+      res.json({
+        success: true,
+        data: hierarchy
       });
-      
-      return ApiResponse.success(res, {
-        consecutivos: updated[0]
-      }, 'Consecutivos actualizados exitosamente');
-      
     } catch (error) {
-      logger.error('Error actualizando consecutivos:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
-    }
-  }
-
-  // Incrementar consecutivo específico
-  static async incrementConsecutive(req, res) {
-    try {
-      const { type } = req.params; // 'factura', 'contrato', 'recibo'
-      
-      if (!['factura', 'contrato', 'recibo'].includes(type)) {
-        return ApiResponse.error(res, 'Tipo de consecutivo inválido', 400);
-      }
-      
-      const connection = await pool.getConnection();
-      
-      const [config] = await connection.execute(
-        'SELECT id FROM configuracion_empresa LIMIT 1'
-      );
-      
-      if (config.length === 0) {
-        connection.release();
-        return ApiResponse.notFound(res, 'Configuración de empresa no encontrada');
-      }
-      
-      const fieldName = `consecutivo_${type}`;
-      
-      // Incrementar consecutivo
-      await connection.execute(`
-        UPDATE configuracion_empresa 
-        SET ${fieldName} = ${fieldName} + 1, updated_at = NOW()
-        WHERE id = ?
-      `, [config[0].id]);
-      
-      // Obtener nuevo valor
-      const [updated] = await connection.execute(`
-        SELECT ${fieldName} as nuevo_consecutivo 
-        FROM configuracion_empresa 
-        WHERE id = ?
-      `, [config[0].id]);
-      
-      connection.release();
-      
-      logger.info(`Consecutivo ${type} incrementado`, {
-        type: type,
-        newValue: updated[0].nuevo_consecutivo,
-        updatedBy: req.user?.id || 'system'
+      console.error('Error obteniendo jerarquía geográfica:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
       });
-      
-      return ApiResponse.success(res, {
-        type: type,
-        nuevo_consecutivo: updated[0].nuevo_consecutivo
-      }, `Consecutivo de ${type} incrementado exitosamente`);
-      
-    } catch (error) {
-      logger.error('Error incrementando consecutivo:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
-    }
-  }
-
-  // Restablecer configuración a valores por defecto
-  static async resetConfig(req, res) {
-    try {
-      if (req.user.rol !== 'administrador') {
-        return ApiResponse.forbidden(res, 'Solo los administradores pueden restablecer la configuración');
-      }
-      
-      const { confirm } = req.body;
-      
-      if (confirm !== 'RESET_CONFIG') {
-        return ApiResponse.error(res, 'Confirmación requerida para restablecer configuración', 400);
-      }
-      
-      const connection = await pool.getConnection();
-      
-      // Eliminar configuración existente
-      await connection.execute('DELETE FROM configuracion_empresa');
-      
-      // Crear configuración por defecto
-      await connection.execute(`
-        INSERT INTO configuracion_empresa (
-          licencia, empresa_nombre, empresa_nit, empresa_direccion,
-          empresa_ciudad, empresa_departamento, empresa_telefono, empresa_email,
-          resolucion_facturacion, licencia_internet, vigilado, vigilado_internet,
-          comentario, prefijo_factura, codigo_gs1, consecutivo_factura,
-          consecutivo_contrato, consecutivo_recibo, valor_reconexion,
-          dias_mora_corte, porcentaje_iva, porcentaje_interes,
-          fecha_actualizacion, updated_at
-        ) VALUES (
-          'DEMO2025', '', '', '', '', '', '', '', '', '', '', '', '',
-          'FAC', '', 1, 1, 1, 15000.00, 30, 19.00, 0.00, NOW(), NOW()
-        )
-      `);
-      
-      connection.release();
-      
-      logger.logSecurity('warn', 'Configuración de empresa restablecida', {
-        resetBy: req.user.id,
-        resetByEmail: req.user.email
-      });
-      
-      return ApiResponse.success(res, null, 'Configuración restablecida exitosamente');
-      
-    } catch (error) {
-      logger.error('Error restableciendo configuración:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
     }
   }
 }
