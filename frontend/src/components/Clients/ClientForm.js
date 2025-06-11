@@ -1,4 +1,4 @@
-// frontend/src/components/Clients/ClientForm.js - CORREGIDO
+// frontend/src/components/Clients/ClientForm.js - VERSIÓN CON DEBUG Y VALIDACIÓN MEJORADA
 
 import React, { useState, useEffect } from 'react';
 import { X, Save, AlertCircle, Check } from 'lucide-react';
@@ -26,11 +26,11 @@ const ClientForm = ({ client, onClose, onSave }) => {
     updateClient
   } = useClientForm(client);
 
-  // Usar el hook de configuración corregido
+  // Usar el hook de configuración
   const { 
-    sectors, 
-    cities, 
-    departments, 
+    sectors = [], 
+    cities = [], 
+    departments = [], 
     loading: configLoading, 
     loadCities, 
     loadSectors 
@@ -39,14 +39,25 @@ const ClientForm = ({ client, onClose, onSave }) => {
   const [saving, setSaving] = useState(false);
   const [validatingId, setValidatingId] = useState(false);
   const [idValidation, setIdValidation] = useState(null);
+  const [debugMode, setDebugMode] = useState(process.env.NODE_ENV === 'development');
 
-  // Debug - mostrar en consola lo que está cargando
+  // Debug function
+  const logDebug = (message, data) => {
+    if (debugMode) {
+      console.log(`🐛 ClientForm: ${message}`, data);
+    }
+  };
+
+  // Debug inicial
   useEffect(() => {
-    console.log('🏛️ Departamentos cargados:', departments?.length || 0, departments);
-    console.log('🏙️ Ciudades cargadas:', cities?.length || 0, cities);
-    console.log('🏘️ Sectores cargados:', sectors?.length || 0, sectors);
-    console.log('⏳ Config loading:', configLoading);
-  }, [departments, cities, sectors, configLoading]);
+    logDebug('Formulario inicializado', {
+      isEditing,
+      client,
+      formData,
+      sectorsCount: sectors.length,
+      citiesCount: cities.length
+    });
+  }, [isEditing, client, formData, sectors.length, cities.length]);
 
   // Validar identificación cuando cambie
   useEffect(() => {
@@ -60,7 +71,10 @@ const ClientForm = ({ client, onClose, onSave }) => {
 
         setValidatingId(true);
         try {
+          logDebug('Validando identificación', formData.identificacion);
           const response = await clientService.validateIdentification(formData.identificacion);
+          logDebug('Respuesta validación ID', response);
+          
           if (response.success) {
             setIdValidation(response.data.existe ? 'exists' : 'available');
           }
@@ -78,52 +92,99 @@ const ClientForm = ({ client, onClose, onSave }) => {
     return () => clearTimeout(timeoutId);
   }, [formData.identificacion, isEditing, client?.identificacion]);
 
-  // Manejar cambio de departamento (opcional si quieres filtrar ciudades)
-  const handleDepartmentChange = (departamentoId) => {
-    updateField('departamento_id', departamentoId);
-    updateField('ciudad_id', ''); // Limpiar ciudad seleccionada
-    updateField('sector_id', ''); // Limpiar sector seleccionado
+  // Preparar datos para envío
+  const prepareFormData = () => {
+    // Limpiar datos nulos y undefined
+    const cleanData = {};
     
-    if (departamentoId) {
-      loadCities(departamentoId);
-    }
-  };
+    Object.keys(formData).forEach(key => {
+      const value = formData[key];
+      
+      // Convertir valores apropiadamente
+      if (value === null || value === undefined || value === '') {
+        // No incluir campos vacíos
+        return;
+      }
+      
+      // Conversiones específicas
+      if (key === 'sector_id' || key === 'ciudad_id') {
+        const numValue = parseInt(value);
+        if (!isNaN(numValue) && numValue > 0) {
+          cleanData[key] = numValue;
+        }
+      } else if (key === 'requiere_reconexion') {
+        cleanData[key] = Boolean(value);
+      } else if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed) {
+          cleanData[key] = trimmed;
+        }
+      } else {
+        cleanData[key] = value;
+      }
+    });
 
-  // Manejar cambio de ciudad
-  const handleCityChange = (ciudadId) => {
-    updateField('ciudad_id', ciudadId);
-    updateField('sector_id', ''); // Limpiar sector seleccionado
-    
-    if (ciudadId) {
-      loadSectors(ciudadId);
+    // Asegurar campos requeridos
+    if (!cleanData.tipo_documento) {
+      cleanData.tipo_documento = 'cedula';
     }
+    
+    if (!cleanData.estado) {
+      cleanData.estado = 'activo';
+    }
+    
+    if (!cleanData.fecha_registro) {
+      cleanData.fecha_registro = new Date().toISOString().split('T')[0];
+    }
+
+    logDebug('Datos preparados para envío', {
+      original: formData,
+      cleaned: cleanData
+    });
+
+    return cleanData;
   };
 
   // Manejar envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    logDebug('Iniciando envío de formulario', formData);
+
     if (!validateForm()) {
+      logDebug('Validación de formulario falló', errors);
       return;
     }
 
     if (idValidation === 'exists') {
+      logDebug('ID ya existe, no se puede crear');
       return;
     }
 
     setSaving(true);
     try {
+      const dataToSend = prepareFormData();
+      
+      logDebug('Enviando datos al backend', dataToSend);
+
       let response;
       if (isEditing) {
-        response = await updateClient(client.id);
+        response = await updateClient(client.id, dataToSend);
       } else {
-        response = await createClient();
+        // Crear cliente con datos limpios
+        response = await clientService.createClient(dataToSend);
+        logDebug('Respuesta del backend', response);
       }
 
       if (response.success) {
+        logDebug('Cliente creado/actualizado exitosamente');
         onSave();
+      } else {
+        logDebug('Error en respuesta del backend', response);
+        console.error('Error del backend:', response.message);
       }
     } catch (error) {
+      logDebug('Error en handleSubmit', error);
       console.error('Error saving client:', error);
     } finally {
       setSaving(false);
@@ -141,9 +202,22 @@ const ClientForm = ({ client, onClose, onSave }) => {
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {isEditing ? 'Editar Cliente' : 'Nuevo Cliente'}
-          </h2>
+          <div className="flex items-center space-x-4">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {isEditing ? 'Editar Cliente' : 'Nuevo Cliente'}
+            </h2>
+            
+            {debugMode && (
+              <button
+                type="button"
+                onClick={() => setDebugMode(!debugMode)}
+                className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded"
+              >
+                Debug: {debugMode ? 'ON' : 'OFF'}
+              </button>
+            )}
+          </div>
+          
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 p-1"
@@ -155,6 +229,42 @@ const ClientForm = ({ client, onClose, onSave }) => {
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Panel de Debug */}
+            {debugMode && (
+              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <h4 className="text-sm font-medium text-yellow-800 mb-2">🐛 Debug Info</h4>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <strong>Estado Form:</strong>
+                    <pre className="mt-1 text-xs bg-white p-2 rounded overflow-auto max-h-32">
+                      {JSON.stringify({
+                        loading,
+                        saving,
+                        idValidation,
+                        errorsCount: Object.keys(errors).length
+                      }, null, 2)}
+                    </pre>
+                  </div>
+                  <div>
+                    <strong>Datos Geografía:</strong>
+                    <pre className="mt-1 text-xs bg-white p-2 rounded">
+{`Ciudades: ${cities.length}
+Sectores: ${sectors.length}
+Config Loading: ${configLoading}`}
+                    </pre>
+                  </div>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => logDebug('Estado actual completo', { formData, errors, cities, sectors })}
+                  className="mt-2 text-xs bg-yellow-200 hover:bg-yellow-300 px-2 py-1 rounded"
+                >
+                  Log Estado Completo
+                </button>
+              </div>
+            )}
+
             {/* Información básica */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -168,7 +278,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     Tipo de Documento *
                   </label>
                   <select
-                    value={formData.tipo_documento}
+                    value={formData.tipo_documento || 'cedula'}
                     onChange={(e) => updateField('tipo_documento', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
@@ -189,7 +299,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   <div className="relative">
                     <input
                       type="text"
-                      value={formData.identificacion}
+                      value={formData.identificacion || ''}
                       onChange={(e) => updateField('identificacion', e.target.value)}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                         errors.identificacion ? 'border-red-300' :
@@ -229,7 +339,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="text"
-                    value={formData.nombre}
+                    value={formData.nombre || ''}
                     onChange={(e) => updateField('nombre', e.target.value)}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       errors.nombre ? 'border-red-300' : 'border-gray-300'
@@ -258,7 +368,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="tel"
-                    value={formData.telefono}
+                    value={formData.telefono || ''}
                     onChange={(e) => handlePhoneChange('telefono', e.target.value)}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       errors.telefono ? 'border-red-300' : 'border-gray-300'
@@ -278,7 +388,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="tel"
-                    value={formData.telefono_2}
+                    value={formData.telefono_2 || ''}
                     onChange={(e) => handlePhoneChange('telefono_2', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="6012345678"
@@ -293,7 +403,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </label>
                   <input
                     type="email"
-                    value={formData.correo}
+                    value={formData.correo || ''}
                     onChange={(e) => updateField('correo', e.target.value)}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       errors.correo ? 'border-red-300' : 'border-gray-300'
@@ -320,7 +430,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     Dirección *
                   </label>
                   <textarea
-                    value={formData.direccion}
+                    value={formData.direccion || ''}
                     onChange={(e) => updateField('direccion', e.target.value)}
                     rows="2"
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
@@ -335,53 +445,32 @@ const ClientForm = ({ client, onClose, onSave }) => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Departamento (opcional) */}
-                  {departments && departments.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Departamento
-                      </label>
-                      <select
-                        value={formData.departamento_id || ''}
-                        onChange={(e) => handleDepartmentChange(e.target.value)}
-                        disabled={configLoading}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                      >
-                        <option value="">Seleccionar departamento</option>
-                        {departments.map((dept) => (
-                          <option key={dept.id} value={dept.id}>
-                            {dept.nombre}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
                   {/* Ciudad */}
-                  <div className={departments && departments.length > 0 ? "" : "md:col-start-1"}>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Ciudad
                     </label>
                     <select
                       value={formData.ciudad_id || ''}
-                      onChange={(e) => handleCityChange(e.target.value)}
+                      onChange={(e) => updateField('ciudad_id', e.target.value)}
                       disabled={configLoading}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                     >
                       <option value="">Seleccionar ciudad</option>
-                      {cities && cities.length > 0 ? cities.map((city) => (
+                      {Array.isArray(cities) && cities.map((city) => (
                         <option key={city.id} value={city.id}>
                           {city.nombre} {city.departamento_nombre && `(${city.departamento_nombre})`}
                         </option>
-                      )) : (
-                        <option value="" disabled>
-                          {configLoading ? 'Cargando ciudades...' : 'No hay ciudades disponibles'}
-                        </option>
-                      )}
+                      ))}
                     </select>
                     {!configLoading && (!cities || cities.length === 0) && (
-                      <p className="text-sm text-amber-600 mt-1">
-                        ⚠️ No hay ciudades configuradas. Ve a Configuración → Geografía para agregar ciudades.
+                      <p className="text-red-600 text-sm mt-1">
+                        No hay ciudades configuradas. Ve a Configuración → Geografía para agregar ciudades.
+                      </p>
+                    )}
+                    {debugMode && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Debug: {cities.length} ciudades cargadas
                       </p>
                     )}
                   </div>
@@ -398,19 +487,20 @@ const ClientForm = ({ client, onClose, onSave }) => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                     >
                       <option value="">Seleccionar sector</option>
-                      {sectors && sectors.length > 0 ? sectors.map((sector) => (
+                      {Array.isArray(sectors) && sectors.map((sector) => (
                         <option key={sector.id} value={sector.id}>
                           {sector.codigo} - {sector.nombre}
                         </option>
-                      )) : (
-                        <option value="" disabled>
-                          {configLoading ? 'Cargando sectores...' : 'No hay sectores disponibles'}
-                        </option>
-                      )}
+                      ))}
                     </select>
                     {!configLoading && (!sectors || sectors.length === 0) && (
-                      <p className="text-sm text-amber-600 mt-1">
-                        ⚠️ No hay sectores configurados. Ve a Configuración → Geografía para agregar sectores.
+                      <p className="text-red-600 text-sm mt-1">
+                        No hay sectores configurados. Ve a Configuración → Geografía para agregar sectores.
+                      </p>
+                    )}
+                    {debugMode && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Debug: {sectors.length} sectores cargados
                       </p>
                     )}
                   </div>
@@ -451,10 +541,10 @@ const ClientForm = ({ client, onClose, onSave }) => {
               </div>
             </div>
 
-            {/* Información técnica */}
+            {/* Información técnica básica */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Información Técnica
+                Información Adicional
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -464,7 +554,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
                     Estado
                   </label>
                   <select
-                    value={formData.estado}
+                    value={formData.estado || 'activo'}
                     onChange={(e) => updateField('estado', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
@@ -476,144 +566,34 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   </select>
                 </div>
 
-                {/* MAC Address */}
+                {/* Fecha de registro */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Dirección MAC
+                    Fecha de Registro
                   </label>
                   <input
-                    type="text"
-                    value={formData.mac_address || ''}
-                    onChange={(e) => updateField('mac_address', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.mac_address ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="AA:BB:CC:DD:EE:FF"
-                  />
-                  {errors.mac_address && (
-                    <p className="text-red-600 text-sm mt-1">{errors.mac_address}</p>
-                  )}
-                </div>
-
-                {/* IP Asignada */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    IP Asignada
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.ip_asignada || ''}
-                    onChange={(e) => updateField('ip_asignada', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.ip_asignada ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="192.168.1.100"
-                  />
-                  {errors.ip_asignada && (
-                    <p className="text-red-600 text-sm mt-1">{errors.ip_asignada}</p>
-                  )}
-                </div>
-
-                {/* TAP */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    TAP
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.tap || ''}
-                    onChange={(e) => updateField('tap', e.target.value)}
+                    type="date"
+                    value={formData.fecha_registro || new Date().toISOString().split('T')[0]}
+                    onChange={(e) => updateField('fecha_registro', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="TAP001"
                   />
                 </div>
 
-                {/* Poste */}
-                <div>
+                {/* Observaciones */}
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Poste
+                    Observaciones
                   </label>
-                  <input
-                    type="text"
-                    value={formData.poste || ''}
-                    onChange={(e) => updateField('poste', e.target.value)}
+                  <textarea
+                    value={formData.observaciones || ''}
+                    onChange={(e) => updateField('observaciones', e.target.value)}
+                    rows="3"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="P-001"
+                    placeholder="Observaciones adicionales..."
                   />
                 </div>
-
-                {/* Contrato */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Número de Contrato
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.contrato || ''}
-                    onChange={(e) => updateField('contrato', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="CT-001"
-                  />
-                </div>
-
-                {/* Ruta */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ruta
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.ruta || ''}
-                    onChange={(e) => updateField('ruta', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="R001"
-                  />
-                </div>
-
-                {/* Código de usuario */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Código de Usuario
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.codigo_usuario || ''}
-                    onChange={(e) => updateField('codigo_usuario', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="USR001"
-                  />
-                </div>
-              </div>
-
-              {/* Observaciones */}
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observaciones
-                </label>
-                <textarea
-                  value={formData.observaciones || ''}
-                  onChange={(e) => updateField('observaciones', e.target.value)}
-                  rows="3"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Observaciones adicionales..."
-                />
               </div>
             </div>
-
-            {/* Debug info - Solo en desarrollo */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-yellow-800 mb-2">🔧 Debug Info</h4>
-                <div className="text-xs text-yellow-700 space-y-1">
-                  <p>Departamentos: {departments?.length || 0}</p>
-                  <p>Ciudades: {cities?.length || 0}</p>
-                  <p>Sectores: {sectors?.length || 0}</p>
-                  <p>Config Loading: {configLoading ? 'Sí' : 'No'}</p>
-                  <p>Form Data Ciudad ID: {formData.ciudad_id || 'vacío'}</p>
-                  <p>Form Data Sector ID: {formData.sector_id || 'vacío'}</p>
-                </div>
-              </div>
-            )}
 
             {/* Botones */}
             <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">

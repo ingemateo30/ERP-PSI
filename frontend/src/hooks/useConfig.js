@@ -1,59 +1,60 @@
-// frontend/src/hooks/useConfig.js - CORREGIDO PARA CIUDADES Y SECTORES
+// frontend/src/hooks/useConfig.js - VERSIÓN ROBUSTA CON MANEJO DE UNDEFINED
 
 import { useState, useEffect, useCallback } from 'react';
 import configService from '../services/configService';
 
 /**
- * Hook personalizado para manejar el estado de configuración del sistema
+ * Hook principal para configuración - VERSIÓN ROBUSTA
  */
 export const useConfig = () => {
+  // Estados principales con valores por defecto seguros
   const [overview, setOverview] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   
-  // Estados adicionales para ciudades y sectores
+  // Estados específicos para geografía con arrays vacíos por defecto
   const [cities, setCities] = useState([]);
   const [sectors, setSectors] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [citiesLoading, setCitiesLoading] = useState(false);
   const [sectorsLoading, setSectorsLoading] = useState(false);
 
-  // Cargar resumen de configuración
-  const loadOverview = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await configService.getConfigOverview();
-      setOverview(response.data);
-      setLastUpdate(new Date());
-      
-      return response.data;
-    } catch (err) {
-      console.error('Error cargando configuración:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
+  // Debug function
+  const logDebug = (message, data) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔍 useConfig: ${message}`, data);
     }
-  }, []);
+  };
 
   // Cargar ciudades
   const loadCities = useCallback(async (departamentoId = null) => {
+    logDebug('Iniciando carga de ciudades', { departamentoId });
+    
     try {
       setCitiesLoading(true);
+      setError(null);
+      
       const response = await configService.getCities(departamentoId, false);
       
-      if (response.success) {
-        setCities(response.data || []);
+      logDebug('Respuesta de getCities', response);
+      
+      if (response && response.success && Array.isArray(response.data)) {
+        const citiesData = response.data;
+        setCities(citiesData);
+        logDebug('Ciudades cargadas exitosamente', { count: citiesData.length });
       } else {
-        console.error('Error cargando ciudades:', response.message);
+        logDebug('Error o datos inválidos de getCities', response);
         setCities([]);
+        if (response && !response.success) {
+          setError(response.message || 'Error cargando ciudades');
+        }
       }
     } catch (err) {
-      console.error('Error cargando ciudades:', err);
+      logDebug('Error en loadCities', err);
+      console.error('❌ Error cargando ciudades:', err);
       setCities([]);
+      setError('Error de conexión al cargar ciudades');
     } finally {
       setCitiesLoading(false);
     }
@@ -61,19 +62,32 @@ export const useConfig = () => {
 
   // Cargar sectores
   const loadSectors = useCallback(async (ciudadId = null) => {
+    logDebug('Iniciando carga de sectores', { ciudadId });
+    
     try {
       setSectorsLoading(true);
-      const response = await configService.getSectors(ciudadId, true, false); // ciudadId, activo, includeStats
+      setError(null);
       
-      if (response.success) {
-        setSectors(response.data || []);
+      const response = await configService.getSectors(ciudadId, true, false);
+      
+      logDebug('Respuesta de getSectors', response);
+      
+      if (response && response.success && Array.isArray(response.data)) {
+        const sectorsData = response.data;
+        setSectors(sectorsData);
+        logDebug('Sectores cargados exitosamente', { count: sectorsData.length });
       } else {
-        console.error('Error cargando sectores:', response.message);
+        logDebug('Error o datos inválidos de getSectors', response);
         setSectors([]);
+        if (response && !response.success) {
+          setError(response.message || 'Error cargando sectores');
+        }
       }
     } catch (err) {
-      console.error('Error cargando sectores:', err);
+      logDebug('Error en loadSectors', err);
+      console.error('❌ Error cargando sectores:', err);
       setSectors([]);
+      setError('Error de conexión al cargar sectores');
     } finally {
       setSectorsLoading(false);
     }
@@ -81,55 +95,141 @@ export const useConfig = () => {
 
   // Cargar departamentos
   const loadDepartments = useCallback(async () => {
+    logDebug('Iniciando carga de departamentos');
+    
     try {
       const response = await configService.getDepartments(false);
       
-      if (response.success) {
-        setDepartments(response.data || []);
+      logDebug('Respuesta de getDepartments', response);
+      
+      if (response && response.success && Array.isArray(response.data)) {
+        const departmentsData = response.data;
+        setDepartments(departmentsData);
+        logDebug('Departamentos cargados exitosamente', { count: departmentsData.length });
       } else {
-        console.error('Error cargando departamentos:', response.message);
+        logDebug('Error o datos inválidos de getDepartments', response);
         setDepartments([]);
       }
     } catch (err) {
-      console.error('Error cargando departamentos:', err);
+      logDebug('Error en loadDepartments', err);
+      console.error('❌ Error cargando departamentos:', err);
       setDepartments([]);
     }
   }, []);
 
-  // Cargar datos iniciales
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        await Promise.all([
-          loadOverview(),
-          loadDepartments(),
-          loadCities(), // Cargar todas las ciudades inicialmente
-          loadSectors() // Cargar todos los sectores inicialmente
-        ]);
-      } catch (error) {
-        console.error('Error cargando datos iniciales:', error);
+  // Cargar resumen de configuración
+  const loadOverview = useCallback(async () => {
+    logDebug('Iniciando carga de overview');
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await configService.getConfigOverview();
+      
+      logDebug('Respuesta de getConfigOverview', response);
+      
+      if (response && response.success) {
+        const overviewData = response.data || {};
+        setOverview(overviewData);
+        setLastUpdate(new Date());
+        logDebug('Overview cargado exitosamente', overviewData);
+      } else {
+        logDebug('Error en getConfigOverview', response);
+        setError(response?.message || 'Error cargando configuración');
+        // Establecer overview por defecto para evitar crashes
+        setOverview({
+          empresa_configurada: false,
+          configuracion_completa: false,
+          porcentaje_completado: 0,
+          contadores: {
+            departamentos: 0,
+            ciudades: 0,
+            sectores_activos: 0,
+            bancos_activos: 0,
+            planes_activos: 0,
+            conceptos_activos: 0
+          }
+        });
       }
+    } catch (err) {
+      logDebug('Error en loadOverview', err);
+      console.error('❌ Error cargando overview:', err);
+      setError('Error de conexión al cargar configuración');
+      // Establecer overview por defecto para evitar crashes
+      setOverview({
+        empresa_configurada: false,
+        configuracion_completa: false,
+        porcentaje_completado: 0,
+        contadores: {
+          departamentos: 0,
+          ciudades: 0,
+          sectores_activos: 0,
+          bancos_activos: 0,
+          planes_activos: 0,
+          conceptos_activos: 0
+        }
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Función para cargar todo inicialmente
+  const loadAllData = useCallback(async () => {
+    logDebug('Cargando todos los datos iniciales');
+    
+    try {
+      // Cargar datos geográficos en paralelo
+      await Promise.allSettled([
+        loadDepartments(),
+        loadCities(),
+        loadSectors()
+      ]);
+      
+      // Cargar overview después
+      await loadOverview();
+      
+      logDebug('Carga de datos completada');
+    } catch (error) {
+      logDebug('Error cargando datos iniciales', error);
+      console.error('❌ Error cargando datos iniciales:', error);
+    }
+  }, [loadDepartments, loadCities, loadSectors, loadOverview]);
+
+  // Efecto para cargar datos al montar el componente
+  useEffect(() => {
+    logDebug('useConfig montado, iniciando carga de datos');
+    loadAllData();
+  }, [loadAllData]);
+
+  // Función de refresh
+  const refresh = useCallback(async () => {
+    logDebug('Refrescando todos los datos');
+    await loadAllData();
+  }, [loadAllData]);
+
+  // Funciones de utilidad con valores seguros
+  const isConfigComplete = Boolean(overview?.configuracion_completa);
+  const isCompanyConfigured = Boolean(overview?.empresa_configurada);
+
+  const getCounters = useCallback(() => {
+    const contadores = overview?.contadores || {};
+    return {
+      departamentos: Number(contadores.departamentos) || 0,
+      ciudades: Number(contadores.ciudades) || 0,
+      sectores_activos: Number(contadores.sectores_activos) || 0,
+      bancos_activos: Number(contadores.bancos_activos) || 0,
+      planes_activos: Number(contadores.planes_activos) || 0,
+      conceptos_activos: Number(contadores.conceptos_activos) || 0
     };
+  }, [overview]);
 
-    loadInitialData();
-  }, [loadOverview, loadDepartments, loadCities, loadSectors]);
-
-  // Función para refrescar la configuración
-  const refresh = useCallback(() => {
-    return loadOverview();
-  }, [loadOverview]);
-
-  // Verificar si la configuración está completa
-  const isConfigComplete = overview?.configuracion_completa || false;
-
-  // Verificar si la empresa está configurada
-  const isCompanyConfigured = overview?.empresa_configurada || false;
-
-  // Obtener tareas pendientes de configuración
   const getPendingTasks = useCallback(() => {
-    if (!overview) return [];
+    if (!overview || !overview.contadores) return [];
     
     const tasks = [];
+    const contadores = overview.contadores;
     
     // Verificar configuración de empresa
     if (!overview.empresa_configurada) {
@@ -145,7 +245,7 @@ export const useConfig = () => {
     }
     
     // Verificar bancos
-    if ((overview.contadores?.bancos_activos || 0) === 0) {
+    if ((contadores.bancos_activos || 0) === 0) {
       tasks.push({
         id: 'banks',
         title: 'Agregar Bancos',
@@ -158,7 +258,7 @@ export const useConfig = () => {
     }
     
     // Verificar geografía
-    if ((overview.contadores?.sectores_activos || 0) === 0) {
+    if ((contadores.sectores_activos || 0) === 0) {
       tasks.push({
         id: 'geography',
         title: 'Configurar Geografía',
@@ -171,7 +271,7 @@ export const useConfig = () => {
     }
     
     // Verificar planes de servicio
-    if ((overview.contadores?.planes_activos || 0) === 0) {
+    if ((contadores.planes_activos || 0) === 0) {
       tasks.push({
         id: 'service-plans',
         title: 'Crear Planes de Servicio',
@@ -186,7 +286,6 @@ export const useConfig = () => {
     return tasks;
   }, [overview]);
 
-  // Obtener estadísticas de configuración
   const getConfigStats = useCallback(() => {
     if (!overview) return null;
     
@@ -207,19 +306,6 @@ export const useConfig = () => {
     };
   }, [overview]);
 
-  // Obtener contadores de configuración
-  const getCounters = useCallback(() => {
-    return {
-      departamentos: overview?.contadores?.departamentos || 0,
-      ciudades: overview?.contadores?.ciudades || 0,
-      sectores_activos: overview?.contadores?.sectores_activos || 0,
-      bancos_activos: overview?.contadores?.bancos_activos || 0,
-      planes_activos: overview?.contadores?.planes_activos || 0,
-      conceptos_activos: overview?.contadores?.conceptos_activos || 0
-    };
-  }, [overview]);
-
-  // Verificar si una funcionalidad específica está habilitada
   const isFeatureEnabled = useCallback((feature) => {
     const counters = getCounters();
     
@@ -237,7 +323,6 @@ export const useConfig = () => {
     }
   }, [isCompanyConfigured, getCounters]);
 
-  // Obtener recomendaciones de configuración
   const getRecommendations = useCallback(() => {
     const tasks = getPendingTasks();
     const recommendations = [];
@@ -269,6 +354,27 @@ export const useConfig = () => {
     return recommendations;
   }, [getPendingTasks]);
 
+  // Asegurar que siempre devolvemos arrays
+  const safeCities = Array.isArray(cities) ? cities : [];
+  const safeSectors = Array.isArray(sectors) ? sectors : [];
+  const safeDepartments = Array.isArray(departments) ? departments : [];
+
+  // Debug del estado actual
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      logDebug('Estado actual del hook', {
+        overview: !!overview,
+        citiesCount: safeCities.length,
+        sectorsCount: safeSectors.length,
+        departmentsCount: safeDepartments.length,
+        loading,
+        error,
+        isConfigComplete,
+        isCompanyConfigured
+      });
+    }
+  }, [overview, safeCities, safeSectors, safeDepartments, loading, error, isConfigComplete, isCompanyConfigured]);
+
   return {
     // Datos principales
     overview,
@@ -276,10 +382,10 @@ export const useConfig = () => {
     error,
     lastUpdate,
     
-    // Datos geográficos específicos
-    cities,
-    sectors,
-    departments,
+    // Datos geográficos específicos (siempre arrays)
+    cities: safeCities,
+    sectors: safeSectors,
+    departments: safeDepartments,
     citiesLoading,
     sectorsLoading,
     
@@ -287,7 +393,7 @@ export const useConfig = () => {
     isConfigComplete,
     isCompanyConfigured,
     
-    // Funciones de utilidad
+    // Funciones
     refresh,
     loadCities,
     loadSectors,
@@ -298,7 +404,7 @@ export const useConfig = () => {
     isFeatureEnabled,
     getRecommendations,
     
-    // Datos computados
+    // Datos computados (siempre definidos)
     pendingTasks: getPendingTasks(),
     configStats: getConfigStats(),
     counters: getCounters(),
@@ -307,7 +413,7 @@ export const useConfig = () => {
 };
 
 /**
- * Hook para manejar configuración específica de empresa
+ * Hook simplificado para configuración de empresa
  */
 export const useCompanyConfig = () => {
   const [config, setConfig] = useState(null);
@@ -321,13 +427,14 @@ export const useCompanyConfig = () => {
       setError(null);
       
       const response = await configService.getCompanyConfig();
-      setConfig(response.data?.config || null);
-      
-      return response.data?.config;
+      if (response && response.success) {
+        setConfig(response.data?.config || null);
+      } else {
+        setError(response?.message || 'Error cargando configuración');
+      }
     } catch (err) {
       console.error('Error cargando configuración de empresa:', err);
-      setError(err.message);
-      throw err;
+      setError('Error de conexión');
     } finally {
       setLoading(false);
     }
@@ -339,12 +446,16 @@ export const useCompanyConfig = () => {
       setError(null);
       
       const response = await configService.updateCompanyConfig(newConfig);
-      setConfig(response.data?.config || newConfig);
-      
-      return response.data?.config;
+      if (response && response.success) {
+        setConfig(response.data?.config || newConfig);
+        return response;
+      } else {
+        setError(response?.message || 'Error actualizando configuración');
+        throw new Error(response?.message || 'Error actualizando configuración');
+      }
     } catch (err) {
       console.error('Error actualizando configuración de empresa:', err);
-      setError(err.message);
+      setError('Error de conexión');
       throw err;
     } finally {
       setSaving(false);
@@ -362,7 +473,7 @@ export const useCompanyConfig = () => {
     saving,
     loadConfig,
     updateConfig,
-    isConfigured: config && config.empresa_nombre && config.empresa_nit
+    isConfigured: Boolean(config && config.empresa_nombre && config.empresa_nit)
   };
 };
 
@@ -370,14 +481,14 @@ export const useCompanyConfig = () => {
  * Hook para notificaciones de configuración
  */
 export const useConfigNotifications = () => {
-  const { pendingTasks, isConfigComplete, overview } = useConfig();
+  const { pendingTasks = [], isConfigComplete, overview } = useConfig();
   const [dismissed, setDismissed] = useState(new Set());
 
   // Obtener notificaciones activas
   const getNotifications = useCallback(() => {
     const notifications = [];
     
-    if (!isConfigComplete && pendingTasks.length > 0) {
+    if (!isConfigComplete && Array.isArray(pendingTasks) && pendingTasks.length > 0) {
       const highPriorityTasks = pendingTasks.filter(task => 
         task.priority === 'high' && !dismissed.has(task.id)
       );

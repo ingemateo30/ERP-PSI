@@ -1,3 +1,5 @@
+// backend/controllers/clienteController.js - VERSIÓN SIMPLIFICADA PARA DEBUG
+
 const Cliente = require('../models/cliente');
 
 class ClienteController {
@@ -92,25 +94,61 @@ class ClienteController {
     }
   }
 
-  // Crear nuevo cliente
+  // Crear nuevo cliente - VERSIÓN SIMPLIFICADA
   static async crear(req, res) {
     try {
-      // Validaciones básicas
+      console.log('🔍 DEBUG - Crear Cliente');
+      console.log('Body recibido:', JSON.stringify(req.body, null, 2));
+
+      // Validaciones básicas mínimas
       const { identificacion, nombre, direccion } = req.body;
       
       if (!identificacion || !nombre || !direccion) {
+        console.log('❌ Faltan campos requeridos:', { identificacion: !!identificacion, nombre: !!nombre, direccion: !!direccion });
         return res.status(400).json({
           success: false,
-          message: 'Identificación, nombre y dirección son requeridos'
+          message: 'Identificación, nombre y dirección son requeridos',
+          received: {
+            identificacion: !!identificacion,
+            nombre: !!nombre,
+            direccion: !!direccion
+          }
         });
       }
 
+      // Preparar datos con valores por defecto seguros
       const datosCliente = {
-        ...req.body,
-        created_by: req.user?.id // ID del usuario autenticado
+        identificacion: identificacion.toString().trim(),
+        tipo_documento: req.body.tipo_documento || 'cedula',
+        nombre: nombre.toString().trim(),
+        direccion: direccion.toString().trim(),
+        sector_id: req.body.sector_id ? parseInt(req.body.sector_id) : null,
+        estrato: req.body.estrato || null,
+        barrio: req.body.barrio || null,
+        ciudad_id: req.body.ciudad_id ? parseInt(req.body.ciudad_id) : null,
+        telefono: req.body.telefono || null,
+        telefono_2: req.body.telefono_2 || null,
+        correo: req.body.correo || null,
+        fecha_registro: req.body.fecha_registro || new Date().toISOString().split('T')[0],
+        fecha_hasta: req.body.fecha_hasta || null,
+        estado: req.body.estado || 'activo',
+        mac_address: req.body.mac_address || null,
+        ip_asignada: req.body.ip_asignada || null,
+        tap: req.body.tap || null,
+        poste: req.body.poste || null,
+        contrato: req.body.contrato || null,
+        ruta: req.body.ruta || null,
+        requiere_reconexion: req.body.requiere_reconexion ? 1 : 0,
+        codigo_usuario: req.body.codigo_usuario || null,
+        observaciones: req.body.observaciones || null,
+        created_by: req.user?.id || 1 // ID del usuario autenticado
       };
 
+      console.log('📤 Datos a enviar al modelo:', JSON.stringify(datosCliente, null, 2));
+
       const nuevoCliente = await Cliente.crear(datosCliente);
+
+      console.log('✅ Cliente creado exitosamente:', nuevoCliente.id);
 
       res.status(201).json({
         success: true,
@@ -118,7 +156,7 @@ class ClienteController {
         data: nuevoCliente
       });
     } catch (error) {
-      console.error('Error al crear cliente:', error);
+      console.error('❌ Error al crear cliente:', error);
       
       if (error.message.includes('Ya existe un cliente')) {
         return res.status(409).json({
@@ -130,15 +168,20 @@ class ClienteController {
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',
-        error: error.message
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }
   }
 
-  // Actualizar cliente
+  // Actualizar cliente - VERSIÓN SIMPLIFICADA
   static async actualizar(req, res) {
     try {
       const { id } = req.params;
+      
+      console.log('🔍 DEBUG - Actualizar Cliente');
+      console.log('ID:', id);
+      console.log('Body recibido:', JSON.stringify(req.body, null, 2));
       
       if (!id || isNaN(id)) {
         return res.status(400).json({
@@ -147,7 +190,34 @@ class ClienteController {
         });
       }
 
-      const clienteActualizado = await Cliente.actualizar(id, req.body);
+      // Limpiar datos de entrada - solo incluir campos que no estén vacíos
+      const datosLimpios = {};
+      
+      Object.keys(req.body).forEach(key => {
+        const value = req.body[key];
+        
+        // Solo incluir valores no vacíos
+        if (value !== null && value !== undefined && value !== '') {
+          if (key === 'sector_id' || key === 'ciudad_id') {
+            const numValue = parseInt(value);
+            if (!isNaN(numValue) && numValue > 0) {
+              datosLimpios[key] = numValue;
+            }
+          } else if (key === 'requiere_reconexion') {
+            datosLimpios[key] = value ? 1 : 0;
+          } else if (typeof value === 'string') {
+            datosLimpios[key] = value.trim();
+          } else {
+            datosLimpios[key] = value;
+          }
+        }
+      });
+
+      console.log('📤 Datos limpios para actualizar:', JSON.stringify(datosLimpios, null, 2));
+
+      const clienteActualizado = await Cliente.actualizar(id, datosLimpios);
+
+      console.log('✅ Cliente actualizado exitosamente');
 
       res.json({
         success: true,
@@ -155,7 +225,7 @@ class ClienteController {
         data: clienteActualizado
       });
     } catch (error) {
-      console.error('Error al actualizar cliente:', error);
+      console.error('❌ Error al actualizar cliente:', error);
       
       if (error.message.includes('no encontrado')) {
         return res.status(404).json({
@@ -174,7 +244,8 @@ class ClienteController {
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',
-        error: error.message
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }
   }
