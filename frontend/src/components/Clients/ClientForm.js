@@ -27,13 +27,13 @@ const ClientForm = ({ client, onClose, onSave }) => {
   } = useClientForm(client);
 
   // Usar el hook de configuración
-  const { 
-    sectors = [], 
-    cities = [], 
-    departments = [], 
-    loading: configLoading, 
-    loadCities, 
-    loadSectors 
+  const {
+    sectors = [],
+    cities = [],
+    departments = [],
+    loading: configLoading,
+    loadCities,
+    loadSectors
   } = useConfig();
 
   const [saving, setSaving] = useState(false);
@@ -74,7 +74,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
           logDebug('Validando identificación', formData.identificacion);
           const response = await clientService.validateIdentification(formData.identificacion);
           logDebug('Respuesta validación ID', response);
-          
+
           if (response.success) {
             setIdValidation(response.data.existe ? 'exists' : 'available');
           }
@@ -96,16 +96,16 @@ const ClientForm = ({ client, onClose, onSave }) => {
   const prepareFormData = () => {
     // Limpiar datos nulos y undefined
     const cleanData = {};
-    
+
     Object.keys(formData).forEach(key => {
       const value = formData[key];
-      
+
       // Convertir valores apropiadamente
       if (value === null || value === undefined || value === '') {
         // No incluir campos vacíos
         return;
       }
-      
+
       // Conversiones específicas
       if (key === 'sector_id' || key === 'ciudad_id') {
         const numValue = parseInt(value);
@@ -128,11 +128,11 @@ const ClientForm = ({ client, onClose, onSave }) => {
     if (!cleanData.tipo_documento) {
       cleanData.tipo_documento = 'cedula';
     }
-    
+
     if (!cleanData.estado) {
       cleanData.estado = 'activo';
     }
-    
+
     if (!cleanData.fecha_registro) {
       cleanData.fecha_registro = new Date().toISOString().split('T')[0];
     }
@@ -164,7 +164,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
     setSaving(true);
     try {
       const dataToSend = prepareFormData();
-      
+
       logDebug('Enviando datos al backend', dataToSend);
 
       let response;
@@ -206,7 +206,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
             <h2 className="text-xl font-semibold text-gray-900">
               {isEditing ? 'Editar Cliente' : 'Nuevo Cliente'}
             </h2>
-            
+
             {debugMode && (
               <button
                 type="button"
@@ -217,7 +217,7 @@ const ClientForm = ({ client, onClose, onSave }) => {
               </button>
             )}
           </div>
-          
+
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 p-1"
@@ -248,13 +248,13 @@ const ClientForm = ({ client, onClose, onSave }) => {
                   <div>
                     <strong>Datos Geografía:</strong>
                     <pre className="mt-1 text-xs bg-white p-2 rounded">
-{`Ciudades: ${cities.length}
+                      {`Ciudades: ${cities.length}
 Sectores: ${sectors.length}
 Config Loading: ${configLoading}`}
                     </pre>
                   </div>
                 </div>
-                
+
                 <button
                   type="button"
                   onClick={() => logDebug('Estado actual completo', { formData, errors, cities, sectors })}
@@ -301,12 +301,11 @@ Config Loading: ${configLoading}`}
                       type="text"
                       value={formData.identificacion || ''}
                       onChange={(e) => updateField('identificacion', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.identificacion ? 'border-red-300' :
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.identificacion ? 'border-red-300' :
                         idValidation === 'exists' ? 'border-red-300' :
-                        idValidation === 'available' ? 'border-green-300' :
-                        'border-gray-300'
-                      }`}
+                          idValidation === 'available' ? 'border-green-300' :
+                            'border-gray-300'
+                        }`}
                       placeholder="Número de identificación"
                       required
                     />
@@ -341,9 +340,8 @@ Config Loading: ${configLoading}`}
                     type="text"
                     value={formData.nombre || ''}
                     onChange={(e) => updateField('nombre', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.nombre ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.nombre ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="Nombre completo del cliente"
                     required
                   />
@@ -370,9 +368,8 @@ Config Loading: ${configLoading}`}
                     type="tel"
                     value={formData.telefono || ''}
                     onChange={(e) => handlePhoneChange('telefono', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.telefono ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.telefono ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="3001234567"
                     maxLength="10"
                   />
@@ -405,9 +402,8 @@ Config Loading: ${configLoading}`}
                     type="email"
                     value={formData.correo || ''}
                     onChange={(e) => updateField('correo', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.correo ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.correo ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="cliente@email.com"
                   />
                   {errors.correo && (
@@ -433,9 +429,8 @@ Config Loading: ${configLoading}`}
                     value={formData.direccion || ''}
                     onChange={(e) => updateField('direccion', e.target.value)}
                     rows="2"
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.direccion ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.direccion ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="Dirección completa de instalación"
                     required
                   />
