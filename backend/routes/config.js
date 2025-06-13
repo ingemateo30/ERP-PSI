@@ -59,12 +59,12 @@ router.use(authenticateToken);
 router.get('/overview', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('📊 GET /config/overview');
-    
+
     const connection = await Database.query('SELECT 1');
-    
+
     // Configuración básica
     const [company] = await Database.query('SELECT * FROM configuracion_empresa LIMIT 1');
-    
+
     // Conteos básicos
     const [counts] = await Database.query(`
       SELECT 
@@ -85,7 +85,7 @@ router.get('/overview', requireRole('administrador', 'supervisor'), async (req, 
     // Verificar nivel de configuración
     const isConfigured = company && company.empresa_nombre && company.empresa_nit;
     const stats = counts;
-    
+
     // Calcular nivel de completitud
     const configurationItems = {
       empresa: isConfigured,
@@ -99,7 +99,7 @@ router.get('/overview', requireRole('administrador', 'supervisor'), async (req, 
     const completedItems = Object.values(configurationItems).filter(Boolean).length;
     const totalItems = Object.keys(configurationItems).length;
     const completionPercentage = Math.round((completedItems / totalItems) * 100);
-    
+
     res.json({
       success: true,
       message: 'Resumen de configuración obtenido exitosamente',
@@ -122,7 +122,7 @@ router.get('/overview', requireRole('administrador', 'supervisor'), async (req, 
       },
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('❌ Error en overview:', error);
     res.status(500).json({
@@ -141,7 +141,7 @@ router.get('/overview', requireRole('administrador', 'supervisor'), async (req, 
 router.get('/health', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('🏥 GET /config/health');
-    
+
     // Verificaciones de salud del sistema
     const healthChecks = {
       database: false,
@@ -177,7 +177,7 @@ router.get('/health', requireRole('administrador', 'supervisor'), async (req, re
         (SELECT COUNT(*) FROM ciudades) as cities,
         (SELECT COUNT(*) FROM sectores WHERE activo = 1) as sectors
     `);
-    
+
     if (geoCounts.deps > 0 && geoCounts.cities > 0 && geoCounts.sectors > 0) {
       healthChecks.geography = true;
     } else {
@@ -211,10 +211,10 @@ router.get('/health', requireRole('administrador', 'supervisor'), async (req, re
     const healthyItems = Object.values(healthChecks).filter(Boolean).length;
     const totalItems = Object.keys(healthChecks).length;
     const healthPercentage = Math.round((healthyItems / totalItems) * 100);
-    
-    const overallHealth = healthPercentage === 100 ? 'excelente' : 
-                         healthPercentage >= 80 ? 'bueno' : 
-                         healthPercentage >= 60 ? 'regular' : 'crítico';
+
+    const overallHealth = healthPercentage === 100 ? 'excelente' :
+      healthPercentage >= 80 ? 'bueno' :
+        healthPercentage >= 60 ? 'regular' : 'crítico';
 
     res.json({
       success: true,
@@ -228,7 +228,7 @@ router.get('/health', requireRole('administrador', 'supervisor'), async (req, re
         timestamp: new Date().toISOString()
       }
     });
-    
+
   } catch (error) {
     console.error('❌ Error verificando salud del sistema:', error);
     res.status(500).json({
@@ -247,7 +247,7 @@ router.get('/health', requireRole('administrador', 'supervisor'), async (req, re
 router.get('/stats', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('📈 GET /config/stats');
-    
+
     const [stats] = await Database.query(`
       SELECT 
         (SELECT COUNT(*) FROM departamentos) as departamentos,
@@ -263,7 +263,7 @@ router.get('/stats', requireRole('administrador', 'supervisor'), async (req, res
       data: stats,
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('❌ Error obteniendo estadísticas:', error);
     res.status(500).json({
@@ -286,16 +286,16 @@ router.get('/stats', requireRole('administrador', 'supervisor'), async (req, res
 router.get('/departments', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('🏛️ GET /config/departments');
-    
+
     const departments = await Database.query('SELECT * FROM departamentos ORDER BY nombre ASC');
-    
+
     res.json({
       success: true,
       data: departments,
       count: departments.length,
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('❌ Error obteniendo departamentos:', error);
     res.status(500).json({
@@ -308,15 +308,196 @@ router.get('/departments', requireRole('administrador', 'supervisor'), async (re
 });
 
 /**
+ * @route POST /api/v1/config/departments
+ * @desc Crear departamento
+ */
+router.post('/departments', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🏛️ POST /config/departments');
+
+    const { codigo, nombre } = req.body;
+
+    if (!codigo || !nombre) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código y nombre son requeridos'
+      });
+    }
+
+    // Verificar si ya existe
+    const existing = await Database.query(
+      'SELECT id FROM departamentos WHERE codigo = ? OR nombre = ?',
+      [codigo, nombre]
+    );
+
+    if (existing.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Ya existe un departamento con ese código o nombre'
+      });
+    }
+
+    // Crear departamento
+    const result = await Database.query(
+      'INSERT INTO departamentos (codigo, nombre) VALUES (?, ?)',
+      [codigo.trim(), nombre.trim()]
+    );
+
+    // Obtener el departamento creado
+    const [created] = await Database.query(
+      'SELECT * FROM departamentos WHERE id = ?',
+      [result.insertId]
+    );
+
+    res.status(201).json({
+      success: true,
+      data: created,
+      message: 'Departamento creado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error creando departamento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route PUT /api/v1/config/departments/:id
+ * @desc Actualizar departamento
+ */
+router.put('/departments/:id', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🏛️ PUT /config/departments/:id');
+
+    const { id } = req.params;
+    const { codigo, nombre } = req.body;
+
+    if (!codigo || !nombre) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código y nombre son requeridos'
+      });
+    }
+
+    // Verificar si existe
+    const existing = await Database.query(
+      'SELECT id FROM departamentos WHERE id = ?',
+      [id]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Departamento no encontrado'
+      });
+    }
+
+    // Verificar duplicados
+    const duplicates = await Database.query(
+      'SELECT id FROM departamentos WHERE (codigo = ? OR nombre = ?) AND id != ?',
+      [codigo, nombre, id]
+    );
+
+    if (duplicates.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Ya existe otro departamento con ese código o nombre'
+      });
+    }
+
+    // Actualizar
+    await Database.query(
+      'UPDATE departamentos SET codigo = ?, nombre = ? WHERE id = ?',
+      [codigo.trim(), nombre.trim(), id]
+    );
+
+    // Obtener el departamento actualizado
+    const [updated] = await Database.query(
+      'SELECT * FROM departamentos WHERE id = ?',
+      [id]
+    );
+
+    res.json({
+      success: true,
+      data: updated,
+      message: 'Departamento actualizado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error actualizando departamento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/v1/config/departments/:id
+ * @desc Eliminar departamento
+ */
+router.delete('/departments/:id', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🏛️ DELETE /config/departments/:id');
+
+    const { id } = req.params;
+
+    // Verificar si tiene ciudades asociadas
+    const [cities] = await Database.query(
+      'SELECT COUNT(*) as count FROM ciudades WHERE departamento_id = ?',
+      [id]
+    );
+
+    if (cities.count > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'No se puede eliminar un departamento que tiene ciudades asociadas'
+      });
+    }
+
+    // Eliminar
+    const result = await Database.query(
+      'DELETE FROM departamentos WHERE id = ?',
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Departamento no encontrado'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Departamento eliminado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error eliminando departamento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
  * @route GET /api/v1/config/cities
  * @desc Obtener ciudades con filtros opcionales
  */
 router.get('/cities', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('🏙️ GET /config/cities');
-    
+
     const { departamento_id, includeStats } = req.query;
-    
+
     let query = `
       SELECT 
         c.*,
@@ -324,14 +505,14 @@ router.get('/cities', requireRole('administrador', 'supervisor'), async (req, re
       FROM ciudades c
       LEFT JOIN departamentos d ON c.departamento_id = d.id
     `;
-    
+
     const params = [];
-    
+
     if (departamento_id) {
       query += ' WHERE c.departamento_id = ?';
       params.push(departamento_id);
     }
-    
+
     query += ' ORDER BY c.nombre ASC';
 
     const cities = await Database.query(query, params);
@@ -345,7 +526,7 @@ router.get('/cities', requireRole('administrador', 'supervisor'), async (req, re
       filters: { departamento_id },
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('❌ Error obteniendo ciudades:', error);
     res.status(500).json({
@@ -358,15 +539,228 @@ router.get('/cities', requireRole('administrador', 'supervisor'), async (req, re
 });
 
 /**
+ * @route POST /api/v1/config/cities
+ * @desc Crear ciudad
+ */
+router.post('/cities', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🏙️ POST /config/cities');
+
+    const { departamento_id, codigo, nombre } = req.body;
+
+    if (!departamento_id || !codigo || !nombre) {
+      return res.status(400).json({
+        success: false,
+        message: 'Departamento, código y nombre son requeridos'
+      });
+    }
+
+    // Verificar si el departamento existe
+    const dept = await Database.query(
+      'SELECT id FROM departamentos WHERE id = ?',
+      [departamento_id]
+    );
+
+    if (dept.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'El departamento especificado no existe'
+      });
+    }
+
+    // Verificar duplicados
+    const existing = await Database.query(
+      'SELECT id FROM ciudades WHERE codigo = ? OR nombre = ?',
+      [codigo, nombre]
+    );
+
+    if (existing.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Ya existe una ciudad con ese código o nombre'
+      });
+    }
+
+    // Crear ciudad
+    const result = await Database.query(
+      'INSERT INTO ciudades (departamento_id, codigo, nombre) VALUES (?, ?, ?)',
+      [departamento_id, codigo.trim(), nombre.trim()]
+    );
+
+    // Obtener la ciudad creada con información del departamento
+    const [created] = await Database.query(
+      `SELECT c.*, d.nombre as departamento_nombre 
+       FROM ciudades c 
+       LEFT JOIN departamentos d ON c.departamento_id = d.id 
+       WHERE c.id = ?`,
+      [result.insertId]
+    );
+
+    res.status(201).json({
+      success: true,
+      data: created,
+      message: 'Ciudad creada exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error creando ciudad:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route PUT /api/v1/config/cities/:id
+ * @desc Actualizar ciudad
+ */
+router.put('/cities/:id', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🏙️ PUT /config/cities/:id');
+
+    const { id } = req.params;
+    const { departamento_id, codigo, nombre } = req.body;
+
+    if (!departamento_id || !codigo || !nombre) {
+      return res.status(400).json({
+        success: false,
+        message: 'Departamento, código y nombre son requeridos'
+      });
+    }
+
+    // Verificar si la ciudad existe
+    const existing = await Database.query(
+      'SELECT id FROM ciudades WHERE id = ?',
+      [id]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ciudad no encontrada'
+      });
+    }
+
+    // Verificar si el departamento existe
+    const dept = await Database.query(
+      'SELECT id FROM departamentos WHERE id = ?',
+      [departamento_id]
+    );
+
+    if (dept.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'El departamento especificado no existe'
+      });
+    }
+
+    // Verificar duplicados
+    const duplicates = await Database.query(
+      'SELECT id FROM ciudades WHERE (codigo = ? OR nombre = ?) AND id != ?',
+      [codigo, nombre, id]
+    );
+
+    if (duplicates.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Ya existe otra ciudad con ese código o nombre'
+      });
+    }
+
+    // Actualizar
+    await Database.query(
+      'UPDATE ciudades SET departamento_id = ?, codigo = ?, nombre = ? WHERE id = ?',
+      [departamento_id, codigo.trim(), nombre.trim(), id]
+    );
+
+    // Obtener la ciudad actualizada
+    const [updated] = await Database.query(
+      `SELECT c.*, d.nombre as departamento_nombre 
+       FROM ciudades c 
+       LEFT JOIN departamentos d ON c.departamento_id = d.id 
+       WHERE c.id = ?`,
+      [id]
+    );
+
+    res.json({
+      success: true,
+      data: updated,
+      message: 'Ciudad actualizada exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error actualizando ciudad:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/v1/config/cities/:id
+ * @desc Eliminar ciudad
+ */
+router.delete('/cities/:id', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🏙️ DELETE /config/cities/:id');
+
+    const { id } = req.params;
+
+    // Verificar si tiene sectores asociados
+    const [sectors] = await Database.query(
+      'SELECT COUNT(*) as count FROM sectores WHERE ciudad_id = ?',
+      [id]
+    );
+
+    if (sectors.count > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'No se puede eliminar una ciudad que tiene sectores asociados'
+      });
+    }
+
+    // Eliminar
+    const result = await Database.query(
+      'DELETE FROM ciudades WHERE id = ?',
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ciudad no encontrada'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Ciudad eliminada exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error eliminando ciudad:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
  * @route GET /api/v1/config/sectors
  * @desc Obtener sectores con filtros opcionales
  */
 router.get('/sectors', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('🏘️ GET /config/sectors');
-    
+
     const { ciudad_id, activo, includeStats } = req.query;
-    
+
     let query = `
       SELECT 
         s.*,
@@ -377,19 +771,19 @@ router.get('/sectors', requireRole('administrador', 'supervisor'), async (req, r
       LEFT JOIN departamentos d ON c.departamento_id = d.id
       WHERE 1=1
     `;
-    
+
     const params = [];
-    
+
     if (ciudad_id) {
       query += ' AND s.ciudad_id = ?';
       params.push(ciudad_id);
     }
-    
+
     if (activo !== undefined) {
       query += ' AND s.activo = ?';
       params.push(activo === 'true' ? 1 : 0);
     }
-    
+
     query += ' ORDER BY s.codigo ASC';
 
     const sectors = await Database.query(query, params);
@@ -403,7 +797,7 @@ router.get('/sectors', requireRole('administrador', 'supervisor'), async (req, r
       filters: { ciudad_id, activo },
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('❌ Error obteniendo sectores:', error);
     res.status(500).json({
@@ -416,23 +810,299 @@ router.get('/sectors', requireRole('administrador', 'supervisor'), async (req, r
 });
 
 /**
+ * @route POST /api/v1/config/sectors
+ * @desc Crear sector
+ */
+router.post('/sectors', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🏘️ POST /config/sectors');
+
+    const { ciudad_id, codigo, nombre, activo = true } = req.body;
+
+    if (!codigo || !nombre) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código y nombre son requeridos'
+      });
+    }
+
+    // Verificar si la ciudad existe (si se especifica)
+    if (ciudad_id) {
+      const city = await Database.query(
+        'SELECT id FROM ciudades WHERE id = ?',
+        [ciudad_id]
+      );
+
+      if (city.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'La ciudad especificada no existe'
+        });
+      }
+    }
+
+    // Verificar duplicados
+    const existing = await Database.query(
+      'SELECT id FROM sectores WHERE codigo = ?',
+      [codigo]
+    );
+
+    if (existing.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Ya existe un sector con ese código'
+      });
+    }
+
+    // Crear sector
+    const result = await Database.query(
+      'INSERT INTO sectores (ciudad_id, codigo, nombre, activo) VALUES (?, ?, ?, ?)',
+      [ciudad_id || null, codigo.trim(), nombre.trim(), activo ? 1 : 0]
+    );
+
+    // Obtener el sector creado con información relacionada
+    const [created] = await Database.query(
+      `SELECT s.*, c.nombre as ciudad_nombre, d.nombre as departamento_nombre
+       FROM sectores s
+       LEFT JOIN ciudades c ON s.ciudad_id = c.id
+       LEFT JOIN departamentos d ON c.departamento_id = d.id
+       WHERE s.id = ?`,
+      [result.insertId]
+    );
+
+    res.status(201).json({
+      success: true,
+      data: created,
+      message: 'Sector creado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error creando sector:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route PUT /api/v1/config/sectors/:id
+ * @desc Actualizar sector
+ */
+router.put('/sectors/:id', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🏘️ PUT /config/sectors/:id');
+
+    const { id } = req.params;
+    const { ciudad_id, codigo, nombre, activo } = req.body;
+
+    if (!codigo || !nombre) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código y nombre son requeridos'
+      });
+    }
+
+    // Verificar si el sector existe
+    const existing = await Database.query(
+      'SELECT id FROM sectores WHERE id = ?',
+      [id]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sector no encontrado'
+      });
+    }
+
+    // Verificar si la ciudad existe (si se especifica)
+    if (ciudad_id) {
+      const city = await Database.query(
+        'SELECT id FROM ciudades WHERE id = ?',
+        [ciudad_id]
+      );
+
+      if (city.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'La ciudad especificada no existe'
+        });
+      }
+    }
+
+    // Verificar duplicados
+    const duplicates = await Database.query(
+      'SELECT id FROM sectores WHERE codigo = ? AND id != ?',
+      [codigo, id]
+    );
+
+    if (duplicates.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Ya existe otro sector con ese código'
+      });
+    }
+
+    // Actualizar
+    await Database.query(
+      'UPDATE sectores SET ciudad_id = ?, codigo = ?, nombre = ?, activo = ? WHERE id = ?',
+      [ciudad_id || null, codigo.trim(), nombre.trim(), activo ? 1 : 0, id]
+    );
+
+    // Obtener el sector actualizado
+    const [updated] = await Database.query(
+      `SELECT s.*, c.nombre as ciudad_nombre, d.nombre as departamento_nombre
+       FROM sectores s
+       LEFT JOIN ciudades c ON s.ciudad_id = c.id
+       LEFT JOIN departamentos d ON c.departamento_id = d.id
+       WHERE s.id = ?`,
+      [id]
+    );
+
+    res.json({
+      success: true,
+      data: updated,
+      message: 'Sector actualizado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error actualizando sector:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/v1/config/sectors/:id
+ * @desc Eliminar sector
+ */
+router.delete('/sectors/:id', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🏘️ DELETE /config/sectors/:id');
+
+    const { id } = req.params;
+
+    // Verificar si tiene clientes asociados
+    const [clients] = await Database.query(
+      'SELECT COUNT(*) as count FROM clientes WHERE sector_id = ?',
+      [id]
+    );
+
+    if (clients.count > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'No se puede eliminar un sector que tiene clientes asociados'
+      });
+    }
+
+    // Eliminar
+    const result = await Database.query(
+      'DELETE FROM sectores WHERE id = ?',
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sector no encontrado'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Sector eliminado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error eliminando sector:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route POST /api/v1/config/sectors/:id/toggle
+ * @desc Cambiar estado activo/inactivo del sector
+ */
+router.post('/sectors/:id/toggle', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🏘️ POST /config/sectors/:id/toggle');
+
+    const { id } = req.params;
+
+    // Obtener estado actual
+    const [current] = await Database.query(
+      'SELECT activo FROM sectores WHERE id = ?',
+      [id]
+    );
+
+    if (!current) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sector no encontrado'
+      });
+    }
+
+    const newState = current.activo ? 0 : 1;
+
+    // Actualizar estado
+    await Database.query(
+      'UPDATE sectores SET activo = ? WHERE id = ?',
+      [newState, id]
+    );
+
+    // Obtener el sector actualizado
+    const [updated] = await Database.query(
+      `SELECT s.*, c.nombre as ciudad_nombre, d.nombre as departamento_nombre
+       FROM sectores s
+       LEFT JOIN ciudades c ON s.ciudad_id = c.id
+       LEFT JOIN departamentos d ON c.departamento_id = d.id
+       WHERE s.id = ?`,
+      [id]
+    );
+
+    res.json({
+      success: true,
+      data: updated,
+      message: `Sector ${newState ? 'activado' : 'desactivado'} exitosamente`
+    });
+
+  } catch (error) {
+    console.error('❌ Error cambiando estado del sector:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
  * @route GET /api/v1/config/banks
  * @desc Obtener bancos
  */
 router.get('/banks', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('🏦 GET /config/banks');
-    
+
     const { activo } = req.query;
-    
+
     let query = 'SELECT * FROM bancos';
     const params = [];
-    
+
     if (activo !== undefined) {
       query += ' WHERE activo = ?';
       params.push(activo === 'true' ? 1 : 0);
     }
-    
+
     query += ' ORDER BY nombre ASC';
 
     const banks = await Database.query(query, params);
@@ -443,7 +1113,7 @@ router.get('/banks', requireRole('administrador', 'supervisor'), async (req, res
       count: banks.length,
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('❌ Error obteniendo bancos:', error);
     res.status(500).json({
@@ -462,22 +1132,22 @@ router.get('/banks', requireRole('administrador', 'supervisor'), async (req, res
 router.get('/service-plans', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('📦 GET /config/service-plans');
-    
+
     const { tipo, activo } = req.query;
-    
+
     let query = 'SELECT * FROM planes_servicio WHERE 1=1';
     const params = [];
-    
+
     if (tipo) {
       query += ' AND tipo = ?';
       params.push(tipo);
     }
-    
+
     if (activo !== undefined) {
       query += ' AND activo = ?';
       params.push(activo === 'true' ? 1 : 0);
     }
-    
+
     query += ' ORDER BY tipo ASC, precio ASC';
 
     const plans = await Database.query(query, params);
@@ -488,7 +1158,7 @@ router.get('/service-plans', requireRole('administrador', 'supervisor'), async (
       count: plans.length,
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('❌ Error obteniendo planes de servicio:', error);
     res.status(500).json({
@@ -511,7 +1181,7 @@ router.get('/service-plans', requireRole('administrador', 'supervisor'), async (
 router.get('/company', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('🏢 GET /config/company');
-    
+
     const [config] = await Database.query('SELECT * FROM configuracion_empresa LIMIT 1');
 
     res.json({
@@ -521,7 +1191,7 @@ router.get('/company', requireRole('administrador', 'supervisor'), async (req, r
       },
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('❌ Error obteniendo configuración de empresa:', error);
     res.status(500).json({
@@ -540,9 +1210,9 @@ router.get('/company', requireRole('administrador', 'supervisor'), async (req, r
 router.put('/company', requireRole('administrador'), async (req, res) => {
   try {
     console.log('🏢 PUT /config/company');
-    
+
     const configData = req.body;
-    
+
     // Verificar si existe configuración
     const [existingConfig] = await Database.query('SELECT id FROM configuracion_empresa LIMIT 1');
 
@@ -567,7 +1237,7 @@ router.put('/company', requireRole('administrador'), async (req, res) => {
 
       updateValues.push(existingConfig.id);
       const query = `UPDATE configuracion_empresa SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`;
-      
+
       await Database.query(query, updateValues);
     } else {
       // Crear nueva configuración
@@ -590,7 +1260,7 @@ router.put('/company', requireRole('administrador'), async (req, res) => {
       },
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('❌ Error actualizando configuración de empresa:', error);
     res.status(500).json({
@@ -606,26 +1276,20 @@ router.put('/company', requireRole('administrador'), async (req, res) => {
 // RUTAS DELEGADAS A CONTROLADORES (SI EXISTEN)
 // ==========================================
 
-// Rutas para conceptos de facturación
-if (conceptosController) {
-  router.get('/conceptos', conceptosController.getAll || conceptosController.obtenerTodos);
-  router.get('/conceptos/stats', conceptosController.getStats);
-  router.get('/conceptos/tipos', conceptosController.getTipos);
-  router.get('/conceptos/tipo/:tipo', conceptosController.getByType);
-  router.get('/conceptos/:id', conceptosController.getById);
-  router.post('/conceptos', conceptosController.create || conceptosController.crear);
-  router.put('/conceptos/:id', conceptosController.update);
-  router.post('/conceptos/:id/toggle', conceptosController.toggleStatus);
-  router.delete('/conceptos/:id', conceptosController.delete);
-  console.log('✅ Rutas de conceptos delegadas al controlador');
+// Solo delegar si los controladores existen
+if (GeographyController && typeof GeographyController.obtenerJerarquia === 'function') {
+  router.get('/geography/hierarchy', GeographyController.obtenerJerarquia);
+  console.log('✅ Ruta /geography/hierarchy delegada');
 }
 
-// Rutas delegadas a GeographyController si existe
-if (GeographyController) {
-  router.get('/geography/hierarchy', GeographyController.getGeographyHierarchy);
-  router.get('/geography/search', GeographyController.searchLocations);
-  router.get('/geography/stats', GeographyController.getGeographyStats);
-  console.log('✅ Rutas avanzadas de geografía delegadas al controlador');
+if (GeographyController && typeof GeographyController.buscarUbicaciones === 'function') {
+  router.get('/geography/search', GeographyController.buscarUbicaciones);
+  console.log('✅ Ruta /geography/search delegada');
+}
+
+if (GeographyController && typeof GeographyController.obtenerEstadisticasGeografia === 'function') {
+  router.get('/geography/stats', GeographyController.obtenerEstadisticasGeografia);
+  console.log('✅ Ruta /geography/stats delegada');
 }
 
 // ==========================================
@@ -639,7 +1303,7 @@ if (GeographyController) {
 router.get('/test', async (req, res) => {
   try {
     const testQuery = await Database.query('SELECT 1 as test');
-    
+
     res.json({
       success: true,
       message: 'Rutas de configuración funcionando correctamente',
@@ -647,18 +1311,40 @@ router.get('/test', async (req, res) => {
       timestamp: new Date().toISOString(),
       available_routes: [
         'GET /api/v1/config/overview',
-        'GET /api/v1/config/health', 
+        'GET /api/v1/config/health',
         'GET /api/v1/config/stats',
+
+        // Departamentos
         'GET /api/v1/config/departments',
+        'POST /api/v1/config/departments',
+        'PUT /api/v1/config/departments/:id',
+        'DELETE /api/v1/config/departments/:id',
+
+        // Ciudades
         'GET /api/v1/config/cities',
+        'POST /api/v1/config/cities',
+        'PUT /api/v1/config/cities/:id',
+        'DELETE /api/v1/config/cities/:id',
+
+        // Sectores
         'GET /api/v1/config/sectors',
+        'POST /api/v1/config/sectors',
+        'PUT /api/v1/config/sectors/:id',
+        'DELETE /api/v1/config/sectors/:id',
+        'POST /api/v1/config/sectors/:id/toggle',
+
+        // Bancos
         'GET /api/v1/config/banks',
+
+        // Planes de servicio
         'GET /api/v1/config/service-plans',
+
+        // Empresa
         'GET /api/v1/config/company',
         'PUT /api/v1/config/company'
       ]
     });
-    
+
   } catch (error) {
     res.status(500).json({
       success: false,

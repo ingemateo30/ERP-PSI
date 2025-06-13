@@ -1,1116 +1,1146 @@
-// backend/controllers/geographyController.js - CONTROLADOR GEOGRÁFICO COMPLETO
+// backend/controllers/geographyController.js - Controlador de configuración geográfica
 
-const { validationResult } = require('express-validator');
-const logger = require('../utils/logger');
-const ApiResponse = require('../utils/responses');
 const pool = require('../config/database');
+const logger = require('../utils/logger');
 
 class GeographyController {
-  
-  // ========================================
+  // ============================================
   // DEPARTAMENTOS
-  // ========================================
-  
+  // ============================================
+
   // Obtener todos los departamentos
-  static async getDepartments(req, res) {
+  static async obtenerDepartamentos(req, res) {
     try {
-      const { includeStats = 'false' } = req.query;
-      
-      const connection = await pool.getConnection();
+      const { includeStats } = req.query;
       
       let query = `
-        SELECT 
-          d.id,
-          d.codigo,
-          d.nombre
-      `;
-      
-      if (includeStats === 'true') {
-        query += `,
-          COUNT(DISTINCT c.id) as total_ciudades,
-          COUNT(DISTINCT s.id) as total_sectores,
-          COUNT(DISTINCT cl.id) as total_clientes
-        `;
-      }
-      
-      query += `
+        SELECT d.*
+        ${includeStats === 'true' ? ', (SELECT COUNT(*) FROM ciudades WHERE departamento_id = d.id) as ciudades_count' : ''}
         FROM departamentos d
+        ORDER BY d.nombre ASC
       `;
-      
-      if (includeStats === 'true') {
-        query += `
-          LEFT JOIN ciudades c ON d.id = c.departamento_id
-          LEFT JOIN sectores s ON c.id = s.ciudad_id
-          LEFT JOIN clientes cl ON s.id = cl.sector_id
-          GROUP BY d.id, d.codigo, d.nombre
-        `;
-      }
-      
-      query += ` ORDER BY d.nombre ASC`;
-      
-      const [departments] = await connection.execute(query);
-      
+
+      const connection = await pool.getConnection();
+      const [departamentos] = await connection.execute(query);
       connection.release();
-      
-      return ApiResponse.success(res, departments, 'Departamentos obtenidos exitosamente');
-      
+
+      res.json({
+        success: true,
+        data: departamentos,
+        message: 'Departamentos obtenidos exitosamente'
+      });
     } catch (error) {
-      logger.error('Error obteniendo departamentos:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error obteniendo departamentos:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
-  
+
   // Obtener departamento por ID
-  static async getDepartmentById(req, res) {
+  static async obtenerDepartamentoPorId(req, res) {
     try {
       const { id } = req.params;
-      
-      const connection = await pool.getConnection();
-      
-      const [departments] = await connection.execute(`
-        SELECT 
-          d.*,
-          COUNT(DISTINCT c.id) as total_ciudades,
-          COUNT(DISTINCT s.id) as total_sectores,
-          COUNT(DISTINCT cl.id) as total_clientes
+
+      const query = `
+        SELECT d.*,
+          (SELECT COUNT(*) FROM ciudades WHERE departamento_id = d.id) as ciudades_count
         FROM departamentos d
-        LEFT JOIN ciudades c ON d.id = c.departamento_id
-        LEFT JOIN sectores s ON c.id = s.ciudad_id
-        LEFT JOIN clientes cl ON s.id = cl.sector_id
         WHERE d.id = ?
-        GROUP BY d.id
-      `, [id]);
-      
+      `;
+
+      const connection = await pool.getConnection();
+      const [departamentos] = await connection.execute(query, [id]);
       connection.release();
-      
-      if (departments.length === 0) {
-        return ApiResponse.notFound(res, 'Departamento no encontrado');
+
+      if (departamentos.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Departamento no encontrado'
+        });
       }
-      
-      return ApiResponse.success(res, departments[0], 'Departamento obtenido exitosamente');
-      
+
+      res.json({
+        success: true,
+        data: departamentos[0],
+        message: 'Departamento obtenido exitosamente'
+      });
     } catch (error) {
-      logger.error('Error obteniendo departamento:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error obteniendo departamento:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
-  
+
   // Crear departamento
+  static async crearDepartamento(req, res) {
+    return GeographyController.createDepartment(req, res);
+  }
+
   static async createDepartment(req, res) {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return ApiResponse.validationError(res, errors.array());
-      }
-      
       const { codigo, nombre } = req.body;
-      
+
+      // Validaciones
+      if (!codigo || !nombre) {
+        return res.status(400).json({
+          success: false,
+          message: 'Código y nombre son requeridos'
+        });
+      }
+
+      // Verificar si ya existe
       const connection = await pool.getConnection();
       
-      // Verificar si ya existe
       const [existing] = await connection.execute(
         'SELECT id FROM departamentos WHERE codigo = ? OR nombre = ?',
         [codigo, nombre]
       );
-      
+
       if (existing.length > 0) {
         connection.release();
-        return ApiResponse.conflict(res, 'Ya existe un departamento con ese código o nombre');
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe un departamento con ese código o nombre'
+        });
       }
-      
+
+      // Crear departamento
       const [result] = await connection.execute(
         'INSERT INTO departamentos (codigo, nombre) VALUES (?, ?)',
-        [codigo.toUpperCase(), nombre]
+        [codigo.trim(), nombre.trim()]
       );
-      
+
       // Obtener el departamento creado
-      const [newDept] = await connection.execute(
+      const [created] = await connection.execute(
         'SELECT * FROM departamentos WHERE id = ?',
         [result.insertId]
       );
-      
+
       connection.release();
-      
-      logger.info('Departamento creado', {
-        deptId: result.insertId,
-        codigo: codigo,
-        nombre: nombre,
-        createdBy: req.user.id
+
+      res.status(201).json({
+        success: true,
+        data: created[0],
+        message: 'Departamento creado exitosamente'
       });
-      
-      return ApiResponse.created(res, newDept[0], 'Departamento creado exitosamente');
-      
     } catch (error) {
-      logger.error('Error creando departamento:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error creando departamento:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
-  
+
   // Actualizar departamento
+  static async actualizarDepartamento(req, res) {
+    return GeographyController.updateDepartment(req, res);
+  }
+
   static async updateDepartment(req, res) {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return ApiResponse.validationError(res, errors.array());
-      }
-      
       const { id } = req.params;
       const { codigo, nombre } = req.body;
-      
+
+      if (!codigo || !nombre) {
+        return res.status(400).json({
+          success: false,
+          message: 'Código y nombre son requeridos'
+        });
+      }
+
       const connection = await pool.getConnection();
-      
-      // Verificar que existe
+
+      // Verificar si existe
       const [existing] = await connection.execute(
-        'SELECT * FROM departamentos WHERE id = ?',
+        'SELECT id FROM departamentos WHERE id = ?',
         [id]
       );
-      
+
       if (existing.length === 0) {
         connection.release();
-        return ApiResponse.notFound(res, 'Departamento no encontrado');
+        return res.status(404).json({
+          success: false,
+          message: 'Departamento no encontrado'
+        });
       }
-      
-      // Verificar duplicados (excluyendo el actual)
+
+      // Verificar duplicados
       const [duplicates] = await connection.execute(
         'SELECT id FROM departamentos WHERE (codigo = ? OR nombre = ?) AND id != ?',
         [codigo, nombre, id]
       );
-      
+
       if (duplicates.length > 0) {
         connection.release();
-        return ApiResponse.conflict(res, 'Ya existe otro departamento con ese código o nombre');
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe otro departamento con ese código o nombre'
+        });
       }
-      
+
+      // Actualizar
       await connection.execute(
         'UPDATE departamentos SET codigo = ?, nombre = ? WHERE id = ?',
-        [codigo.toUpperCase(), nombre, id]
+        [codigo.trim(), nombre.trim(), id]
       );
-      
-      // Obtener departamento actualizado
+
+      // Obtener el departamento actualizado
       const [updated] = await connection.execute(
         'SELECT * FROM departamentos WHERE id = ?',
         [id]
       );
-      
+
       connection.release();
-      
-      logger.info('Departamento actualizado', {
-        deptId: id,
-        updatedBy: req.user.id
+
+      res.json({
+        success: true,
+        data: updated[0],
+        message: 'Departamento actualizado exitosamente'
       });
-      
-      return ApiResponse.success(res, updated[0], 'Departamento actualizado exitosamente');
-      
     } catch (error) {
-      logger.error('Error actualizando departamento:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error actualizando departamento:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 
   // Eliminar departamento
+  static async eliminarDepartamento(req, res) {
+    return GeographyController.deleteDepartment(req, res);
+  }
+
   static async deleteDepartment(req, res) {
     try {
       const { id } = req.params;
-      
+
       const connection = await pool.getConnection();
-      
-      // Verificar que existe
-      const [existing] = await connection.execute(
-        'SELECT * FROM departamentos WHERE id = ?',
-        [id]
-      );
-      
-      if (existing.length === 0) {
-        connection.release();
-        return ApiResponse.notFound(res, 'Departamento no encontrado');
-      }
-      
+
       // Verificar si tiene ciudades asociadas
       const [cities] = await connection.execute(
         'SELECT COUNT(*) as count FROM ciudades WHERE departamento_id = ?',
         [id]
       );
-      
+
       if (cities[0].count > 0) {
         connection.release();
-        return ApiResponse.error(res, 'No se puede eliminar el departamento porque tiene ciudades asociadas', 400);
+        return res.status(409).json({
+          success: false,
+          message: 'No se puede eliminar un departamento que tiene ciudades asociadas'
+        });
       }
-      
-      await connection.execute('DELETE FROM departamentos WHERE id = ?', [id]);
-      
+
+      // Eliminar
+      const [result] = await connection.execute(
+        'DELETE FROM departamentos WHERE id = ?',
+        [id]
+      );
+
       connection.release();
-      
-      logger.info('Departamento eliminado', {
-        deptId: id,
-        deletedBy: req.user.id
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Departamento no encontrado'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Departamento eliminado exitosamente'
       });
-      
-      return ApiResponse.success(res, null, 'Departamento eliminado exitosamente');
-      
     } catch (error) {
-      logger.error('Error eliminando departamento:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error eliminando departamento:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
-  
-  // ========================================
+
+  // ============================================
   // CIUDADES
-  // ========================================
-  
-  // Obtener ciudades (con filtros)
-  static async getCities(req, res) {
+  // ============================================
+
+  // Obtener todas las ciudades
+  static async obtenerCiudades(req, res) {
     try {
-      const { departamento_id, includeStats = 'false' } = req.query;
-      
-      const connection = await pool.getConnection();
+      const { departamento_id, includeStats } = req.query;
       
       let query = `
-        SELECT 
-          c.id,
-          c.departamento_id,
-          c.codigo,
-          c.nombre,
-          d.nombre as departamento_nombre
-      `;
-      
-      if (includeStats === 'true') {
-        query += `,
-          COUNT(DISTINCT s.id) as total_sectores,
-          COUNT(DISTINCT cl.id) as total_clientes
-        `;
-      }
-      
-      query += `
+        SELECT c.*, d.nombre as departamento_nombre
+        ${includeStats === 'true' ? ', (SELECT COUNT(*) FROM sectores WHERE ciudad_id = c.id) as sectores_count' : ''}
         FROM ciudades c
         LEFT JOIN departamentos d ON c.departamento_id = d.id
       `;
       
-      if (includeStats === 'true') {
-        query += `
-          LEFT JOIN sectores s ON c.id = s.ciudad_id
-          LEFT JOIN clientes cl ON s.id = cl.sector_id
-        `;
-      }
-      
-      let params = [];
+      const params = [];
       
       if (departamento_id) {
         query += ' WHERE c.departamento_id = ?';
         params.push(departamento_id);
       }
       
-      if (includeStats === 'true') {
-        query += ' GROUP BY c.id, c.departamento_id, c.codigo, c.nombre, d.nombre';
-      }
-      
       query += ' ORDER BY d.nombre ASC, c.nombre ASC';
-      
-      const [cities] = await connection.execute(query, params);
-      
+
+      const connection = await pool.getConnection();
+      const [ciudades] = await connection.execute(query, params);
       connection.release();
-      
-      return ApiResponse.success(res, cities, 'Ciudades obtenidas exitosamente');
-      
+
+      res.json({
+        success: true,
+        data: ciudades,
+        message: 'Ciudades obtenidas exitosamente'
+      });
     } catch (error) {
-      logger.error('Error obteniendo ciudades:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error obteniendo ciudades:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 
   // Obtener ciudad por ID
-  static async getCityById(req, res) {
+  static async obtenerCiudadPorId(req, res) {
     try {
       const { id } = req.params;
-      
-      const connection = await pool.getConnection();
-      
-      const [cities] = await connection.execute(`
-        SELECT 
-          c.*,
-          d.nombre as departamento_nombre,
-          COUNT(DISTINCT s.id) as total_sectores,
-          COUNT(DISTINCT cl.id) as total_clientes
+
+      const query = `
+        SELECT c.*, d.nombre as departamento_nombre,
+          (SELECT COUNT(*) FROM sectores WHERE ciudad_id = c.id) as sectores_count
         FROM ciudades c
         LEFT JOIN departamentos d ON c.departamento_id = d.id
-        LEFT JOIN sectores s ON c.id = s.ciudad_id
-        LEFT JOIN clientes cl ON s.id = cl.sector_id
         WHERE c.id = ?
-        GROUP BY c.id
-      `, [id]);
-      
+      `;
+
+      const connection = await pool.getConnection();
+      const [ciudades] = await connection.execute(query, [id]);
       connection.release();
-      
-      if (cities.length === 0) {
-        return ApiResponse.notFound(res, 'Ciudad no encontrada');
+
+      if (ciudades.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Ciudad no encontrada'
+        });
       }
-      
-      return ApiResponse.success(res, cities[0], 'Ciudad obtenida exitosamente');
-      
+
+      res.json({
+        success: true,
+        data: ciudades[0],
+        message: 'Ciudad obtenida exitosamente'
+      });
     } catch (error) {
-      logger.error('Error obteniendo ciudad:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error obteniendo ciudad:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
-  
+
   // Crear ciudad
+  static async crearCiudad(req, res) {
+    return GeographyController.createCity(req, res);
+  }
+
   static async createCity(req, res) {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return ApiResponse.validationError(res, errors.array());
-      }
-      
       const { departamento_id, codigo, nombre } = req.body;
-      
+
+      if (!departamento_id || !codigo || !nombre) {
+        return res.status(400).json({
+          success: false,
+          message: 'Departamento, código y nombre son requeridos'
+        });
+      }
+
       const connection = await pool.getConnection();
-      
-      // Verificar que el departamento existe
-      const [deptExists] = await connection.execute(
+
+      // Verificar si el departamento existe
+      const [dept] = await connection.execute(
         'SELECT id FROM departamentos WHERE id = ?',
         [departamento_id]
       );
-      
-      if (deptExists.length === 0) {
+
+      if (dept.length === 0) {
         connection.release();
-        return ApiResponse.error(res, 'Departamento no encontrado', 400);
+        return res.status(400).json({
+          success: false,
+          message: 'El departamento especificado no existe'
+        });
       }
-      
+
       // Verificar duplicados
       const [existing] = await connection.execute(
-        'SELECT id FROM ciudades WHERE codigo = ? OR (nombre = ? AND departamento_id = ?)',
-        [codigo, nombre, departamento_id]
+        'SELECT id FROM ciudades WHERE codigo = ? OR nombre = ?',
+        [codigo, nombre]
       );
-      
+
       if (existing.length > 0) {
         connection.release();
-        return ApiResponse.conflict(res, 'Ya existe una ciudad con ese código o nombre en este departamento');
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe una ciudad con ese código o nombre'
+        });
       }
-      
+
+      // Crear ciudad
       const [result] = await connection.execute(
         'INSERT INTO ciudades (departamento_id, codigo, nombre) VALUES (?, ?, ?)',
-        [departamento_id, codigo, nombre]
+        [departamento_id, codigo.trim(), nombre.trim()]
       );
-      
-      // Obtener ciudad creada con departamento
-      const [newCity] = await connection.execute(`
-        SELECT 
-          c.*,
-          d.nombre as departamento_nombre
-        FROM ciudades c
-        LEFT JOIN departamentos d ON c.departamento_id = d.id
-        WHERE c.id = ?
-      `, [result.insertId]);
-      
+
+      // Obtener la ciudad creada con información del departamento
+      const [created] = await connection.execute(
+        `SELECT c.*, d.nombre as departamento_nombre 
+         FROM ciudades c 
+         LEFT JOIN departamentos d ON c.departamento_id = d.id 
+         WHERE c.id = ?`,
+        [result.insertId]
+      );
+
       connection.release();
-      
-      logger.info('Ciudad creada', {
-        cityId: result.insertId,
-        codigo: codigo,
-        nombre: nombre,
-        departamento_id: departamento_id,
-        createdBy: req.user.id
+
+      res.status(201).json({
+        success: true,
+        data: created[0],
+        message: 'Ciudad creada exitosamente'
       });
-      
-      return ApiResponse.created(res, newCity[0], 'Ciudad creada exitosamente');
-      
     } catch (error) {
-      logger.error('Error creando ciudad:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error creando ciudad:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 
   // Actualizar ciudad
+  static async actualizarCiudad(req, res) {
+    return GeographyController.updateCity(req, res);
+  }
+
   static async updateCity(req, res) {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return ApiResponse.validationError(res, errors.array());
-      }
-      
       const { id } = req.params;
       const { departamento_id, codigo, nombre } = req.body;
-      
+
+      if (!departamento_id || !codigo || !nombre) {
+        return res.status(400).json({
+          success: false,
+          message: 'Departamento, código y nombre son requeridos'
+        });
+      }
+
       const connection = await pool.getConnection();
-      
-      // Verificar que la ciudad existe
+
+      // Verificar si la ciudad existe
       const [existing] = await connection.execute(
-        'SELECT * FROM ciudades WHERE id = ?',
+        'SELECT id FROM ciudades WHERE id = ?',
         [id]
       );
-      
+
       if (existing.length === 0) {
         connection.release();
-        return ApiResponse.notFound(res, 'Ciudad no encontrada');
+        return res.status(404).json({
+          success: false,
+          message: 'Ciudad no encontrada'
+        });
       }
-      
-      // Verificar que el departamento existe
-      const [deptExists] = await connection.execute(
+
+      // Verificar si el departamento existe
+      const [dept] = await connection.execute(
         'SELECT id FROM departamentos WHERE id = ?',
         [departamento_id]
       );
-      
-      if (deptExists.length === 0) {
+
+      if (dept.length === 0) {
         connection.release();
-        return ApiResponse.error(res, 'Departamento no encontrado', 400);
+        return res.status(400).json({
+          success: false,
+          message: 'El departamento especificado no existe'
+        });
       }
-      
-      // Verificar duplicados (excluyendo la actual)
+
+      // Verificar duplicados
       const [duplicates] = await connection.execute(
-        'SELECT id FROM ciudades WHERE (codigo = ? OR (nombre = ? AND departamento_id = ?)) AND id != ?',
-        [codigo, nombre, departamento_id, id]
+        'SELECT id FROM ciudades WHERE (codigo = ? OR nombre = ?) AND id != ?',
+        [codigo, nombre, id]
       );
-      
+
       if (duplicates.length > 0) {
         connection.release();
-        return ApiResponse.conflict(res, 'Ya existe otra ciudad con ese código o nombre en este departamento');
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe otra ciudad con ese código o nombre'
+        });
       }
-      
+
+      // Actualizar
       await connection.execute(
         'UPDATE ciudades SET departamento_id = ?, codigo = ?, nombre = ? WHERE id = ?',
-        [departamento_id, codigo, nombre, id]
+        [departamento_id, codigo.trim(), nombre.trim(), id]
       );
-      
-      // Obtener ciudad actualizada
-      const [updated] = await connection.execute(`
-        SELECT 
-          c.*,
-          d.nombre as departamento_nombre
-        FROM ciudades c
-        LEFT JOIN departamentos d ON c.departamento_id = d.id
-        WHERE c.id = ?
-      `, [id]);
-      
+
+      // Obtener la ciudad actualizada
+      const [updated] = await connection.execute(
+        `SELECT c.*, d.nombre as departamento_nombre 
+         FROM ciudades c 
+         LEFT JOIN departamentos d ON c.departamento_id = d.id 
+         WHERE c.id = ?`,
+        [id]
+      );
+
       connection.release();
-      
-      logger.info('Ciudad actualizada', {
-        cityId: id,
-        updatedBy: req.user.id
+
+      res.json({
+        success: true,
+        data: updated[0],
+        message: 'Ciudad actualizada exitosamente'
       });
-      
-      return ApiResponse.success(res, updated[0], 'Ciudad actualizada exitosamente');
-      
     } catch (error) {
-      logger.error('Error actualizando ciudad:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error actualizando ciudad:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 
   // Eliminar ciudad
+  static async eliminarCiudad(req, res) {
+    return GeographyController.deleteCity(req, res);
+  }
+
   static async deleteCity(req, res) {
     try {
       const { id } = req.params;
-      
+
       const connection = await pool.getConnection();
-      
-      // Verificar que existe
-      const [existing] = await connection.execute(
-        'SELECT * FROM ciudades WHERE id = ?',
-        [id]
-      );
-      
-      if (existing.length === 0) {
-        connection.release();
-        return ApiResponse.notFound(res, 'Ciudad no encontrada');
-      }
-      
+
       // Verificar si tiene sectores asociados
       const [sectors] = await connection.execute(
         'SELECT COUNT(*) as count FROM sectores WHERE ciudad_id = ?',
         [id]
       );
-      
+
       if (sectors[0].count > 0) {
         connection.release();
-        return ApiResponse.error(res, 'No se puede eliminar la ciudad porque tiene sectores asociados', 400);
+        return res.status(409).json({
+          success: false,
+          message: 'No se puede eliminar una ciudad que tiene sectores asociados'
+        });
       }
-      
-      await connection.execute('DELETE FROM ciudades WHERE id = ?', [id]);
-      
+
+      // Eliminar
+      const [result] = await connection.execute(
+        'DELETE FROM ciudades WHERE id = ?',
+        [id]
+      );
+
       connection.release();
-      
-      logger.info('Ciudad eliminada', {
-        cityId: id,
-        deletedBy: req.user.id
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Ciudad no encontrada'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Ciudad eliminada exitosamente'
       });
-      
-      return ApiResponse.success(res, null, 'Ciudad eliminada exitosamente');
-      
     } catch (error) {
-      logger.error('Error eliminando ciudad:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error eliminando ciudad:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
-  
-  // ========================================
+
+  // ============================================
   // SECTORES
-  // ========================================
-  
-  // Obtener sectores
-  static async getSectors(req, res) {
+  // ============================================
+
+  // Obtener todos los sectores
+  static async obtenerSectores(req, res) {
     try {
-      const { ciudad_id, activo, includeStats = 'false' } = req.query;
-      
-      const connection = await pool.getConnection();
+      const { ciudad_id, activo, includeStats } = req.query;
       
       let query = `
-        SELECT 
-          s.id,
-          s.codigo,
-          s.nombre,
-          s.ciudad_id,
-          s.activo,
-          c.nombre as ciudad_nombre,
-          d.nombre as departamento_nombre
-      `;
-      
-      if (includeStats === 'true') {
-        query += `,
-          COUNT(DISTINCT cl.id) as total_clientes,
-          COUNT(CASE WHEN cl.estado = 'activo' THEN 1 END) as clientes_activos
-        `;
-      }
-      
-      query += `
+        SELECT s.*, c.nombre as ciudad_nombre, d.nombre as departamento_nombre
+        ${includeStats === 'true' ? ', (SELECT COUNT(*) FROM clientes WHERE sector_id = s.id) as clientes_count' : ''}
         FROM sectores s
         LEFT JOIN ciudades c ON s.ciudad_id = c.id
         LEFT JOIN departamentos d ON c.departamento_id = d.id
+        WHERE 1=1
       `;
       
-      if (includeStats === 'true') {
-        query += ` LEFT JOIN clientes cl ON s.id = cl.sector_id`;
-      }
-      
-      let whereConditions = [];
-      let params = [];
+      const params = [];
       
       if (ciudad_id) {
-        whereConditions.push('s.ciudad_id = ?');
+        query += ' AND s.ciudad_id = ?';
         params.push(ciudad_id);
       }
       
-      if (activo !== undefined) {
-        whereConditions.push('s.activo = ?');
+      if (activo !== null && activo !== undefined) {
+        query += ' AND s.activo = ?';
         params.push(activo === 'true' ? 1 : 0);
       }
       
-      if (whereConditions.length > 0) {
-        query += ` WHERE ${whereConditions.join(' AND ')}`;
-      }
-      
-      if (includeStats === 'true') {
-        query += ` GROUP BY s.id, s.codigo, s.nombre, s.ciudad_id, s.activo, c.nombre, d.nombre`;
-      }
-      
       query += ' ORDER BY d.nombre ASC, c.nombre ASC, s.nombre ASC';
-      
-      const [sectors] = await connection.execute(query, params);
-      
+
+      const connection = await pool.getConnection();
+      const [sectores] = await connection.execute(query, params);
       connection.release();
-      
-      return ApiResponse.success(res, sectors, 'Sectores obtenidos exitosamente');
-      
+
+      res.json({
+        success: true,
+        data: sectores,
+        message: 'Sectores obtenidos exitosamente'
+      });
     } catch (error) {
-      logger.error('Error obteniendo sectores:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error obteniendo sectores:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 
   // Obtener sector por ID
-  static async getSectorById(req, res) {
+  static async obtenerSectorPorId(req, res) {
     try {
       const { id } = req.params;
-      
-      const connection = await pool.getConnection();
-      
-      const [sectors] = await connection.execute(`
-        SELECT 
-          s.*,
-          c.nombre as ciudad_nombre,
-          d.nombre as departamento_nombre,
-          COUNT(DISTINCT cl.id) as total_clientes,
-          COUNT(CASE WHEN cl.estado = 'activo' THEN 1 END) as clientes_activos
+
+      const query = `
+        SELECT s.*, c.nombre as ciudad_nombre, d.nombre as departamento_nombre,
+          (SELECT COUNT(*) FROM clientes WHERE sector_id = s.id) as clientes_count
         FROM sectores s
         LEFT JOIN ciudades c ON s.ciudad_id = c.id
         LEFT JOIN departamentos d ON c.departamento_id = d.id
-        LEFT JOIN clientes cl ON s.id = cl.sector_id
         WHERE s.id = ?
-        GROUP BY s.id
-      `, [id]);
-      
+      `;
+
+      const connection = await pool.getConnection();
+      const [sectores] = await connection.execute(query, [id]);
       connection.release();
-      
-      if (sectors.length === 0) {
-        return ApiResponse.notFound(res, 'Sector no encontrado');
+
+      if (sectores.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Sector no encontrado'
+        });
       }
-      
-      return ApiResponse.success(res, sectors[0], 'Sector obtenido exitosamente');
-      
+
+      res.json({
+        success: true,
+        data: sectores[0],
+        message: 'Sector obtenido exitosamente'
+      });
     } catch (error) {
-      logger.error('Error obteniendo sector:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error obteniendo sector:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
-  
+
   // Crear sector
+  static async crearSector(req, res) {
+    return GeographyController.createSector(req, res);
+  }
+
   static async createSector(req, res) {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return ApiResponse.validationError(res, errors.array());
+      const { ciudad_id, codigo, nombre, activo = true } = req.body;
+
+      if (!codigo || !nombre) {
+        return res.status(400).json({
+          success: false,
+          message: 'Código y nombre son requeridos'
+        });
       }
-      
-      const { codigo, nombre, ciudad_id } = req.body;
-      
+
       const connection = await pool.getConnection();
-      
-      // Verificar que la ciudad existe (si se proporciona)
+
+      // Verificar si la ciudad existe (si se especifica)
       if (ciudad_id) {
-        const [cityExists] = await connection.execute(
+        const [city] = await connection.execute(
           'SELECT id FROM ciudades WHERE id = ?',
           [ciudad_id]
         );
-        
-        if (cityExists.length === 0) {
+
+        if (city.length === 0) {
           connection.release();
-          return ApiResponse.error(res, 'Ciudad no encontrada', 400);
+          return res.status(400).json({
+            success: false,
+            message: 'La ciudad especificada no existe'
+          });
         }
       }
-      
+
       // Verificar duplicados
       const [existing] = await connection.execute(
         'SELECT id FROM sectores WHERE codigo = ?',
         [codigo]
       );
-      
+
       if (existing.length > 0) {
         connection.release();
-        return ApiResponse.conflict(res, 'Ya existe un sector con ese código');
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe un sector con ese código'
+        });
       }
-      
+
+      // Crear sector
       const [result] = await connection.execute(
-        'INSERT INTO sectores (codigo, nombre, ciudad_id, activo) VALUES (?, ?, ?, 1)',
-        [codigo.toUpperCase(), nombre, ciudad_id || null]
+        'INSERT INTO sectores (ciudad_id, codigo, nombre, activo) VALUES (?, ?, ?, ?)',
+        [ciudad_id || null, codigo.trim(), nombre.trim(), activo ? 1 : 0]
       );
-      
-      // Obtener sector creado
-      const [newSector] = await connection.execute(`
-        SELECT 
-          s.*,
-          c.nombre as ciudad_nombre,
-          d.nombre as departamento_nombre
-        FROM sectores s
-        LEFT JOIN ciudades c ON s.ciudad_id = c.id
-        LEFT JOIN departamentos d ON c.departamento_id = d.id
-        WHERE s.id = ?
-      `, [result.insertId]);
-      
+
+      // Obtener el sector creado con información relacionada
+      const [created] = await connection.execute(
+        `SELECT s.*, c.nombre as ciudad_nombre, d.nombre as departamento_nombre
+         FROM sectores s
+         LEFT JOIN ciudades c ON s.ciudad_id = c.id
+         LEFT JOIN departamentos d ON c.departamento_id = d.id
+         WHERE s.id = ?`,
+        [result.insertId]
+      );
+
       connection.release();
-      
-      logger.info('Sector creado', {
-        sectorId: result.insertId,
-        codigo: codigo,
-        nombre: nombre,
-        ciudad_id: ciudad_id,
-        createdBy: req.user.id
+
+      res.status(201).json({
+        success: true,
+        data: created[0],
+        message: 'Sector creado exitosamente'
       });
-      
-      return ApiResponse.created(res, newSector[0], 'Sector creado exitosamente');
-      
     } catch (error) {
-      logger.error('Error creando sector:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error creando sector:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 
   // Actualizar sector
-  static async updateSector(req, res) {
+  static async actualizarSector(req, res) {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return ApiResponse.validationError(res, errors.array());
-      }
-      
       const { id } = req.params;
-      const { codigo, nombre, ciudad_id } = req.body;
-      
+      const { ciudad_id, codigo, nombre, activo } = req.body;
+
+      if (!codigo || !nombre) {
+        return res.status(400).json({
+          success: false,
+          message: 'Código y nombre son requeridos'
+        });
+      }
+
       const connection = await pool.getConnection();
-      
-      // Verificar que el sector existe
+
+      // Verificar si el sector existe
       const [existing] = await connection.execute(
-        'SELECT * FROM sectores WHERE id = ?',
+        'SELECT id FROM sectores WHERE id = ?',
         [id]
       );
-      
+
       if (existing.length === 0) {
         connection.release();
-        return ApiResponse.notFound(res, 'Sector no encontrado');
+        return res.status(404).json({
+          success: false,
+          message: 'Sector no encontrado'
+        });
       }
-      
-      // Verificar que la ciudad existe (si se proporciona)
+
+      // Verificar si la ciudad existe (si se especifica)
       if (ciudad_id) {
-        const [cityExists] = await connection.execute(
+        const [city] = await connection.execute(
           'SELECT id FROM ciudades WHERE id = ?',
           [ciudad_id]
         );
-        
-        if (cityExists.length === 0) {
+
+        if (city.length === 0) {
           connection.release();
-          return ApiResponse.error(res, 'Ciudad no encontrada', 400);
+          return res.status(400).json({
+            success: false,
+            message: 'La ciudad especificada no existe'
+          });
         }
       }
-      
-      // Verificar código único (excluyendo el actual)
+
+      // Verificar duplicados
       const [duplicates] = await connection.execute(
         'SELECT id FROM sectores WHERE codigo = ? AND id != ?',
         [codigo, id]
       );
-      
+
       if (duplicates.length > 0) {
         connection.release();
-        return ApiResponse.conflict(res, 'Ya existe otro sector con ese código');
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe otro sector con ese código'
+        });
       }
-      
+
+      // Actualizar
       await connection.execute(
-        'UPDATE sectores SET codigo = ?, nombre = ?, ciudad_id = ? WHERE id = ?',
-        [codigo.toUpperCase(), nombre, ciudad_id || null, id]
+        'UPDATE sectores SET ciudad_id = ?, codigo = ?, nombre = ?, activo = ? WHERE id = ?',
+        [ciudad_id || null, codigo.trim(), nombre.trim(), activo ? 1 : 0, id]
       );
-      
-      // Obtener sector actualizado
-      const [updated] = await connection.execute(`
-        SELECT 
-          s.*,
-          c.nombre as ciudad_nombre,
-          d.nombre as departamento_nombre
-        FROM sectores s
-        LEFT JOIN ciudades c ON s.ciudad_id = c.id
-        LEFT JOIN departamentos d ON c.departamento_id = d.id
-        WHERE s.id = ?
-      `, [id]);
-      
+
+      // Obtener el sector actualizado
+      const [updated] = await connection.execute(
+        `SELECT s.*, c.nombre as ciudad_nombre, d.nombre as departamento_nombre
+         FROM sectores s
+         LEFT JOIN ciudades c ON s.ciudad_id = c.id
+         LEFT JOIN departamentos d ON c.departamento_id = d.id
+         WHERE s.id = ?`,
+        [id]
+      );
+
       connection.release();
-      
-      logger.info('Sector actualizado', {
-        sectorId: id,
-        updatedBy: req.user.id
+
+      res.json({
+        success: true,
+        data: updated[0],
+        message: 'Sector actualizado exitosamente'
       });
-      
-      return ApiResponse.success(res, updated[0], 'Sector actualizado exitosamente');
-      
     } catch (error) {
-      logger.error('Error actualizando sector:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error actualizando sector:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
-  
-  // Activar/desactivar sector
+
+  // Toggle estado del sector
   static async toggleSector(req, res) {
     try {
       const { id } = req.params;
-      
+
       const connection = await pool.getConnection();
-      
-      const [sector] = await connection.execute(
-        'SELECT * FROM sectores WHERE id = ?',
+
+      // Obtener estado actual
+      const [current] = await connection.execute(
+        'SELECT activo FROM sectores WHERE id = ?',
         [id]
       );
-      
-      if (sector.length === 0) {
+
+      if (current.length === 0) {
         connection.release();
-        return ApiResponse.notFound(res, 'Sector no encontrado');
+        return res.status(404).json({
+          success: false,
+          message: 'Sector no encontrado'
+        });
       }
-      
-      const newStatus = sector[0].activo ? 0 : 1;
-      
-      // Si se desactiva, verificar que no tenga clientes activos
-      if (newStatus === 0) {
-        const [activeClients] = await connection.execute(
-          'SELECT COUNT(*) as count FROM clientes WHERE sector_id = ? AND estado = "activo"',
-          [id]
-        );
-        
-        if (activeClients[0].count > 0) {
-          connection.release();
-          return ApiResponse.error(res, 'No se puede desactivar el sector porque tiene clientes activos', 400);
-        }
-      }
-      
+
+      const newState = current[0].activo ? 0 : 1;
+
+      // Actualizar estado
       await connection.execute(
         'UPDATE sectores SET activo = ? WHERE id = ?',
-        [newStatus, id]
+        [newState, id]
       );
-      
+
+      // Obtener el sector actualizado
+      const [updated] = await connection.execute(
+        `SELECT s.*, c.nombre as ciudad_nombre, d.nombre as departamento_nombre
+         FROM sectores s
+         LEFT JOIN ciudades c ON s.ciudad_id = c.id
+         LEFT JOIN departamentos d ON c.departamento_id = d.id
+         WHERE s.id = ?`,
+        [id]
+      );
+
       connection.release();
-      
-      logger.info('Estado de sector cambiado', {
-        sectorId: id,
-        newStatus: newStatus,
-        changedBy: req.user.id
+
+      res.json({
+        success: true,
+        data: updated[0],
+        message: `Sector ${newState ? 'activado' : 'desactivado'} exitosamente`
       });
-      
-      return ApiResponse.success(res, {
-        activo: newStatus === 1
-      }, `Sector ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
-      
     } catch (error) {
-      logger.error('Error cambiando estado del sector:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error cambiando estado del sector:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 
   // Eliminar sector
-  static async deleteSector(req, res) {
+  static async eliminarSector(req, res) {
     try {
       const { id } = req.params;
-      
+
       const connection = await pool.getConnection();
-      
-      // Verificar que existe
-      const [existing] = await connection.execute(
-        'SELECT * FROM sectores WHERE id = ?',
-        [id]
-      );
-      
-      if (existing.length === 0) {
-        connection.release();
-        return ApiResponse.notFound(res, 'Sector no encontrado');
-      }
-      
+
       // Verificar si tiene clientes asociados
       const [clients] = await connection.execute(
         'SELECT COUNT(*) as count FROM clientes WHERE sector_id = ?',
         [id]
       );
-      
+
       if (clients[0].count > 0) {
         connection.release();
-        return ApiResponse.error(res, 'No se puede eliminar el sector porque tiene clientes asociados', 400);
+        return res.status(409).json({
+          success: false,
+          message: 'No se puede eliminar un sector que tiene clientes asociados'
+        });
       }
-      
-      await connection.execute('DELETE FROM sectores WHERE id = ?', [id]);
-      
+
+      // Eliminar
+      const [result] = await connection.execute(
+        'DELETE FROM sectores WHERE id = ?',
+        [id]
+      );
+
       connection.release();
-      
-      logger.info('Sector eliminado', {
-        sectorId: id,
-        deletedBy: req.user.id
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Sector no encontrado'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Sector eliminado exitosamente'
       });
-      
-      return ApiResponse.success(res, null, 'Sector eliminado exitosamente');
-      
     } catch (error) {
-      logger.error('Error eliminando sector:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error eliminando sector:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 
-  // ========================================
-  // MÉTODOS DE UTILIDAD
-  // ========================================
+  // ============================================
+  // UTILIDADES GEOGRÁFICAS
+  // ============================================
 
-  // Obtener jerarquía geográfica completa
+  // Obtener jerarquía completa
+  static async obtenerJerarquia(req, res) {
+    return GeographyController.getGeographyHierarchy(req, res);
+  }
+
   static async getGeographyHierarchy(req, res) {
     try {
       const connection = await pool.getConnection();
-      
-      const [departments] = await connection.execute(`
+
+      const [jerarquia] = await connection.execute(`
         SELECT 
-          d.id,
-          d.codigo,
-          d.nombre,
-          COUNT(DISTINCT c.id) as total_ciudades,
-          COUNT(DISTINCT s.id) as total_sectores
+          d.id as departamento_id,
+          d.codigo as departamento_codigo,
+          d.nombre as departamento_nombre,
+          c.id as ciudad_id,
+          c.codigo as ciudad_codigo,
+          c.nombre as ciudad_nombre,
+          s.id as sector_id,
+          s.codigo as sector_codigo,
+          s.nombre as sector_nombre,
+          s.activo as sector_activo
         FROM departamentos d
         LEFT JOIN ciudades c ON d.id = c.departamento_id
         LEFT JOIN sectores s ON c.id = s.ciudad_id
-        GROUP BY d.id, d.codigo, d.nombre
-        ORDER BY d.nombre ASC
+        ORDER BY d.nombre ASC, c.nombre ASC, s.nombre ASC
       `);
-      
-      // Para cada departamento, obtener sus ciudades y sectores
-      for (let dept of departments) {
-        const [cities] = await connection.execute(`
-          SELECT 
-            c.id,
-            c.codigo,
-            c.nombre,
-            COUNT(DISTINCT s.id) as total_sectores
-          FROM ciudades c
-          LEFT JOIN sectores s ON c.id = s.ciudad_id
-          WHERE c.departamento_id = ?
-          GROUP BY c.id, c.codigo, c.nombre
-          ORDER BY c.nombre ASC
-        `, [dept.id]);
-        
-        // Para cada ciudad, obtener sus sectores
-        for (let city of cities) {
-          const [sectors] = await connection.execute(`
-            SELECT id, codigo, nombre, activo
-            FROM sectores
-            WHERE ciudad_id = ?
-            ORDER BY nombre ASC
-          `, [city.id]);
-          
-          city.sectores = sectors;
-        }
-        
-        dept.ciudades = cities;
-      }
-      
+
       connection.release();
-      
-      return ApiResponse.success(res, departments, 'Jerarquía geográfica obtenida exitosamente');
-      
+
+      // Organizar datos en estructura jerárquica
+      const departamentos = {};
+
+      jerarquia.forEach(row => {
+        if (!departamentos[row.departamento_id]) {
+          departamentos[row.departamento_id] = {
+            id: row.departamento_id,
+            codigo: row.departamento_codigo,
+            nombre: row.departamento_nombre,
+            ciudades: {}
+          };
+        }
+
+        if (row.ciudad_id && !departamentos[row.departamento_id].ciudades[row.ciudad_id]) {
+          departamentos[row.departamento_id].ciudades[row.ciudad_id] = {
+            id: row.ciudad_id,
+            codigo: row.ciudad_codigo,
+            nombre: row.ciudad_nombre,
+            sectores: []
+          };
+        }
+
+        if (row.sector_id) {
+          departamentos[row.departamento_id].ciudades[row.ciudad_id].sectores.push({
+            id: row.sector_id,
+            codigo: row.sector_codigo,
+            nombre: row.sector_nombre,
+            activo: Boolean(row.sector_activo)
+          });
+        }
+      });
+
+      // Convertir a array
+      const resultado = Object.values(departamentos).map(dept => ({
+        ...dept,
+        ciudades: Object.values(dept.ciudades)
+      }));
+
+      res.json({
+        success: true,
+        data: resultado,
+        message: 'Jerarquía geográfica obtenida exitosamente'
+      });
     } catch (error) {
-      logger.error('Error obteniendo jerarquía geográfica:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error obteniendo jerarquía:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 
-  // Buscar ubicaciones por término
+  // Buscar ubicaciones
+  static async buscarUbicaciones(req, res) {
+    return GeographyController.searchLocations(req, res);
+  }
+
   static async searchLocations(req, res) {
     try {
-      const { q, type = 'all' } = req.query;
-      
-      if (!q || q.length < 2) {
-        return ApiResponse.error(res, 'El término de búsqueda debe tener al menos 2 caracteres', 400);
+      const { q: query, type = 'all' } = req.query;
+
+      if (!query || query.length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'El término de búsqueda debe tener al menos 2 caracteres'
+        });
       }
-      
+
       const connection = await pool.getConnection();
-      
-      let results = {
-        departamentos: [],
-        ciudades: [],
-        sectores: []
-      };
-      
-      const searchTerm = `%${q}%`;
-      
+      const searchTerm = `%${query}%`;
+      const results = { departamentos: [], ciudades: [], sectores: [] };
+
       // Buscar departamentos
       if (type === 'all' || type === 'departamentos') {
-        const [departments] = await connection.execute(`
-          SELECT id, codigo, nombre, 'departamento' as tipo
-          FROM departamentos
-          WHERE nombre LIKE ? OR codigo LIKE ?
-          ORDER BY nombre ASC
-          LIMIT 10
-        `, [searchTerm, searchTerm]);
-        
-        results.departamentos = departments;
+        const [departamentos] = await connection.execute(
+          'SELECT id, codigo, nombre, "departamento" as tipo FROM departamentos WHERE nombre LIKE ? OR codigo LIKE ? ORDER BY nombre ASC LIMIT 10',
+          [searchTerm, searchTerm]
+        );
+        results.departamentos = departamentos;
       }
-      
+
       // Buscar ciudades
       if (type === 'all' || type === 'ciudades') {
-        const [cities] = await connection.execute(`
-          SELECT 
-            c.id, 
-            c.codigo, 
-            c.nombre, 
-            c.departamento_id,
-            d.nombre as departamento_nombre,
-            'ciudad' as tipo
-          FROM ciudades c
-          LEFT JOIN departamentos d ON c.departamento_id = d.id
-          WHERE c.nombre LIKE ? OR c.codigo LIKE ?
-          ORDER BY c.nombre ASC
-          LIMIT 10
-        `, [searchTerm, searchTerm]);
-        
-        results.ciudades = cities;
+        const [ciudades] = await connection.execute(
+          `SELECT c.id, c.codigo, c.nombre, d.nombre as departamento_nombre, "ciudad" as tipo
+           FROM ciudades c
+           LEFT JOIN departamentos d ON c.departamento_id = d.id
+           WHERE c.nombre LIKE ? OR c.codigo LIKE ?
+           ORDER BY c.nombre ASC LIMIT 10`,
+          [searchTerm, searchTerm]
+        );
+        results.ciudades = ciudades;
       }
-      
+
       // Buscar sectores
       if (type === 'all' || type === 'sectores') {
-        const [sectors] = await connection.execute(`
-          SELECT 
-            s.id, 
-            s.codigo, 
-            s.nombre, 
-            s.ciudad_id,
-            s.activo,
-            c.nombre as ciudad_nombre,
-            d.nombre as departamento_nombre,
-            'sector' as tipo
-          FROM sectores s
-          LEFT JOIN ciudades c ON s.ciudad_id = c.id
-          LEFT JOIN departamentos d ON c.departamento_id = d.id
-          WHERE s.nombre LIKE ? OR s.codigo LIKE ?
-          ORDER BY s.nombre ASC
-          LIMIT 10
-        `, [searchTerm, searchTerm]);
-        
-        results.sectores = sectors;
+        const [sectores] = await connection.execute(
+          `SELECT s.id, s.codigo, s.nombre, s.activo, c.nombre as ciudad_nombre, d.nombre as departamento_nombre, "sector" as tipo
+           FROM sectores s
+           LEFT JOIN ciudades c ON s.ciudad_id = c.id
+           LEFT JOIN departamentos d ON c.departamento_id = d.id
+           WHERE s.nombre LIKE ? OR s.codigo LIKE ?
+           ORDER BY s.nombre ASC LIMIT 10`,
+          [searchTerm, searchTerm]
+        );
+        results.sectores = sectores;
       }
-      
+
       connection.release();
-      
-      const totalResults = results.departamentos.length + results.ciudades.length + results.sectores.length;
-      
-      return ApiResponse.success(res, {
-        ...results,
-        total_resultados: totalResults,
-        termino_busqueda: q
-      }, 'Búsqueda realizada exitosamente');
-      
+
+      res.json({
+        success: true,
+        data: results,
+        message: 'Búsqueda completada exitosamente'
+      });
     } catch (error) {
-      logger.error('Error en búsqueda de ubicaciones:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error en búsqueda:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 
   // Obtener estadísticas geográficas
+  static async obtenerEstadisticasGeografia(req, res) {
+    return GeographyController.getGeographyStats(req, res);
+  }
+
   static async getGeographyStats(req, res) {
     try {
       const connection = await pool.getConnection();
-      
-      const [stats] = await connection.execute(`
+
+      const [estadisticas] = await connection.execute(`
         SELECT 
           (SELECT COUNT(*) FROM departamentos) as total_departamentos,
           (SELECT COUNT(*) FROM ciudades) as total_ciudades,
           (SELECT COUNT(*) FROM sectores) as total_sectores,
           (SELECT COUNT(*) FROM sectores WHERE activo = 1) as sectores_activos,
           (SELECT COUNT(*) FROM sectores WHERE activo = 0) as sectores_inactivos,
-          (SELECT COUNT(DISTINCT cl.sector_id) FROM clientes cl WHERE cl.sector_id IS NOT NULL) as sectores_con_clientes,
-          (SELECT COUNT(*) FROM clientes WHERE sector_id IS NULL) as clientes_sin_sector
+          (SELECT COUNT(DISTINCT s.ciudad_id) FROM sectores s WHERE s.activo = 1) as ciudades_con_sectores_activos,
+          (SELECT COUNT(DISTINCT c.departamento_id) FROM ciudades c 
+           INNER JOIN sectores s ON c.id = s.ciudad_id WHERE s.activo = 1) as departamentos_con_sectores_activos
       `);
-      
-      // Departamentos con más ciudades
-      const [topDepartments] = await connection.execute(`
-        SELECT 
-          d.nombre,
-          COUNT(c.id) as total_ciudades
-        FROM departamentos d
-        LEFT JOIN ciudades c ON d.id = c.departamento_id
-        GROUP BY d.id, d.nombre
-        ORDER BY total_ciudades DESC
-        LIMIT 5
-      `);
-      
-      // Sectores con más clientes
-      const [topSectors] = await connection.execute(`
-        SELECT 
-          s.nombre as sector_nombre,
-          c.nombre as ciudad_nombre,
-          COUNT(cl.id) as total_clientes
-        FROM sectores s
-        LEFT JOIN ciudades c ON s.ciudad_id = c.id
-        LEFT JOIN clientes cl ON s.id = cl.sector_id
-        WHERE s.activo = 1
-        GROUP BY s.id, s.nombre, c.nombre
-        ORDER BY total_clientes DESC
-        LIMIT 5
-      `);
-      
+
       connection.release();
-      
-      return ApiResponse.success(res, {
-        ...stats[0],
-        departamentos_con_mas_ciudades: topDepartments,
-        sectores_con_mas_clientes: topSectors
-      }, 'Estadísticas geográficas obtenidas exitosamente');
-      
+
+      res.json({
+        success: true,
+        data: estadisticas[0],
+        message: 'Estadísticas geográficas obtenidas exitosamente'
+      });
     } catch (error) {
-      logger.error('Error obteniendo estadísticas geográficas:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500);
+      console.error('Error obteniendo estadísticas geográficas:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
     }
   }
 }
