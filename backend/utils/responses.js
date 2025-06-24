@@ -15,6 +15,143 @@ class ApiResponse {
     });
   }
 
+  static respuestaExitosa(res, data = null, message = 'Operación exitosa', statusCode = 200) {
+  return res.status(statusCode).json({
+    success: true,
+    message,
+    data,
+    timestamp: new Date().toISOString()
+  });
+}
+
+/**
+ * Respuesta de error
+ */
+static respuestaError(res, message = 'Error interno del servidor', statusCode = 500, errors = null) {
+  const response = {
+    success: false,
+    message,
+    timestamp: new Date().toISOString()
+  };
+
+  if (errors) {
+    response.errors = errors;
+  }
+
+  if (process.env.NODE_ENV === 'development' && statusCode >= 500) {
+    response.stack = new Error().stack;
+  }
+
+  return res.status(statusCode).json(response);
+}
+
+/**
+ * Respuesta de validación fallida
+ */
+static respuestaValidacion(res, errors, message = 'Datos de entrada inválidos') {
+  return res.status(400).json({
+    success: false,
+    message,
+    errors: Array.isArray(errors) ? errors : [errors],
+    timestamp: new Date().toISOString()
+  });
+}
+
+/**
+ * Respuesta de no autorizado
+ */
+static respuestaNoAutorizado(res, message = 'No autorizado') {
+  return res.status(401).json({
+    success: false,
+    message,
+    error: {
+      code: 'UNAUTHORIZED',
+      description: 'Token de acceso requerido o inválido'
+    },
+    timestamp: new Date().toISOString()
+  });
+}
+
+/**
+ * Respuesta de acceso prohibido
+ */
+static respuestaProhibido(res, message = 'Acceso prohibido') {
+  return res.status(403).json({
+    success: false,
+    message,
+    error: {
+      code: 'FORBIDDEN',
+      description: 'No tienes permisos para acceder a este recurso'
+    },
+    timestamp: new Date().toISOString()
+  });
+}
+
+/**
+ * Respuesta de recurso no encontrado
+ */
+static respuestaNoEncontrado(res, message = 'Recurso no encontrado') {
+  return res.status(404).json({
+    success: false,
+    message,
+    error: {
+      code: 'NOT_FOUND',
+      description: 'El recurso solicitado no existe'
+    },
+    timestamp: new Date().toISOString()
+  });
+}
+
+/**
+ * Respuesta de conflicto
+ */
+static respuestaConflicto(res, message = 'Conflicto de datos') {
+  return res.status(409).json({
+    success: false,
+    message,
+    error: {
+      code: 'CONFLICT',
+      description: 'Los datos enviados entran en conflicto con los existentes'
+    },
+    timestamp: new Date().toISOString()
+  });
+}
+
+/**
+ * Respuesta de creación exitosa
+ */
+static respuestaCreado(res, data, message = 'Recurso creado exitosamente') {
+  return res.status(201).json({
+    success: true,
+    message,
+    data,
+    timestamp: new Date().toISOString()
+  });
+}
+
+/**
+ * Respuesta de actualización exitosa
+ */
+static respuestaActualizado(res, data = null, message = 'Recurso actualizado exitosamente') {
+  return res.status(200).json({
+    success: true,
+    message,
+    data,
+    timestamp: new Date().toISOString()
+  });
+}
+
+/**
+ * Respuesta de eliminación exitosa
+ */
+static respuestaEliminado(res, message = 'Recurso eliminado exitosamente') {
+  return res.status(200).json({
+    success: true,
+    message,
+    timestamp: new Date().toISOString()
+  });
+}
+
   /**
    * Respuesta de error genérica
    */
