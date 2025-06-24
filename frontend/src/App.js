@@ -32,6 +32,7 @@ const ReportesRegulatorios = lazy(() => import('./components/Reports/ReportesReg
 const PQRManagement = lazy(() => import('./components/PQR/PQRManagement'));// CORREGIDO: Importación correcta del componente PQRManagement' from './components/PQR/PQRManagement';
 const IncidenciasManagement = lazy(() => import('./components/Incidencias/IncidenciasManagement'));
 const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
+const InstalacionesManagement = lazy(() => import('./components/Instalaciones/InstalacionesManagement'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -338,12 +339,15 @@ function App() {
                 }
               />
 
-              <Route
-                path="/installations"
+             <Route
+                path="/instalaciones"
                 element={
-                  <ProtectedRoute requiredRole="instalador">
-                    <MainLayout title="Gestión de Instalaciones" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Gestión de Instalaciones" />
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout 
+                      title="Gestión de Instalaciones" 
+                      subtitle="Administra las instalaciones de servicios de internet y televisión"
+                    >
+                      <InstalacionesManagement />
                     </MainLayout>
                   </ProtectedRoute>
                 }

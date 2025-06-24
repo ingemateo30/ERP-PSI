@@ -120,8 +120,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     {
       icon: <Wrench size={22} />,
       label: 'Instalaciones',
-      path: '/installations',
-      permission: 'instalador'
+      path: '/instalaciones',
+      permission: 'administrador'
     },
     {
       icon: <Package size={22} />,
