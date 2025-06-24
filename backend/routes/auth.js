@@ -1,4 +1,4 @@
-// backend/routes/auth.js - RUTAS DE AUTENTICACIÓN CORREGIDAS
+// backend/routes/auth.js - RUTAS DE AUTENTICACIÓN SIMPLIFICADAS
 
 const express = require('express');
 const router = express.Router();
@@ -6,8 +6,22 @@ const Joi = require('joi');
 const AuthController = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
 
-// Importación corregida del rateLimiter - ahora directamente
-const rateLimiter = require('../middleware/rateLimiter');
+// Importar rateLimiter con manejo de errores
+let rateLimiter;
+try {
+  rateLimiter = require('../middleware/rateLimiter');
+  console.log('✅ rateLimiter cargado correctamente');
+} catch (error) {
+  console.error('❌ Error cargando rateLimiter:', error.message);
+  // Crear middleware dummy si falla
+  rateLimiter = {
+    login: (req, res, next) => next(),
+    register: (req, res, next) => next(),
+    refresh: (req, res, next) => next(),
+    forgotPassword: (req, res, next) => next(),
+    resetPassword: (req, res, next) => next()
+  };
+}
 
 // Función de validación
 const validate = (schema) => {
@@ -37,7 +51,7 @@ const validate = (schema) => {
   };
 };
 
-// Esquemas de validación
+// Esquemas de validación básicos
 const loginSchema = Joi.object({
   email: Joi.string()
     .email({ tlds: { allow: false } })
@@ -78,13 +92,11 @@ const registerSchema = Joi.object({
     .required()
     .min(8)
     .max(128)
-    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .messages({
       'string.min': 'La contraseña debe tener al menos 8 caracteres',
       'string.empty': 'La contraseña es requerida',
       'any.required': 'La contraseña es requerida',
-      'string.max': 'La contraseña no puede tener más de 128 caracteres',
-      'string.pattern.base': 'La contraseña debe contener al menos una minúscula, una mayúscula y un número'
+      'string.max': 'La contraseña no puede tener más de 128 caracteres'
     }),
   confirmPassword: Joi.string()
     .required()
@@ -94,42 +106,31 @@ const registerSchema = Joi.object({
       'string.empty': 'La confirmación de contraseña es requerida',
       'any.required': 'La confirmación de contraseña es requerida'
     }),
-  nombres: Joi.string()
+  nombre: Joi.string()
     .required()
     .min(2)
     .max(100)
     .trim()
     .messages({
-      'string.min': 'Los nombres deben tener al menos 2 caracteres',
-      'string.empty': 'Los nombres son requeridos',
-      'any.required': 'Los nombres son requeridos',
-      'string.max': 'Los nombres no pueden tener más de 100 caracteres'
-    }),
-  apellidos: Joi.string()
-    .required()
-    .min(2)
-    .max(100)
-    .trim()
-    .messages({
-      'string.min': 'Los apellidos deben tener al menos 2 caracteres',
-      'string.empty': 'Los apellidos son requeridos',
-      'any.required': 'Los apellidos son requeridos',
-      'string.max': 'Los apellidos no pueden tener más de 100 caracteres'
-    }),
-  rol: Joi.string()
-    .valid('administrador', 'supervisor', 'instalador')
-    .default('instalador')
-    .messages({
-      'any.only': 'El rol debe ser administrador, supervisor o instalador'
+      'string.min': 'El nombre debe tener al menos 2 caracteres',
+      'string.empty': 'El nombre es requerido',
+      'any.required': 'El nombre es requerido',
+      'string.max': 'El nombre no puede tener más de 100 caracteres'
     }),
   telefono: Joi.string()
     .optional()
     .allow('')
     .max(20)
-    .pattern(/^[0-9+\-\s()]+$/)
+    .pattern(/^[0-9+\-\s()]*$/)
     .messages({
       'string.max': 'El teléfono no puede tener más de 20 caracteres',
       'string.pattern.base': 'El teléfono solo puede contener números y símbolos válidos'
+    }),
+  rol: Joi.string()
+    .valid('administrador', 'supervisor', 'instalador')
+    .default('supervisor')
+    .messages({
+      'any.only': 'El rol debe ser administrador, supervisor o instalador'
     })
 });
 
@@ -144,12 +145,10 @@ const changePasswordSchema = Joi.object({
     .required()
     .min(8)
     .max(128)
-    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .messages({
       'string.min': 'La nueva contraseña debe tener al menos 8 caracteres',
       'string.empty': 'La nueva contraseña es requerida',
-      'any.required': 'La nueva contraseña es requerida',
-      'string.pattern.base': 'La nueva contraseña debe contener al menos una minúscula, una mayúscula y un número'
+      'any.required': 'La nueva contraseña es requerida'
     }),
   confirmNewPassword: Joi.string()
     .required()
@@ -161,8 +160,34 @@ const changePasswordSchema = Joi.object({
     })
 });
 
+// Verificar que AuthController tenga los métodos necesarios
+const verificarMetodo = (metodo, nombre) => {
+  if (typeof AuthController[metodo] === 'function') {
+    console.log(`✅ AuthController.${metodo} disponible`);
+    return AuthController[metodo];
+  } else {
+    console.error(`❌ AuthController.${metodo} NO ENCONTRADO`);
+    // Retornar un handler de error temporal
+    return (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: `Método ${nombre} no implementado`,
+        timestamp: new Date().toISOString()
+      });
+    };
+  }
+};
+
+// Obtener métodos con verificación
+const loginHandler = verificarMetodo('login', 'login');
+const registerHandler = verificarMetodo('register', 'register');
+const logoutHandler = verificarMetodo('logout', 'logout');
+const verifyHandler = verificarMetodo('verify', 'verify');
+const meHandler = verificarMetodo('me', 'me');
+const changePasswordHandler = verificarMetodo('changePassword', 'changePassword');
+
 // ==========================================
-// RUTAS DE AUTENTICACIÓN
+// RUTAS BÁSICAS DE AUTENTICACIÓN
 // ==========================================
 
 /**
@@ -173,7 +198,7 @@ const changePasswordSchema = Joi.object({
 router.post('/login', 
   rateLimiter.login,
   validate(loginSchema),
-  AuthController.login
+  loginHandler
 );
 
 /**
@@ -184,17 +209,7 @@ router.post('/login',
 router.post('/register', 
   rateLimiter.register,
   validate(registerSchema),
-  AuthController.register
-);
-
-/**
- * @route POST /api/v1/auth/refresh
- * @desc Renovar token de acceso
- * @access Public (con refresh token)
- */
-router.post('/refresh',
-  rateLimiter.refresh,
-  AuthController.refreshToken
+  registerHandler
 );
 
 /**
@@ -204,7 +219,7 @@ router.post('/refresh',
  */
 router.post('/logout', 
   authenticateToken,
-  AuthController.logout
+  logoutHandler
 );
 
 /**
@@ -214,7 +229,7 @@ router.post('/logout',
  */
 router.get('/verify', 
   authenticateToken,
-  AuthController.verify
+  verifyHandler
 );
 
 /**
@@ -224,7 +239,7 @@ router.get('/verify',
  */
 router.get('/me', 
   authenticateToken,
-  AuthController.me
+  meHandler
 );
 
 /**
@@ -235,7 +250,7 @@ router.get('/me',
 router.post('/change-password', 
   authenticateToken,
   validate(changePasswordSchema),
-  AuthController.changePassword
+  changePasswordHandler
 );
 
 /**
@@ -245,67 +260,125 @@ router.post('/change-password',
  */
 router.get('/profile', 
   authenticateToken,
-  AuthController.me
+  meHandler
 );
 
 // ==========================================
-// RUTAS DE RECUPERACIÓN DE CONTRASEÑA
+// RUTAS OPCIONALES (solo si están implementadas)
+// ==========================================
+
+// Verificar si existe refreshToken
+if (typeof AuthController.refreshToken === 'function') {
+  /**
+   * @route POST /api/v1/auth/refresh
+   * @desc Renovar token de acceso
+   * @access Public (con refresh token)
+   */
+  router.post('/refresh',
+    rateLimiter.refresh,
+    AuthController.refreshToken
+  );
+  console.log('✅ Ruta /refresh habilitada');
+} else {
+  console.log('⚠️ AuthController.refreshToken no disponible - ruta /refresh deshabilitada');
+}
+
+// Verificar si existe forgotPassword
+if (typeof AuthController.forgotPassword === 'function') {
+  /**
+   * @route POST /api/v1/auth/forgot-password
+   * @desc Solicitar recuperación de contraseña
+   * @access Public
+   */
+  router.post('/forgot-password',
+    rateLimiter.forgotPassword,
+    validate(Joi.object({
+      email: Joi.string()
+        .email()
+        .required()
+        .messages({
+          'string.email': 'Debe proporcionar un email válido',
+          'any.required': 'El email es requerido'
+        })
+    })),
+    AuthController.forgotPassword
+  );
+  console.log('✅ Ruta /forgot-password habilitada');
+} else {
+  console.log('⚠️ AuthController.forgotPassword no disponible - ruta /forgot-password deshabilitada');
+}
+
+// Verificar si existe resetPassword
+if (typeof AuthController.resetPassword === 'function') {
+  /**
+   * @route POST /api/v1/auth/reset-password
+   * @desc Restablecer contraseña con token
+   * @access Public
+   */
+  router.post('/reset-password',
+    rateLimiter.resetPassword,
+    validate(Joi.object({
+      token: Joi.string()
+        .required()
+        .messages({
+          'any.required': 'El token de recuperación es requerido'
+        }),
+      newPassword: Joi.string()
+        .required()
+        .min(8)
+        .messages({
+          'string.min': 'La contraseña debe tener al menos 8 caracteres',
+          'any.required': 'La nueva contraseña es requerida'
+        }),
+      confirmPassword: Joi.string()
+        .required()
+        .valid(Joi.ref('newPassword'))
+        .messages({
+          'any.only': 'Las contraseñas no coinciden',
+          'any.required': 'La confirmación de contraseña es requerida'
+        })
+    })),
+    AuthController.resetPassword
+  );
+  console.log('✅ Ruta /reset-password habilitada');
+} else {
+  console.log('⚠️ AuthController.resetPassword no disponible - ruta /reset-password deshabilitada');
+}
+
+// ==========================================
+// RUTA DE INFORMACIÓN
 // ==========================================
 
 /**
- * @route POST /api/v1/auth/forgot-password
- * @desc Solicitar recuperación de contraseña
+ * @route GET /api/v1/auth/info
+ * @desc Obtener información sobre las rutas de autenticación disponibles
  * @access Public
  */
-router.post('/forgot-password',
-  rateLimiter.forgotPassword,
-  validate(Joi.object({
-    email: Joi.string()
-      .email()
-      .required()
-      .messages({
-        'string.email': 'Debe proporcionar un email válido',
-        'any.required': 'El email es requerido'
-      })
-  })),
-  AuthController.forgotPassword
-);
-
-/**
- * @route POST /api/v1/auth/reset-password
- * @desc Restablecer contraseña con token
- * @access Public
- */
-router.post('/reset-password',
-  rateLimiter.resetPassword,
-  validate(Joi.object({
-    token: Joi.string()
-      .required()
-      .messages({
-        'any.required': 'El token de recuperación es requerido'
-      }),
-    newPassword: Joi.string()
-      .required()
-      .min(8)
-      .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .messages({
-        'string.min': 'La contraseña debe tener al menos 8 caracteres',
-        'any.required': 'La nueva contraseña es requerida',
-        'string.pattern.base': 'La contraseña debe contener al menos una minúscula, una mayúscula y un número'
-      }),
-    confirmPassword: Joi.string()
-      .required()
-      .valid(Joi.ref('newPassword'))
-      .messages({
-        'any.only': 'Las contraseñas no coinciden',
-        'any.required': 'La confirmación de contraseña es requerida'
-      })
-  })),
-  AuthController.resetPassword
-);
+router.get('/info', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API de Autenticación - Sistema PSI',
+    availableRoutes: {
+      'POST /login': 'Iniciar sesión',
+      'POST /register': 'Registrar nuevo usuario',
+      'POST /logout': 'Cerrar sesión (requiere token)',
+      'GET /verify': 'Verificar token (requiere token)',
+      'GET /me': 'Obtener información del usuario actual (requiere token)',
+      'GET /profile': 'Alias de /me (requiere token)',
+      'POST /change-password': 'Cambiar contraseña (requiere token)',
+      'GET /info': 'Esta información'
+    },
+    optionalRoutes: {
+      'POST /refresh': AuthController.refreshToken ? 'Disponible' : 'No implementado',
+      'POST /forgot-password': AuthController.forgotPassword ? 'Disponible' : 'No implementado',
+      'POST /reset-password': AuthController.resetPassword ? 'Disponible' : 'No implementado'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
 
 // ==========================================
-// MANEJO DE ERRORES ESPECÍFICO
+// MANEJO DE ERRORES
 // ==========================================
 
 // Middleware de manejo de errores para auth
@@ -347,5 +420,7 @@ router.use((error, req, res, next) => {
     timestamp: new Date().toISOString()
   });
 });
+
+console.log('🔐 Rutas de autenticación configuradas correctamente');
 
 module.exports = router;

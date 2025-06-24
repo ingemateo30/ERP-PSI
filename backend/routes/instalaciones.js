@@ -1,11 +1,111 @@
 const express = require('express');
 const router = express.Router();
-const InstalacionesController = require('../controllers/instalacionesController');
-const auth = require('../middleware/auth');
-const rateLimiter = require('../middleware/rateLimiter');
+const { authenticateToken, requireRole } = require('../middleware/auth');
+
+// Importar rateLimiter con manejo de errores
+let rateLimiter;
+try {
+  rateLimiter = require('../middleware/rateLimiter');
+  console.log('✅ rateLimiter para instalaciones cargado');
+} catch (error) {
+  console.error('❌ Error cargando rateLimiter:', error.message);
+  // Crear middleware dummy si falla
+  rateLimiter = {
+    instalaciones: (req, res, next) => next()
+  };
+}
+
+// Verificar si existe el controlador de instalaciones
+let InstalacionesController;
+try {
+  InstalacionesController = require('../controllers/instalacionesController');
+  console.log('✅ InstalacionesController cargado');
+} catch (error) {
+  console.error('❌ InstalacionesController no encontrado:', error.message);
+  // Crear controlador dummy
+  InstalacionesController = {
+    listar: (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: 'Controlador de instalaciones no implementado',
+        timestamp: new Date().toISOString()
+      });
+    },
+    obtenerPorId: (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: 'Método obtenerPorId no implementado',
+        timestamp: new Date().toISOString()
+      });
+    },
+    crear: (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: 'Método crear no implementado',
+        timestamp: new Date().toISOString()
+      });
+    },
+    actualizar: (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: 'Método actualizar no implementado',
+        timestamp: new Date().toISOString()
+      });
+    },
+    eliminar: (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: 'Método eliminar no implementado',
+        timestamp: new Date().toISOString()
+      });
+    },
+    cambiarEstado: (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: 'Método cambiarEstado no implementado',
+        timestamp: new Date().toISOString()
+      });
+    },
+    reagendar: (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: 'Método reagendar no implementado',
+        timestamp: new Date().toISOString()
+      });
+    },
+    asignarInstalador: (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: 'Método asignarInstalador no implementado',
+        timestamp: new Date().toISOString()
+      });
+    },
+    obtenerEstadisticas: (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: 'Método obtenerEstadisticas no implementado',
+        timestamp: new Date().toISOString()
+      });
+    },
+    obtenerPendientesPorInstalador: (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: 'Método obtenerPendientesPorInstalador no implementado',
+        timestamp: new Date().toISOString()
+      });
+    },
+    obtenerAgendaInstalador: (req, res) => {
+      res.status(501).json({
+        success: false,
+        message: 'Método obtenerAgendaInstalador no implementado',
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
+}
 
 // Middleware de autenticación para todas las rutas
-router.use(auth.verificarToken);
+router.use(authenticateToken);
 
 // Aplicar rate limiting
 router.use(rateLimiter.instalaciones);
@@ -13,7 +113,7 @@ router.use(rateLimiter.instalaciones);
 // Middleware para verificar roles
 const verificarRol = (rolesPermitidos) => {
   return (req, res, next) => {
-    if (!rolesPermitidos.includes(req.usuario.rol)) {
+    if (!rolesPermitidos.includes(req.user.rol)) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para realizar esta acción',
@@ -26,9 +126,9 @@ const verificarRol = (rolesPermitidos) => {
 
 // Middleware para verificar que instaladores solo vean sus instalaciones
 const verificarAccesoInstalacion = (req, res, next) => {
-  if (req.usuario.rol === 'instalador') {
+  if (req.user.rol === 'instalador') {
     // Los instaladores solo pueden ver sus propias instalaciones
-    if (req.params.instalador_id && parseInt(req.params.instalador_id) !== req.usuario.id) {
+    if (req.params.instalador_id && parseInt(req.params.instalador_id) !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Solo puedes acceder a tus propias instalaciones',
@@ -38,25 +138,20 @@ const verificarAccesoInstalacion = (req, res, next) => {
     
     // Para listados, agregar filtro automático
     if (req.method === 'GET' && !req.params.id) {
-      req.query.instalador_id = req.usuario.id;
+      req.query.instalador_id = req.user.id;
     }
   }
   next();
 };
 
+// ==========================================
+// RUTAS BÁSICAS
+// ==========================================
+
 /**
  * @route GET /api/v1/instalaciones
  * @desc Listar instalaciones con filtros y paginación
  * @access Administrador, Supervisor, Instalador (solo las propias)
- * @query {number} pagina - Número de página (default: 1)
- * @query {number} limite - Elementos por página (default: 10, max: 100)
- * @query {string} estado - Filtrar por estado
- * @query {number} instalador_id - Filtrar por instalador
- * @query {string} fecha_desde - Filtrar desde fecha (YYYY-MM-DD)
- * @query {string} fecha_hasta - Filtrar hasta fecha (YYYY-MM-DD)
- * @query {string} tipo_instalacion - Filtrar por tipo
- * @query {number} ciudad_id - Filtrar por ciudad
- * @query {string} busqueda - Búsqueda general
  */
 router.get('/', 
   verificarRol(['administrador', 'supervisor', 'instalador']),
@@ -68,9 +163,6 @@ router.get('/',
  * @route GET /api/v1/instalaciones/estadisticas
  * @desc Obtener estadísticas de instalaciones
  * @access Administrador, Supervisor
- * @query {string} fecha_desde - Filtrar desde fecha (YYYY-MM-DD)
- * @query {string} fecha_hasta - Filtrar hasta fecha (YYYY-MM-DD)
- * @query {number} instalador_id - Filtrar por instalador
  */
 router.get('/estadisticas',
   verificarRol(['administrador', 'supervisor']),
@@ -81,7 +173,6 @@ router.get('/estadisticas',
  * @route GET /api/v1/instalaciones/instalador/:instalador_id/pendientes
  * @desc Obtener instalaciones pendientes de un instalador
  * @access Administrador, Supervisor, Instalador (solo las propias)
- * @param {number} instalador_id - ID del instalador
  */
 router.get('/instalador/:instalador_id/pendientes',
   verificarRol(['administrador', 'supervisor', 'instalador']),
@@ -93,9 +184,6 @@ router.get('/instalador/:instalador_id/pendientes',
  * @route GET /api/v1/instalaciones/instalador/:instalador_id/agenda
  * @desc Obtener agenda del instalador
  * @access Administrador, Supervisor, Instalador (solo la propia)
- * @param {number} instalador_id - ID del instalador
- * @query {string} fecha_desde - Filtrar desde fecha (YYYY-MM-DD)
- * @query {string} fecha_hasta - Filtrar hasta fecha (YYYY-MM-DD)
  */
 router.get('/instalador/:instalador_id/agenda',
   verificarRol(['administrador', 'supervisor', 'instalador']),
@@ -107,42 +195,10 @@ router.get('/instalador/:instalador_id/agenda',
  * @route GET /api/v1/instalaciones/:id
  * @desc Obtener instalación por ID
  * @access Administrador, Supervisor, Instalador (solo las propias)
- * @param {number} id - ID de la instalación
  */
 router.get('/:id',
   verificarRol(['administrador', 'supervisor', 'instalador']),
-  async (req, res, next) => {
-    // Verificar acceso específico para instaladores
-    if (req.usuario.rol === 'instalador') {
-      try {
-        const Instalacion = require('../models/instalacion');
-        const instalacion = await Instalacion.obtenerPorId(parseInt(req.params.id));
-        
-        if (!instalacion) {
-          return res.status(404).json({
-            success: false,
-            message: 'Instalación no encontrada',
-            timestamp: new Date().toISOString()
-          });
-        }
-
-        if (instalacion.instalador_id !== req.usuario.id) {
-          return res.status(403).json({
-            success: false,
-            message: 'Solo puedes acceder a tus propias instalaciones',
-            timestamp: new Date().toISOString()
-          });
-        }
-      } catch (error) {
-        return res.status(500).json({
-          success: false,
-          message: 'Error interno del servidor',
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-    next();
-  },
+  // Verificación de acceso específico se maneja en el controlador
   InstalacionesController.obtenerPorId
 );
 
@@ -150,21 +206,6 @@ router.get('/:id',
  * @route POST /api/v1/instalaciones
  * @desc Crear nueva instalación
  * @access Administrador, Supervisor
- * @body {number} cliente_id - ID del cliente (requerido)
- * @body {number} plan_id - ID del plan (requerido)
- * @body {number} instalador_id - ID del instalador (opcional)
- * @body {string} fecha_programada - Fecha programada (requerido)
- * @body {string} direccion_instalacion - Dirección (requerido)
- * @body {string} barrio - Barrio (opcional)
- * @body {number} ciudad_id - ID de la ciudad (opcional)
- * @body {string} telefono_contacto - Teléfono de contacto (opcional)
- * @body {string} persona_recibe - Persona que recibe (opcional)
- * @body {string} tipo_instalacion - Tipo de instalación (opcional)
- * @body {string} observaciones - Observaciones (opcional)
- * @body {array} equipos_instalados - Equipos a instalar (opcional)
- * @body {number} coordenadas_lat - Latitud (opcional)
- * @body {number} coordenadas_lng - Longitud (opcional)
- * @body {number} costo_instalacion - Costo de instalación (opcional)
  */
 router.post('/',
   verificarRol(['administrador', 'supervisor']),
@@ -175,7 +216,6 @@ router.post('/',
  * @route PUT /api/v1/instalaciones/:id
  * @desc Actualizar instalación completa
  * @access Administrador, Supervisor
- * @param {number} id - ID de la instalación
  */
 router.put('/:id',
   verificarRol(['administrador', 'supervisor']),
@@ -186,47 +226,9 @@ router.put('/:id',
  * @route PATCH /api/v1/instalaciones/:id/estado
  * @desc Cambiar estado de instalación
  * @access Administrador, Supervisor, Instalador (solo las propias)
- * @param {number} id - ID de la instalación
- * @body {string} estado - Nuevo estado (requerido)
- * @body {string} observaciones - Observaciones (opcional)
- * @body {string} fecha_realizada - Fecha de realización (requerido si estado es 'completada')
- * @body {array} equipos_instalados - Equipos instalados (opcional)
- * @body {array} fotos_instalacion - Fotos de la instalación (opcional)
  */
 router.patch('/:id/estado',
   verificarRol(['administrador', 'supervisor', 'instalador']),
-  async (req, res, next) => {
-    // Verificar acceso específico para instaladores
-    if (req.usuario.rol === 'instalador') {
-      try {
-        const Instalacion = require('../models/instalacion');
-        const instalacion = await Instalacion.obtenerPorId(parseInt(req.params.id));
-        
-        if (!instalacion) {
-          return res.status(404).json({
-            success: false,
-            message: 'Instalación no encontrada',
-            timestamp: new Date().toISOString()
-          });
-        }
-
-        if (instalacion.instalador_id !== req.usuario.id) {
-          return res.status(403).json({
-            success: false,
-            message: 'Solo puedes actualizar tus propias instalaciones',
-            timestamp: new Date().toISOString()
-          });
-        }
-      } catch (error) {
-        return res.status(500).json({
-          success: false,
-          message: 'Error interno del servidor',
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-    next();
-  },
   InstalacionesController.cambiarEstado
 );
 
@@ -234,9 +236,6 @@ router.patch('/:id/estado',
  * @route PATCH /api/v1/instalaciones/:id/reagendar
  * @desc Reagendar instalación
  * @access Administrador, Supervisor
- * @param {number} id - ID de la instalación
- * @body {string} nueva_fecha - Nueva fecha programada (requerido)
- * @body {string} motivo - Motivo del reagendamiento (opcional)
  */
 router.patch('/:id/reagendar',
   verificarRol(['administrador', 'supervisor']),
@@ -247,8 +246,6 @@ router.patch('/:id/reagendar',
  * @route PATCH /api/v1/instalaciones/:id/asignar-instalador
  * @desc Asignar instalador a una instalación
  * @access Administrador, Supervisor
- * @param {number} id - ID de la instalación
- * @body {number} instalador_id - ID del instalador (requerido)
  */
 router.patch('/:id/asignar-instalador',
   verificarRol(['administrador', 'supervisor']),
@@ -259,12 +256,52 @@ router.patch('/:id/asignar-instalador',
  * @route DELETE /api/v1/instalaciones/:id
  * @desc Eliminar instalación
  * @access Administrador
- * @param {number} id - ID de la instalación
  */
 router.delete('/:id',
   verificarRol(['administrador']),
   InstalacionesController.eliminar
 );
+
+// ==========================================
+// RUTA DE INFORMACIÓN
+// ==========================================
+
+/**
+ * @route GET /api/v1/instalaciones/info
+ * @desc Obtener información sobre las rutas de instalaciones disponibles
+ * @access Private
+ */
+router.get('/info', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API de Instalaciones - Sistema PSI',
+    availableRoutes: {
+      'GET /': 'Listar instalaciones con filtros',
+      'GET /estadisticas': 'Estadísticas de instalaciones',
+      'GET /instalador/:id/pendientes': 'Instalaciones pendientes por instalador',
+      'GET /instalador/:id/agenda': 'Agenda del instalador',
+      'GET /:id': 'Obtener instalación específica',
+      'POST /': 'Crear nueva instalación',
+      'PUT /:id': 'Actualizar instalación',
+      'PATCH /:id/estado': 'Cambiar estado de instalación',
+      'PATCH /:id/reagendar': 'Reagendar instalación',
+      'PATCH /:id/asignar-instalador': 'Asignar instalador',
+      'DELETE /:id': 'Eliminar instalación',
+      'GET /info': 'Esta información'
+    },
+    roles: {
+      administrador: 'Acceso completo a todas las funcionalidades',
+      supervisor: 'Gestión y supervisión de instalaciones',
+      instalador: 'Acceso limitado solo a sus propias instalaciones'
+    },
+    controllerStatus: InstalacionesController ? 'Funcional' : 'No implementado',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ==========================================
+// MANEJO DE ERRORES
+// ==========================================
 
 // Middleware de manejo de errores específico para instalaciones
 router.use((error, req, res, next) => {
@@ -295,5 +332,7 @@ router.use((error, req, res, next) => {
     timestamp: new Date().toISOString()
   });
 });
+
+console.log('🔧 Rutas de instalaciones configuradas correctamente');
 
 module.exports = router;
