@@ -6,7 +6,7 @@ const corsOptions = {
 
     const allowedOrigins = process.env.CORS_ORIGIN
       ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-      : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3002'];
+      : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3002', 'http://localhost:3001'];
 
     console.log('CORS Orígenes permitidos:', allowedOrigins);
 
