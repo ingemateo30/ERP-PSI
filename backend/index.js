@@ -250,6 +250,11 @@ try {
   app.use('/api/incidencias', incidenciasRoutes);
   console.log('✅ Rutas de incidencias cargadas: /api/incidencias');
 
+  //rutas de instalaciones
+  console.log('🔧 Cargando rutas de instalaciones...');
+  const instalacionesRoutes = require('./routes/instalaciones');
+  app.use('/api/v1/instalaciones', instalacionesRoutes);
+
   // Rutas de reportes (si existe)
   try {
     console.log('📈 Cargando rutas de reportes generales...');
