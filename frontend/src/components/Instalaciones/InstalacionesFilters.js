@@ -52,8 +52,7 @@ const InstalacionesFilters = ({
   const cargarOpciones = async () => {
     setLoadingOptions(true);
     try {
-      // Aquí harías las llamadas a la API para obtener instaladores y ciudades
-      // Por ahora simulamos datos
+     
       setInstaladores([
         { id: 1, nombres: 'Juan', apellidos: 'Pérez' },
         { id: 2, nombres: 'María', apellidos: 'González' },
