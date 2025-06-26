@@ -1,11 +1,5 @@
-/**
- * Utilidades para respuestas estandarizadas de la API
- */
-
 class ApiResponse {
-  /**
-   * Respuesta exitosa genérica
-   */
+
   static success(res, data = null, message = 'Operación exitosa', statusCode = 200) {
     return res.status(statusCode).json({
       success: true,
@@ -24,9 +18,6 @@ class ApiResponse {
   });
 }
 
-/**
- * Respuesta de error
- */
 static respuestaError(res, message = 'Error interno del servidor', statusCode = 500, errors = null) {
   const response = {
     success: false,
@@ -45,9 +36,6 @@ static respuestaError(res, message = 'Error interno del servidor', statusCode = 
   return res.status(statusCode).json(response);
 }
 
-/**
- * Respuesta de validación fallida
- */
 static respuestaValidacion(res, errors, message = 'Datos de entrada inválidos') {
   return res.status(400).json({
     success: false,
@@ -57,9 +45,6 @@ static respuestaValidacion(res, errors, message = 'Datos de entrada inválidos')
   });
 }
 
-/**
- * Respuesta de no autorizado
- */
 static respuestaNoAutorizado(res, message = 'No autorizado') {
   return res.status(401).json({
     success: false,
@@ -72,9 +57,6 @@ static respuestaNoAutorizado(res, message = 'No autorizado') {
   });
 }
 
-/**
- * Respuesta de acceso prohibido
- */
 static respuestaProhibido(res, message = 'Acceso prohibido') {
   return res.status(403).json({
     success: false,
@@ -87,9 +69,6 @@ static respuestaProhibido(res, message = 'Acceso prohibido') {
   });
 }
 
-/**
- * Respuesta de recurso no encontrado
- */
 static respuestaNoEncontrado(res, message = 'Recurso no encontrado') {
   return res.status(404).json({
     success: false,
@@ -102,9 +81,6 @@ static respuestaNoEncontrado(res, message = 'Recurso no encontrado') {
   });
 }
 
-/**
- * Respuesta de conflicto
- */
 static respuestaConflicto(res, message = 'Conflicto de datos') {
   return res.status(409).json({
     success: false,
@@ -117,9 +93,6 @@ static respuestaConflicto(res, message = 'Conflicto de datos') {
   });
 }
 
-/**
- * Respuesta de creación exitosa
- */
 static respuestaCreado(res, data, message = 'Recurso creado exitosamente') {
   return res.status(201).json({
     success: true,
@@ -129,9 +102,6 @@ static respuestaCreado(res, data, message = 'Recurso creado exitosamente') {
   });
 }
 
-/**
- * Respuesta de actualización exitosa
- */
 static respuestaActualizado(res, data = null, message = 'Recurso actualizado exitosamente') {
   return res.status(200).json({
     success: true,
@@ -141,9 +111,6 @@ static respuestaActualizado(res, data = null, message = 'Recurso actualizado exi
   });
 }
 
-/**
- * Respuesta de eliminación exitosa
- */
 static respuestaEliminado(res, message = 'Recurso eliminado exitosamente') {
   return res.status(200).json({
     success: true,
@@ -152,9 +119,6 @@ static respuestaEliminado(res, message = 'Recurso eliminado exitosamente') {
   });
 }
 
-  /**
-   * Respuesta de error genérica
-   */
   static error(res, message = 'Error interno del servidor', statusCode = 500, errors = null) {
     const response = {
       success: false,
@@ -173,9 +137,6 @@ static respuestaEliminado(res, message = 'Recurso eliminado exitosamente') {
     return res.status(statusCode).json(response);
   }
 
-  /**
-   * Respuesta de validación fallida
-   */
   static validationError(res, errors, message = 'Datos de entrada inválidos') {
     return res.status(400).json({
       success: false,
@@ -185,9 +146,6 @@ static respuestaEliminado(res, message = 'Recurso eliminado exitosamente') {
     });
   }
 
-  /**
-   * Respuesta de no autorizado
-   */
   static unauthorized(res, message = 'No autorizado') {
     return res.status(401).json({
       success: false,
@@ -200,9 +158,6 @@ static respuestaEliminado(res, message = 'Recurso eliminado exitosamente') {
     });
   }
 
-  /**
-   * Respuesta de acceso prohibido
-   */
   static forbidden(res, message = 'Acceso prohibido') {
     return res.status(403).json({
       success: false,
@@ -215,9 +170,6 @@ static respuestaEliminado(res, message = 'Recurso eliminado exitosamente') {
     });
   }
 
-  /**
-   * Respuesta de recurso no encontrado
-   */
   static notFound(res, message = 'Recurso no encontrado') {
     return res.status(404).json({
       success: false,
@@ -230,9 +182,6 @@ static respuestaEliminado(res, message = 'Recurso eliminado exitosamente') {
     });
   }
 
-  /**
-   * Respuesta de conflicto (ej: email duplicado)
-   */
   static conflict(res, message = 'Conflicto de datos') {
     return res.status(409).json({
       success: false,
@@ -245,9 +194,6 @@ static respuestaEliminado(res, message = 'Recurso eliminado exitosamente') {
     });
   }
 
-  /**
-   * Respuesta de límite de tasa excedido
-   */
   static rateLimitExceeded(res, message = 'Demasiadas solicitudes') {
     return res.status(429).json({
       success: false,

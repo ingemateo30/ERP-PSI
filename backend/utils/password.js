@@ -1,14 +1,8 @@
 const bcrypt = require('bcryptjs');
 const logger = require('./logger');
 
-/**
- * Utilidades para el manejo seguro de contraseñas
- */
 class PasswordUtils {
   
-  /**
-   * Validar fortaleza de contraseña
-   */
   static validatePassword(password) {
     const errors = [];
     
