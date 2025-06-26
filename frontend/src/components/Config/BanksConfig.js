@@ -41,24 +41,10 @@ const BanksConfig = () => {
       setLoading(true);
       setError(null);
       
-      console.log('🔄 Iniciando carga de bancos...');
       const response = await configService.getBanks();
-      
-      // Debug detallado
-      console.log('✅ Respuesta completa de la API:', response);
-      console.log('📊 response.data:', response.data);
-      console.log('📊 response.message:', response.message);
-      console.log('🔍 Tipo de response:', typeof response);
-      console.log('🔍 Tipo de response.data:', typeof response.data);
-      console.log('🔍 Tipo de response.message:', typeof response.message);
-      console.log('📋 ¿Es response.data un array?:', Array.isArray(response.data));
-      console.log('📋 ¿Es response.message un array?:', Array.isArray(response.message));
-      console.log('📋 ¿Es response un array?:', Array.isArray(response));
-      
       // Manejo seguro de diferentes estructuras de respuesta
       let banksData = [];
       
-      // CORRECCIÓN: Los bancos están en response.message según tu debug
       if (response && response.message && Array.isArray(response.message)) {
         banksData = response.message;
         console.log('✅ Usando response.message como array');

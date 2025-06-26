@@ -191,8 +191,8 @@ const InstalacionesManagement = () => {
                     <button
                         onClick={handleAutoRefreshToggle}
                         className={`p-2 rounded-lg border transition-colors ${autoRefreshEnabled
-                                ? 'bg-green-50 border-green-200 text-green-700'
-                                : 'bg-gray-50 border-gray-200 text-gray-500'
+                            ? 'bg-green-50 border-green-200 text-green-700'
+                            : 'bg-gray-50 border-gray-200 text-gray-500'
                             }`}
                         title={`Auto-actualización ${autoRefreshEnabled ? 'activada' : 'desactivada'}`}
                     >
@@ -294,8 +294,8 @@ const InstalacionesManagement = () => {
                         <button
                             onClick={() => setShowFilters(!showFilters)}
                             className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${showFilters || Object.keys(filters).length > 0
-                                    ? 'bg-[#0e6493] text-white border-[#0e6493]'
-                                    : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50'
+                                ? 'bg-[#0e6493] text-white border-[#0e6493]'
+                                : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50'
                                 }`}
                         >
                             <Filter className="w-4 h-4 inline mr-2" />
@@ -321,8 +321,8 @@ const InstalacionesManagement = () => {
                             <button
                                 onClick={() => handleViewModeChange('list')}
                                 className={`px-3 py-2 text-sm ${viewMode === 'list'
-                                        ? 'bg-[#0e6493] text-white'
-                                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                                    ? 'bg-[#0e6493] text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50'
                                     }`}
                                 title="Vista de lista"
                             >
@@ -331,8 +331,8 @@ const InstalacionesManagement = () => {
                             <button
                                 onClick={() => handleViewModeChange('calendar')}
                                 className={`px-3 py-2 text-sm border-l border-gray-300 ${viewMode === 'calendar'
-                                        ? 'bg-[#0e6493] text-white'
-                                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                                    ? 'bg-[#0e6493] text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50'
                                     }`}
                                 title="Vista de calendario"
                             >
@@ -341,8 +341,8 @@ const InstalacionesManagement = () => {
                             <button
                                 onClick={() => handleViewModeChange('map')}
                                 className={`px-3 py-2 text-sm border-l border-gray-300 ${viewMode === 'map'
-                                        ? 'bg-[#0e6493] text-white'
-                                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                                    ? 'bg-[#0e6493] text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50'
                                     }`}
                                 title="Vista de mapa"
                             >

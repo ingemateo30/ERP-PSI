@@ -102,11 +102,6 @@ class AuthService {
         }
     }
 
-    // Iniciar sesión
-    // En tu authService.js - Reemplaza el método login
-
-    // En tu authService.js - Reemplaza el método login
-
     async login(email, password) {
         try {
             console.log('🚀 FRONTEND - Iniciando login con:', email);

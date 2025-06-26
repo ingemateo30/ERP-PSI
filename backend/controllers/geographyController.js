@@ -4,11 +4,7 @@ const pool = require('../config/database');
 const logger = require('../utils/logger');
 
 class GeographyController {
-  // ============================================
-  // DEPARTAMENTOS
-  // ============================================
-
-  // Obtener todos los departamentos
+ 
   static async obtenerDepartamentos(req, res) {
     try {
       const { includeStats } = req.query;
