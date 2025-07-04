@@ -349,11 +349,11 @@ class ClienteController {
       }
 
       if (datosCliente.fecha_inicio_servicio) {
-        datosCliente.fecha_inicio_servicio = this.procesarFecha(datosCliente.fecha_inicio_servicio);
+        datosCliente.fecha_inicio_servicio = ClienteController.procesarFecha(datosCliente.fecha_inicio_servicio);
       }
 
       if (datosCliente.fecha_fin_servicio) {
-        datosCliente.fecha_fin_servicio = this.procesarFecha(datosCliente.fecha_fin_servicio);
+        datosCliente.fecha_fin_servicio = ClienteController.procesarFecha(datosCliente.fecha_fin_servicio);
       }
 
       // CORRECCIÓN: Validar sincronización ciudad-sector
@@ -439,15 +439,15 @@ class ClienteController {
       const datosActualizacion = { ...req.body };
 
       if (datosActualizacion.fecha_registro) {
-        datosActualizacion.fecha_registro = this.procesarFecha(datosActualizacion.fecha_registro);
+        datosActualizacion.fecha_registro = ClienteController.procesarFecha(datosActualizacion.fecha_registro);
       }
 
       if (datosActualizacion.fecha_inicio_servicio) {
-        datosActualizacion.fecha_inicio_servicio = this.procesarFecha(datosActualizacion.fecha_inicio_servicio);
+        datosActualizacion.fecha_inicio_servicio = ClienteController.procesarFecha(datosActualizacion.fecha_inicio_servicio);
       }
 
       if (datosActualizacion.fecha_fin_servicio) {
-        datosActualizacion.fecha_fin_servicio = this.procesarFecha(datosActualizacion.fecha_fin_servicio);
+        datosActualizacion.fecha_fin_servicio = ClienteController.procesarFecha(datosActualizacion.fecha_fin_servicio);
       }
 
       // CORRECCIÓN: Validar sincronización ciudad-sector en actualización
