@@ -1,6 +1,7 @@
 // frontend/src/services/clientService.js - VERSIÓN CORREGIDA COMPLETA
 
 import apiService from './apiService';
+import authService from './authService';
 
 const CLIENT_ENDPOINTS = {
   LIST: '/clients',
@@ -348,77 +349,102 @@ class ClientService {
   }
 
   // CORRECCIÓN: Exportar clientes
-  async exportClients(formato = 'excel', filtros = {}) {
-    try {
-      this.log('Exportando clientes', { formato, filtros });
+ // CORRECCIÓN: Método exportClients usando authService
+async exportClients(formato = 'excel', filtros = {}) {
+  try {
+    this.log('Exportando clientes', { formato, filtros });
 
-      const queryParams = new URLSearchParams();
-      
-      // Agregar filtros
-      if (filtros.estado) queryParams.append('estado', filtros.estado);
-      if (filtros.sector_id) queryParams.append('sector_id', filtros.sector_id);
-      if (filtros.ciudad_id) queryParams.append('ciudad_id', filtros.ciudad_id);
-      if (filtros.fechaInicio) queryParams.append('fechaInicio', filtros.fechaInicio);
-      if (filtros.fechaFin) queryParams.append('fechaFin', filtros.fechaFin);
-      
-      // Agregar formato
-      queryParams.append('format', formato);
+    const queryParams = new URLSearchParams();
+    
+    // Agregar filtros
+    if (filtros.estado) queryParams.append('estado', filtros.estado);
+    if (filtros.sector_id) queryParams.append('sector_id', filtros.sector_id);
+    if (filtros.ciudad_id) queryParams.append('ciudad_id', filtros.ciudad_id);
+    if (filtros.fechaInicio) queryParams.append('fechaInicio', filtros.fechaInicio);
+    if (filtros.fechaFin) queryParams.append('fechaFin', filtros.fechaFin);
+    
+    // Agregar formato
+    queryParams.append('format', formato);
 
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Token de autenticación requerido');
-      }
-
-      const response = await fetch(`${apiService.baseURL}${CLIENT_ENDPOINTS.EXPORT}?${queryParams}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': formato === 'excel' 
-            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            : 'text/csv'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
-      const blob = await response.blob();
-      
-      if (blob.size === 0) {
-        throw new Error('El archivo exportado está vacío');
-      }
-
-      // Generar nombre de archivo
-      const fechaActual = new Date().toISOString().split('T')[0];
-      const extension = formato === 'excel' ? 'xlsx' : 'csv';
-      const filename = `clientes_${fechaActual}.${extension}`;
-
-      // Crear URL de descarga
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      this.log('Exportación completada', { filename, size: blob.size });
-
-      return {
-        success: true,
-        message: `Archivo ${filename} descargado exitosamente`
-      };
-    } catch (error) {
-      this.log('Error en exportación', error);
-      return {
-        success: false,
-        message: error.message || 'Error en la exportación'
-      };
+    // CORREGIDO: Usar authService en lugar de localStorage directo
+    const token = authService.getToken();
+    if (!token) {
+      throw new Error('Token de autenticación requerido');
     }
-  }
 
+    this.log('Token obtenido', { hasToken: !!token });
+
+    const response = await fetch(`${apiService.baseURL}${CLIENT_ENDPOINTS.EXPORT}?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': formato === 'excel' 
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'text/csv'
+      }
+    });
+
+    this.log('Respuesta del servidor', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+
+    // MEJORADO: Manejo de errores más específico
+    if (!response.ok) {
+      if (response.status === 401) {
+        // Token expirado o inválido
+        throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+      } else if (response.status === 403) {
+        throw new Error('No tienes permisos para exportar clientes.');
+      } else if (response.status === 404) {
+        throw new Error('Endpoint de exportación no encontrado.');
+      } else {
+        // Intentar obtener el mensaje de error del servidor
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+        } catch (jsonError) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+      }
+    }
+
+    const blob = await response.blob();
+    
+    if (blob.size === 0) {
+      throw new Error('El archivo exportado está vacío');
+    }
+
+    // Generar nombre de archivo
+    const fechaActual = new Date().toISOString().split('T')[0];
+    const extension = formato === 'excel' ? 'xlsx' : 'csv';
+    const filename = `clientes_${fechaActual}.${extension}`;
+
+    // Crear URL de descarga
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    this.log('Exportación completada', { filename, size: blob.size });
+
+    return {
+      success: true,
+      message: `Archivo ${filename} descargado exitosamente`
+    };
+  } catch (error) {
+    this.log('Error en exportación', error);
+    return {
+      success: false,
+      message: error.message || 'Error en la exportación'
+    };
+  }
+}
   // Alias para compatibilidad
   async getStats() {
     return this.getClientStats();
