@@ -1,4 +1,4 @@
-// frontend/src/services/clientService.js - VERSIÓN CORREGIDA
+// frontend/src/services/clientService.js - VERSIÓN CORREGIDA COMPLETA
 
 import apiService from './apiService';
 
@@ -12,7 +12,7 @@ const CLIENT_ENDPOINTS = {
   STATS: '/clients/stats',
   VALIDATE: '/clients/validate',
   BY_IDENTIFICATION: '/clients/identification',
-  EXPORT: '/clients/export' // Nuevo endpoint para exportar
+  EXPORT: '/clients/export'
 };
 
 class ClientService {
@@ -32,13 +32,9 @@ class ClientService {
     if (!fecha) return null;
     
     try {
-      // Si la fecha viene como string, convertirla
       const fechaObj = new Date(fecha);
-      
-      // Agregar offset de timezone para corregir el desfase de un día
       const offsetMinutos = fechaObj.getTimezoneOffset();
       fechaObj.setMinutes(fechaObj.getMinutes() + offsetMinutos);
-      
       return fechaObj.toISOString().split('T')[0];
     } catch (error) {
       console.error('Error corrigiendo fecha:', error);
@@ -46,155 +42,41 @@ class ClientService {
     }
   }
 
-  // CORRECCIÓN: Función para exportar clientes con fechas corregidas
-  async exportClients(formato = 'excel', filtros = {}) {
-    try {
-      this.log('Exportando clientes', { formato, filtros });
+  // CORRECCIÓN: Validar y limpiar datos del cliente
+  validateAndCleanClientData(clientData) {
+    const cleanedData = { ...clientData };
 
-      const queryParams = new URLSearchParams();
-      
-      // Agregar filtros
-      if (filtros.estado) queryParams.append('estado', filtros.estado);
-      if (filtros.sector_id) queryParams.append('sector_id', filtros.sector_id);
-      if (filtros.ciudad_id) queryParams.append('ciudad_id', filtros.ciudad_id);
-      if (filtros.fechaInicio) queryParams.append('fechaInicio', filtros.fechaInicio);
-      if (filtros.fechaFin) queryParams.append('fechaFin', filtros.fechaFin);
-      
-      // Agregar formato
-      queryParams.append('format', formato);
-
-      const response = await fetch(`${apiService.baseURL}${CLIENT_ENDPOINTS.EXPORT}?${queryParams}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Accept': formato === 'excel' 
-            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            : 'text/csv'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+    // Validaciones requeridas
+    const requiredFields = ['identificacion', 'nombre', 'telefono'];
+    for (const field of requiredFields) {
+      if (!cleanedData[field] || cleanedData[field].toString().trim() === '') {
+        throw new Error(`El campo ${field} es requerido`);
       }
-
-      const blob = await response.blob();
-      
-      if (blob.size === 0) {
-        throw new Error('El archivo exportado está vacío');
-      }
-
-      // Generar nombre de archivo con fecha actual
-      const fechaActual = new Date().toISOString().split('T')[0];
-      const extension = formato === 'excel' ? 'xlsx' : 'csv';
-      const nombreArchivo = `clientes_${fechaActual}.${extension}`;
-
-      // Descargar archivo
-      this.descargarArchivo(blob, nombreArchivo);
-
-      this.log('Exportación exitosa', { nombreArchivo, tamaño: blob.size });
-      
-      return {
-        success: true,
-        message: `Archivo ${nombreArchivo} descargado exitosamente`
-      };
-
-    } catch (error) {
-      this.log('Error en exportación', error);
-      return {
-        success: false,
-        message: error.message || 'Error al exportar clientes'
-      };
-    }
-  }
-
-  // Función auxiliar para descargar archivos
-  descargarArchivo(blob, nombreArchivo) {
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = nombreArchivo;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  }
-
-  // Limpiar y validar datos de cliente antes de enviar
-  cleanClientData(clientData) {
-    if (!clientData || typeof clientData !== 'object') {
-      throw new Error('Datos de cliente inválidos');
     }
 
-    const cleanedData = {};
+    // Limpiar campos de texto
+    if (cleanedData.nombre) cleanedData.nombre = cleanedData.nombre.trim();
+    if (cleanedData.direccion) cleanedData.direccion = cleanedData.direccion.trim();
+    if (cleanedData.email) cleanedData.email = cleanedData.email.trim().toLowerCase();
 
-    // Procesar cada campo
-    Object.keys(clientData).forEach(key => {
-      const value = clientData[key];
+    // Validar email si existe
+    if (cleanedData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanedData.email)) {
+      throw new Error('El formato del email es inválido');
+    }
 
-      // Saltar valores nulos, undefined o cadenas vacías
-      if (value === null || value === undefined || value === '') {
-        return;
-      }
+    // Convertir campos numéricos
+    if (cleanedData.sector_id) cleanedData.sector_id = parseInt(cleanedData.sector_id);
+    if (cleanedData.ciudad_id) cleanedData.ciudad_id = parseInt(cleanedData.ciudad_id);
+    if (cleanedData.estrato) cleanedData.estrato = parseInt(cleanedData.estrato);
 
-      // CORRECCIÓN: Procesar fechas correctamente
-      if (key.includes('fecha') && typeof value === 'string') {
-        // Asegurar formato correcto de fecha
-        const fechaCorregida = this.corregirFechaUTC(value);
-        if (fechaCorregida) {
-          cleanedData[key] = fechaCorregida;
-        }
-      }
-      // Limpiar strings
-      else if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed) {
-          cleanedData[key] = trimmed;
-        }
-      }
-      // Convertir números
-      else if (key === 'sector_id' || key === 'ciudad_id') {
-        const numValue = parseInt(value);
-        if (!isNaN(numValue) && numValue > 0) {
-          cleanedData[key] = numValue;
-        }
-      }
-      // Convertir booleanos
-      else if (key === 'requiere_reconexion') {
-        cleanedData[key] = Boolean(value);
-      }
-      // Otros valores
-      else {
-        cleanedData[key] = value;
+    // Limpiar campos vacíos
+    Object.keys(cleanedData).forEach(key => {
+      if (cleanedData[key] === '' || cleanedData[key] === null || cleanedData[key] === undefined) {
+        delete cleanedData[key];
       }
     });
 
-    // Validaciones básicas
-    if (!cleanedData.identificacion || cleanedData.identificacion.length < 5) {
-      throw new Error('La identificación es requerida y debe tener al menos 5 caracteres');
-    }
-
-    if (!cleanedData.nombre || cleanedData.nombre.length < 3) {
-      throw new Error('El nombre es requerido y debe tener al menos 3 caracteres');
-    }
-
-    if (!cleanedData.direccion || cleanedData.direccion.length < 5) {
-      throw new Error('La dirección es requerida y debe tener al menos 5 caracteres');
-    }
-
-    // Asegurar valores por defecto
-    if (!cleanedData.tipo_documento) {
-      cleanedData.tipo_documento = 'cedula';
-    }
-
-    if (!cleanedData.estado) {
-      cleanedData.estado = 'activo';
-    }
-
-    if (!cleanedData.fecha_registro) {
-      cleanedData.fecha_registro = new Date().toISOString().split('T')[0];
-    }
-
-    this.log('Datos de cliente limpiados', {
+    this.log('Datos validados y limpiados', {
       original: clientData,
       cleaned: cleanedData
     });
@@ -225,10 +107,9 @@ class ClientService {
       this.log('URL de petición', url);
 
       const response = await apiService.get(url);
-
       this.log('Respuesta del servidor', response);
 
-      // CORRECCIÓN: Procesar fechas en la respuesta
+      // Procesar fechas en la respuesta
       if (response.data && Array.isArray(response.data)) {
         response.data = response.data.map(cliente => ({
           ...cliente,
@@ -242,8 +123,8 @@ class ClientService {
 
       return {
         success: true,
-        data: response.data || [],
-        pagination: response.pagination || {},
+        data: response.data,
+        pagination: response.pagination,
         message: response.message
       };
     } catch (error) {
@@ -251,8 +132,41 @@ class ClientService {
       return {
         success: false,
         data: [],
-        pagination: {},
+        pagination: null,
         message: error.message || 'Error al cargar clientes'
+      };
+    }
+  }
+
+  // CORRECCIÓN: Función para obtener estadísticas de clientes
+  async getClientStats() {
+    try {
+      this.log('Obteniendo estadísticas de clientes');
+
+      const response = await apiService.get(CLIENT_ENDPOINTS.STATS);
+      this.log('Estadísticas obtenidas', response);
+
+      return {
+        success: true,
+        data: response.data || response.message || {},
+        message: response.message || 'Estadísticas cargadas exitosamente'
+      };
+    } catch (error) {
+      this.log('Error obteniendo estadísticas', error);
+      return {
+        success: false,
+        data: {
+          total: 0,
+          activos: 0,
+          suspendidos: 0,
+          cortados: 0,
+          retirados: 0,
+          inactivos: 0,
+          nuevos_hoy: 0,
+          nuevos_semana: 0,
+          nuevos_mes: 0
+        },
+        message: error.message || 'Error al cargar estadísticas'
       };
     }
   }
@@ -261,24 +175,21 @@ class ClientService {
   async getClientById(id) {
     try {
       this.log('Obteniendo cliente por ID', id);
-      
+
       if (!id) {
         throw new Error('ID de cliente requerido');
       }
 
       const response = await apiService.get(`${CLIENT_ENDPOINTS.DETAIL}/${id}`);
-      
       this.log('Cliente obtenido', response);
 
-      // CORRECCIÓN: Procesar fechas en cliente individual
+      // Corregir fechas en la respuesta
       if (response.data) {
         response.data = {
           ...response.data,
           fecha_registro: this.corregirFechaUTC(response.data.fecha_registro),
           fecha_inicio_servicio: this.corregirFechaUTC(response.data.fecha_inicio_servicio),
-          fecha_fin_servicio: this.corregirFechaUTC(response.data.fecha_fin_servicio),
-          updated_at: response.data.updated_at ? new Date(response.data.updated_at).toLocaleString('es-CO') : null,
-          created_at: response.data.created_at ? new Date(response.data.created_at).toLocaleString('es-CO') : null
+          fecha_fin_servicio: this.corregirFechaUTC(response.data.fecha_fin_servicio)
         };
       }
 
@@ -300,9 +211,9 @@ class ClientService {
   // Crear nuevo cliente
   async createClient(clientData) {
     try {
-      this.log('Creando cliente', clientData);
+      this.log('Creando nuevo cliente', clientData);
 
-      const cleanData = this.cleanClientData(clientData);
+      const cleanData = this.validateAndCleanClientData(clientData);
       const response = await apiService.post(CLIENT_ENDPOINTS.CREATE, cleanData);
       
       this.log('Cliente creado', response);
@@ -331,7 +242,7 @@ class ClientService {
         throw new Error('ID de cliente requerido');
       }
 
-      const cleanData = this.cleanClientData(clientData);
+      const cleanData = this.validateAndCleanClientData(clientData);
       const response = await apiService.put(`${CLIENT_ENDPOINTS.UPDATE}/${id}`, cleanData);
       
       this.log('Cliente actualizado', response);
@@ -361,7 +272,6 @@ class ClientService {
       }
 
       const response = await apiService.delete(`${CLIENT_ENDPOINTS.DELETE}/${id}`);
-      
       this.log('Cliente eliminado', response);
 
       return {
@@ -391,7 +301,6 @@ class ClientService {
       }
 
       const response = await apiService.get(`${CLIENT_ENDPOINTS.SEARCH}?q=${encodeURIComponent(termino)}`);
-      
       this.log('Resultados de búsqueda', response);
 
       return {
@@ -409,28 +318,110 @@ class ClientService {
     }
   }
 
-  // Obtener estadísticas
-  async getStats() {
+  // Validar cliente por identificación
+  async validateClientByIdentification(identificacion) {
     try {
-      this.log('Obteniendo estadísticas de clientes');
+      this.log('Validando cliente por identificación', identificacion);
 
-      const response = await apiService.get(CLIENT_ENDPOINTS.STATS);
-      
-      this.log('Estadísticas obtenidas', response);
+      if (!identificacion) {
+        throw new Error('Identificación requerida');
+      }
+
+      const response = await apiService.get(`${CLIENT_ENDPOINTS.BY_IDENTIFICATION}/${identificacion}`);
+      this.log('Validación completada', response);
 
       return {
         success: true,
         data: response.data,
+        exists: !!response.data,
         message: response.message
       };
     } catch (error) {
-      this.log('Error obteniendo estadísticas', error);
+      this.log('Error validando cliente', error);
       return {
         success: false,
         data: null,
-        message: error.message || 'Error al cargar estadísticas'
+        exists: false,
+        message: error.message || 'Error en validación'
       };
     }
+  }
+
+  // CORRECCIÓN: Exportar clientes
+  async exportClients(formato = 'excel', filtros = {}) {
+    try {
+      this.log('Exportando clientes', { formato, filtros });
+
+      const queryParams = new URLSearchParams();
+      
+      // Agregar filtros
+      if (filtros.estado) queryParams.append('estado', filtros.estado);
+      if (filtros.sector_id) queryParams.append('sector_id', filtros.sector_id);
+      if (filtros.ciudad_id) queryParams.append('ciudad_id', filtros.ciudad_id);
+      if (filtros.fechaInicio) queryParams.append('fechaInicio', filtros.fechaInicio);
+      if (filtros.fechaFin) queryParams.append('fechaFin', filtros.fechaFin);
+      
+      // Agregar formato
+      queryParams.append('format', formato);
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Token de autenticación requerido');
+      }
+
+      const response = await fetch(`${apiService.baseURL}${CLIENT_ENDPOINTS.EXPORT}?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': formato === 'excel' 
+            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            : 'text/csv'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      
+      if (blob.size === 0) {
+        throw new Error('El archivo exportado está vacío');
+      }
+
+      // Generar nombre de archivo
+      const fechaActual = new Date().toISOString().split('T')[0];
+      const extension = formato === 'excel' ? 'xlsx' : 'csv';
+      const filename = `clientes_${fechaActual}.${extension}`;
+
+      // Crear URL de descarga
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      this.log('Exportación completada', { filename, size: blob.size });
+
+      return {
+        success: true,
+        message: `Archivo ${filename} descargado exitosamente`
+      };
+    } catch (error) {
+      this.log('Error en exportación', error);
+      return {
+        success: false,
+        message: error.message || 'Error en la exportación'
+      };
+    }
+  }
+
+  // Alias para compatibilidad
+  async getStats() {
+    return this.getClientStats();
   }
 }
 

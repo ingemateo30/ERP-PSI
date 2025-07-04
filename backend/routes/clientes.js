@@ -1,161 +1,326 @@
-// backend/routes/clientes.js - RUTAS CORREGIDAS CON MANEJO DE ERRORES
+// backend/routes/clients.js - RUTAS DE CLIENTES
 
 const express = require('express');
 const router = express.Router();
+const ClientsController = require('../controllers/clientsController');
+const authMiddleware = require('../middleware/authMiddleware');
+const roleMiddleware = require('../middleware/roleMiddleware');
+const validationMiddleware = require('../middleware/validationMiddleware');
+const { body, param, query } = require('express-validator');
 
-// Importar controlador con manejo de errores
-let ClienteController;
-try {
-  ClienteController = require('../controllers/clienteController');
-  console.log('✅ ClienteController cargado correctamente');
-} catch (error) {
-  console.error('❌ Error cargando ClienteController:', error.message);
-  // Crear controlador dummy temporal
-  ClienteController = {
-    obtenerTodos: (req, res) => res.status(501).json({ success: false, message: 'Controlador no disponible' }),
-    exportarClientes: (req, res) => res.status(501).json({ success: false, message: 'Exportación no disponible' }),
-    obtenerEstadisticas: (req, res) => res.status(501).json({ success: false, message: 'Estadísticas no disponibles' }),
-    buscar: (req, res) => res.status(501).json({ success: false, message: 'Búsqueda no disponible' }),
-    obtenerPorIdentificacion: (req, res) => res.status(501).json({ success: false, message: 'Método no disponible' }),
-    obtenerPorId: (req, res) => res.status(501).json({ success: false, message: 'Método no disponible' }),
-    crear: (req, res) => res.status(501).json({ success: false, message: 'Creación no disponible' }),
-    actualizar: (req, res) => res.status(501).json({ success: false, message: 'Actualización no disponible' }),
-    eliminar: (req, res) => res.status(501).json({ success: false, message: 'Eliminación no disponible' })
-  };
-}
+// Middleware de autenticación para todas las rutas
+router.use(authMiddleware);
 
-// Importar middleware de autenticación con manejo de errores
-let authenticateToken, requireRole;
-try {
-  const auth = require('../middleware/auth');
-  authenticateToken = auth.authenticateToken || auth.auth;
-  requireRole = auth.requireRole;
-  console.log('✅ Middleware de autenticación cargado');
-} catch (error) {
-  console.error('❌ Error cargando middleware auth:', error.message);
-  // Crear middleware dummy
-  authenticateToken = (req, res, next) => {
-    console.warn('⚠️ Usando middleware de autenticación dummy');
-    req.user = { id: 1, role: 'administrador' }; // Usuario dummy para desarrollo
-    next();
-  };
-  requireRole = (...roles) => (req, res, next) => next();
-}
+// ============================================
+// VALIDACIONES
+// ============================================
 
-// Importar rateLimiter con manejo de errores
-let rateLimiter;
-try {
-  rateLimiter = require('../middleware/rateLimiter');
-  console.log('✅ RateLimiter cargado correctamente');
-} catch (error) {
-  console.error('❌ Error cargando rateLimiter:', error.message);
-  // Crear rateLimiter dummy
-  rateLimiter = {
-    clientes: (req, res, next) => next(),
-    busquedas: (req, res, next) => next(),
-    criticas: (req, res, next) => next()
-  };
-}
+const clientValidationRules = [
+  body('identificacion')
+    .notEmpty()
+    .withMessage('La identificación es requerida')
+    .isLength({ min: 3, max: 20 })
+    .withMessage('La identificación debe tener entre 3 y 20 caracteres')
+    .matches(/^[0-9]+$/)
+    .withMessage('La identificación solo debe contener números'),
+    
+  body('nombre')
+    .notEmpty()
+    .withMessage('El nombre es requerido')
+    .isLength({ min: 3, max: 255 })
+    .withMessage('El nombre debe tener entre 3 y 255 caracteres')
+    .matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/)
+    .withMessage('El nombre solo debe contener letras y espacios'),
+    
+  body('telefono')
+    .notEmpty()
+    .withMessage('El teléfono es requerido')
+    .matches(/^[0-9+\-\s()]+$/)
+    .withMessage('El teléfono tiene un formato inválido')
+    .isLength({ min: 7, max: 30 })
+    .withMessage('El teléfono debe tener entre 7 y 30 caracteres'),
+    
+  body('email')
+    .optional()
+    .isEmail()
+    .withMessage('El email tiene un formato inválido')
+    .normalizeEmail(),
+    
+  body('direccion')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('La dirección no puede exceder 500 caracteres'),
+    
+  body('ciudad_id')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('El ID de ciudad debe ser un número entero positivo'),
+    
+  body('sector_id')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('El ID de sector debe ser un número entero positivo'),
+    
+  body('estrato')
+    .optional()
+    .isInt({ min: 1, max: 6 })
+    .withMessage('El estrato debe ser un número entre 1 y 6'),
+    
+  body('coordenadas_lat')
+    .optional()
+    .isFloat({ min: -90, max: 90 })
+    .withMessage('La latitud debe estar entre -90 y 90'),
+    
+  body('coordenadas_lng')
+    .optional()
+    .isFloat({ min: -180, max: 180 })
+    .withMessage('La longitud debe estar entre -180 y 180'),
+    
+  body('fecha_registro')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha de registro debe tener formato válido'),
+    
+  body('observaciones')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Las observaciones no pueden exceder 1000 caracteres')
+];
 
-// Importar validaciones con manejo de errores
-let validarCreacionCliente, validarActualizacionCliente;
-try {
-  const validaciones = require('../middleware/validaciones');
-  validarCreacionCliente = validaciones.validarCreacionCliente || [];
-  validarActualizacionCliente = validaciones.validarActualizacionCliente || [];
-  console.log('✅ Validaciones cargadas correctamente');
-} catch (error) {
-  console.error('❌ Error cargando validaciones:', error.message);
-  // Crear validaciones dummy
-  validarCreacionCliente = [];
-  validarActualizacionCliente = [];
-}
+const updateClientValidationRules = [
+  body('identificacion')
+    .optional()
+    .isLength({ min: 3, max: 20 })
+    .withMessage('La identificación debe tener entre 3 y 20 caracteres')
+    .matches(/^[0-9]+$/)
+    .withMessage('La identificación solo debe contener números'),
+    
+  body('nombre')
+    .optional()
+    .isLength({ min: 3, max: 255 })
+    .withMessage('El nombre debe tener entre 3 y 255 caracteres')
+    .matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/)
+    .withMessage('El nombre solo debe contener letras y espacios'),
+    
+  body('telefono')
+    .optional()
+    .matches(/^[0-9+\-\s()]+$/)
+    .withMessage('El teléfono tiene un formato inválido')
+    .isLength({ min: 7, max: 30 })
+    .withMessage('El teléfono debe tener entre 7 y 30 caracteres'),
+    
+  body('email')
+    .optional()
+    .isEmail()
+    .withMessage('El email tiene un formato inválido')
+    .normalizeEmail(),
+    
+  body('estado')
+    .optional()
+    .isIn(['activo', 'suspendido', 'cortado', 'retirado', 'inactivo'])
+    .withMessage('El estado debe ser: activo, suspendido, cortado, retirado o inactivo')
+];
 
-// Aplicar autenticación a todas las rutas
-router.use(authenticateToken);
+const idValidationRules = [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('El ID debe ser un número entero positivo')
+];
 
-// ==========================================
-// RUTAS DE CONSULTA
-// ==========================================
+const identificationValidationRules = [
+  param('identificacion')
+    .notEmpty()
+    .withMessage('La identificación es requerida')
+    .matches(/^[0-9]+$/)
+    .withMessage('La identificación solo debe contener números')
+];
 
-// Obtener todos los clientes con filtros y paginación
+const searchValidationRules = [
+  query('q')
+    .notEmpty()
+    .withMessage('El término de búsqueda es requerido')
+    .isLength({ min: 2, max: 100 })
+    .withMessage('El término de búsqueda debe tener entre 2 y 100 caracteres')
+];
+
+const paginationValidationRules = [
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('La página debe ser un número entero positivo'),
+    
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('El límite debe ser un número entre 1 y 100')
+];
+
+// ============================================
+// RUTAS PÚBLICAS (solo requieren autenticación)
+// ============================================
+
+/**
+ * @route   GET /api/v1/clients
+ * @desc    Obtener lista de clientes con filtros y paginación
+ * @access  Private (Todos los roles)
+ */
 router.get('/', 
-  rateLimiter.clientes, 
-  ClienteController.obtenerTodos
+  paginationValidationRules,
+  validationMiddleware,
+  ClientsController.getClients
 );
 
-// NUEVA: Ruta para exportar clientes
-router.get('/export', 
-  rateLimiter.clientes,
-  ClienteController.exportarClientes
-);
-
-// Obtener estadísticas de clientes
+/**
+ * @route   GET /api/v1/clients/stats
+ * @desc    Obtener estadísticas de clientes
+ * @access  Private (Todos los roles)
+ */
 router.get('/stats', 
-  rateLimiter.clientes, 
-  ClienteController.obtenerEstadisticas
+  ClientsController.getClientStats
 );
 
-// Buscar clientes
+/**
+ * @route   GET /api/v1/clients/search
+ * @desc    Buscar clientes
+ * @access  Private (Todos los roles)
+ */
 router.get('/search', 
-  rateLimiter.busquedas, 
-  ClienteController.buscar
+  searchValidationRules,
+  validationMiddleware,
+  ClientsController.searchClients
 );
 
-// Obtener cliente por identificación
+/**
+ * @route   GET /api/v1/clients/active-with-services
+ * @desc    Obtener clientes activos con servicios
+ * @access  Private (Todos los roles)
+ */
+router.get('/active-with-services', 
+  ClientsController.getActiveClientsWithServices
+);
+
+/**
+ * @route   GET /api/v1/clients/export
+ * @desc    Exportar clientes
+ * @access  Private (Administrador, Supervisor)
+ */
+router.get('/export', 
+  roleMiddleware(['administrador', 'supervisor']),
+  ClientsController.exportClients
+);
+
+/**
+ * @route   GET /api/v1/clients/identification/:identificacion
+ * @desc    Obtener cliente por identificación
+ * @access  Private (Todos los roles)
+ */
 router.get('/identification/:identificacion', 
-  rateLimiter.clientes, 
-  ClienteController.obtenerPorIdentificacion
+  identificationValidationRules,
+  validationMiddleware,
+  ClientsController.getClientByIdentification
 );
 
-// Obtener cliente por ID (debe ir al final para evitar conflictos)
+/**
+ * @route   GET /api/v1/clients/:id
+ * @desc    Obtener cliente por ID
+ * @access  Private (Todos los roles)
+ */
 router.get('/:id', 
-  rateLimiter.clientes, 
-  ClienteController.obtenerPorId
+  idValidationRules,
+  validationMiddleware,
+  ClientsController.getClientById
 );
 
-// ==========================================
-// RUTAS DE MODIFICACIÓN
-// ==========================================
+/**
+ * @route   GET /api/v1/clients/:id/summary
+ * @desc    Obtener resumen completo de cliente
+ * @access  Private (Todos los roles)
+ */
+router.get('/:id/summary', 
+  idValidationRules,
+  validationMiddleware,
+  ClientsController.getClientSummary
+);
 
-// Crear nuevo cliente
+// ============================================
+// RUTAS RESTRINGIDAS POR ROL
+// ============================================
+
+/**
+ * @route   POST /api/v1/clients
+ * @desc    Crear nuevo cliente
+ * @access  Private (Administrador, Supervisor)
+ */
 router.post('/', 
-  rateLimiter.clientes,
-  ...validarCreacionCliente, // Spread operator para aplicar array de validaciones
-  ClienteController.crear
+  roleMiddleware(['administrador', 'supervisor']),
+  clientValidationRules,
+  validationMiddleware,
+  ClientsController.createClient
 );
 
-// Actualizar cliente
+/**
+ * @route   PUT /api/v1/clients/:id
+ * @desc    Actualizar cliente
+ * @access  Private (Administrador, Supervisor)
+ */
 router.put('/:id', 
-  rateLimiter.clientes,
-  ...validarActualizacionCliente, // Spread operator para aplicar array de validaciones
-  ClienteController.actualizar
+  roleMiddleware(['administrador', 'supervisor']),
+  idValidationRules,
+  updateClientValidationRules,
+  validationMiddleware,
+  ClientsController.updateClient
 );
 
-// Eliminar cliente
+/**
+ * @route   DELETE /api/v1/clients/:id
+ * @desc    Eliminar cliente
+ * @access  Private (Solo Administrador)
+ */
 router.delete('/:id', 
-  rateLimiter.criticas,
-  ClienteController.eliminar
+  roleMiddleware(['administrador']),
+  idValidationRules,
+  validationMiddleware,
+  ClientsController.deleteClient
 );
 
-// Manejo de errores para rutas no encontradas
-router.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: `Ruta ${req.method} ${req.originalUrl} no encontrada`,
-    timestamp: new Date().toISOString()
-  });
-});
+/**
+ * @route   POST /api/v1/clients/validate
+ * @desc    Validar datos de cliente
+ * @access  Private (Administrador, Supervisor)
+ */
+router.post('/validate', 
+  roleMiddleware(['administrador', 'supervisor']),
+  body('identificacion').notEmpty().withMessage('Identificación requerida'),
+  validationMiddleware,
+  ClientsController.validateClient
+);
 
-// Manejo de errores generales
+// ============================================
+// MANEJO DE ERRORES ESPECÍFICO DE RUTAS
+// ============================================
+
+// Middleware para capturar errores no manejados en las rutas de clientes
 router.use((error, req, res, next) => {
-  console.error('❌ Error en rutas de clientes:', error);
+  console.error('Error en rutas de clientes:', error);
   
-  res.status(error.status || 500).json({
+  if (error.type === 'validation') {
+    return res.status(400).json({
+      success: false,
+      message: 'Error de validación',
+      errors: error.details
+    });
+  }
+  
+  if (error.code === 'ER_DUP_ENTRY') {
+    return res.status(409).json({
+      success: false,
+      message: 'Ya existe un cliente con esa identificación'
+    });
+  }
+  
+  return res.status(500).json({
     success: false,
-    message: error.message || 'Error interno del servidor',
-    ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
-    timestamp: new Date().toISOString()
+    message: 'Error interno del servidor en módulo de clientes'
   });
 });
 
