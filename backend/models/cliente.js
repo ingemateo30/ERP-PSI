@@ -1,3 +1,5 @@
+// backend/models/cliente.js - VERSIÓN CORREGIDA CON NUEVOS MÉTODOS
+
 const pool = require('../config/database');
 
 class Cliente {
@@ -69,6 +71,84 @@ class Cliente {
     }
   }
 
+  // NUEVO: Obtener todos los clientes para exportación (sin paginación)
+  static async obtenerTodosParaExportar(filtros = {}) {
+    try {
+      let query = `
+        SELECT 
+          c.*,
+          s.nombre as sector_nombre,
+          s.codigo as sector_codigo,
+          ci.nombre as ciudad_nombre,
+          d.nombre as departamento_nombre
+        FROM clientes c
+        LEFT JOIN sectores s ON c.sector_id = s.id
+        LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+        LEFT JOIN departamentos d ON ci.departamento_id = d.id
+        WHERE 1=1
+      `;
+      
+      const params = [];
+      
+      // Filtros dinámicos
+      if (filtros.estado) {
+        query += ' AND c.estado = ?';
+        params.push(filtros.estado);
+      }
+      
+      if (filtros.sector_id) {
+        query += ' AND c.sector_id = ?';
+        params.push(filtros.sector_id);
+      }
+      
+      if (filtros.ciudad_id) {
+        query += ' AND c.ciudad_id = ?';
+        params.push(filtros.ciudad_id);
+      }
+
+      // CORRECCIÓN: Filtros de fecha para exportación
+      if (filtros.fecha_inicio) {
+        query += ' AND c.fecha_registro >= ?';
+        params.push(filtros.fecha_inicio);
+      }
+
+      if (filtros.fecha_fin) {
+        query += ' AND c.fecha_registro <= ?';
+        params.push(filtros.fecha_fin);
+      }
+      
+      query += ' ORDER BY c.created_at DESC';
+      
+      const connection = await pool.getConnection();
+      const [filas] = await connection.execute(query, params);
+      connection.release();
+      
+      return filas;
+    } catch (error) {
+      throw new Error(`Error al obtener clientes para exportación: ${error.message}`);
+    }
+  }
+
+  // NUEVO: Validar que el sector pertenezca a la ciudad
+  static async validarSectorCiudad(sectorId, ciudadId) {
+    try {
+      const query = `
+        SELECT COUNT(*) as count
+        FROM sectores s
+        WHERE s.id = ? AND s.ciudad_id = ?
+      `;
+      
+      const connection = await pool.getConnection();
+      const [filas] = await connection.execute(query, [sectorId, ciudadId]);
+      connection.release();
+      
+      return filas[0].count > 0;
+    } catch (error) {
+      console.error('Error validando sector-ciudad:', error);
+      return false;
+    }
+  }
+
   // Contar total de clientes con filtros
   static async contarTotal(filtros = {}) {
     try {
@@ -110,7 +190,7 @@ class Cliente {
     }
   }
 
-  // Obtener cliente por ID
+  // Obtener cliente por ID con información técnica completa
   static async obtenerPorId(id) {
     try {
       const query = `
@@ -144,10 +224,13 @@ class Cliente {
         SELECT 
           c.*,
           s.nombre as sector_nombre,
-          ci.nombre as ciudad_nombre
+          s.codigo as sector_codigo,
+          ci.nombre as ciudad_nombre,
+          d.nombre as departamento_nombre
         FROM clientes c
         LEFT JOIN sectores s ON c.sector_id = s.id
         LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+        LEFT JOIN departamentos d ON ci.departamento_id = d.id
         WHERE c.identificacion = ?
       `;
       
@@ -157,71 +240,118 @@ class Cliente {
       
       return filas[0] || null;
     } catch (error) {
-      throw new Error(`Error al buscar cliente por identificación: ${error.message}`);
+      throw new Error(`Error al obtener cliente por identificación: ${error.message}`);
     }
   }
 
   // Crear nuevo cliente
-  static async crear(datosCliente) {
+  static async crear(datos) {
     try {
-      // Verificar si ya existe la identificación
-      const clienteExistente = await this.obtenerPorIdentificacion(datosCliente.identificacion);
-      if (clienteExistente) {
-        throw new Error('Ya existe un cliente con esta identificación');
-      }
-
+      // CORRECCIÓN: Incluir todos los campos en la inserción
       const query = `
         INSERT INTO clientes (
-          identificacion, tipo_documento, nombre, direccion, sector_id,
-          estrato, barrio, ciudad_id, telefono, telefono_2, correo,
-          fecha_registro, fecha_hasta, estado, mac_address, ip_asignada,
-          tap, poste, contrato, ruta, requiere_reconexion, codigo_usuario,
-          observaciones, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          identificacion, tipo_documento, nombre, direccion, sector_id, 
+          estrato, barrio, ciudad_id, telefono, telefono_2, email, 
+          fecha_registro, fecha_inicio_servicio, fecha_fin_servicio, estado, 
+          mac_address, ip_asignada, tap, puerto, numero_contrato, ruta, 
+          requiere_reconexion, codigo_usuario, observaciones, activo
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       
-      const valores = [
-        datosCliente.identificacion,
-        datosCliente.tipo_documento || 'cedula',
-        datosCliente.nombre,
-        datosCliente.direccion,
-        datosCliente.sector_id || null,
-        datosCliente.estrato || null,
-        datosCliente.barrio || null,
-        datosCliente.ciudad_id || null,
-        datosCliente.telefono || null,
-        datosCliente.telefono_2 || null,
-        datosCliente.correo || null,
-        datosCliente.fecha_registro || new Date().toISOString().split('T')[0],
-        datosCliente.fecha_hasta || null,
-        datosCliente.estado || 'activo',
-        datosCliente.mac_address || null,
-        datosCliente.ip_asignada || null,
-        datosCliente.tap || null,
-        datosCliente.poste || null,
-        datosCliente.contrato || null,
-        datosCliente.ruta || null,
-        datosCliente.requiere_reconexion || 0,
-        datosCliente.codigo_usuario || null,
-        datosCliente.observaciones || null,
-        datosCliente.created_by || null
+      const params = [
+        datos.identificacion,
+        datos.tipo_documento || 'cedula',
+        datos.nombre,
+        datos.direccion,
+        datos.sector_id || null,
+        datos.estrato || null,
+        datos.barrio || null,
+        datos.ciudad_id || null,
+        datos.telefono || null,
+        datos.telefono_2 || null,
+        datos.email || null,
+        datos.fecha_registro || new Date().toISOString().split('T')[0],
+        datos.fecha_inicio_servicio || null,
+        datos.fecha_fin_servicio || null,
+        datos.estado || 'activo',
+        datos.mac_address || null,
+        datos.ip_asignada || null,
+        datos.tap || null,
+        datos.puerto || null,
+        datos.numero_contrato || null,
+        datos.ruta || null,
+        datos.requiere_reconexion ? 1 : 0,
+        datos.codigo_usuario || null,
+        datos.observaciones || null,
+        datos.activo !== undefined ? (datos.activo ? 1 : 0) : 1
       ];
       
       const connection = await pool.getConnection();
-      const [resultado] = await connection.execute(query, valores);
+      const [resultado] = await connection.execute(query, params);
       connection.release();
       
-      return {
-        id: resultado.insertId,
-        ...datosCliente
-      };
+      return resultado.insertId;
     } catch (error) {
       throw new Error(`Error al crear cliente: ${error.message}`);
     }
   }
 
   // Actualizar cliente
-  static async actualizar(id, datosCliente) {
+  static async actualizar(id, datos) {
+    try {
+      // CORRECCIÓN: Construir query dinámicamente solo con campos proporcionados
+      const camposActualizacion = [];
+      const params = [];
+      
+      const camposPermitidos = [
+        'identificacion', 'tipo_documento', 'nombre', 'direccion', 'sector_id',
+        'estrato', 'barrio', 'ciudad_id', 'telefono', 'telefono_2', 'email',
+        'fecha_registro', 'fecha_inicio_servicio', 'fecha_fin_servicio', 'estado',
+        'mac_address', 'ip_asignada', 'tap', 'puerto', 'numero_contrato', 'ruta',
+        'requiere_reconexion', 'codigo_usuario', 'observaciones', 'activo'
+      ];
+      
+      camposPermitidos.forEach(campo => {
+        if (datos.hasOwnProperty(campo)) {
+          camposActualizacion.push(`${campo} = ?`);
+          
+          // Manejar campos boolean
+          if (campo === 'requiere_reconexion' || campo === 'activo') {
+            params.push(datos[campo] ? 1 : 0);
+          } else {
+            params.push(datos[campo]);
+          }
+        }
+      });
+      
+      if (camposActualizacion.length === 0) {
+        throw new Error('No hay campos para actualizar');
+      }
+      
+      const query = `
+        UPDATE clientes 
+        SET ${camposActualizacion.join(', ')}, updated_at = NOW()
+        WHERE id = ?
+      `;
+      
+      params.push(id);
+      
+      const connection = await pool.getConnection();
+      const [resultado] = await connection.execute(query, params);
+      connection.release();
+      
+      if (resultado.affectedRows === 0) {
+        throw new Error('Cliente no encontrado');
+      }
+      
+      return true;
+    } catch (error) {
+      throw new Error(`Error al actualizar cliente: ${error.message}`);
+    }
+  }
+
+  // Eliminar cliente
+  static async eliminar(id) {
     try {
       // Verificar si el cliente existe
       const clienteExistente = await this.obtenerPorId(id);
@@ -229,92 +359,31 @@ class Cliente {
         throw new Error('Cliente no encontrado');
       }
 
-      // Si se está cambiando la identificación, verificar que no exista otra
-      if (datosCliente.identificacion && datosCliente.identificacion !== clienteExistente.identificacion) {
-        const otroCliente = await this.obtenerPorIdentificacion(datosCliente.identificacion);
-        if (otroCliente && otroCliente.id !== id) {
-          throw new Error('Ya existe un cliente con esta identificación');
-        }
-      }
-
-      const camposActualizar = [];
-      const valores = [];
-      
-      // Construir query dinámicamente
-      Object.keys(datosCliente).forEach(campo => {
-        if (datosCliente[campo] !== undefined && campo !== 'id') {
-          camposActualizar.push(`${campo} = ?`);
-          valores.push(datosCliente[campo]);
-        }
-      });
-      
-      if (camposActualizar.length === 0) {
-        throw new Error('No hay campos para actualizar');
-      }
-      
-      valores.push(id);
-      
-      const query = `
-        UPDATE clientes 
-        SET ${camposActualizar.join(', ')}, updated_at = NOW()
-        WHERE id = ?
-      `;
-      
-      const connection = await pool.getConnection();
-      await connection.execute(query, valores);
-      connection.release();
-      
-      return await this.obtenerPorId(id);
-    } catch (error) {
-      throw new Error(`Error al actualizar cliente: ${error.message}`);
-    }
-  }
-
-  // Eliminar cliente (soft delete)
-  static async eliminar(id) {
-    try {
-      const cliente = await this.obtenerPorId(id);
-      if (!cliente) {
-        throw new Error('Cliente no encontrado');
-      }
-
-      // Verificar si tiene servicios activos
+      // Verificar si tiene servicios activos (facturas, instalaciones, etc.)
       const connection = await pool.getConnection();
       
-      const queryServicios = 'SELECT COUNT(*) as total FROM servicios_cliente WHERE cliente_id = ? AND estado = "activo"';
-      const [servicios] = await connection.execute(queryServicios, [id]);
+      const [facturas] = await connection.execute(
+        'SELECT COUNT(*) as count FROM facturas WHERE cliente_id = ?',
+        [id]
+      );
       
-      if (servicios[0].total > 0) {
+      if (facturas[0].count > 0) {
         connection.release();
-        throw new Error('No se puede eliminar un cliente con servicios activos');
+        throw new Error('No se puede eliminar el cliente porque tiene facturas asociadas');
       }
-
-      // Mover a clientes inactivos
-      const queryInactivo = `
-        INSERT INTO clientes_inactivos (
-          identificacion, nombre, direccion, descripcion, fecha_inactivacion,
-          barrio, sector_codigo, telefono, poste, estrato, motivo_inactivacion, cliente_id
-        ) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, 'ELIMINADO POR USUARIO', ?)
-      `;
       
-      await connection.execute(queryInactivo, [
-        cliente.identificacion,
-        cliente.nombre,
-        cliente.direccion,
-        'Cliente eliminado del sistema',
-        cliente.barrio,
-        cliente.sector_codigo,
-        cliente.telefono,
-        cliente.poste,
-        cliente.estrato,
-        id
-      ]);
-
-      // Eliminar cliente
-      const queryEliminar = 'DELETE FROM clientes WHERE id = ?';
-      await connection.execute(queryEliminar, [id]);
+      // Realizar eliminación
+      const [resultado] = await connection.execute(
+        'DELETE FROM clientes WHERE id = ?',
+        [id]
+      );
       
       connection.release();
+      
+      if (resultado.affectedRows === 0) {
+        throw new Error('No se pudo eliminar el cliente');
+      }
+      
       return true;
     } catch (error) {
       throw new Error(`Error al eliminar cliente: ${error.message}`);
@@ -326,8 +395,8 @@ class Cliente {
     try {
       let query = `
         SELECT 
-          c.*,
-          s.nombre as sector_nombre,
+          c.id, c.identificacion, c.nombre, c.direccion, c.telefono, 
+          c.estado, s.codigo as sector_codigo, s.nombre as sector_nombre,
           ci.nombre as ciudad_nombre
         FROM clientes c
         LEFT JOIN sectores s ON c.sector_id = s.id
@@ -335,14 +404,17 @@ class Cliente {
         WHERE (
           c.identificacion LIKE ? OR 
           c.nombre LIKE ? OR 
-          c.telefono LIKE ? OR 
-          c.telefono_2 LIKE ? OR
-          c.direccion LIKE ?
+          c.telefono LIKE ? OR
+          c.telefono_2 LIKE ?
         )
       `;
       
-      const searchTerm = `%${termino}%`;
-      const params = [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
+      const params = [
+        `%${termino}%`,
+        `%${termino}%`,
+        `%${termino}%`,
+        `%${termino}%`
+      ];
       
       if (filtros.estado) {
         query += ' AND c.estado = ?';
@@ -357,32 +429,59 @@ class Cliente {
       
       return filas;
     } catch (error) {
-      throw new Error(`Error en búsqueda de clientes: ${error.message}`);
+      throw new Error(`Error al buscar clientes: ${error.message}`);
     }
   }
 
-  // Estadísticas de clientes
+  // Obtener estadísticas
   static async obtenerEstadisticas() {
     try {
-      const query = `
+      const connection = await pool.getConnection();
+      
+      // Estadísticas básicas
+      const [estadisticasBasicas] = await connection.execute(`
         SELECT 
-          COUNT(*) as total,
+          COUNT(*) as total_clientes,
           SUM(CASE WHEN estado = 'activo' THEN 1 ELSE 0 END) as activos,
           SUM(CASE WHEN estado = 'suspendido' THEN 1 ELSE 0 END) as suspendidos,
           SUM(CASE WHEN estado = 'cortado' THEN 1 ELSE 0 END) as cortados,
-          SUM(CASE WHEN estado = 'retirado' THEN 1 ELSE 0 END) as retirados,
-          SUM(CASE WHEN estado = 'inactivo' THEN 1 ELSE 0 END) as inactivos,
           SUM(CASE WHEN DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) as nuevos_hoy,
-          SUM(CASE WHEN WEEK(created_at) = WEEK(NOW()) AND YEAR(created_at) = YEAR(NOW()) THEN 1 ELSE 0 END) as nuevos_semana,
-          SUM(CASE WHEN MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW()) THEN 1 ELSE 0 END) as nuevos_mes
+          SUM(CASE WHEN DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as nuevos_semana
         FROM clientes
-      `;
+      `);
       
-      const connection = await pool.getConnection();
-      const [filas] = await connection.execute(query);
+      // Estadísticas por ciudad
+      const [estadisticasCiudad] = await connection.execute(`
+        SELECT 
+          ci.nombre as ciudad,
+          COUNT(*) as cantidad
+        FROM clientes c
+        LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+        GROUP BY c.ciudad_id, ci.nombre
+        ORDER BY cantidad DESC
+        LIMIT 10
+      `);
+      
+      // Estadísticas por sector
+      const [estadisticasSector] = await connection.execute(`
+        SELECT 
+          s.codigo, s.nombre as sector,
+          COUNT(*) as cantidad
+        FROM clientes c
+        LEFT JOIN sectores s ON c.sector_id = s.id
+        WHERE s.codigo IS NOT NULL
+        GROUP BY c.sector_id, s.codigo, s.nombre
+        ORDER BY cantidad DESC
+        LIMIT 10
+      `);
+      
       connection.release();
       
-      return filas[0];
+      return {
+        basicas: estadisticasBasicas[0],
+        por_ciudad: estadisticasCiudad,
+        por_sector: estadisticasSector
+      };
     } catch (error) {
       throw new Error(`Error al obtener estadísticas: ${error.message}`);
     }

@@ -142,8 +142,8 @@ const ConfigMain = () => {
             color: '#06b6d4',
             bgColor: 'bg-cyan-50',
             borderColor: 'border-cyan-200',
-            completed: (overview?.contadores?.plantillas_activas || 0) > 0,
-            count: overview?.contadores?.plantillas_activas || 0,
+            completed: (overview?.contadores?.plantillas_activas || 1) > 0,
+            count: overview?.contadores?.plantillas_activas || 1,
             total: 'Variable',
             permission: 'administrador'
         }

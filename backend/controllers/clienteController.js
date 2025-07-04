@@ -1,6 +1,8 @@
-// backend/controllers/clienteController.js - VERSIÓN SIMPLIFICADA PARA DEBUG
+// backend/controllers/clienteController.js - VERSIÓN CORREGIDA
 
 const Cliente = require('../models/cliente');
+const XLSX = require('xlsx');
+const path = require('path');
 
 class ClienteController {
   // Obtener todos los clientes
@@ -39,9 +41,19 @@ class ClienteController {
 
       const totalPages = Math.ceil(total / limit);
 
+      // CORRECCIÓN: Formatear fechas correctamente para evitar desfase
+      const clientesFormateados = clientes.map(cliente => ({
+        ...cliente,
+        fecha_registro: cliente.fecha_registro ? new Date(cliente.fecha_registro).toISOString().split('T')[0] : null,
+        fecha_inicio_servicio: cliente.fecha_inicio_servicio ? new Date(cliente.fecha_inicio_servicio).toISOString().split('T')[0] : null,
+        fecha_fin_servicio: cliente.fecha_fin_servicio ? new Date(cliente.fecha_fin_servicio).toISOString().split('T')[0] : null,
+        created_at: cliente.created_at ? new Date(cliente.created_at).toISOString() : null,
+        updated_at: cliente.updated_at ? new Date(cliente.updated_at).toISOString() : null
+      }));
+
       res.json({
         success: true,
-        data: clientes,
+        data: clientesFormateados,
         pagination: {
           currentPage: parseInt(page),
           totalPages,
@@ -57,6 +69,210 @@ class ClienteController {
         error: error.message
       });
     }
+  }
+
+  // NUEVO: Función para exportar clientes
+  static async exportarClientes(req, res) {
+    try {
+      console.log('🔄 Iniciando exportación de clientes');
+      
+      const {
+        format = 'excel',
+        estado,
+        sector_id,
+        ciudad_id,
+        fechaInicio,
+        fechaFin
+      } = req.query;
+
+      // Construir filtros para la exportación
+      const filtros = {};
+      
+      if (estado) filtros.estado = estado;
+      if (sector_id) filtros.sector_id = sector_id;
+      if (ciudad_id) filtros.ciudad_id = ciudad_id;
+
+      // CORRECCIÓN: Agregar filtros de fecha si se proporcionan
+      if (fechaInicio) filtros.fecha_inicio = fechaInicio;
+      if (fechaFin) filtros.fecha_fin = fechaFin;
+
+      // Obtener todos los clientes que coincidan con los filtros
+      const clientes = await Cliente.obtenerTodosParaExportar(filtros);
+
+      if (!clientes || clientes.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No se encontraron clientes para exportar'
+        });
+      }
+
+      console.log(`📊 Exportando ${clientes.length} clientes`);
+
+      // CORRECCIÓN: Formatear datos para exportación con fechas corregidas
+      const datosExportacion = clientes.map(cliente => ({
+        'ID': cliente.id,
+        'Identificación': cliente.identificacion,
+        'Tipo Documento': cliente.tipo_documento,
+        'Nombre': cliente.nombre,
+        'Dirección': cliente.direccion,
+        'Barrio': cliente.barrio,
+        'Ciudad': cliente.ciudad_nombre || '',
+        'Sector': cliente.sector_codigo ? `${cliente.sector_codigo} - ${cliente.sector_nombre}` : '',
+        'Estrato': cliente.estrato,
+        'Teléfono': cliente.telefono,
+        'Teléfono 2': cliente.telefono_2 || '',
+        'Email': cliente.email || '',
+        'Estado': cliente.estado,
+        'Fecha Registro': cliente.fecha_registro ? this.formatearFechaExportacion(cliente.fecha_registro) : '',
+        'Fecha Inicio Servicio': cliente.fecha_inicio_servicio ? this.formatearFechaExportacion(cliente.fecha_inicio_servicio) : '',
+        'Fecha Fin Servicio': cliente.fecha_fin_servicio ? this.formatearFechaExportacion(cliente.fecha_fin_servicio) : '',
+        'MAC Address': cliente.mac_address || '',
+        'IP Asignada': cliente.ip_asignada || '',
+        'TAP': cliente.tap || '',
+        'Puerto': cliente.puerto || '',
+        'Contrato': cliente.numero_contrato || '',
+        'Ruta': cliente.ruta || '',
+        'Requiere Reconexión': cliente.requiere_reconexion ? 'Sí' : 'No',
+        'Código Usuario': cliente.codigo_usuario || '',
+        'Observaciones': cliente.observaciones || '',
+        'Fecha Creación': cliente.created_at ? this.formatearFechaHoraExportacion(cliente.created_at) : '',
+        'Última Actualización': cliente.updated_at ? this.formatearFechaHoraExportacion(cliente.updated_at) : ''
+      }));
+
+      if (format === 'csv') {
+        // Exportar como CSV
+        const csv = this.convertirACSV(datosExportacion);
+        const fechaActual = new Date().toISOString().split('T')[0];
+        
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="clientes_${fechaActual}.csv"`);
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+        
+        // Agregar BOM para compatibilidad con Excel
+        res.write('\uFEFF');
+        res.end(csv);
+      } else {
+        // Exportar como Excel
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.json_to_sheet(datosExportacion);
+        
+        // CORRECCIÓN: Configurar anchos de columna apropiados
+        const columnWidths = [
+          { wch: 8 },   // ID
+          { wch: 15 },  // Identificación
+          { wch: 12 },  // Tipo Documento
+          { wch: 30 },  // Nombre
+          { wch: 40 },  // Dirección
+          { wch: 20 },  // Barrio
+          { wch: 15 },  // Ciudad
+          { wch: 25 },  // Sector
+          { wch: 8 },   // Estrato
+          { wch: 15 },  // Teléfono
+          { wch: 15 },  // Teléfono 2
+          { wch: 25 },  // Email
+          { wch: 12 },  // Estado
+          { wch: 12 },  // Fecha Registro
+          { wch: 15 },  // Fecha Inicio Servicio
+          { wch: 15 },  // Fecha Fin Servicio
+          { wch: 18 },  // MAC Address
+          { wch: 12 },  // IP Asignada
+          { wch: 10 },  // TAP
+          { wch: 10 },  // Puerto
+          { wch: 15 },  // Contrato
+          { wch: 8 },   // Ruta
+          { wch: 12 },  // Requiere Reconexión
+          { wch: 15 },  // Código Usuario
+          { wch: 30 },  // Observaciones
+          { wch: 18 },  // Fecha Creación
+          { wch: 18 }   // Última Actualización
+        ];
+        
+        worksheet['!cols'] = columnWidths;
+        
+        // Agregar hoja al libro
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Clientes');
+        
+        // Generar buffer
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        
+        const fechaActual = new Date().toISOString().split('T')[0];
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="clientes_${fechaActual}.xlsx"`);
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+        
+        res.end(buffer);
+      }
+
+      console.log('✅ Exportación completada exitosamente');
+
+    } catch (error) {
+      console.error('❌ Error al exportar clientes:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor durante la exportación',
+        error: error.message
+      });
+    }
+  }
+
+  // CORRECCIÓN: Función auxiliar para formatear fechas en exportación
+  static formatearFechaExportacion(fecha) {
+    if (!fecha) return '';
+    
+    try {
+      const fechaObj = new Date(fecha);
+      // Ajustar por zona horaria para evitar desfase
+      const offsetMinutos = fechaObj.getTimezoneOffset();
+      fechaObj.setMinutes(fechaObj.getMinutes() + offsetMinutos);
+      
+      return fechaObj.toLocaleDateString('es-CO', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formateando fecha:', error);
+      return fecha;
+    }
+  }
+
+  // Función auxiliar para formatear fecha y hora
+  static formatearFechaHoraExportacion(fechaHora) {
+    if (!fechaHora) return '';
+    
+    try {
+      return new Date(fechaHora).toLocaleString('es-CO', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formateando fecha y hora:', error);
+      return fechaHora;
+    }
+  }
+
+  // Función auxiliar para convertir a CSV
+  static convertirACSV(datos) {
+    if (!datos || datos.length === 0) return '';
+    
+    const headers = Object.keys(datos[0]);
+    const csvHeaders = headers.join(',');
+    
+    const csvRows = datos.map(row => {
+      return headers.map(header => {
+        const value = row[header] || '';
+        // Escapar comillas y envolver en comillas si contiene comas
+        const escapedValue = value.toString().replace(/"/g, '""');
+        return escapedValue.includes(',') ? `"${escapedValue}"` : escapedValue;
+      }).join(',');
+    });
+    
+    return [csvHeaders, ...csvRows].join('\n');
   }
 
   // Obtener cliente por ID
@@ -80,9 +296,17 @@ class ClienteController {
         });
       }
 
+      // CORRECCIÓN: Formatear fechas antes de enviar respuesta
+      const clienteFormateado = {
+        ...cliente,
+        fecha_registro: cliente.fecha_registro ? new Date(cliente.fecha_registro).toISOString().split('T')[0] : null,
+        fecha_inicio_servicio: cliente.fecha_inicio_servicio ? new Date(cliente.fecha_inicio_servicio).toISOString().split('T')[0] : null,
+        fecha_fin_servicio: cliente.fecha_fin_servicio ? new Date(cliente.fecha_fin_servicio).toISOString().split('T')[0] : null
+      };
+
       res.json({
         success: true,
-        data: cliente
+        data: clienteFormateado
       });
     } catch (error) {
       console.error('Error al obtener cliente:', error);
@@ -94,7 +318,7 @@ class ClienteController {
     }
   }
 
-  // Crear nuevo cliente - VERSIÓN SIMPLIFICADA
+  // Crear nuevo cliente
   static async crear(req, res) {
     try {
       console.log('🔍 DEBUG - Crear Cliente');
@@ -104,84 +328,96 @@ class ClienteController {
       const { identificacion, nombre, direccion } = req.body;
       
       if (!identificacion || !nombre || !direccion) {
-        console.log('❌ Faltan campos requeridos:', { identificacion: !!identificacion, nombre: !!nombre, direccion: !!direccion });
+        console.log('❌ Faltan campos requeridos:', { 
+          identificacion: !!identificacion, 
+          nombre: !!nombre, 
+          direccion: !!direccion 
+        });
+        
         return res.status(400).json({
           success: false,
-          message: 'Identificación, nombre y dirección son requeridos',
-          received: {
-            identificacion: !!identificacion,
-            nombre: !!nombre,
-            direccion: !!direccion
-          }
+          message: 'Identificación, nombre y dirección son campos requeridos'
         });
       }
 
-      // Preparar datos con valores por defecto seguros
-      const datosCliente = {
-        identificacion: identificacion.toString().trim(),
-        tipo_documento: req.body.tipo_documento || 'cedula',
-        nombre: nombre.toString().trim(),
-        direccion: direccion.toString().trim(),
-        sector_id: req.body.sector_id ? parseInt(req.body.sector_id) : null,
-        estrato: req.body.estrato || null,
-        barrio: req.body.barrio || null,
-        ciudad_id: req.body.ciudad_id ? parseInt(req.body.ciudad_id) : null,
-        telefono: req.body.telefono || null,
-        telefono_2: req.body.telefono_2 || null,
-        correo: req.body.correo || null,
-        fecha_registro: req.body.fecha_registro || new Date().toISOString().split('T')[0],
-        fecha_hasta: req.body.fecha_hasta || null,
-        estado: req.body.estado || 'activo',
-        mac_address: req.body.mac_address || null,
-        ip_asignada: req.body.ip_asignada || null,
-        tap: req.body.tap || null,
-        poste: req.body.poste || null,
-        contrato: req.body.contrato || null,
-        ruta: req.body.ruta || null,
-        requiere_reconexion: req.body.requiere_reconexion ? 1 : 0,
-        codigo_usuario: req.body.codigo_usuario || null,
-        observaciones: req.body.observaciones || null,
-        created_by: req.user?.id || 1 // ID del usuario autenticado
-      };
+      // CORRECCIÓN: Procesar fechas correctamente antes de guardar
+      const datosCliente = { ...req.body };
+      
+      // Convertir fechas al formato correcto
+      if (datosCliente.fecha_registro) {
+        datosCliente.fecha_registro = this.procesarFecha(datosCliente.fecha_registro);
+      }
+      
+      if (datosCliente.fecha_inicio_servicio) {
+        datosCliente.fecha_inicio_servicio = this.procesarFecha(datosCliente.fecha_inicio_servicio);
+      }
+      
+      if (datosCliente.fecha_fin_servicio) {
+        datosCliente.fecha_fin_servicio = this.procesarFecha(datosCliente.fecha_fin_servicio);
+      }
 
-      console.log('📤 Datos a enviar al modelo:', JSON.stringify(datosCliente, null, 2));
+      // CORRECCIÓN: Validar sincronización ciudad-sector
+      if (datosCliente.sector_id && datosCliente.ciudad_id) {
+        const sectorValido = await Cliente.validarSectorCiudad(datosCliente.sector_id, datosCliente.ciudad_id);
+        if (!sectorValido) {
+          return res.status(400).json({
+            success: false,
+            message: 'El sector seleccionado no pertenece a la ciudad especificada'
+          });
+        }
+      }
 
-      const nuevoCliente = await Cliente.crear(datosCliente);
+      console.log('✅ Datos procesados:', datosCliente);
 
-      console.log('✅ Cliente creado exitosamente:', nuevoCliente.id);
+      const clienteId = await Cliente.crear(datosCliente);
+      const clienteCreado = await Cliente.obtenerPorId(clienteId);
 
       res.status(201).json({
         success: true,
-        message: 'Cliente creado exitosamente',
-        data: nuevoCliente
+        data: clienteCreado,
+        message: 'Cliente creado exitosamente'
       });
+
     } catch (error) {
-      console.error('❌ Error al crear cliente:', error);
+      console.error('Error al crear cliente:', error);
       
-      if (error.message.includes('Ya existe un cliente')) {
+      if (error.message.includes('Duplicate entry')) {
         return res.status(409).json({
           success: false,
-          message: error.message
+          message: 'Ya existe un cliente con esta identificación'
         });
       }
 
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',
-        error: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        error: error.message
       });
     }
   }
 
-  // Actualizar cliente - VERSIÓN SIMPLIFICADA
+  // CORRECCIÓN: Función auxiliar para procesar fechas
+  static procesarFecha(fecha) {
+    if (!fecha) return null;
+    
+    try {
+      // Si viene como string de fecha, asegurar formato YYYY-MM-DD
+      if (typeof fecha === 'string') {
+        const fechaObj = new Date(fecha + 'T00:00:00.000Z');
+        return fechaObj.toISOString().split('T')[0];
+      }
+      
+      return fecha;
+    } catch (error) {
+      console.error('Error procesando fecha:', error);
+      return null;
+    }
+  }
+
+  // Actualizar cliente
   static async actualizar(req, res) {
     try {
       const { id } = req.params;
-      
-      console.log('🔍 DEBUG - Actualizar Cliente');
-      console.log('ID:', id);
-      console.log('Body recibido:', JSON.stringify(req.body, null, 2));
       
       if (!id || isNaN(id)) {
         return res.status(400).json({
@@ -190,62 +426,64 @@ class ClienteController {
         });
       }
 
-      // Limpiar datos de entrada - solo incluir campos que no estén vacíos
-      const datosLimpios = {};
-      
-      Object.keys(req.body).forEach(key => {
-        const value = req.body[key];
-        
-        // Solo incluir valores no vacíos
-        if (value !== null && value !== undefined && value !== '') {
-          if (key === 'sector_id' || key === 'ciudad_id') {
-            const numValue = parseInt(value);
-            if (!isNaN(numValue) && numValue > 0) {
-              datosLimpios[key] = numValue;
-            }
-          } else if (key === 'requiere_reconexion') {
-            datosLimpios[key] = value ? 1 : 0;
-          } else if (typeof value === 'string') {
-            datosLimpios[key] = value.trim();
-          } else {
-            datosLimpios[key] = value;
-          }
-        }
-      });
-
-      console.log('📤 Datos limpios para actualizar:', JSON.stringify(datosLimpios, null, 2));
-
-      const clienteActualizado = await Cliente.actualizar(id, datosLimpios);
-
-      console.log('✅ Cliente actualizado exitosamente');
-
-      res.json({
-        success: true,
-        message: 'Cliente actualizado exitosamente',
-        data: clienteActualizado
-      });
-    } catch (error) {
-      console.error('❌ Error al actualizar cliente:', error);
-      
-      if (error.message.includes('no encontrado')) {
+      // Verificar que el cliente existe
+      const clienteExistente = await Cliente.obtenerPorId(id);
+      if (!clienteExistente) {
         return res.status(404).json({
           success: false,
-          message: error.message
+          message: 'Cliente no encontrado'
         });
       }
 
-      if (error.message.includes('Ya existe un cliente')) {
+      // CORRECCIÓN: Procesar fechas en actualización
+      const datosActualizacion = { ...req.body };
+      
+      if (datosActualizacion.fecha_registro) {
+        datosActualizacion.fecha_registro = this.procesarFecha(datosActualizacion.fecha_registro);
+      }
+      
+      if (datosActualizacion.fecha_inicio_servicio) {
+        datosActualizacion.fecha_inicio_servicio = this.procesarFecha(datosActualizacion.fecha_inicio_servicio);
+      }
+      
+      if (datosActualizacion.fecha_fin_servicio) {
+        datosActualizacion.fecha_fin_servicio = this.procesarFecha(datosActualizacion.fecha_fin_servicio);
+      }
+
+      // CORRECCIÓN: Validar sincronización ciudad-sector en actualización
+      if (datosActualizacion.sector_id && datosActualizacion.ciudad_id) {
+        const sectorValido = await Cliente.validarSectorCiudad(datosActualizacion.sector_id, datosActualizacion.ciudad_id);
+        if (!sectorValido) {
+          return res.status(400).json({
+            success: false,
+            message: 'El sector seleccionado no pertenece a la ciudad especificada'
+          });
+        }
+      }
+
+      await Cliente.actualizar(id, datosActualizacion);
+      const clienteActualizado = await Cliente.obtenerPorId(id);
+
+      res.json({
+        success: true,
+        data: clienteActualizado,
+        message: 'Cliente actualizado exitosamente'
+      });
+
+    } catch (error) {
+      console.error('Error al actualizar cliente:', error);
+      
+      if (error.message.includes('Duplicate entry')) {
         return res.status(409).json({
           success: false,
-          message: error.message
+          message: 'Ya existe otro cliente con esta identificación'
         });
       }
 
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',
-        error: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        error: error.message
       });
     }
   }
@@ -370,37 +608,6 @@ class ClienteController {
       });
     } catch (error) {
       console.error('Error al obtener cliente por identificación:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error interno del servidor',
-        error: error.message
-      });
-    }
-  }
-
-  // Validar identificación
-  static async validarIdentificacion(req, res) {
-    try {
-      const { identificacion } = req.params;
-
-      if (!identificacion) {
-        return res.status(400).json({
-          success: false,
-          message: 'Identificación requerida'
-        });
-      }
-
-      const cliente = await Cliente.obtenerPorIdentificacion(identificacion);
-
-      res.json({
-        success: true,
-        data: {
-          existe: !!cliente,
-          cliente: cliente || null
-        }
-      });
-    } catch (error) {
-      console.error('Error al validar identificación:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',

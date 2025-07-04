@@ -208,6 +208,11 @@ try {
   app.use('/api/v1/config', configRoutes);
   console.log('✅ Rutas de configuración cargadas: /api/v1/config');
 
+   console.log('📋 Cargando rutas de conceptos...');
+  const conceptosRoutes = require('./routes/conceptos');
+  app.use('/api/v1/conceptos', conceptosRoutes);
+  console.log('✅ Rutas de conceptos cargadas: /api/v1/conceptos');
+
   // Rutas de clientes
   console.log('👤 Cargando rutas de clientes...');
   const clientRoutes = require('./routes/clientes');

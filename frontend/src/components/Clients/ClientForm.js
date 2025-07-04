@@ -1,624 +1,812 @@
-// frontend/src/components/Clients/ClientForm.js - VERSIÓN CON DEBUG Y VALIDACIÓN MEJORADA
+// frontend/src/components/Clients/ClientForm.js - VERSIÓN CORREGIDA
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, AlertCircle, Check } from 'lucide-react';
-import { useClientForm } from '../../hooks/useClients';
-import { useConfig } from '../../hooks/useConfig';
+import { X, Save, AlertCircle, User, MapPin, Phone, Globe, Calendar, Settings } from 'lucide-react';
 import { clientService } from '../../services/clientService';
-import {
-  DOCUMENT_TYPES,
-  DOCUMENT_TYPE_LABELS,
-  CLIENT_STATES,
-  CLIENT_STATE_LABELS,
-  STRATOS
-} from '../../constants/clientConstants';
+import { useConfig } from '../../hooks/useConfig';
 
-const ClientForm = ({ client, onClose, onSave }) => {
-  const isEditing = Boolean(client);
-  const {
-    formData,
-    errors,
-    loading,
-    updateField,
-    validateForm,
-    resetForm,
-    createClient,
-    updateClient
-  } = useClientForm(client);
+const ClientForm = ({ client, onClose, onSave, permissions }) => {
+  // Estados del formulario
+  const [formData, setFormData] = useState({
+    identificacion: '',
+    tipo_documento: 'cedula',
+    nombre: '',
+    direccion: '',
+    barrio: '',
+    estrato: '',
+    ciudad_id: '',
+    sector_id: '',
+    telefono: '',
+    telefono_2: '',
+    email: '',
+    fecha_registro: new Date().toISOString().split('T')[0],
+    fecha_inicio_servicio: '',
+    fecha_fin_servicio: '',
+    estado: 'activo',
+    mac_address: '',
+    ip_asignada: '',
+    tap: '',
+    puerto: '',
+    numero_contrato: '',
+    ruta: '',
+    codigo_usuario: '',
+    observaciones: '',
+    requiere_reconexion: false
+  });
 
-  // Usar el hook de configuración
-  const {
-    sectors = [],
-    cities = [],
-    departments = [],
-    loading: configLoading,
-    loadCities,
-    loadSectors
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // CORRECCIÓN: Obtener datos de configuración y sectores filtrados
+  const { 
+    cities, 
+    sectors: allSectors, 
+    loading: configLoading 
   } = useConfig();
 
-  const [saving, setSaving] = useState(false);
-  const [validatingId, setValidatingId] = useState(false);
-  const [idValidation, setIdValidation] = useState(null);
-  const [debugMode, setDebugMode] = useState(process.env.NODE_ENV === 'development');
+  // NUEVO: Estado para sectores filtrados por ciudad
+  const [availableSectors, setAvailableSectors] = useState([]);
 
-  // Debug function
-  const logDebug = (message, data) => {
-    if (debugMode) {
-      console.log(`🐛 ClientForm: ${message}`, data);
+  // Cargar datos del cliente si es edición
+  useEffect(() => {
+    if (client) {
+      setFormData({
+        identificacion: client.identificacion || '',
+        tipo_documento: client.tipo_documento || 'cedula',
+        nombre: client.nombre || '',
+        direccion: client.direccion || '',
+        barrio: client.barrio || '',
+        estrato: client.estrato || '',
+        ciudad_id: client.ciudad_id || '',
+        sector_id: client.sector_id || '',
+        telefono: client.telefono || '',
+        telefono_2: client.telefono_2 || '',
+        email: client.email || '',
+        fecha_registro: client.fecha_registro || new Date().toISOString().split('T')[0],
+        fecha_inicio_servicio: client.fecha_inicio_servicio || '',
+        fecha_fin_servicio: client.fecha_fin_servicio || '',
+        estado: client.estado || 'activo',
+        mac_address: client.mac_address || '',
+        ip_asignada: client.ip_asignada || '',
+        tap: client.tap || '',
+        puerto: client.puerto || '',
+        numero_contrato: client.numero_contrato || '',
+        ruta: client.ruta || '',
+        codigo_usuario: client.codigo_usuario || '',
+        observaciones: client.observaciones || '',
+        requiere_reconexion: Boolean(client.requiere_reconexion)
+      });
+    }
+  }, [client]);
+
+  // CORRECCIÓN: Filtrar sectores cuando cambie la ciudad
+  useEffect(() => {
+    if (formData.ciudad_id && allSectors.length > 0) {
+      const sectoresFiltrados = allSectors.filter(
+        sector => sector.ciudad_id === parseInt(formData.ciudad_id)
+      );
+      setAvailableSectors(sectoresFiltrados);
+      
+      // Si el sector actual no pertenece a la ciudad seleccionada, limpiarlo
+      if (formData.sector_id) {
+        const sectorActualValido = sectoresFiltrados.some(
+          sector => sector.id === parseInt(formData.sector_id)
+        );
+        
+        if (!sectorActualValido) {
+          console.log('🔄 Sector no válido para la ciudad seleccionada, limpiando...');
+          setFormData(prev => ({ ...prev, sector_id: '' }));
+          
+          // Limpiar error de sector si existe
+          if (errors.sector_id) {
+            setErrors(prev => ({ ...prev, sector_id: null }));
+          }
+        }
+      }
+    } else {
+      setAvailableSectors([]);
+      // Limpiar sector si no hay ciudad seleccionada
+      if (formData.sector_id) {
+        setFormData(prev => ({ ...prev, sector_id: '' }));
+      }
+    }
+  }, [formData.ciudad_id, allSectors]);
+
+  // Manejar cambios en los campos
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    
+    let finalValue = value;
+    
+    // Manejar campos específicos
+    if (type === 'checkbox') {
+      finalValue = checked;
+    } else if (name === 'ciudad_id') {
+      // CORRECCIÓN: Limpiar sector cuando cambie la ciudad
+      setFormData(prev => ({
+        ...prev,
+        [name]: finalValue,
+        sector_id: '' // Limpiar sector al cambiar ciudad
+      }));
+      
+      // Limpiar errores relacionados
+      if (errors[name]) {
+        setErrors(prev => ({ ...prev, [name]: null }));
+      }
+      if (errors.sector_id) {
+        setErrors(prev => ({ ...prev, sector_id: null }));
+      }
+      
+      return; // Salir temprano para evitar el setFormData de abajo
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: finalValue
+    }));
+
+    // Limpiar error del campo
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: null
+      }));
     }
   };
 
-  // Debug inicial
-  useEffect(() => {
-    logDebug('Formulario inicializado', {
-      isEditing,
-      client,
-      formData,
-      sectorsCount: sectors.length,
-      citiesCount: cities.length
-    });
-  }, [isEditing, client, formData, sectors.length, cities.length]);
+  // Validar formulario
+  const validateForm = () => {
+    const newErrors = {};
 
-  // Validar identificación cuando cambie
-  useEffect(() => {
-    const validateIdentification = async () => {
-      if (formData.identificacion && formData.identificacion.length >= 5) {
-        // No validar si es la misma identificación del cliente que se está editando
-        if (isEditing && formData.identificacion === client.identificacion) {
-          setIdValidation(null);
-          return;
-        }
-
-        setValidatingId(true);
-        try {
-          logDebug('Validando identificación', formData.identificacion);
-          const response = await clientService.validateIdentification(formData.identificacion);
-          logDebug('Respuesta validación ID', response);
-
-          if (response.success) {
-            setIdValidation(response.data.existe ? 'exists' : 'available');
-          }
-        } catch (error) {
-          console.error('Error validating ID:', error);
-        } finally {
-          setValidatingId(false);
-        }
-      } else {
-        setIdValidation(null);
-      }
-    };
-
-    const timeoutId = setTimeout(validateIdentification, 500);
-    return () => clearTimeout(timeoutId);
-  }, [formData.identificacion, isEditing, client?.identificacion]);
-
-  // Preparar datos para envío
-  const prepareFormData = () => {
-    // Limpiar datos nulos y undefined
-    const cleanData = {};
-
-    Object.keys(formData).forEach(key => {
-      const value = formData[key];
-
-      // Convertir valores apropiadamente
-      if (value === null || value === undefined || value === '') {
-        // No incluir campos vacíos
-        return;
-      }
-
-      // Conversiones específicas
-      if (key === 'sector_id' || key === 'ciudad_id') {
-        const numValue = parseInt(value);
-        if (!isNaN(numValue) && numValue > 0) {
-          cleanData[key] = numValue;
-        }
-      } else if (key === 'requiere_reconexion') {
-        cleanData[key] = Boolean(value);
-      } else if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed) {
-          cleanData[key] = trimmed;
-        }
-      } else {
-        cleanData[key] = value;
-      }
-    });
-
-    // Asegurar campos requeridos
-    if (!cleanData.tipo_documento) {
-      cleanData.tipo_documento = 'cedula';
+    // Validaciones básicas
+    if (!formData.identificacion.trim()) {
+      newErrors.identificacion = 'La identificación es requerida';
+    } else if (formData.identificacion.length < 5) {
+      newErrors.identificacion = 'La identificación debe tener al menos 5 caracteres';
     }
 
-    if (!cleanData.estado) {
-      cleanData.estado = 'activo';
+    if (!formData.nombre.trim()) {
+      newErrors.nombre = 'El nombre es requerido';
+    } else if (formData.nombre.length < 3) {
+      newErrors.nombre = 'El nombre debe tener al menos 3 caracteres';
     }
 
-    if (!cleanData.fecha_registro) {
-      cleanData.fecha_registro = new Date().toISOString().split('T')[0];
+    if (!formData.direccion.trim()) {
+      newErrors.direccion = 'La dirección es requerida';
+    } else if (formData.direccion.length < 5) {
+      newErrors.direccion = 'La dirección debe tener al menos 5 caracteres';
     }
 
-    logDebug('Datos preparados para envío', {
-      original: formData,
-      cleaned: cleanData
-    });
+    // CORRECCIÓN: Validar sincronización ciudad-sector
+    if (formData.sector_id && !formData.ciudad_id) {
+      newErrors.ciudad_id = 'Debe seleccionar una ciudad antes de seleccionar un sector';
+    }
 
-    return cleanData;
+    if (formData.ciudad_id && formData.sector_id) {
+      const sectorValido = availableSectors.some(
+        sector => sector.id === parseInt(formData.sector_id)
+      );
+      
+      if (!sectorValido) {
+        newErrors.sector_id = 'El sector seleccionado no pertenece a la ciudad';
+      }
+    }
+
+    // Validar email si se proporciona
+    if (formData.email && formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        newErrors.email = 'El formato del email no es válido';
+      }
+    }
+
+    // Validar teléfono
+    if (formData.telefono && formData.telefono.trim()) {
+      const phoneRegex = /^[0-9+\-\s()]+$/;
+      if (!phoneRegex.test(formData.telefono)) {
+        newErrors.telefono = 'El formato del teléfono no es válido';
+      }
+    }
+
+    // Validar fechas
+    if (formData.fecha_inicio_servicio && formData.fecha_fin_servicio) {
+      if (new Date(formData.fecha_fin_servicio) <= new Date(formData.fecha_inicio_servicio)) {
+        newErrors.fecha_fin_servicio = 'La fecha de fin debe ser posterior a la fecha de inicio';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   // Manejar envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    logDebug('Iniciando envío de formulario', formData);
-
+    
     if (!validateForm()) {
-      logDebug('Validación de formulario falló', errors);
-      return;
-    }
-
-    if (idValidation === 'exists') {
-      logDebug('ID ya existe, no se puede crear');
+      console.log('❌ Formulario inválido:', errors);
       return;
     }
 
     setSaving(true);
+    
     try {
-      const dataToSend = prepareFormData();
-
-      logDebug('Enviando datos al backend', dataToSend);
+      console.log('💾 Guardando cliente:', formData);
 
       let response;
-      if (isEditing) {
-        response = await updateClient(client.id, dataToSend);
+      if (client?.id) {
+        response = await clientService.updateClient(client.id, formData);
       } else {
-        // Crear cliente con datos limpios
-        response = await clientService.createClient(dataToSend);
-        logDebug('Respuesta del backend', response);
+        response = await clientService.createClient(formData);
       }
 
       if (response.success) {
-        logDebug('Cliente creado/actualizado exitosamente');
-        onSave();
+        console.log('✅ Cliente guardado exitosamente');
+        
+        // Mostrar notificación de éxito
+        if (window.showNotification) {
+          window.showNotification('success', response.message || 'Cliente guardado exitosamente');
+        }
+        
+        onSave(response.data);
       } else {
-        logDebug('Error en respuesta del backend', response);
-        console.error('Error del backend:', response.message);
+        throw new Error(response.message || 'Error al guardar cliente');
       }
+
     } catch (error) {
-      logDebug('Error en handleSubmit', error);
-      console.error('Error saving client:', error);
+      console.error('❌ Error guardando cliente:', error);
+      
+      // Mostrar notificación de error
+      if (window.showNotification) {
+        window.showNotification('error', error.message || 'Error al guardar cliente');
+      } else {
+        alert(error.message || 'Error al guardar cliente');
+      }
     } finally {
       setSaving(false);
     }
   };
 
-  // Formatear teléfono mientras se escribe
-  const handlePhoneChange = (field, value) => {
-    const cleaned = value.replace(/\D/g, '');
-    updateField(field, cleaned);
+  // Cerrar modal
+  const handleClose = () => {
+    if (saving) return; // No permitir cerrar mientras se guarda
+    onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div className="flex items-center space-x-4">
+          <div>
             <h2 className="text-xl font-semibold text-gray-900">
-              {isEditing ? 'Editar Cliente' : 'Nuevo Cliente'}
+              {client ? 'Editar Cliente' : 'Nuevo Cliente'}
             </h2>
-
-            {debugMode && (
-              <button
-                type="button"
-                onClick={() => setDebugMode(!debugMode)}
-                className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded"
-              >
-                Debug: {debugMode ? 'ON' : 'OFF'}
-              </button>
-            )}
+            <p className="text-sm text-gray-600 mt-1">
+              {client ? 'Modifica la información del cliente' : 'Ingresa los datos del nuevo cliente'}
+            </p>
           </div>
-
           <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1"
+            onClick={handleClose}
+            disabled={saving}
+            className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Content */}
+        {/* Contenido del formulario */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Panel de Debug */}
-            {debugMode && (
-              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                <h4 className="text-sm font-medium text-yellow-800 mb-2">🐛 Debug Info</h4>
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <strong>Estado Form:</strong>
-                    <pre className="mt-1 text-xs bg-white p-2 rounded overflow-auto max-h-32">
-                      {JSON.stringify({
-                        loading,
-                        saving,
-                        idValidation,
-                        errorsCount: Object.keys(errors).length
-                      }, null, 2)}
-                    </pre>
-                  </div>
-                  <div>
-                    <strong>Datos Geografía:</strong>
-                    <pre className="mt-1 text-xs bg-white p-2 rounded">
-                      {`Ciudades: ${cities.length}
-Sectores: ${sectors.length}
-Config Loading: ${configLoading}`}
-                    </pre>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => logDebug('Estado actual completo', { formData, errors, cities, sectors })}
-                  className="mt-2 text-xs bg-yellow-200 hover:bg-yellow-300 px-2 py-1 rounded"
-                >
-                  Log Estado Completo
-                </button>
-              </div>
-            )}
-
-            {/* Información básica */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Información Básica
+          <form onSubmit={handleSubmit} className="space-y-8">
+            
+            {/* Información Personal */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <User className="w-5 h-5 text-blue-600" />
+                Información Personal
               </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Tipo de documento */}
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Tipo de Documento *
                   </label>
                   <select
-                    value={formData.tipo_documento || 'cedula'}
-                    onChange={(e) => updateField('tipo_documento', e.target.value)}
+                    name="tipo_documento"
+                    value={formData.tipo_documento}
+                    onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
                   >
-                    {Object.entries(DOCUMENT_TYPE_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
+                    <option value="cedula">Cédula de Ciudadanía</option>
+                    <option value="nit">NIT</option>
+                    <option value="pasaporte">Pasaporte</option>
+                    <option value="extranjeria">Cédula de Extranjería</option>
                   </select>
                 </div>
 
-                {/* Identificación */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Identificación *
                   </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={formData.identificacion || ''}
-                      onChange={(e) => updateField('identificacion', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.identificacion ? 'border-red-300' :
-                        idValidation === 'exists' ? 'border-red-300' :
-                          idValidation === 'available' ? 'border-green-300' :
-                            'border-gray-300'
-                        }`}
-                      placeholder="Número de identificación"
-                      required
-                    />
-                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                      {validatingId && (
-                        <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                      )}
-                      {!validatingId && idValidation === 'available' && (
-                        <Check className="w-4 h-4 text-green-500" />
-                      )}
-                      {!validatingId && idValidation === 'exists' && (
-                        <AlertCircle className="w-4 h-4 text-red-500" />
-                      )}
-                    </div>
-                  </div>
+                  <input
+                    type="text"
+                    name="identificacion"
+                    value={formData.identificacion}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.identificacion ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="Número de identificación"
+                  />
                   {errors.identificacion && (
-                    <p className="text-red-600 text-sm mt-1">{errors.identificacion}</p>
-                  )}
-                  {idValidation === 'exists' && (
-                    <p className="text-red-600 text-sm mt-1">
-                      Ya existe un cliente con esta identificación
-                    </p>
+                    <p className="mt-1 text-sm text-red-600">{errors.identificacion}</p>
                   )}
                 </div>
 
-                {/* Nombre */}
+                <div className="md:col-span-2 lg:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Estado
+                  </label>
+                  <select
+                    name="estado"
+                    value={formData.estado}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="activo">Activo</option>
+                    <option value="suspendido">Suspendido</option>
+                    <option value="cortado">Cortado</option>
+                    <option value="inactivo">Inactivo</option>
+                  </select>
+                </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Nombre Completo *
                   </label>
                   <input
                     type="text"
-                    value={formData.nombre || ''}
-                    onChange={(e) => updateField('nombre', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.nombre ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                    name="nombre"
+                    value={formData.nombre}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.nombre ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="Nombre completo del cliente"
-                    required
                   />
                   {errors.nombre && (
-                    <p className="text-red-600 text-sm mt-1">{errors.nombre}</p>
+                    <p className="mt-1 text-sm text-red-600">{errors.nombre}</p>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Información de contacto */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Información de Contacto
+            {/* Información de Ubicación */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-blue-600" />
+                Ubicación
               </h3>
-
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Teléfono principal */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Teléfono Principal
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.telefono || ''}
-                    onChange={(e) => handlePhoneChange('telefono', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.telefono ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                    placeholder="3001234567"
-                    maxLength="10"
-                  />
-                  {errors.telefono && (
-                    <p className="text-red-600 text-sm mt-1">{errors.telefono}</p>
-                  )}
-                </div>
-
-                {/* Teléfono secundario */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Teléfono Secundario
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.telefono_2 || ''}
-                    onChange={(e) => handlePhoneChange('telefono_2', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="6012345678"
-                    maxLength="10"
-                  />
-                </div>
-
-                {/* Email */}
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Correo Electrónico
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.correo || ''}
-                    onChange={(e) => updateField('correo', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.correo ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                    placeholder="cliente@email.com"
-                  />
-                  {errors.correo && (
-                    <p className="text-red-600 text-sm mt-1">{errors.correo}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Información de ubicación */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Información de Ubicación
-              </h3>
-
-              <div className="space-y-4">
-                {/* Dirección */}
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Dirección *
                   </label>
-                  <textarea
-                    value={formData.direccion || ''}
-                    onChange={(e) => updateField('direccion', e.target.value)}
-                    rows="2"
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.direccion ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                    placeholder="Dirección completa de instalación"
-                    required
+                  <input
+                    type="text"
+                    name="direccion"
+                    value={formData.direccion}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.direccion ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="Dirección completa"
                   />
                   {errors.direccion && (
-                    <p className="text-red-600 text-sm mt-1">{errors.direccion}</p>
+                    <p className="mt-1 text-sm text-red-600">{errors.direccion}</p>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Ciudad */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Ciudad
-                    </label>
-                    <select
-                      value={formData.ciudad_id || ''}
-                      onChange={(e) => updateField('ciudad_id', e.target.value)}
-                      disabled={configLoading}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                    >
-                      <option value="">Seleccionar ciudad</option>
-                      {Array.isArray(cities) && cities.map((city) => (
-                        <option key={city.id} value={city.id}>
-                          {city.nombre} {city.departamento_nombre && `(${city.departamento_nombre})`}
-                        </option>
-                      ))}
-                    </select>
-                    {!configLoading && (!cities || cities.length === 0) && (
-                      <p className="text-red-600 text-sm mt-1">
-                        No hay ciudades configuradas. Ve a Configuración → Geografía para agregar ciudades.
-                      </p>
-                    )}
-                    {debugMode && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Debug: {cities.length} ciudades cargadas
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Sector */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Sector
-                    </label>
-                    <select
-                      value={formData.sector_id || ''}
-                      onChange={(e) => updateField('sector_id', e.target.value)}
-                      disabled={configLoading}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                    >
-                      <option value="">Seleccionar sector</option>
-                      {Array.isArray(sectors) && sectors.map((sector) => (
-                        <option key={sector.id} value={sector.id}>
-                          {sector.codigo} - {sector.nombre}
-                        </option>
-                      ))}
-                    </select>
-                    {!configLoading && (!sectors || sectors.length === 0) && (
-                      <p className="text-red-600 text-sm mt-1">
-                        No hay sectores configurados. Ve a Configuración → Geografía para agregar sectores.
-                      </p>
-                    )}
-                    {debugMode && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Debug: {sectors.length} sectores cargados
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Estrato */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Estrato
-                    </label>
-                    <select
-                      value={formData.estrato || ''}
-                      onChange={(e) => updateField('estrato', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Seleccionar estrato</option>
-                      {STRATOS.map((estrato) => (
-                        <option key={estrato.value} value={estrato.value}>
-                          {estrato.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Barrio */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Barrio
                   </label>
                   <input
                     type="text"
-                    value={formData.barrio || ''}
-                    onChange={(e) => updateField('barrio', e.target.value)}
+                    name="barrio"
+                    value={formData.barrio}
+                    onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Nombre del barrio"
                   />
                 </div>
-              </div>
-            </div>
 
-            {/* Información técnica básica */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Información Adicional
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Estado */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estado
+                    Estrato
                   </label>
                   <select
-                    value={formData.estado || 'activo'}
-                    onChange={(e) => updateField('estado', e.target.value)}
+                    name="estrato"
+                    value={formData.estrato}
+                    onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    {Object.entries(CLIENT_STATE_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
+                    <option value="">Seleccionar estrato</option>
+                    <option value="1">Estrato 1</option>
+                    <option value="2">Estrato 2</option>
+                    <option value="3">Estrato 3</option>
+                    <option value="4">Estrato 4</option>
+                    <option value="5">Estrato 5</option>
+                    <option value="6">Estrato 6</option>
                   </select>
                 </div>
 
-                {/* Fecha de registro */}
+                {/* CORRECCIÓN: Ciudad con sincronización */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ciudad
+                  </label>
+                  <select
+                    name="ciudad_id"
+                    value={formData.ciudad_id}
+                    onChange={handleInputChange}
+                    disabled={configLoading}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
+                      errors.ciudad_id ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">Seleccionar ciudad</option>
+                    {cities.map(city => (
+                      <option key={city.id} value={city.id}>
+                        {city.nombre} - {city.departamento_nombre}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.ciudad_id && (
+                    <p className="mt-1 text-sm text-red-600">{errors.ciudad_id}</p>
+                  )}
+                </div>
+
+                {/* CORRECCIÓN: Sector sincronizado con ciudad */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sector
+                  </label>
+                  <select
+                    name="sector_id"
+                    value={formData.sector_id}
+                    onChange={handleInputChange}
+                    disabled={configLoading || !formData.ciudad_id || availableSectors.length === 0}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
+                      errors.sector_id ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">
+                      {!formData.ciudad_id 
+                        ? 'Primero selecciona una ciudad' 
+                        : availableSectors.length === 0 
+                          ? 'No hay sectores disponibles' 
+                          : 'Seleccionar sector'
+                      }
+                    </option>
+                    {availableSectors.map(sector => (
+                      <option key={sector.id} value={sector.id}>
+                        {sector.codigo} - {sector.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.sector_id && (
+                    <p className="mt-1 text-sm text-red-600">{errors.sector_id}</p>
+                  )}
+                  {formData.ciudad_id && availableSectors.length === 0 && (
+                    <p className="mt-1 text-sm text-yellow-600">
+                      No hay sectores configurados para esta ciudad
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Información de Contacto */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <Phone className="w-5 h-5 text-blue-600" />
+                Contacto
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Teléfono Principal
+                  </label>
+                  <input
+                    type="tel"
+                    name="telefono"
+                    value={formData.telefono}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.telefono ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="3001234567"
+                  />
+                  {errors.telefono && (
+                    <p className="mt-1 text-sm text-red-600">{errors.telefono}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Teléfono Secundario
+                  </label>
+                  <input
+                    type="tel"
+                    name="telefono_2"
+                    value={formData.telefono_2}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="6012345678"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.email ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="cliente@ejemplo.com"
+                  />
+                  {errors.email && (
+                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Fechas de Servicio */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-600" />
+                Fechas de Servicio
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Fecha de Registro
                   </label>
                   <input
                     type="date"
-                    value={formData.fecha_registro || new Date().toISOString().split('T')[0]}
-                    onChange={(e) => updateField('fecha_registro', e.target.value)}
+                    name="fecha_registro"
+                    value={formData.fecha_registro}
+                    onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
 
-                {/* Observaciones */}
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Observaciones
+                    Fecha Inicio Servicio
                   </label>
-                  <textarea
-                    value={formData.observaciones || ''}
-                    onChange={(e) => updateField('observaciones', e.target.value)}
-                    rows="3"
+                  <input
+                    type="date"
+                    name="fecha_inicio_servicio"
+                    value={formData.fecha_inicio_servicio}
+                    onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Observaciones adicionales..."
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fecha Fin Servicio
+                  </label>
+                  <input
+                    type="date"
+                    name="fecha_fin_servicio"
+                    value={formData.fecha_fin_servicio}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.fecha_fin_servicio ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  />
+                  {errors.fecha_fin_servicio && (
+                    <p className="mt-1 text-sm text-red-600">{errors.fecha_fin_servicio}</p>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Botones */}
-            <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                disabled={saving}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={saving || loading || idValidation === 'exists'}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? (
-                  <>
-                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    {isEditing ? 'Actualizar' : 'Crear'} Cliente
-                  </>
-                )}
-              </button>
+            {/* Información Técnica */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <Settings className="w-5 h-5 text-blue-600" />
+                Información Técnica
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    MAC Address
+                  </label>
+                  <input
+                    type="text"
+                    name="mac_address"
+                    value={formData.mac_address}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="AA:BB:CC:DD:EE:FF"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    IP Asignada
+                  </label>
+                  <input
+                    type="text"
+                    name="ip_asignada"
+                    value={formData.ip_asignada}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="192.168.1.100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    TAP
+                  </label>
+                  <input
+                    type="text"
+                    name="tap"
+                    value={formData.tap}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="TAP001"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Puerto
+                  </label>
+                  <input
+                    type="text"
+                    name="puerto"
+                    value={formData.puerto}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="P-001"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Número de Contrato
+                  </label>
+                  <input
+                    type="text"
+                    name="numero_contrato"
+                    value={formData.numero_contrato}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="CT-00001"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ruta
+                  </label>
+                  <input
+                    type="text"
+                    name="ruta"
+                    value={formData.ruta}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="R001"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Código de Usuario
+                  </label>
+                  <input
+                    type="text"
+                    name="codigo_usuario"
+                    value={formData.codigo_usuario}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="USR00001"
+                  />
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    name="requiere_reconexion"
+                    checked={formData.requiere_reconexion}
+                    onChange={handleInputChange}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label className="ml-2 block text-sm text-gray-900">
+                    Requiere Reconexión
+                  </label>
+                </div>
+              </div>
             </div>
+
+            {/* Observaciones */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Observaciones
+              </label>
+              <textarea
+                name="observaciones"
+                value={formData.observaciones}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Observaciones adicionales sobre el cliente..."
+              />
+            </div>
+
+            {/* Errores generales */}
+            {Object.keys(errors).length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-red-700 mb-2">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="font-medium">Por favor corrige los siguientes errores:</span>
+                </div>
+                <ul className="text-sm text-red-600 space-y-1">
+                  {Object.values(errors).map((error, index) => (
+                    <li key={index}>• {error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </form>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={saving}
+            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          
+          <button
+            type="submit"
+            onClick={handleSubmit}
+            disabled={saving || Object.keys(errors).length > 0}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? (
+              <>
+                <Save className="w-4 h-4 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                {client ? 'Actualizar' : 'Crear'} Cliente
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-// frontend/src/services/clientService.js - VERSIÓN CORREGIDA CON DEBUG
+// frontend/src/services/clientService.js - VERSIÓN CORREGIDA
 
 import apiService from './apiService';
 
@@ -11,7 +11,8 @@ const CLIENT_ENDPOINTS = {
   SEARCH: '/clients/search',
   STATS: '/clients/stats',
   VALIDATE: '/clients/validate',
-  BY_IDENTIFICATION: '/clients/identification'
+  BY_IDENTIFICATION: '/clients/identification',
+  EXPORT: '/clients/export' // Nuevo endpoint para exportar
 };
 
 class ClientService {
@@ -24,6 +25,98 @@ class ClientService {
     if (this.debug) {
       console.log(`👤 ClientService: ${message}`, data);
     }
+  }
+
+  // CORRECCIÓN: Función para corregir fechas UTC
+  corregirFechaUTC(fecha) {
+    if (!fecha) return null;
+    
+    try {
+      // Si la fecha viene como string, convertirla
+      const fechaObj = new Date(fecha);
+      
+      // Agregar offset de timezone para corregir el desfase de un día
+      const offsetMinutos = fechaObj.getTimezoneOffset();
+      fechaObj.setMinutes(fechaObj.getMinutes() + offsetMinutos);
+      
+      return fechaObj.toISOString().split('T')[0];
+    } catch (error) {
+      console.error('Error corrigiendo fecha:', error);
+      return fecha;
+    }
+  }
+
+  // CORRECCIÓN: Función para exportar clientes con fechas corregidas
+  async exportClients(formato = 'excel', filtros = {}) {
+    try {
+      this.log('Exportando clientes', { formato, filtros });
+
+      const queryParams = new URLSearchParams();
+      
+      // Agregar filtros
+      if (filtros.estado) queryParams.append('estado', filtros.estado);
+      if (filtros.sector_id) queryParams.append('sector_id', filtros.sector_id);
+      if (filtros.ciudad_id) queryParams.append('ciudad_id', filtros.ciudad_id);
+      if (filtros.fechaInicio) queryParams.append('fechaInicio', filtros.fechaInicio);
+      if (filtros.fechaFin) queryParams.append('fechaFin', filtros.fechaFin);
+      
+      // Agregar formato
+      queryParams.append('format', formato);
+
+      const response = await fetch(`${apiService.baseURL}${CLIENT_ENDPOINTS.EXPORT}?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Accept': formato === 'excel' 
+            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            : 'text/csv'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      
+      if (blob.size === 0) {
+        throw new Error('El archivo exportado está vacío');
+      }
+
+      // Generar nombre de archivo con fecha actual
+      const fechaActual = new Date().toISOString().split('T')[0];
+      const extension = formato === 'excel' ? 'xlsx' : 'csv';
+      const nombreArchivo = `clientes_${fechaActual}.${extension}`;
+
+      // Descargar archivo
+      this.descargarArchivo(blob, nombreArchivo);
+
+      this.log('Exportación exitosa', { nombreArchivo, tamaño: blob.size });
+      
+      return {
+        success: true,
+        message: `Archivo ${nombreArchivo} descargado exitosamente`
+      };
+
+    } catch (error) {
+      this.log('Error en exportación', error);
+      return {
+        success: false,
+        message: error.message || 'Error al exportar clientes'
+      };
+    }
+  }
+
+  // Función auxiliar para descargar archivos
+  descargarArchivo(blob, nombreArchivo) {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nombreArchivo;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   }
 
   // Limpiar y validar datos de cliente antes de enviar
@@ -43,8 +136,16 @@ class ClientService {
         return;
       }
 
+      // CORRECCIÓN: Procesar fechas correctamente
+      if (key.includes('fecha') && typeof value === 'string') {
+        // Asegurar formato correcto de fecha
+        const fechaCorregida = this.corregirFechaUTC(value);
+        if (fechaCorregida) {
+          cleanedData[key] = fechaCorregida;
+        }
+      }
       // Limpiar strings
-      if (typeof value === 'string') {
+      else if (typeof value === 'string') {
         const trimmed = value.trim();
         if (trimmed) {
           cleanedData[key] = trimmed;
@@ -127,6 +228,18 @@ class ClientService {
 
       this.log('Respuesta del servidor', response);
 
+      // CORRECCIÓN: Procesar fechas en la respuesta
+      if (response.data && Array.isArray(response.data)) {
+        response.data = response.data.map(cliente => ({
+          ...cliente,
+          fecha_registro: this.corregirFechaUTC(cliente.fecha_registro),
+          fecha_inicio_servicio: this.corregirFechaUTC(cliente.fecha_inicio_servicio),
+          fecha_fin_servicio: this.corregirFechaUTC(cliente.fecha_fin_servicio),
+          updated_at: cliente.updated_at ? new Date(cliente.updated_at).toLocaleString('es-CO') : null,
+          created_at: cliente.created_at ? new Date(cliente.created_at).toLocaleString('es-CO') : null
+        }));
+      }
+
       return {
         success: true,
         data: response.data || [],
@@ -157,6 +270,18 @@ class ClientService {
       
       this.log('Cliente obtenido', response);
 
+      // CORRECCIÓN: Procesar fechas en cliente individual
+      if (response.data) {
+        response.data = {
+          ...response.data,
+          fecha_registro: this.corregirFechaUTC(response.data.fecha_registro),
+          fecha_inicio_servicio: this.corregirFechaUTC(response.data.fecha_inicio_servicio),
+          fecha_fin_servicio: this.corregirFechaUTC(response.data.fecha_fin_servicio),
+          updated_at: response.data.updated_at ? new Date(response.data.updated_at).toLocaleString('es-CO') : null,
+          created_at: response.data.created_at ? new Date(response.data.created_at).toLocaleString('es-CO') : null
+        };
+      }
+
       return {
         success: true,
         data: response.data,
@@ -172,23 +297,101 @@ class ClientService {
     }
   }
 
-  // Buscar clientes
-  async searchClients(searchTerm, filters = {}) {
+  // Crear nuevo cliente
+  async createClient(clientData) {
     try {
-      this.log('Buscando clientes', { searchTerm, filters });
+      this.log('Creando cliente', clientData);
 
-      if (!searchTerm || searchTerm.trim().length < 2) {
-        throw new Error('El término de búsqueda debe tener al menos 2 caracteres');
+      const cleanData = this.cleanClientData(clientData);
+      const response = await apiService.post(CLIENT_ENDPOINTS.CREATE, cleanData);
+      
+      this.log('Cliente creado', response);
+
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Cliente creado exitosamente'
+      };
+    } catch (error) {
+      this.log('Error creando cliente', error);
+      return {
+        success: false,
+        data: null,
+        message: error.message || 'Error al crear cliente'
+      };
+    }
+  }
+
+  // Actualizar cliente
+  async updateClient(id, clientData) {
+    try {
+      this.log('Actualizando cliente', { id, clientData });
+
+      if (!id) {
+        throw new Error('ID de cliente requerido');
       }
 
-      const queryParams = new URLSearchParams();
-      queryParams.append('q', searchTerm.trim());
+      const cleanData = this.cleanClientData(clientData);
+      const response = await apiService.put(`${CLIENT_ENDPOINTS.UPDATE}/${id}`, cleanData);
+      
+      this.log('Cliente actualizado', response);
 
-      if (filters.estado) queryParams.append('estado', filters.estado);
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Cliente actualizado exitosamente'
+      };
+    } catch (error) {
+      this.log('Error actualizando cliente', error);
+      return {
+        success: false,
+        data: null,
+        message: error.message || 'Error al actualizar cliente'
+      };
+    }
+  }
 
-      const url = `${CLIENT_ENDPOINTS.SEARCH}?${queryParams.toString()}`;
-      const response = await apiService.get(url);
+  // Eliminar cliente
+  async deleteClient(id) {
+    try {
+      this.log('Eliminando cliente', id);
 
+      if (!id) {
+        throw new Error('ID de cliente requerido');
+      }
+
+      const response = await apiService.delete(`${CLIENT_ENDPOINTS.DELETE}/${id}`);
+      
+      this.log('Cliente eliminado', response);
+
+      return {
+        success: true,
+        message: response.message || 'Cliente eliminado exitosamente'
+      };
+    } catch (error) {
+      this.log('Error eliminando cliente', error);
+      return {
+        success: false,
+        message: error.message || 'Error al eliminar cliente'
+      };
+    }
+  }
+
+  // Buscar clientes
+  async buscarClientes(termino) {
+    try {
+      this.log('Buscando clientes', termino);
+
+      if (!termino || termino.length < 2) {
+        return {
+          success: true,
+          data: [],
+          message: 'Término de búsqueda muy corto'
+        };
+      }
+
+      const response = await apiService.get(`${CLIENT_ENDPOINTS.SEARCH}?q=${encodeURIComponent(termino)}`);
+      
       this.log('Resultados de búsqueda', response);
 
       return {
@@ -206,202 +409,31 @@ class ClientService {
     }
   }
 
-  // Obtener estadísticas de clientes
-  async getClientStats() {
+  // Obtener estadísticas
+  async getStats() {
     try {
       this.log('Obteniendo estadísticas de clientes');
 
       const response = await apiService.get(CLIENT_ENDPOINTS.STATS);
-
+      
       this.log('Estadísticas obtenidas', response);
 
       return {
         success: true,
-        data: response.data || {},
+        data: response.data,
         message: response.message
       };
     } catch (error) {
       this.log('Error obteniendo estadísticas', error);
       return {
         success: false,
-        data: {},
+        data: null,
         message: error.message || 'Error al cargar estadísticas'
-      };
-    }
-  }
-
-  // Crear nuevo cliente
-  async createClient(clientData) {
-    try {
-      this.log('Creando nuevo cliente', clientData);
-
-      const cleanedData = this.cleanClientData(clientData);
-      
-      this.log('Datos limpiados para crear cliente', cleanedData);
-
-      const response = await apiService.post(CLIENT_ENDPOINTS.CREATE, cleanedData);
-
-      this.log('Cliente creado exitosamente', response);
-
-      return {
-        success: true,
-        data: response.data,
-        message: response.message || 'Cliente creado exitosamente'
-      };
-    } catch (error) {
-      this.log('Error creando cliente', error);
-      return {
-        success: false,
-        data: null,
-        message: error.message || 'Error al crear cliente',
-        errors: error.response?.errors || []
-      };
-    }
-  }
-
-  // Actualizar cliente
-  async updateClient(id, clientData) {
-    try {
-      this.log('Actualizando cliente', { id, clientData });
-
-      if (!id) {
-        throw new Error('ID de cliente requerido');
-      }
-
-      // Para actualización, usamos limpieza menos estricta
-      const cleanedData = {};
-      
-      Object.keys(clientData).forEach(key => {
-        const value = clientData[key];
-        
-        // Solo incluir valores que no estén vacíos
-        if (value !== null && value !== undefined && value !== '') {
-          if (key === 'sector_id' || key === 'ciudad_id') {
-            const numValue = parseInt(value);
-            if (!isNaN(numValue) && numValue > 0) {
-              cleanedData[key] = numValue;
-            }
-          } else if (key === 'requiere_reconexion') {
-            cleanedData[key] = Boolean(value);
-          } else if (typeof value === 'string') {
-            const trimmed = value.trim();
-            if (trimmed) {
-              cleanedData[key] = trimmed;
-            }
-          } else {
-            cleanedData[key] = value;
-          }
-        }
-      });
-
-      this.log('Datos limpiados para actualizar cliente', cleanedData);
-
-      const response = await apiService.put(`${CLIENT_ENDPOINTS.UPDATE}/${id}`, cleanedData);
-
-      this.log('Cliente actualizado exitosamente', response);
-
-      return {
-        success: true,
-        data: response.data,
-        message: response.message || 'Cliente actualizado exitosamente'
-      };
-    } catch (error) {
-      this.log('Error actualizando cliente', error);
-      return {
-        success: false,
-        data: null,
-        message: error.message || 'Error al actualizar cliente',
-        errors: error.response?.errors || []
-      };
-    }
-  }
-
-  // Eliminar cliente
-  async deleteClient(id) {
-    try {
-      this.log('Eliminando cliente', id);
-
-      if (!id) {
-        throw new Error('ID de cliente requerido');
-      }
-
-      const response = await apiService.delete(`${CLIENT_ENDPOINTS.DELETE}/${id}`);
-
-      this.log('Cliente eliminado exitosamente', response);
-
-      return {
-        success: true,
-        data: response.data,
-        message: response.message || 'Cliente eliminado exitosamente'
-      };
-    } catch (error) {
-      this.log('Error eliminando cliente', error);
-      return {
-        success: false,
-        data: null,
-        message: error.message || 'Error al eliminar cliente'
-      };
-    }
-  }
-
-  // Validar identificación
-  async validateIdentification(identificacion) {
-    try {
-      this.log('Validando identificación', identificacion);
-
-      if (!identificacion || identificacion.trim().length < 5) {
-        throw new Error('Identificación requerida');
-      }
-
-      const response = await apiService.get(`${CLIENT_ENDPOINTS.VALIDATE}/${identificacion.trim()}`);
-
-      this.log('Validación de identificación', response);
-
-      return {
-        success: true,
-        data: response.data,
-        message: response.message
-      };
-    } catch (error) {
-      this.log('Error validando identificación', error);
-      return {
-        success: false,
-        data: { existe: false, cliente: null },
-        message: error.message || 'Error al validar identificación'
-      };
-    }
-  }
-
-  // Obtener cliente por identificación
-  async getClientByIdentification(identificacion) {
-    try {
-      this.log('Obteniendo cliente por identificación', identificacion);
-
-      if (!identificacion || identificacion.trim().length < 5) {
-        throw new Error('Identificación requerida');
-      }
-
-      const response = await apiService.get(`${CLIENT_ENDPOINTS.BY_IDENTIFICATION}/${identificacion.trim()}`);
-
-      this.log('Cliente obtenido por identificación', response);
-
-      return {
-        success: true,
-        data: response.data,
-        message: response.message
-      };
-    } catch (error) {
-      this.log('Error obteniendo cliente por identificación', error);
-      return {
-        success: false,
-        data: null,
-        message: error.message || 'Cliente no encontrado'
       };
     }
   }
 }
 
-// Crear instancia del servicio
+// Exportar instancia única
 export const clientService = new ClientService();
-
 export default clientService;

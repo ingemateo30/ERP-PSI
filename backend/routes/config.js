@@ -51,7 +51,256 @@ router.use(authenticateToken);
 // ==========================================
 // RUTAS BÁSICAS DE CONFIGURACIÓN
 // ==========================================
+// backend/routes/config.js - AGREGAR ESTAS RUTAS AL FINAL DEL ARCHIVO
 
+// ==========================================
+// RUTAS DE CONCEPTOS DENTRO DE CONFIG
+// ==========================================
+
+/**
+ * @route GET /api/v1/config/conceptos
+ * @desc Obtener conceptos de facturación
+ */
+router.get('/conceptos', requireRole('administrador', 'supervisor'), async (req, res) => {
+  try {
+    console.log('📋 GET /config/conceptos - Redirigiendo a conceptos');
+    
+    // Importar el controlador de conceptos
+    let conceptosController;
+    try {
+      conceptosController = require('../controllers/conceptosController');
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Controller de conceptos no disponible',
+        error: error.message
+      });
+    }
+
+    // Llamar al método del controlador
+    await conceptosController.getAll(req, res);
+  } catch (error) {
+    console.error('❌ Error en GET /config/conceptos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route GET /api/v1/config/conceptos/stats
+ * @desc Obtener estadísticas de conceptos
+ */
+router.get('/conceptos/stats', requireRole('administrador', 'supervisor'), async (req, res) => {
+  try {
+    console.log('📊 GET /config/conceptos/stats');
+    
+    let conceptosController;
+    try {
+      conceptosController = require('../controllers/conceptosController');
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Controller de conceptos no disponible',
+        error: error.message
+      });
+    }
+
+    await conceptosController.getStats(req, res);
+  } catch (error) {
+    console.error('❌ Error en GET /config/conceptos/stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route GET /api/v1/config/conceptos/tipos
+ * @desc Obtener tipos de conceptos
+ */
+router.get('/conceptos/tipos', requireRole('administrador', 'supervisor'), async (req, res) => {
+  try {
+    console.log('📋 GET /config/conceptos/tipos');
+    
+    let conceptosController;
+    try {
+      conceptosController = require('../controllers/conceptosController');
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Controller de conceptos no disponible',
+        error: error.message
+      });
+    }
+
+    await conceptosController.getTipos(req, res);
+  } catch (error) {
+    console.error('❌ Error en GET /config/conceptos/tipos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route GET /api/v1/config/conceptos/:id
+ * @desc Obtener concepto por ID
+ */
+router.get('/conceptos/:id', requireRole('administrador', 'supervisor'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🔍 GET /config/conceptos/:id con ID:', id);
+    
+    let conceptosController;
+    try {
+      conceptosController = require('../controllers/conceptosController');
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Controller de conceptos no disponible',
+        error: error.message
+      });
+    }
+
+    await conceptosController.getById(req, res);
+  } catch (error) {
+    console.error('❌ Error en GET /config/conceptos/:id:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route POST /api/v1/config/conceptos
+ * @desc Crear nuevo concepto
+ */
+router.post('/conceptos', requireRole('administrador', 'supervisor'), async (req, res) => {
+  try {
+    console.log('➕ POST /config/conceptos');
+    
+    let conceptosController;
+    try {
+      conceptosController = require('../controllers/conceptosController');
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Controller de conceptos no disponible',
+        error: error.message
+      });
+    }
+
+    await conceptosController.create(req, res);
+  } catch (error) {
+    console.error('❌ Error en POST /config/conceptos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route PUT /api/v1/config/conceptos/:id
+ * @desc Actualizar concepto
+ */
+router.put('/conceptos/:id', requireRole('administrador', 'supervisor'), async (req, res) => {
+  try {
+    console.log('✏️ PUT /config/conceptos/:id');
+    
+    let conceptosController;
+    try {
+      conceptosController = require('../controllers/conceptosController');
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Controller de conceptos no disponible',
+        error: error.message
+      });
+    }
+
+    await conceptosController.update(req, res);
+  } catch (error) {
+    console.error('❌ Error en PUT /config/conceptos/:id:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route POST /api/v1/config/conceptos/:id/toggle
+ * @desc Cambiar estado de concepto
+ */
+router.post('/conceptos/:id/toggle', requireRole('administrador', 'supervisor'), async (req, res) => {
+  try {
+    console.log('🔄 POST /config/conceptos/:id/toggle');
+    
+    let conceptosController;
+    try {
+      conceptosController = require('../controllers/conceptosController');
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Controller de conceptos no disponible',
+        error: error.message
+      });
+    }
+
+    await conceptosController.toggleStatus(req, res);
+  } catch (error) {
+    console.error('❌ Error en POST /config/conceptos/:id/toggle:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/v1/config/conceptos/:id
+ * @desc Eliminar concepto
+ */
+router.delete('/conceptos/:id', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🗑️ DELETE /config/conceptos/:id');
+    
+    let conceptosController;
+    try {
+      conceptosController = require('../controllers/conceptosController');
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Controller de conceptos no disponible',
+        error: error.message
+      });
+    }
+
+    await conceptosController.delete(req, res);
+  } catch (error) {
+    console.error('❌ Error en DELETE /config/conceptos/:id:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// AGREGAR AL FINAL DEL ARCHIVO backend/routes/config.js, ANTES DEL module.exports
 /**
  * @route GET /api/v1/config/overview
  * @desc Obtener resumen completo de configuración

@@ -1,378 +1,471 @@
+// frontend/src/components/Clients/ClientModal.js - VERSIÓN CORREGIDA
+
 import React, { useState } from 'react';
-import {
-  X,
-  Edit,
-  Trash2,
-  Phone,
-  Mail,
-  MapPin,
-  Calendar,
-  User,
-  Hash,
-  Wifi,
-  Globe,
-  Router,
-  AlertTriangle
+import { 
+  X, Edit, Trash2, Phone, Mail, MapPin, Calendar, 
+  User, CreditCard, Wifi, Settings, AlertTriangle,
+  CheckCircle, Clock, XCircle
 } from 'lucide-react';
-import { CLIENT_STATE_LABELS, CLIENT_STATE_COLORS, DOCUMENT_TYPE_LABELS } from '../../constants/clientConstants';
 import { clientService } from '../../services/clientService';
 
 const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Función para obtener el color del estado
-  const getStateColor = (state) => {
-    const colorClass = CLIENT_STATE_COLORS[state] || 'gray';
-    return {
-      'green': 'bg-green-100 text-green-800 border-green-200',
-      'yellow': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'red': 'bg-red-100 text-red-800 border-red-200',
-      'gray': 'bg-gray-100 text-gray-800 border-gray-200',
-      'slate': 'bg-slate-100 text-slate-800 border-slate-200'
-    }[colorClass];
+  // Función para formatear fechas
+  const formatDate = (dateString) => {
+    if (!dateString) return 'No especificada';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('es-CO', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Fecha inválida';
+    }
   };
 
-  // Formatear teléfono
+  // Función para formatear teléfonos
   const formatPhone = (phone) => {
     if (!phone) return '';
     const cleaned = phone.replace(/\D/g, '');
     if (cleaned.length === 10 && cleaned.startsWith('3')) {
-      return `+57 ${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6)}`;
-    } else if (cleaned.length === 10) {
-      return `+57 ${cleaned.slice(0, 1)} ${cleaned.slice(1, 4)} ${cleaned.slice(4)}`;
+      return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6)}`;
     }
     return phone;
   };
 
-  // Formatear fecha
-  const formatDate = (dateString) => {
-    if (!dateString) return 'No especificada';
-    return new Date(dateString).toLocaleDateString('es-CO', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+  // Función para obtener el color del estado
+  const getStateColor = (state) => {
+    const colors = {
+      'activo': 'bg-green-100 text-green-800 border-green-200',
+      'suspendido': 'bg-yellow-100 text-yellow-800 border-yellow-200', 
+      'cortado': 'bg-red-100 text-red-800 border-red-200',
+      'inactivo': 'bg-gray-100 text-gray-800 border-gray-200'
+    };
+    return colors[state] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  // Función para obtener el icono del estado
+  const getStateIcon = (state) => {
+    const icons = {
+      'activo': CheckCircle,
+      'suspendido': Clock,
+      'cortado': XCircle,
+      'inactivo': AlertTriangle
+    };
+    const IconComponent = icons[state] || AlertTriangle;
+    return <IconComponent className="w-4 h-4" />;
   };
 
   // Manejar eliminación
   const handleDelete = async () => {
+    if (!permissions.canDelete) {
+      alert('No tienes permisos para eliminar clientes');
+      return;
+    }
+
     setDeleting(true);
+    
     try {
       const response = await clientService.deleteClient(client.id);
+      
       if (response.success) {
+        // Mostrar notificación de éxito
+        if (window.showNotification) {
+          window.showNotification('success', response.message || 'Cliente eliminado exitosamente');
+        }
+        
         onDelete();
         onClose();
       } else {
-        alert(response.message || 'Error al eliminar cliente');
+        throw new Error(response.message || 'Error al eliminar cliente');
       }
     } catch (error) {
-      alert('Error al eliminar cliente');
       console.error('Error eliminando cliente:', error);
+      
+      // Mostrar notificación de error
+      if (window.showNotification) {
+        window.showNotification('error', error.message || 'Error al eliminar cliente');
+      } else {
+        alert(error.message || 'Error al eliminar cliente');
+      }
     } finally {
       setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-              <User className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                {client.nombre}
-              </h2>
-              <p className="text-gray-600">
-                {DOCUMENT_TYPE_LABELS[client.tipo_documento] || 'Documento'}: {client.identificacion}
-              </p>
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold text-gray-900">{client.nombre}</h2>
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-sm text-gray-600">
+                  {client.tipo_documento === 'cedula' ? 'CC' : 
+                   client.tipo_documento === 'nit' ? 'NIT' : 
+                   client.tipo_documento?.toUpperCase()} {client.identificacion}
+                </span>
+                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getStateColor(client.estado)}`}>
+                  {getStateIcon(client.estado)}
+                  {client.estado?.charAt(0).toUpperCase() + client.estado?.slice(1)}
+                </span>
+              </div>
             </div>
           </div>
-
-          <div className="flex items-center space-x-2">
-            {permissions.canDelete && onDelete && (
+          
+          <div className="flex items-center gap-2">
+            {permissions.canEdit && (
+              <button
+                onClick={onEdit}
+                className="flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <Edit className="w-4 h-4" />
+                Editar
+              </button>
+            )}
+            
+            {permissions.canDelete && (
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                disabled={deleting}
+                className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
               >
                 <Trash2 className="w-4 h-4" />
                 Eliminar
               </button>
             )}
-
+            
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 p-1"
+              className="text-gray-400 hover:text-gray-600 transition-colors p-1"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
-          <div className="space-y-6">
-            {/* Estado del cliente */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div>
-                <h3 className="text-sm font-medium text-gray-700">Estado del Cliente</h3>
-                <div className="mt-1">
-                  <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full border ${getStateColor(client.estado)}`}>
-                    {CLIENT_STATE_LABELS[client.estado] || client.estado}
-                  </span>
+        {/* Contenido */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            {/* Información Personal */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <User className="w-5 h-5 text-blue-600" />
+                Información Personal
+              </h3>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm text-gray-500">Nombre Completo</p>
+                  <p className="text-sm font-medium text-gray-900">{client.nombre}</p>
                 </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500">Fecha de Registro</p>
-                <p className="text-sm font-medium text-gray-900">
-                  {formatDate(client.fecha_registro || client.created_at)}
-                </p>
-              </div>
-            </div>
 
-            {/* Información de contacto */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                  <Phone className="w-5 h-5 text-blue-600" />
-                  Información de Contacto
-                </h3>
-
-                <div className="space-y-3">
-                  {client.telefono && (
-                    <div className="flex items-center space-x-3">
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <p className="text-sm text-gray-500">Teléfono Principal</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {formatPhone(client.telefono)}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {client.telefono_2 && (
-                    <div className="flex items-center space-x-3">
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <p className="text-sm text-gray-500">Teléfono Secundario</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {formatPhone(client.telefono_2)}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {client.correo && (
-                    <div className="flex items-center space-x-3">
-                      <Mail className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <p className="text-sm text-gray-500">Correo Electrónico</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {client.correo}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-blue-600" />
-                  Ubicación
-                </h3>
-
-                <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-500">Dirección</p>
+                    <p className="text-sm text-gray-500">Tipo de Documento</p>
                     <p className="text-sm font-medium text-gray-900">
-                      {client.direccion}
+                      {client.tipo_documento === 'cedula' ? 'Cédula de Ciudadanía' : 
+                       client.tipo_documento === 'nit' ? 'NIT' : 
+                       client.tipo_documento === 'pasaporte' ? 'Pasaporte' : 
+                       client.tipo_documento === 'extranjeria' ? 'Cédula de Extranjería' :
+                       client.tipo_documento}
                     </p>
                   </div>
 
-                  {client.barrio && (
-                    <div>
-                      <p className="text-sm text-gray-500">Barrio</p>
+                  <div>
+                    <p className="text-sm text-gray-500">Identificación</p>
+                    <p className="text-sm font-medium text-gray-900">{client.identificacion}</p>
+                  </div>
+                </div>
+
+                {client.estrato && (
+                  <div>
+                    <p className="text-sm text-gray-500">Estrato</p>
+                    <p className="text-sm font-medium text-gray-900">Estrato {client.estrato}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Información de Contacto */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <Phone className="w-5 h-5 text-blue-600" />
+                Contacto
+              </h3>
+
+              <div className="space-y-3">
+                {client.telefono && (
+                  <div>
+                    <p className="text-sm text-gray-500">Teléfono Principal</p>
+                    <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-gray-900">
-                        {client.barrio}
+                        {formatPhone(client.telefono)}
+                      </p>
+                      <a 
+                        href={`tel:${client.telefono}`}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <Phone className="w-4 h-4" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {client.telefono_2 && (
+                  <div>
+                    <p className="text-sm text-gray-500">Teléfono Secundario</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900">
+                        {formatPhone(client.telefono_2)}
+                      </p>
+                      <a 
+                        href={`tel:${client.telefono_2}`}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <Phone className="w-4 h-4" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {client.email && (
+                  <div>
+                    <p className="text-sm text-gray-500">Email</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900">{client.email}</p>
+                      <a 
+                        href={`mailto:${client.email}`}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Ubicación */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-blue-600" />
+                Ubicación
+              </h3>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm text-gray-500">Dirección</p>
+                  <p className="text-sm font-medium text-gray-900">{client.direccion}</p>
+                </div>
+
+                {client.barrio && (
+                  <div>
+                    <p className="text-sm text-gray-500">Barrio</p>
+                    <p className="text-sm font-medium text-gray-900">{client.barrio}</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  {client.sector_nombre && (
+                    <div>
+                      <p className="text-sm text-gray-500">Sector</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {client.sector_codigo} - {client.sector_nombre}
                       </p>
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-4">
-                    {client.sector_nombre && (
-                      <div>
-                        <p className="text-sm text-gray-500">Sector</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {client.sector_codigo} - {client.sector_nombre}
-                        </p>
-                      </div>
-                    )}
-
-                    {client.estrato && (
-                      <div>
-                        <p className="text-sm text-gray-500">Estrato</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          Estrato {client.estrato}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {client.ciudad_nombre && (
+                  {client.estrato && (
                     <div>
-                      <p className="text-sm text-gray-500">Ciudad</p>
+                      <p className="text-sm text-gray-500">Estrato</p>
                       <p className="text-sm font-medium text-gray-900">
-                        {client.ciudad_nombre}
-                        {client.departamento_nombre && ` - ${client.departamento_nombre}`}
+                        Estrato {client.estrato}
                       </p>
                     </div>
                   )}
                 </div>
+
+                {client.ciudad_nombre && (
+                  <div>
+                    <p className="text-sm text-gray-500">Ciudad</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {client.ciudad_nombre}
+                      {client.departamento_nombre && ` - ${client.departamento_nombre}`}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Información técnica */}
+            {/* CORRECCIÓN: Información Técnica Completa */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <Router className="w-5 h-5 text-blue-600" />
+                <Settings className="w-5 h-5 text-blue-600" />
                 Información Técnica
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {client.mac_address && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <Wifi className="w-4 h-4 text-gray-400" />
-                      <p className="text-sm text-gray-500">MAC Address</p>
+              <div className="space-y-3">
+                {/* Conectividad */}
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <Wifi className="w-4 h-4" />
+                    Conectividad
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-gray-500">MAC Address</p>
+                      <p className="font-medium text-gray-900">
+                        {client.mac_address || 'No asignada'}
+                      </p>
                     </div>
-                    <p className="text-sm font-mono font-medium text-gray-900">
-                      {client.mac_address}
-                    </p>
+                    
+                    <div>
+                      <p className="text-gray-500">IP Asignada</p>
+                      <p className="font-medium text-gray-900">
+                        {client.ip_asignada || 'No asignada'}
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
 
-                {client.ip_asignada && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <Globe className="w-4 h-4 text-gray-400" />
-                      <p className="text-sm text-gray-500">IP Asignada</p>
+                {/* Infraestructura Física */}
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">
+                    Infraestructura Física
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-gray-500">TAP</p>
+                      <p className="font-medium text-gray-900">
+                        {client.tap || 'No asignado'}
+                      </p>
                     </div>
-                    <p className="text-sm font-mono font-medium text-gray-900">
-                      {client.ip_asignada}
-                    </p>
+                    
+                    <div>
+                      <p className="text-gray-500">Puerto</p>
+                      <p className="font-medium text-gray-900">
+                        {client.puerto || 'No asignado'}
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
 
-                {client.tap && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <Hash className="w-4 h-4 text-gray-400" />
-                      <p className="text-sm text-gray-500">TAP</p>
+                {/* Información Contractual */}
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" />
+                    Información Contractual
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-gray-500">Número de Contrato</p>
+                      <p className="font-medium text-gray-900">
+                        {client.numero_contrato || 'No asignado'}
+                      </p>
                     </div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {client.tap}
-                    </p>
-                  </div>
-                )}
-
-                {client.poste && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <Hash className="w-4 h-4 text-gray-400" />
-                      <p className="text-sm text-gray-500">Poste</p>
+                    
+                    <div>
+                      <p className="text-gray-500">Código de Usuario</p>
+                      <p className="font-medium text-gray-900">
+                        {client.codigo_usuario || 'No asignado'}
+                      </p>
                     </div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {client.poste}
-                    </p>
-                  </div>
-                )}
-
-                {client.contrato && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <Hash className="w-4 h-4 text-gray-400" />
-                      <p className="text-sm text-gray-500">Contrato</p>
+                    
+                    <div>
+                      <p className="text-gray-500">Ruta</p>
+                      <p className="font-medium text-gray-900">
+                        {client.ruta || 'No asignada'}
+                      </p>
                     </div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {client.contrato}
-                    </p>
-                  </div>
-                )}
-
-                {client.ruta && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <Hash className="w-4 h-4 text-gray-400" />
-                      <p className="text-sm text-gray-500">Ruta</p>
+                    
+                    <div>
+                      <p className="text-gray-500">Requiere Reconexión</p>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${
+                          client.requiere_reconexion ? 'bg-red-500' : 'bg-green-500'
+                        }`}></div>
+                        <p className="font-medium text-gray-900">
+                          {client.requiere_reconexion ? 'Sí' : 'No'}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {client.ruta}
-                    </p>
                   </div>
-                )}
+                </div>
               </div>
             </div>
 
-            {/* Código de usuario */}
-            {client.codigo_usuario && (
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="text-sm font-medium text-blue-900 mb-1">Código de Usuario</h4>
-                <p className="text-lg font-mono font-bold text-blue-700">
-                  {client.codigo_usuario}
-                </p>
+            {/* Fechas de Servicio */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-600" />
+                Fechas de Servicio
+              </h3>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm text-gray-500">Fecha de Registro</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {formatDate(client.fecha_registro)}
+                  </p>
+                </div>
+
+                {client.fecha_inicio_servicio && (
+                  <div>
+                    <p className="text-sm text-gray-500">Inicio de Servicio</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {formatDate(client.fecha_inicio_servicio)}
+                    </p>
+                  </div>
+                )}
+
+                {client.fecha_fin_servicio && (
+                  <div>
+                    <p className="text-sm text-gray-500">Fin de Servicio</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {formatDate(client.fecha_fin_servicio)}
+                    </p>
+                  </div>
+                )}
+
+                {/* Fechas de Sistema */}
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-500">
+                    <div>
+                      <p>Creado</p>
+                      <p>{client.created_at ? formatDate(client.created_at) : 'No disponible'}</p>
+                    </div>
+                    <div>
+                      <p>Última Actualización</p>
+                      <p>{client.updated_at ? formatDate(client.updated_at) : 'No disponible'}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            )}
+            </div>
 
             {/* Observaciones */}
             {client.observaciones && (
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Observaciones</h3>
+              <div className="lg:col-span-2">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  Observaciones
+                </h3>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">
                     {client.observaciones}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Fechas importantes */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Calendar className="w-4 h-4 text-gray-400" />
-                  <h4 className="text-sm font-medium text-gray-700">Fecha de Registro</h4>
-                </div>
-                <p className="text-sm text-gray-900">
-                  {formatDate(client.fecha_registro || client.created_at)}
-                </p>
-              </div>
-
-              {client.fecha_hasta && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <h4 className="text-sm font-medium text-gray-700">Fecha Hasta</h4>
-                  </div>
-                  <p className="text-sm text-gray-900">
-                    {formatDate(client.fecha_hasta)}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Indicador de reconexión */}
-            {client.requiere_reconexion && (
-              <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                  <p className="text-sm font-medium text-yellow-800">
-                    Este cliente requiere reconexión
                   </p>
                 </div>
               </div>
@@ -383,53 +476,56 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
         {/* Modal de confirmación de eliminación */}
         {showDeleteConfirm && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="p-6">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                    <AlertTriangle className="w-6 h-6 text-red-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Confirmar Eliminación
-                    </h3>
-                    <p className="text-gray-600">
-                      Esta acción no se puede deshacer
-                    </p>
-                  </div>
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
                 </div>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Confirmar Eliminación
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Esta acción no se puede deshacer.
+                  </p>
+                </div>
+              </div>
 
-                <p className="text-gray-700 mb-6">
-                  ¿Estás seguro de que deseas eliminar al cliente{' '}
-                  <strong>{client.nombre}</strong>? El cliente será movido a la lista de inactivos.
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-red-700">
+                  ¿Estás seguro de que deseas eliminar al cliente <strong>{client.nombre}</strong>?
                 </p>
+                <p className="text-xs text-red-600 mt-1">
+                  Esto eliminará toda la información asociada al cliente.
+                </p>
+              </div>
 
-                <div className="flex justify-end space-x-4">
-                  <button
-                    onClick={() => setShowDeleteConfirm(false)}
-                    disabled={deleting}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                  >
-                    {deleting ? (
-                      <>
-                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                        Eliminando...
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="w-4 h-4" />
-                        Eliminar Cliente
-                      </>
-                    )}
-                  </button>
-                </div>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                >
+                  {deleting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Eliminando...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Eliminar Cliente
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

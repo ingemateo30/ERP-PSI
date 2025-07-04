@@ -1,10 +1,13 @@
-// backend/routes/conceptos.js
+// backend/routes/conceptos.js - ACTUALIZADO
 
 const express = require('express');
 const { body, param, query } = require('express-validator');
 const router = express.Router();
 const conceptosController = require('../controllers/conceptosController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+
+// Middleware de autenticación para todas las rutas
+router.use(authenticateToken);
 
 // Validaciones reutilizables
 const validateConceptoId = [
@@ -19,8 +22,8 @@ const validateConceptoCreate = [
         .withMessage('El código es requerido')
         .isLength({ max: 10 })
         .withMessage('El código no puede exceder 10 caracteres')
-        .matches(/^[A-Z0-9_]+$/)
-        .withMessage('El código solo puede contener letras mayúsculas, números y guiones bajos'),
+        .matches(/^[A-Z0-9_]+$/i)
+        .withMessage('El código solo puede contener letras, números y guiones bajos'),
     
     body('nombre')
         .notEmpty()
@@ -59,7 +62,7 @@ const validateConceptoCreate = [
     body('activo')
         .optional()
         .isBoolean()
-        .withMessage('Estado activo debe ser verdadero o falso')
+        .withMessage('El campo activo debe ser verdadero o falso')
 ];
 
 const validateConceptoUpdate = [
@@ -67,8 +70,8 @@ const validateConceptoUpdate = [
         .optional()
         .isLength({ max: 10 })
         .withMessage('El código no puede exceder 10 caracteres')
-        .matches(/^[A-Z0-9_]+$/)
-        .withMessage('El código solo puede contener letras mayúsculas, números y guiones bajos'),
+        .matches(/^[A-Z0-9_]+$/i)
+        .withMessage('El código solo puede contener letras, números y guiones bajos'),
     
     body('nombre')
         .optional()
@@ -105,35 +108,7 @@ const validateConceptoUpdate = [
     body('activo')
         .optional()
         .isBoolean()
-        .withMessage('Estado activo debe ser verdadero o falso')
-];
-
-const validateQueryParams = [
-    query('page')
-        .optional()
-        .isInt({ min: 1 })
-        .withMessage('La página debe ser un número entero positivo'),
-    
-    query('limit')
-        .optional()
-        .isInt({ min: 1, max: 100 })
-        .withMessage('El límite debe estar entre 1 y 100'),
-    
-    query('tipo')
-        .optional()
-        .isIn(['internet', 'television', 'reconexion', 'interes', 'descuento', 'varios', 'publicidad'])
-        .withMessage('Tipo de filtro inválido'),
-    
-    query('activo')
-        .optional()
-        .isIn(['true', 'false'])
-        .withMessage('Filtro activo debe ser true o false'),
-    
-    query('search')
-        .optional()
-        .isLength({ min: 1, max: 100 })
-        .withMessage('Término de búsqueda debe tener entre 1 y 100 caracteres')
-        .trim()
+        .withMessage('El campo activo debe ser verdadero o falso')
 ];
 
 const validateTipoParam = [
@@ -142,131 +117,121 @@ const validateTipoParam = [
         .withMessage('Tipo inválido')
 ];
 
-// ===============================================
-// RUTAS PÚBLICAS (requieren autenticación básica)
-// ===============================================
+const validateBulkCreate = [
+    body('conceptos')
+        .isArray({ min: 1, max: 100 })
+        .withMessage('Se requiere un array de conceptos (máximo 100)'),
+    
+    body('conceptos.*.codigo')
+        .notEmpty()
+        .withMessage('El código es requerido en todos los conceptos'),
+    
+    body('conceptos.*.nombre')
+        .notEmpty()
+        .withMessage('El nombre es requerido en todos los conceptos'),
+    
+    body('conceptos.*.tipo')
+        .isIn(['internet', 'television', 'reconexion', 'interes', 'descuento', 'varios', 'publicidad'])
+        .withMessage('Tipo inválido en concepto')
+];
 
-// GET /api/v1/conceptos - Obtener todos los conceptos
-router.get('/', 
-    authenticateToken,
-    validateQueryParams,
-    (req, res) => conceptosController.getAll(req, res)
-);
+// ===========================================
+// RUTAS PÚBLICAS (SOLO LECTURA)
+// ===========================================
 
-// GET /api/v1/conceptos/stats - Obtener estadísticas
-router.get('/stats', 
-    authenticateToken,
-    requireRole('administrador', 'supervisor'),
-    (req, res) => conceptosController.getStats(req, res)
-);
+/**
+ * @route GET /api/v1/conceptos
+ * @desc Obtener todos los conceptos con filtros opcionales
+ * @access Autenticado
+ */
+router.get('/', conceptosController.getAll);
 
-// GET /api/v1/conceptos/tipos - Obtener tipos disponibles
-router.get('/tipos', 
-    authenticateToken,
-    (req, res) => conceptosController.getTipos(req, res)
-);
+/**
+ * @route GET /api/v1/conceptos/tipos
+ * @desc Obtener tipos de conceptos disponibles
+ * @access Autenticado
+ */
+router.get('/tipos', conceptosController.getTipos);
 
-// GET /api/v1/conceptos/tipo/:tipo - Obtener conceptos por tipo
-router.get('/tipo/:tipo', 
-    authenticateToken,
-    validateTipoParam,
-    (req, res) => conceptosController.getByType(req, res)
-);
+/**
+ * @route GET /api/v1/conceptos/stats
+ * @desc Obtener estadísticas de conceptos
+ * @access Autenticado
+ */
+router.get('/stats', conceptosController.getStats);
 
-// GET /api/v1/conceptos/:id - Obtener concepto por ID
-router.get('/:id', 
-    authenticateToken,
-    validateConceptoId,
-    (req, res) => conceptosController.getById(req, res)
-);
+/**
+ * @route GET /api/v1/conceptos/tipo/:tipo
+ * @desc Obtener conceptos por tipo específico
+ * @access Autenticado
+ */
+router.get('/tipo/:tipo', validateTipoParam, conceptosController.getByType);
 
-// ===============================================
-// RUTAS ADMINISTRATIVAS (solo administradores)
-// ===============================================
+/**
+ * @route GET /api/v1/conceptos/:id
+ * @desc Obtener concepto por ID
+ * @access Autenticado
+ */
+router.get('/:id', validateConceptoId, conceptosController.getById);
 
-// POST /api/v1/conceptos - Crear nuevo concepto
+// ===========================================
+// RUTAS ADMINISTRATIVAS
+// ===========================================
+
+/**
+ * @route POST /api/v1/conceptos
+ * @desc Crear nuevo concepto de facturación
+ * @access Administrador, Supervisor
+ */
 router.post('/', 
-    authenticateToken,
-    requireRole('administrador'),
+    requireRole('administrador', 'supervisor'),
     validateConceptoCreate,
-    (req, res) => conceptosController.create(req, res)
+    conceptosController.create
 );
 
-// PUT /api/v1/conceptos/:id - Actualizar concepto
-router.put('/:id', 
-    authenticateToken,
+/**
+ * @route POST /api/v1/conceptos/bulk
+ * @desc Crear múltiples conceptos en lote
+ * @access Administrador
+ */
+router.post('/bulk',
     requireRole('administrador'),
+    validateBulkCreate,
+    conceptosController.bulkCreate
+);
+
+/**
+ * @route PUT /api/v1/conceptos/:id
+ * @desc Actualizar concepto existente
+ * @access Administrador, Supervisor
+ */
+router.put('/:id',
+    requireRole('administrador', 'supervisor'),
     validateConceptoId,
     validateConceptoUpdate,
-    (req, res) => conceptosController.update(req, res)
+    conceptosController.update
 );
 
-// POST /api/v1/conceptos/:id/toggle - Cambiar estado activo/inactivo
-router.post('/:id/toggle', 
-    authenticateToken,
+/**
+ * @route POST /api/v1/conceptos/:id/toggle
+ * @desc Cambiar estado activo/inactivo del concepto
+ * @access Administrador, Supervisor
+ */
+router.post('/:id/toggle',
+    requireRole('administrador', 'supervisor'),
+    validateConceptoId,
+    conceptosController.toggleStatus
+);
+
+/**
+ * @route DELETE /api/v1/conceptos/:id
+ * @desc Eliminar/desactivar concepto
+ * @access Administrador
+ */
+router.delete('/:id',
     requireRole('administrador'),
     validateConceptoId,
-    (req, res) => conceptosController.toggleStatus(req, res)
+    conceptosController.delete
 );
-
-// DELETE /api/v1/conceptos/:id - Eliminar concepto
-router.delete('/:id', 
-    authenticateToken,
-    requireRole('administrador'),
-    validateConceptoId,
-    (req, res) => conceptosController.delete(req, res)
-);
-
-// ===============================================
-// MIDDLEWARE DE MANEJO DE ERRORES
-// ===============================================
-
-// Middleware para manejar errores de validación
-router.use((error, req, res, next) => {
-    console.error('Error en middleware de conceptos:', error);
-    
-    if (error.type === 'entity.parse.failed') {
-        return res.status(400).json({
-            success: false,
-            message: 'Datos JSON inválidos',
-            error: 'El cuerpo de la petición contiene JSON malformado'
-        });
-    }
-    
-    if (error.type === 'entity.too.large') {
-        return res.status(413).json({
-            success: false,
-            message: 'Datos demasiado grandes',
-            error: 'El cuerpo de la petición excede el tamaño máximo permitido'
-        });
-    }
-    
-    // Error genérico del servidor
-    res.status(500).json({
-        success: false,
-        message: 'Error interno del servidor',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
-    });
-});
-
-// Middleware para rutas no encontradas específicas de conceptos
-router.use('*', (req, res) => {
-    res.status(404).json({
-        success: false,
-        message: 'Ruta no encontrada en conceptos',
-        error: `La ruta ${req.method} ${req.originalUrl} no existe en el módulo de conceptos`,
-        availableRoutes: [
-            'GET /conceptos - Listar conceptos',
-            'GET /conceptos/stats - Estadísticas',
-            'GET /conceptos/tipos - Tipos disponibles',
-            'GET /conceptos/tipo/:tipo - Conceptos por tipo',
-            'GET /conceptos/:id - Obtener concepto',
-            'POST /conceptos - Crear concepto',
-            'PUT /conceptos/:id - Actualizar concepto',
-            'POST /conceptos/:id/toggle - Cambiar estado',
-            'DELETE /conceptos/:id - Eliminar concepto'
-        ]
-    });
-});
 
 module.exports = router;
