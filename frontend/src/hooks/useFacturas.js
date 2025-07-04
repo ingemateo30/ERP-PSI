@@ -1,5 +1,5 @@
-// hooks/useFacturas.js - Versión corregida con manejo de errores
-import { useState, useEffect, useCallback } from 'react';
+// hooks/useFacturas.js - Versión corregida sin duplicados de filtros
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import FacturasService from '../services/facturasService';
 
 export const useFacturas = (filtrosIniciales = {}) => {
@@ -12,97 +12,88 @@ export const useFacturas = (filtrosIniciales = {}) => {
     totalItems: 0,
     itemsPerPage: 10
   });
-  const [filtros, setFiltros] = useState({
+
+  // Estados de filtros con memo para evitar duplicados
+  const [filtrosActivos, setFiltrosActivos] = useState(() => ({
     page: 1,
     limit: 10,
     ...filtrosIniciales
-  });
+  }));
 
-  // Cargar facturas
+  // Memoizar filtros para evitar re-renders innecesarios
+  const filtrosMemoizados = useMemo(() => filtrosActivos, [JSON.stringify(filtrosActivos)]);
+
+  // Cargar facturas con debounce mejorado
   const cargarFacturas = useCallback(async (nuevosFiltros = {}) => {
     try {
       setLoading(true);
       setError(null);
       
-      const filtrosCompletos = { ...filtros, ...nuevosFiltros };
+      // Combinar filtros sin duplicar
+      const filtrosFinales = {
+        ...filtrosMemoizados,
+        ...nuevosFiltros
+      };
+
+      // Eliminar filtros vacíos para evitar duplicados en la consulta
+      const filtrosLimpios = Object.fromEntries(
+        Object.entries(filtrosFinales).filter(([key, value]) => 
+          value !== '' && value !== null && value !== undefined
+        )
+      );
       
-      console.log('🔍 Cargando facturas con filtros:', filtrosCompletos);
+      console.log('🔍 Cargando facturas con filtros limpios:', filtrosLimpios);
       
-      const response = await FacturasService.obtenerFacturas(filtrosCompletos);
+      const response = await FacturasService.obtenerFacturas(filtrosLimpios);
       
-      console.log('📦 Respuesta del servidor:', response);
-      
-      // Verificar estructura de respuesta
       if (!response) {
         throw new Error('No se recibió respuesta del servidor');
       }
 
-      console.log('🔍 Estructura completa de respuesta:', response);
-
-      // El problema: response ya contiene { facturas: [...], pagination: {...} }
-      // No está envuelto en response.data cuando viene del backend
-      
+      // Procesar respuesta de manera consistente
       let facturasData = [];
       let paginationData = pagination;
 
-      // Verificar si viene directamente (no envuelto en .data)
-      if (response.facturas) {
-        console.log('✅ Estructura directa detectada');
+      if (response.success && response.data) {
+        if (response.data.facturas) {
+          facturasData = response.data.facturas;
+          paginationData = response.data.pagination || pagination;
+        } else if (Array.isArray(response.data)) {
+          facturasData = response.data;
+        }
+      } else if (response.facturas) {
         facturasData = response.facturas;
         paginationData = response.pagination || pagination;
-      }
-      // O si viene envuelto en .data 
-      else if (response.data && response.data.facturas) {
-        console.log('✅ Estructura con .data detectada');
-        facturasData = response.data.facturas;
-        paginationData = response.data.pagination || pagination;
-      }
-      // O si response.data es directamente un array
-      else if (response.data && Array.isArray(response.data)) {
-        console.log('✅ Array directo en .data detectado');
-        facturasData = response.data;
-        paginationData = { ...pagination, totalItems: response.data.length };
-      }
-      // O si response es directamente un array
-      else if (Array.isArray(response)) {
-        console.log('✅ Array directo detectado');
+      } else if (Array.isArray(response)) {
         facturasData = response;
-        paginationData = { ...pagination, totalItems: response.length };
       }
-      else {
-        console.warn('⚠️ Estructura de respuesta no reconocida:', response);
-        // No lanzar error, usar array vacío
-        facturasData = [];
-      }
-      
-      console.log('✅ Facturas procesadas:', facturasData.length);
       
       setFacturas(facturasData || []);
       setPagination(paginationData);
-      setFiltros(filtrosCompletos);
+      setFiltrosActivos(filtrosFinales);
       
     } catch (err) {
       console.error('❌ Error al cargar facturas:', err);
       
-      // Manejar diferentes tipos de errores
       let errorMessage = 'Error al cargar facturas';
       
       if (err.response) {
-        // Error de respuesta del servidor
-        if (err.response.status === 401) {
-          errorMessage = 'No autorizado. Por favor, inicia sesión nuevamente.';
-        } else if (err.response.status === 404) {
-          errorMessage = 'Endpoint de facturas no encontrado. Verifica que el backend esté configurado.';
-        } else if (err.response.status === 500) {
-          errorMessage = 'Error interno del servidor. Verifica que la base de datos esté funcionando.';
-        } else {
-          errorMessage = err.response.data?.message || `Error del servidor: ${err.response.status}`;
+        switch (err.response.status) {
+          case 401:
+            errorMessage = 'No autorizado. Por favor, inicia sesión nuevamente.';
+            break;
+          case 404:
+            errorMessage = 'Servicio de facturas no disponible.';
+            break;
+          case 500:
+            errorMessage = 'Error interno del servidor.';
+            break;
+          default:
+            errorMessage = err.response.data?.message || `Error del servidor: ${err.response.status}`;
         }
       } else if (err.request) {
-        // Error de red
-        errorMessage = 'No se pudo conectar con el servidor. Verifica que esté ejecutándose.';
+        errorMessage = 'No se pudo conectar con el servidor.';
       } else {
-        // Otros errores
         errorMessage = err.message || 'Error desconocido';
       }
       
@@ -111,44 +102,50 @@ export const useFacturas = (filtrosIniciales = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [filtros, pagination]);
+  }, [filtrosMemoizados, pagination]);
 
-  // Cambiar página
+  // Cambiar página sin duplicar filtros
   const cambiarPagina = useCallback((nuevaPagina) => {
-    cargarFacturas({ page: nuevaPagina });
-  }, [cargarFacturas]);
+    const nuevosFiltros = { ...filtrosActivos, page: nuevaPagina };
+    cargarFacturas(nuevosFiltros);
+  }, [cargarFacturas, filtrosActivos]);
 
-  // Aplicar filtros
+  // Aplicar filtros sin duplicar
   const aplicarFiltros = useCallback((nuevosFiltros) => {
-    cargarFacturas({ ...nuevosFiltros, page: 1 });
-  }, [cargarFacturas]);
+    const filtrosCombinados = { 
+      ...filtrosActivos, 
+      ...nuevosFiltros, 
+      page: 1 // Resetear página al aplicar filtros
+    };
+    cargarFacturas(filtrosCombinados);
+  }, [cargarFacturas, filtrosActivos]);
 
-  // Limpiar filtros
+  // Limpiar filtros completamente
   const limpiarFiltros = useCallback(() => {
     const filtrosLimpios = { page: 1, limit: 10 };
-    setFiltros(filtrosLimpios);
+    setFiltrosActivos(filtrosLimpios);
     cargarFacturas(filtrosLimpios);
   }, [cargarFacturas]);
 
-  // Refrescar datos
+  // Refrescar manteniendo filtros actuales
   const refrescar = useCallback(() => {
     cargarFacturas();
   }, [cargarFacturas]);
 
-  // Cargar al montar solo si no hay facturas
+  // Carga inicial solo una vez
   useEffect(() => {
     if (facturas.length === 0 && !loading && !error) {
       console.log('🚀 Cargando facturas iniciales...');
       cargarFacturas();
     }
-  }, []);
+  }, []); // Solo al montar
 
   return {
     facturas,
     loading,
     error,
     pagination,
-    filtros,
+    filtros: filtrosActivos,
     cargarFacturas,
     cambiarPagina,
     aplicarFiltros,
@@ -157,7 +154,98 @@ export const useFacturas = (filtrosIniciales = {}) => {
   };
 };
 
-// Hook para estadísticas con manejo de errores mejorado
+// Hook para acciones corregido
+export const useFacturasAcciones = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const ejecutarAccion = useCallback(async (accion, nombreAccion = 'acción') => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log(`🔄 Ejecutando ${nombreAccion}...`);
+      const resultado = await accion();
+      console.log(`✅ ${nombreAccion} ejecutada exitosamente`);
+      
+      return resultado;
+    } catch (err) {
+      console.error(`❌ Error en ${nombreAccion}:`, err);
+      
+      let errorMessage = `Error al ejecutar ${nombreAccion}`;
+      
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const crearFactura = useCallback(async (datos) => {
+    return ejecutarAccion(() => FacturasService.crearFactura(datos), 'crear factura');
+  }, [ejecutarAccion]);
+
+  const actualizarFactura = useCallback(async (id, datos) => {
+    if (!id) throw new Error('ID de factura requerido para actualizar');
+    return ejecutarAccion(() => FacturasService.actualizarFactura(id, datos), 'actualizar factura');
+  }, [ejecutarAccion]);
+
+  const marcarComoPagada = useCallback(async (id, datosPago) => {
+    if (!id) throw new Error('ID de factura requerido');
+    if (!datosPago?.metodo_pago) throw new Error('Método de pago requerido');
+    
+    return ejecutarAccion(() => FacturasService.marcarComoPagada(id, datosPago), 'marcar como pagada');
+  }, [ejecutarAccion]);
+
+  const anularFactura = useCallback(async (id, motivo) => {
+    if (!id) throw new Error('ID de factura requerido');
+    if (!motivo || motivo.trim().length < 10) {
+      throw new Error('Motivo de anulación debe tener al menos 10 caracteres');
+    }
+    
+    return ejecutarAccion(() => FacturasService.anularFactura(id, motivo), 'anular factura');
+  }, [ejecutarAccion]);
+
+  const duplicarFactura = useCallback(async (id, datos = {}) => {
+    if (!id) throw new Error('ID de factura requerido para duplicar');
+    return ejecutarAccion(() => FacturasService.duplicarFactura(id, datos), 'duplicar factura');
+  }, [ejecutarAccion]);
+
+  const descargarPDF = useCallback(async (id, nombreCliente = 'factura') => {
+    if (!id) throw new Error('ID de factura requerido para descargar PDF');
+    return ejecutarAccion(() => FacturasService.descargarPDF(id, nombreCliente), 'descargar PDF');
+  }, [ejecutarAccion]);
+
+  const verPDF = useCallback(async (id) => {
+    if (!id) throw new Error('ID de factura requerido para ver PDF');
+    return ejecutarAccion(() => FacturasService.verPDF(id), 'ver PDF');
+  }, [ejecutarAccion]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return {
+    loading,
+    error,
+    crearFactura,
+    actualizarFactura,
+    marcarComoPagada,
+    anularFactura,
+    duplicarFactura,
+    descargarPDF,
+    verPDF,
+    clearError
+  };
+};
+
+// Hook para estadísticas mejorado
 export const useFacturasEstadisticas = () => {
   const [estadisticas, setEstadisticas] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -172,43 +260,25 @@ export const useFacturasEstadisticas = () => {
       
       const response = await FacturasService.obtenerEstadisticas();
       
-      console.log('📈 Respuesta estadísticas:', response);
-      
-      if (response && response.data) {
+      if (response?.data) {
         setEstadisticas(response.data);
+      } else if (response) {
+        setEstadisticas(response);
       } else {
-        // Si no hay datos, usar valores por defecto
         setEstadisticas({
           total: 0,
           pendientes: 0,
           pagadas: 0,
           vencidas: 0,
           anuladas: 0,
-          valor_pendiente: 0,
-          valor_pagado: 0,
-          cartera_vencida: 0,
-          facturadas_hoy: 0,
-          facturado_mes_actual: 0
+          total_valor: 0
         });
       }
+      
     } catch (err) {
       console.error('❌ Error al cargar estadísticas:', err);
-      
-      // Usar estadísticas vacías en caso de error
-      setEstadisticas({
-        total: 0,
-        pendientes: 0,
-        pagadas: 0,
-        vencidas: 0,
-        anuladas: 0,
-        valor_pendiente: 0,
-        valor_pagado: 0,
-        cartera_vencida: 0,
-        facturadas_hoy: 0,
-        facturado_mes_actual: 0
-      });
-      
-      setError(err.message || 'Error al cargar estadísticas');
+      setError('Error al cargar estadísticas');
+      setEstadisticas(null);
     } finally {
       setLoading(false);
     }
@@ -223,109 +293,5 @@ export const useFacturasEstadisticas = () => {
     loading,
     error,
     refrescar: cargarEstadisticas
-  };
-};
-
-// Resto de hooks sin cambios...
-export const useFactura = (id) => {
-  const [factura, setFactura] = useState(null);
-  const [detalles, setDetalles] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const cargarFactura = useCallback(async () => {
-    if (!id) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await FacturasService.obtenerFacturaPorId(id);
-      
-      if (response && response.data) {
-        setFactura(response.data.factura);
-        setDetalles(response.data.detalles || []);
-      }
-    } catch (err) {
-      setError(err.message || 'Error al cargar factura');
-      console.error('Error al cargar factura:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    cargarFactura();
-  }, [cargarFactura]);
-
-  return {
-    factura,
-    detalles,
-    loading,
-    error,
-    refrescar: cargarFactura
-  };
-};
-
-export const useFacturasAcciones = () => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const ejecutarAccion = useCallback(async (accion) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const resultado = await accion();
-      return resultado;
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Error al ejecutar acción';
-      setError(errorMessage);
-      console.error('Error en acción:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const crearFactura = useCallback(async (datos) => {
-    return ejecutarAccion(() => FacturasService.crearFactura(datos));
-  }, [ejecutarAccion]);
-
-  const actualizarFactura = useCallback(async (id, datos) => {
-    return ejecutarAccion(() => FacturasService.actualizarFactura(id, datos));
-  }, [ejecutarAccion]);
-
-  const marcarComoPagada = useCallback(async (id, datosPago) => {
-    return ejecutarAccion(() => FacturasService.marcarComoPagada(id, datosPago));
-  }, [ejecutarAccion]);
-
-  const anularFactura = useCallback(async (id, motivo) => {
-    return ejecutarAccion(() => FacturasService.anularFactura(id, motivo));
-  }, [ejecutarAccion]);
-
-  const duplicarFactura = useCallback(async (id, datos = {}) => {
-    return ejecutarAccion(() => FacturasService.duplicarFactura(id, datos));
-  }, [ejecutarAccion]);
-
-  const descargarPDF = useCallback(async (id, nombreCliente) => {
-    return ejecutarAccion(() => FacturasService.descargarPDF(id, nombreCliente));
-  }, [ejecutarAccion]);
-
-  const verPDF = useCallback(async (id) => {
-    return ejecutarAccion(() => FacturasService.verPDF(id));
-  }, [ejecutarAccion]);
-
-  return {
-    loading,
-    error,
-    crearFactura,
-    actualizarFactura,
-    marcarComoPagada,
-    anularFactura,
-    duplicarFactura,
-    descargarPDF,
-    verPDF,
-    clearError: () => setError(null)
   };
 };
