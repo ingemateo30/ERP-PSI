@@ -188,33 +188,15 @@ class FacturasService {
       
       console.log(`📥 Descargando PDF de factura ${id}...`);
       
-      // Usar fetch directamente para PDFs para evitar interceptors de axios
-      const token = localStorage.getItem('token');
-      const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1';
-      
-      const response = await fetch(`${baseURL}/facturas/${id}/pdf`, {
-        method: 'GET',
+      const response = await apiService.get(`/facturas/${id}/pdf`, {
+        responseType: 'blob',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/pdf',
+          'Accept': 'application/pdf'
         }
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
-
-      // Verificar que la respuesta es un PDF
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/pdf')) {
-        throw new Error('La respuesta no es un PDF válido');
-      }
-
-      // Obtener el blob
-      const blob = await response.blob();
-      
-      // Crear URL y descargar
+      // Crear blob y descargar
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       
       const link = document.createElement('a');
@@ -241,33 +223,15 @@ class FacturasService {
       
       console.log(`👁️ Abriendo PDF de factura ${id}...`);
       
-      // Usar fetch directamente para PDFs para evitar interceptors de axios
-      const token = localStorage.getItem('token');
-      const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1';
-      
-      const response = await fetch(`${baseURL}/facturas/${id}/ver-pdf`, {
-        method: 'GET',
+      const response = await apiService.get(`/facturas/${id}/ver-pdf`, {
+        responseType: 'blob',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/pdf',
+          'Accept': 'application/pdf'
         }
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
-
-      // Verificar que la respuesta es un PDF
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/pdf')) {
-        throw new Error('La respuesta no es un PDF válido');
-      }
-
-      // Obtener el blob
-      const blob = await response.blob();
-      
       // Crear URL del blob y abrir en nueva ventana
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       
       const ventana = window.open(url, '_blank');
@@ -285,56 +249,6 @@ class FacturasService {
     } catch (error) {
       console.error(`❌ Error al ver PDF de factura ${id}:`, error);
       throw this.manejarError(error, 'ver PDF');
-    }
-  }
-
-  // Probar PDF (para desarrollo) - CORREGIDO
-  static async probarPDF() {
-    try {
-      console.log('🧪 Probando generación de PDF...');
-      
-      // Usar fetch directamente para PDFs
-      const token = localStorage.getItem('token');
-      const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1';
-      
-      const response = await fetch(`${baseURL}/facturas/test-pdf`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/pdf',
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
-
-      // Verificar que la respuesta es un PDF
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/pdf')) {
-        throw new Error('La respuesta no es un PDF válido');
-      }
-
-      // Obtener el blob y abrir en nueva ventana
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      
-      const ventana = window.open(url, '_blank');
-      if (!ventana) {
-        throw new Error('No se pudo abrir la ventana. Verifica que no esté bloqueada por el navegador.');
-      }
-      
-      // Limpiar URL después de un tiempo
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-      }, 60000);
-      
-      console.log('✅ PDF de prueba generado exitosamente');
-      return { success: true, message: 'PDF de prueba generado exitosamente' };
-    } catch (error) {
-      console.error('❌ Error al probar PDF:', error);
-      throw this.manejarError(error, 'probar PDF');
     }
   }
 

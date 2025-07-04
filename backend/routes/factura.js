@@ -1,84 +1,873 @@
+// backend/routes/factura.js - RUTAS MEJORADAS CON FACTURACIÓN AUTOMÁTICA
 const express = require('express');
 const router = express.Router();
 const FacturasController = require('../controllers/FacturasController');
+const FacturacionAutomaticaService = require('../services/FacturacionAutomaticaService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { validarCrearFactura, validarActualizarFactura, validarPagarFactura } = require('../middleware/validations');
+const { body, validationResult } = require('express-validator');
+
 
 // Middleware de autenticación para todas las rutas
 router.use(authenticateToken);
 
-// Rutas públicas (para todos los roles autenticados)
+// ==========================================
+// RUTAS PÚBLICAS (LECTURA)
+// ==========================================
 
-// GET /api/v1/facturas - Obtener todas las facturas con filtros y paginación
+/**
+ * @route GET /api/v1/facturas
+ * @desc Obtener todas las facturas con filtros y paginación MEJORADOS
+ * @access Autenticado
+ */
 router.get('/', FacturasController.obtenerTodas);
 
-// GET /api/v1/facturas/search - Buscar facturas
+/**
+ * @route GET /api/v1/facturas/search
+ * @desc Buscar facturas con diferentes criterios
+ * @access Autenticado
+ */
 router.get('/search', FacturasController.buscar);
 
-// GET /api/v1/facturas/stats - Obtener estadísticas de facturas
+/**
+ * @route GET /api/v1/facturas/stats
+ * @desc Obtener estadísticas de facturas
+ * @access Autenticado
+ */
 router.get('/stats', FacturasController.obtenerEstadisticas);
 
-// GET /api/v1/facturas/vencidas - Obtener facturas vencidas
+/**
+ * @route GET /api/v1/facturas/vencidas
+ * @desc Obtener facturas vencidas
+ * @access Autenticado
+ */
 router.get('/vencidas', FacturasController.obtenerVencidas);
 
+/**
+ * @route GET /api/v1/facturas/test-pdf
+ * @desc Probar generación de PDF
+ * @access Autenticado
+ */
 router.get('/test-pdf', FacturasController.probarPDF);
 
-// GET /api/v1/facturas/:id/pdf - Descargar PDF de factura
-router.get('/:id/pdf', FacturasController.generarPDF);
-
-// GET /api/v1/facturas/:id/ver-pdf - Ver PDF en navegador
-router.get('/:id/ver-pdf', FacturasController.verPDF);
-
-// GET /api/v1/facturas/generar-numero - Generar siguiente número de factura
+/**
+ * @route GET /api/v1/facturas/generar-numero
+ * @desc Generar siguiente número de factura
+ * @access Administrador, Supervisor
+ */
 router.get('/generar-numero', 
   requireRole('administrador', 'supervisor'),
   FacturasController.generarNumeroFactura
 );
 
-// GET /api/v1/facturas/validate/:numero - Validar si existe factura con número
+/**
+ * @route GET /api/v1/facturas/validate/:numero
+ * @desc Validar si existe factura con número específico
+ * @access Autenticado
+ */
 router.get('/validate/:numero', FacturasController.validarNumeroFactura);
 
-// GET /api/v1/facturas/numero/:numero - Obtener factura por número
+/**
+ * @route GET /api/v1/facturas/numero/:numero
+ * @desc Obtener factura por número
+ * @access Autenticado
+ */
 router.get('/numero/:numero', FacturasController.obtenerPorNumero);
 
-// GET /api/v1/facturas/:id - Obtener factura por ID
-router.get('/:id', FacturasController.obtenerPorId);
+/**
+ * @route GET /api/v1/facturas/:id/pdf
+ * @desc Descargar PDF de factura
+ * @access Autenticado
+ */
+router.get('/:id/pdf', FacturasController.generarPDF);
 
-// GET /api/v1/facturas/:id/detalles - Obtener detalles de factura
+/**
+ * @route GET /api/v1/facturas/:id/ver-pdf
+ * @desc Ver PDF en navegador
+ * @access Autenticado
+ */
+router.get('/:id/ver-pdf', FacturasController.verPDF);
+
+/**
+ * @route GET /api/v1/facturas/:id/detalles
+ * @desc Obtener detalles de factura
+ * @access Autenticado
+ */
 router.get('/:id/detalles', FacturasController.obtenerDetalles);
 
-// Rutas que requieren permisos específicos
+/**
+ * @route GET /api/v1/facturas/:id
+ * @desc Obtener factura por ID
+ * @access Autenticado
+ */
+router.get('/:id', FacturasController.obtenerPorId);
 
-// POST /api/v1/facturas - Crear nueva factura (Administrador y Supervisor)
+// ==========================================
+// RUTAS DE FACTURACIÓN AUTOMÁTICA
+// ==========================================
+
+/**
+ * @route POST /api/v1/facturas/automatica/generar-mensual
+ * @desc Generar facturación mensual masiva para todos los clientes
+ * @access Administrador
+ */
+router.post('/automatica/generar-mensual',
+  requireRole('administrador'),
+  async (req, res) => {
+    try {
+      console.log('🔄 Iniciando facturación mensual masiva...');
+      
+      const { fecha_referencia } = req.body;
+      const fechaRef = fecha_referencia ? new Date(fecha_referencia) : new Date();
+      
+      const resultado = await FacturacionAutomaticaService.generarFacturacionMensual(fechaRef);
+      
+      res.json({
+        success: true,
+        data: resultado,
+        message: `Facturación mensual procesada: ${resultado.exitosas} exitosas, ${resultado.fallidas} fallidas`,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Error en facturación mensual:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error procesando facturación mensual',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * @route POST /api/v1/facturas/automatica/cliente/:clienteId
+ * @desc Generar factura automática para un cliente específico
+ * @access Administrador, Supervisor
+ */
+router.post('/automatica/cliente/:clienteId',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const { clienteId } = req.params;
+      const { fecha_inicio } = req.body;
+      
+      if (!clienteId || isNaN(clienteId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID de cliente inválido'
+        });
+      }
+
+      console.log(`🧾 Generando factura automática para cliente ${clienteId}...`);
+      
+      const fechaInicio = fecha_inicio ? new Date(fecha_inicio) : new Date();
+      const factura = await FacturacionAutomaticaService.crearFacturaInicialCliente(
+        parseInt(clienteId),
+        fechaInicio
+      );
+
+      res.json({
+        success: true,
+        data: factura,
+        message: `Factura automática generada: ${factura.numero_factura}`,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Error generando factura automática:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error generando factura automática',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * @route POST /api/v1/facturas/automatica/procesar-saldos
+ * @desc Procesar saldos e intereses de facturas vencidas
+ * @access Administrador
+ */
+router.post('/automatica/procesar-saldos',
+  requireRole('administrador'),
+  async (req, res) => {
+    try {
+      console.log('💰 Procesando saldos e intereses...');
+      
+      await FacturacionAutomaticaService.procesarSaldosEIntereses();
+      
+      res.json({
+        success: true,
+        message: 'Saldos e intereses procesados exitosamente',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Error procesando saldos:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error procesando saldos e intereses',
+        error: error.message
+      });
+    }
+  }
+);
+
+// ==========================================
+// RUTAS DE ADMINISTRACIÓN
+// ==========================================
+
+/**
+ * @route POST /api/v1/facturas
+ * @desc Crear nueva factura (manual o automática)
+ * @access Administrador, Supervisor
+ */
 router.post('/', 
   requireRole('administrador', 'supervisor'),
   validarCrearFactura,
   FacturasController.crear
 );
 
-// POST /api/v1/facturas/:id/duplicar - Duplicar factura (Administrador y Supervisor)
+/**
+ * @route POST /api/v1/facturas/:id/duplicar
+ * @desc Duplicar factura existente
+ * @access Administrador, Supervisor
+ */
 router.post('/:id/duplicar',
   requireRole('administrador', 'supervisor'),
   FacturasController.duplicar
 );
 
-// PUT /api/v1/facturas/:id - Actualizar factura (Administrador y Supervisor)
+/**
+ * @route PUT /api/v1/facturas/:id
+ * @desc Actualizar factura
+ * @access Administrador, Supervisor
+ */
 router.put('/:id', 
   requireRole('administrador', 'supervisor'),
   validarActualizarFactura,
   FacturasController.actualizar
 );
 
-// PATCH /api/v1/facturas/:id/pagar - Marcar como pagada (Todos los roles)
+/**
+ * @route PATCH /api/v1/facturas/:id/pagar
+ * @desc Marcar factura como pagada
+ * @access Todos los roles autenticados
+ */
 router.patch('/:id/pagar',
   validarPagarFactura,
   FacturasController.marcarComoPagada
 );
 
-// PATCH /api/v1/facturas/:id/anular - Anular factura (Solo Administrador)
+/**
+ * @route PATCH /api/v1/facturas/:id/anular
+ * @desc Anular factura
+ * @access Solo Administrador
+ */
 router.patch('/:id/anular',
   requireRole('administrador'),
   FacturasController.anular
 );
+
+// ==========================================
+// MIDDLEWARE DE VALIDACIONES MEJORADO
+// ==========================================
+
+/**
+ * Validación para crear factura con soporte automático
+ */
+const validarCrearFacturaMejorada = [
+  body('cliente_id')
+    .notEmpty()
+    .withMessage('ID del cliente es requerido')
+    .isInt({ min: 1 })
+    .withMessage('ID del cliente debe ser un número entero positivo'),
+  
+  body('fecha_emision')
+    .optional()
+    .isISO8601()
+    .withMessage('Fecha de emisión debe ser una fecha válida'),
+  
+  body('fecha_vencimiento')
+    .optional()
+    .isISO8601()
+    .withMessage('Fecha de vencimiento debe ser una fecha válida'),
+  
+  body('automatica')
+    .optional()
+    .isBoolean()
+    .withMessage('El campo automática debe ser un booleano'),
+
+  // Validación condicional: si no es automática, requerir más campos
+  body('periodo_facturacion')
+    .if(body('automatica').not().equals(true))
+    .notEmpty()
+    .withMessage('Período de facturación requerido para facturas manuales'),
+
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Errores de validación',
+        errors: errors.array()
+      });
+    }
+    next();
+  }
+];
+
+/**
+ * Validación mejorada para pagos
+ */
+const validarPagoMejorado = [
+  body('metodo_pago')
+    .notEmpty()
+    .withMessage('Método de pago requerido')
+    .isIn(['efectivo', 'transferencia', 'cheque', 'tarjeta_credito', 'tarjeta_debito'])
+    .withMessage('Método de pago inválido'),
+  
+  body('fecha_pago')
+    .optional()
+    .isISO8601()
+    .withMessage('Fecha de pago debe ser una fecha válida'),
+  
+  body('referencia_pago')
+    .optional()
+    .isLength({ min: 3, max: 100 })
+    .withMessage('Referencia de pago debe tener entre 3 y 100 caracteres'),
+  
+  body('banco_id')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('ID del banco debe ser un número entero positivo'),
+
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Errores de validación en el pago',
+        errors: errors.array()
+      });
+    }
+    next();
+  }
+];
+
+// ==========================================
+// RUTAS DE REPORTING Y ANÁLISIS
+// ==========================================
+
+/**
+ * @route GET /api/v1/facturas/reportes/cartera
+ * @desc Reporte de cartera de clientes
+ * @access Administrador, Supervisor
+ */
+router.get('/reportes/cartera',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const { fecha_corte, incluir_detalle = false } = req.query;
+      
+      const fechaCorte = fecha_corte || new Date().toISOString().split('T')[0];
+      
+      let query = `
+        SELECT 
+          c.identificacion,
+          c.nombre,
+          c.telefono,
+          s.nombre as sector,
+          COUNT(f.id) as total_facturas_pendientes,
+          SUM(f.total) as total_cartera,
+          MIN(f.fecha_vencimiento) as factura_mas_antigua,
+          MAX(DATEDIFF(?, f.fecha_vencimiento)) as dias_mora_maxima
+        FROM clientes c
+        JOIN facturas f ON c.id = f.cliente_id
+        LEFT JOIN sectores s ON c.sector_id = s.id
+        WHERE f.estado = 'pendiente' 
+        AND f.fecha_vencimiento <= ?
+        AND f.activo = '1'
+        GROUP BY c.id
+        HAVING total_cartera > 0
+        ORDER BY total_cartera DESC, dias_mora_maxima DESC
+      `;
+
+      const { Database } = require('../models/Database');
+      const cartera = await Database.query(query, [fechaCorte, fechaCorte]);
+
+      // Estadísticas generales
+      const estadisticas = await Database.query(`
+        SELECT 
+          COUNT(DISTINCT f.cliente_id) as clientes_con_mora,
+          SUM(f.total) as total_cartera_general,
+          AVG(f.total) as promedio_deuda_cliente,
+          COUNT(f.id) as total_facturas_vencidas
+        FROM facturas f
+        WHERE f.estado = 'pendiente' 
+        AND f.fecha_vencimiento <= ?
+        AND f.activo = '1'
+      `, [fechaCorte]);
+
+      res.json({
+        success: true,
+        data: {
+          cartera,
+          estadisticas: estadisticas[0],
+          fecha_corte: fechaCorte,
+          total_registros: cartera.length
+        },
+        message: 'Reporte de cartera generado',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Error generando reporte de cartera:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error generando reporte de cartera',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * @route GET /api/v1/facturas/reportes/ingresos
+ * @desc Reporte de ingresos por período
+ * @access Administrador, Supervisor
+ */
+router.get('/reportes/ingresos',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const { fecha_inicio, fecha_fin, agrupacion = 'mensual' } = req.query;
+      
+      if (!fecha_inicio || !fecha_fin) {
+        return res.status(400).json({
+          success: false,
+          message: 'Fecha de inicio y fin son requeridas'
+        });
+      }
+
+      let formatoFecha;
+      switch (agrupacion) {
+        case 'diario':
+          formatoFecha = '%Y-%m-%d';
+          break;
+        case 'semanal':
+          formatoFecha = '%Y-%u';
+          break;
+        case 'mensual':
+        default:
+          formatoFecha = '%Y-%m';
+          break;
+      }
+
+      const query = `
+        SELECT 
+          DATE_FORMAT(fecha_pago, '${formatoFecha}') as periodo,
+          COUNT(*) as facturas_pagadas,
+          SUM(total) as ingresos_total,
+          AVG(total) as promedio_factura,
+          SUM(s_internet) as ingresos_internet,
+          SUM(s_television) as ingresos_television,
+          SUM(s_varios) as ingresos_varios,
+          SUM(s_iva) as total_iva
+        FROM facturas 
+        WHERE estado = 'pagada' 
+        AND fecha_pago BETWEEN ? AND ?
+        AND activo = '1'
+        GROUP BY DATE_FORMAT(fecha_pago, '${formatoFecha}')
+        ORDER BY periodo DESC
+      `;
+
+      const { Database } = require('../models/Database');
+      const ingresos = await Database.query(query, [fecha_inicio, fecha_fin]);
+
+      res.json({
+        success: true,
+        data: {
+          ingresos,
+          parametros: {
+            fecha_inicio,
+            fecha_fin,
+            agrupacion
+          },
+          total_registros: ingresos.length
+        },
+        message: 'Reporte de ingresos generado',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Error generando reporte de ingresos:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error generando reporte de ingresos',
+        error: error.message
+      });
+    }
+  }
+);
+
+// ==========================================
+// RUTAS DE UTILIDADES Y MANTENIMIENTO
+// ==========================================
+
+/**
+ * @route POST /api/v1/facturas/utilidades/recalcular-totales
+ * @desc Recalcular totales de facturas (utilidad de mantenimiento)
+ * @access Administrador
+ */
+router.post('/utilidades/recalcular-totales',
+  requireRole('administrador'),
+  async (req, res) => {
+    try {
+      const { facturas_ids } = req.body;
+      
+      let whereClause = 'WHERE activo = "1"';
+      let params = [];
+      
+      if (facturas_ids && Array.isArray(facturas_ids)) {
+        whereClause += ` AND id IN (${facturas_ids.map(() => '?').join(',')})`;
+        params = facturas_ids;
+      }
+
+      const { Database } = require('../models/Database');
+      
+      // Obtener facturas a recalcular
+      const facturas = await Database.query(`
+        SELECT id, s_internet, s_television, s_interes, s_reconexion, 
+               s_descuento, s_varios, s_publicidad, s_iva, saldo_anterior
+        FROM facturas ${whereClause}
+      `, params);
+
+      let actualizadas = 0;
+
+      for (const factura of facturas) {
+        // Recalcular subtotal y total
+        const subtotal = (factura.s_internet || 0) + 
+                        (factura.s_television || 0) + 
+                        (factura.s_interes || 0) + 
+                        (factura.s_reconexion || 0) + 
+                        (factura.s_descuento || 0) + 
+                        (factura.s_varios || 0) + 
+                        (factura.s_publicidad || 0);
+        
+        const total = subtotal + (factura.s_iva || 0) + (factura.saldo_anterior || 0);
+
+        await Database.query(
+          'UPDATE facturas SET subtotal = ?, total = ?, updated_at = NOW() WHERE id = ?',
+          [subtotal, total, factura.id]
+        );
+        
+        actualizadas++;
+      }
+
+      res.json({
+        success: true,
+        data: {
+          facturas_procesadas: facturas.length,
+          facturas_actualizadas: actualizadas
+        },
+        message: `${actualizadas} facturas recalculadas exitosamente`,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Error recalculando totales:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error recalculando totales de facturas',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * @route POST /api/v1/facturas/utilidades/actualizar-estados
+ * @desc Actualizar estados de facturas vencidas
+ * @access Administrador
+ */
+router.post('/utilidades/actualizar-estados',
+  requireRole('administrador'),
+  async (req, res) => {
+    try {
+      const { Database } = require('../models/Database');
+      
+      // Marcar facturas vencidas
+      const resultadoVencidas = await Database.query(`
+        UPDATE facturas 
+        SET estado = 'vencida', updated_at = NOW()
+        WHERE estado = 'pendiente' 
+        AND fecha_vencimiento < CURDATE()
+        AND activo = '1'
+      `);
+
+      res.json({
+        success: true,
+        data: {
+          facturas_marcadas_vencidas: resultadoVencidas.affectedRows || 0
+        },
+        message: 'Estados de facturas actualizados',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Error actualizando estados:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error actualizando estados de facturas',
+        error: error.message
+      });
+    }
+  }
+);
+
+// ==========================================
+// MIDDLEWARE DE LOGGING Y AUDITORÍA
+// ==========================================
+
+/**
+ * Middleware para registrar acciones importantes en facturas
+ */
+const auditarAccionFactura = (accion) => {
+  return async (req, res, next) => {
+    // Guardar referencia para logging posterior
+    const originalSend = res.json;
+    res.json = function(data) {
+      // Log de auditoría
+      if (data.success) {
+        console.log(`📋 AUDITORÍA FACTURAS - ${accion}: Usuario ${req.user?.id || 'N/A'} - ${new Date().toISOString()}`);
+        
+        // Aquí podrías enviar a un sistema de auditoría
+        // AuditoriaService.log({
+        //   usuario_id: req.user?.id,
+        //   accion,
+        //   modulo: 'facturas',
+        //   detalles: req.body,
+        //   timestamp: new Date()
+        // });
+      }
+      originalSend.call(this, data);
+    };
+    next();
+  };
+};
+
+// Aplicar auditoría a rutas críticas
+router.use('/automatica/*', auditarAccionFactura('FACTURACION_AUTOMATICA'));
+router.use('/:id/pagar', auditarAccionFactura('PAGO_FACTURA'));
+router.use('/:id/anular', auditarAccionFactura('ANULAR_FACTURA'));
+
+// ==========================================
+// MIDDLEWARE DE VALIDACIONES ESPECÍFICAS
+// ==========================================
+
+
+
+/**
+ * Validaciones específicas para facturación automática
+ */
+const validarFacturacionAutomatica = [
+  body('fecha_referencia')
+    .optional()
+    .isISO8601()
+    .withMessage('Fecha de referencia debe ser una fecha válida'),
+  
+  body('incluir_morosos')
+    .optional()
+    .isBoolean()
+    .withMessage('incluir_morosos debe ser un booleano'),
+  
+  body('solo_activos')
+    .optional()
+    .isBoolean()
+    .withMessage('solo_activos debe ser un booleano'),
+
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Errores de validación en facturación automática',
+        errors: errors.array()
+      });
+    }
+    next();
+  }
+];
+
+// Aplicar validaciones a rutas automáticas
+router.use('/automatica/generar-mensual', validarFacturacionAutomatica);
+
+// ==========================================
+// RUTAS DE INTEGRACIÓN Y WEBHOOKS
+// ==========================================
+
+/**
+ * @route POST /api/v1/facturas/webhook/pago-exitoso
+ * @desc Webhook para procesar pagos exitosos desde pasarelas de pago
+ * @access Sistema (con token especial)
+ */
+router.post('/webhook/pago-exitoso',
+  // Middleware especial para webhooks (sin autenticación de usuario)
+  (req, res, next) => {
+    const webhookToken = req.headers['x-webhook-token'];
+    const expectedToken = process.env.WEBHOOK_TOKEN || 'webhook_secret_token';
+    
+    if (webhookToken !== expectedToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token de webhook inválido'
+      });
+    }
+    next();
+  },
+  async (req, res) => {
+    try {
+      const { 
+        numero_factura, 
+        metodo_pago, 
+        referencia_pago, 
+        monto, 
+        fecha_pago,
+        banco_id 
+      } = req.body;
+
+      if (!numero_factura || !metodo_pago || !monto) {
+        return res.status(400).json({
+          success: false,
+          message: 'Datos de pago incompletos'
+        });
+      }
+
+      const { Database } = require('../models/Database');
+      
+      // Buscar factura por número
+      const factura = await Database.query(
+        'SELECT * FROM facturas WHERE numero_factura = ? AND activo = "1"',
+        [numero_factura]
+      );
+
+      if (factura.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Factura no encontrada'
+        });
+      }
+
+      if (factura[0].estado !== 'pendiente') {
+        return res.status(400).json({
+          success: false,
+          message: 'La factura no está pendiente de pago'
+        });
+      }
+
+      // Verificar monto
+      if (Math.abs(parseFloat(monto) - parseFloat(factura[0].total)) > 0.01) {
+        return res.status(400).json({
+          success: false,
+          message: 'El monto no coincide con el total de la factura'
+        });
+      }
+
+      // Marcar como pagada
+      const Factura = require('../models/factura');
+      const facturaActualizada = await Factura.marcarComoPagada(factura[0].id, {
+        fecha_pago: fecha_pago || new Date().toISOString().split('T')[0],
+        metodo_pago,
+        referencia_pago,
+        banco_id
+      });
+
+      console.log(`💳 Pago procesado vía webhook: ${numero_factura} - ${monto}`);
+
+      res.json({
+        success: true,
+        data: facturaActualizada,
+        message: 'Pago procesado exitosamente',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Error procesando webhook de pago:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error procesando pago',
+        error: error.message
+      });
+    }
+  }
+);
+
+// ==========================================
+// MIDDLEWARE DE RATE LIMITING
+// ==========================================
+
+const rateLimit = require('express-rate-limit');
+
+// Rate limiting para facturación automática masiva
+const facturacionMasivaLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 5, // máximo 5 intentos por hora
+  message: {
+    success: false,
+    message: 'Demasiados intentos de facturación masiva. Intenta de nuevo en una hora.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.use('/automatica/generar-mensual', facturacionMasivaLimit);
+
+// Rate limiting para reportes pesados
+const reportesLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 10, // máximo 10 reportes por 15 minutos
+  message: {
+    success: false,
+    message: 'Demasiadas solicitudes de reportes. Intenta de nuevo en 15 minutos.'
+  }
+});
+
+router.use('/reportes/*', reportesLimit);
+
+// ==========================================
+// MANEJO DE ERRORES GLOBAL
+// ==========================================
+
+router.use((error, req, res, next) => {
+  console.error('❌ Error en rutas de facturas:', error);
+  
+  // Error de validación de MongoDB/MySQL
+  if (error.code === 'ER_DUP_ENTRY') {
+    return res.status(409).json({
+      success: false,
+      message: 'Ya existe un registro con estos datos',
+      error: 'Entrada duplicada'
+    });
+  }
+
+  // Error de conexión a base de datos
+  if (error.code === 'ECONNREFUSED') {
+    return res.status(503).json({
+      success: false,
+      message: 'Servicio de base de datos no disponible',
+      error: 'Error de conexión'
+    });
+  }
+
+  // Error genérico
+  res.status(500).json({
+    success: false,
+    message: 'Error interno del servidor',
+    error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+  });
+});
 
 module.exports = router;
