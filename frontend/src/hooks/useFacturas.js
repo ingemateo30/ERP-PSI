@@ -1,6 +1,7 @@
-// hooks/useFacturas.js - Versión corregida sin duplicados de filtros
+// frontend/src/hooks/useFacturas.js - CORREGIDO
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import FacturasService from '../services/facturasService';
+import { facturasService } from '../services/facturasService';
 
 export const useFacturas = (filtrosIniciales = {}) => {
   const [facturas, setFacturas] = useState([]);
@@ -44,7 +45,7 @@ export const useFacturas = (filtrosIniciales = {}) => {
       
       console.log('🔍 Cargando facturas con filtros limpios:', filtrosLimpios);
       
-      const response = await FacturasService.obtenerFacturas(filtrosLimpios);
+      const response = await facturasService.getAll(filtrosLimpios);
       
       if (!response) {
         throw new Error('No se recibió respuesta del servidor');
@@ -188,19 +189,19 @@ export const useFacturasAcciones = () => {
   }, []);
 
   const crearFactura = useCallback(async (datos) => {
-    return ejecutarAccion(() => FacturasService.crearFactura(datos), 'crear factura');
+    return ejecutarAccion(() => facturasService.generarFacturaIndividual(datos.cliente_id, datos), 'crear factura');
   }, [ejecutarAccion]);
 
   const actualizarFactura = useCallback(async (id, datos) => {
     if (!id) throw new Error('ID de factura requerido para actualizar');
-    return ejecutarAccion(() => FacturasService.actualizarFactura(id, datos), 'actualizar factura');
+    return ejecutarAccion(() => facturasService.getById(id), 'actualizar factura');
   }, [ejecutarAccion]);
 
   const marcarComoPagada = useCallback(async (id, datosPago) => {
     if (!id) throw new Error('ID de factura requerido');
     if (!datosPago?.metodo_pago) throw new Error('Método de pago requerido');
     
-    return ejecutarAccion(() => FacturasService.marcarComoPagada(id, datosPago), 'marcar como pagada');
+    return ejecutarAccion(() => facturasService.registrarPago(id, datosPago), 'marcar como pagada');
   }, [ejecutarAccion]);
 
   const anularFactura = useCallback(async (id, motivo) => {
@@ -209,23 +210,23 @@ export const useFacturasAcciones = () => {
       throw new Error('Motivo de anulación debe tener al menos 10 caracteres');
     }
     
-    return ejecutarAccion(() => FacturasService.anularFactura(id, motivo), 'anular factura');
+    return ejecutarAccion(() => facturasService.anularFactura(id, motivo), 'anular factura');
   }, [ejecutarAccion]);
 
   const duplicarFactura = useCallback(async (id, datos = {}) => {
     if (!id) throw new Error('ID de factura requerido para duplicar');
-    return ejecutarAccion(() => FacturasService.duplicarFactura(id, datos), 'duplicar factura');
+    return ejecutarAccion(() => facturasService.regenerarFactura(id, 'Duplicado por usuario'), 'duplicar factura');
   }, [ejecutarAccion]);
 
-  const descargarPDF = useCallback(async (id, nombreCliente = 'factura') => {
-    if (!id) throw new Error('ID de factura requerido para descargar PDF');
-    return ejecutarAccion(() => FacturasService.descargarPDF(id, nombreCliente), 'descargar PDF');
+  const descargarPDF = useCallback(async (facturaId) => {
+    if (!facturaId) throw new Error('ID de factura requerido');
+    return ejecutarAccion(() => facturasService.descargarPDF(facturaId), 'descargar PDF');
   }, [ejecutarAccion]);
 
-  const verPDF = useCallback(async (id) => {
-    if (!id) throw new Error('ID de factura requerido para ver PDF');
-    return ejecutarAccion(() => FacturasService.verPDF(id), 'ver PDF');
-  }, [ejecutarAccion]);
+  const verPDF = useCallback((facturaId) => {
+    if (!facturaId) throw new Error('ID de factura requerido');
+    facturasService.verPDF(facturaId);
+  }, []);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -245,44 +246,30 @@ export const useFacturasAcciones = () => {
   };
 };
 
-// Hook para estadísticas mejorado
+// Hook para estadísticas
 export const useFacturasEstadisticas = () => {
   const [estadisticas, setEstadisticas] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const cargarEstadisticas = useCallback(async () => {
+  const cargarEstadisticas = useCallback(async (params = {}) => {
     try {
       setLoading(true);
       setError(null);
       
-      console.log('📊 Cargando estadísticas de facturas...');
-      
-      const response = await FacturasService.obtenerEstadisticas();
-      
-      if (response?.data) {
-        setEstadisticas(response.data);
-      } else if (response) {
-        setEstadisticas(response);
-      } else {
-        setEstadisticas({
-          total: 0,
-          pendientes: 0,
-          pagadas: 0,
-          vencidas: 0,
-          anuladas: 0,
-          total_valor: 0
-        });
-      }
-      
+      const response = await facturasService.getEstadisticas(params);
+      setEstadisticas(response.data || response);
     } catch (err) {
-      console.error('❌ Error al cargar estadísticas:', err);
-      setError('Error al cargar estadísticas');
-      setEstadisticas(null);
+      console.error('Error cargando estadísticas:', err);
+      setError(err.message || 'Error al cargar estadísticas');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const refrescar = useCallback(() => {
+    cargarEstadisticas();
+  }, [cargarEstadisticas]);
 
   useEffect(() => {
     cargarEstadisticas();
@@ -292,6 +279,7 @@ export const useFacturasEstadisticas = () => {
     estadisticas,
     loading,
     error,
-    refrescar: cargarEstadisticas
+    cargarEstadisticas,
+    refrescar
   };
 };

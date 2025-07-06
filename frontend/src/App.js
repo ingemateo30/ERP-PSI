@@ -26,7 +26,7 @@ const InventoryManagement = lazy(() => import('./components/Inventory/InventoryM
 
 // Lazy loading de componentes de gestión
 const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagement'));
-const FacturasManagement = lazy(() => import('./components/Facturas/FacturasManagement'));// CORREGIDO: Importación correcta del componente FacturasManagement'./components/Facturas/FacturasManagement';from './components/Facturas/FacturasManagement';
+//const FacturasManagement = lazy(() => import('./components/Facturas/FacturasManagement'));// CORREGIDO: Importación correcta del componente FacturasManagement'./components/Facturas/FacturasManagement';from './components/Facturas/FacturasManagement';
 
 const ReportesRegulatorios = lazy(() => import('./components/Reports/ReportesRegulatorios'));// CORREGIDO: Importación correcta del componente ReportesRegulatorios'from './components/Reports/ReportesRegulatorios';
 const PQRManagement = lazy(() => import('./components/PQR/PQRManagement'));// CORREGIDO: Importación correcta del componente PQRManagement' from './components/PQR/PQRManagement';
@@ -318,16 +318,6 @@ function App() {
                 }
               />
 
-              <Route
-                path="/facturas"
-                element={
-                  <ProtectedRoute requiredRole="administrador">
-                    <MainLayout title="Gestión de Facturas" subtitle="Esta funcionalidad está en desarrollo">
-                      <FacturasManagement />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
               <Route
                 path="/facturacion-automatica"
                 element={

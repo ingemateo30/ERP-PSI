@@ -1,9 +1,9 @@
 // frontend/src/services/facturasService.js
-// Servicio para manejar las APIs de facturación automática - CORREGIDO
+// Servicio para manejar las APIs de facturación automática - CORREGIDO SOLO EL ERROR
 
+import { useState } from 'react';
 import apiServiceDefault from './apiService';
 
-import React from 'react';
 const API_BASE = '/facturacion';
 
 export const facturasService = {
@@ -269,6 +269,17 @@ export const facturasService = {
   },
 
   /**
+   * Formatear moneda
+   */
+  formatearMoneda(valor) {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0
+    }).format(valor || 0);
+  },
+
+  /**
    * Calcular días de vencimiento
    */
   calcularDiasVencimiento(fechaVencimiento) {
@@ -333,12 +344,11 @@ export const facturasService = {
 // HOOKS PERSONALIZADOS PARA FACTURAS
 // ==========================================
 
-
 export const useFacturas = () => {
-  const [facturas, setFacturas] = React.useState([]);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState(null);
-  const [pagination, setPagination] = React.useState({
+  const [facturas, setFacturas] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
     total: 0
@@ -376,9 +386,9 @@ export const useFacturas = () => {
 };
 
 export const useEstadisticasFacturacion = () => {
-  const [estadisticas, setEstadisticas] = React.useState(null);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState(null);
+  const [estadisticas, setEstadisticas] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const cargarEstadisticas = async (periodo = null) => {
     setLoading(true);

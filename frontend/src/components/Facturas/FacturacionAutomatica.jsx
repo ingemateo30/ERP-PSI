@@ -469,7 +469,7 @@ const FacturacionAutomatica = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Facturación Automática</h1>
             <p className="text-gray-600">
-              Sistema automatizado de facturación mensual para PSI Telecomunicaciones
+              Sistema automatizado de facturación mensual PSI
             </p>
           </div>
           <div className="flex items-center space-x-3">
