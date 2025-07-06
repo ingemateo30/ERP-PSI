@@ -13,7 +13,7 @@ class FacturasController {
   static async obtenerTodas(req, res) {
     try {
       console.log('🔍 GET /facturas - Parámetros recibidos:', req.query);
-      
+
       const {
         page = 1,
         limit = 10,
@@ -112,7 +112,7 @@ class FacturasController {
         SELECT 
           f.*,
           c.telefono as cliente_telefono,
-          c.email as cliente_email,
+          c.correo as cliente_email,
           c.estrato as cliente_estrato,
           CASE 
             WHEN f.fecha_vencimiento < CURDATE() AND f.estado = 'pendiente' THEN 'vencida'
@@ -159,7 +159,7 @@ class FacturasController {
   static async buscar(req, res) {
     try {
       const { q, tipo = 'general', limit = 10 } = req.query;
-      
+
       if (!q || q.trim().length < 2) {
         return ApiResponse.success(res, [], 'Término de búsqueda muy corto');
       }
@@ -253,7 +253,7 @@ class FacturasController {
   static async obtenerVencidas(req, res) {
     try {
       const { dias_vencimiento, limit = 50 } = req.query;
-      
+
       let whereClause = `
         WHERE estado = 'pendiente' 
         AND fecha_vencimiento < CURDATE() 
@@ -289,13 +289,13 @@ class FacturasController {
   static async obtenerPorId(req, res) {
     try {
       const { id } = req.params;
-      
+
       if (!id || isNaN(id)) {
         return ApiResponse.validationError(res, 'ID de factura inválido');
       }
 
       const factura = await Factura.obtenerPorId(id);
-      
+
       if (!factura) {
         return ApiResponse.notFound(res, 'Factura no encontrada');
       }
@@ -314,7 +314,7 @@ class FacturasController {
   static async obtenerPorNumero(req, res) {
     try {
       const { numero } = req.params;
-      
+
       if (!numero) {
         return ApiResponse.validationError(res, 'Número de factura requerido');
       }
@@ -349,9 +349,9 @@ class FacturasController {
       // Validar datos requeridos
       const camposRequeridos = ['cliente_id'];
       const camposFaltantes = camposRequeridos.filter(campo => !datosFactura[campo]);
-      
+
       if (camposFaltantes.length > 0) {
-        return ApiResponse.validationError(res, 
+        return ApiResponse.validationError(res,
           `Campos requeridos faltantes: ${camposFaltantes.join(', ')}`
         );
       }
@@ -372,11 +372,11 @@ class FacturasController {
 
     } catch (error) {
       console.error('❌ Error al crear factura:', error);
-      
+
       if (error.message.includes('ya existe')) {
         return ApiResponse.conflict(res, error.message);
       }
-      
+
       if (error.message.includes('Cliente no encontrado')) {
         return ApiResponse.notFound(res, error.message);
       }
@@ -392,7 +392,7 @@ class FacturasController {
     try {
       const { id } = req.params;
       const datosActualizacion = req.body;
-      
+
       if (!id || isNaN(id)) {
         return ApiResponse.validationError(res, 'ID de factura inválido');
       }
@@ -420,7 +420,7 @@ class FacturasController {
 
     } catch (error) {
       console.error('❌ Error al actualizar factura:', error);
-      
+
       if (error.message.includes('no encontrada')) {
         return ApiResponse.notFound(res, error.message);
       }
@@ -436,7 +436,7 @@ class FacturasController {
     try {
       const { id } = req.params;
       const { metodo_pago, fecha_pago, referencia_pago, banco_id } = req.body;
-      
+
       if (!id || isNaN(id)) {
         return ApiResponse.validationError(res, 'ID de factura inválido');
       }
@@ -466,7 +466,7 @@ class FacturasController {
 
     } catch (error) {
       console.error('❌ Error al marcar factura como pagada:', error);
-      
+
       if (error.message.includes('no encontrada')) {
         return ApiResponse.notFound(res, error.message);
       }
@@ -486,13 +486,13 @@ class FacturasController {
     try {
       const { id } = req.params;
       const { motivo } = req.body;
-      
+
       if (!id || isNaN(id)) {
         return ApiResponse.validationError(res, 'ID de factura inválido');
       }
 
       if (!motivo || motivo.trim().length < 10) {
-        return ApiResponse.validationError(res, 
+        return ApiResponse.validationError(res,
           'Motivo de anulación requerido (mínimo 10 caracteres)'
         );
       }
@@ -505,7 +505,7 @@ class FacturasController {
 
     } catch (error) {
       console.error('❌ Error al anular factura:', error);
-      
+
       if (error.message.includes('no encontrada')) {
         return ApiResponse.notFound(res, error.message);
       }
@@ -525,7 +525,7 @@ class FacturasController {
     try {
       const { id } = req.params;
       const datosAdicionales = req.body;
-      
+
       if (!id || isNaN(id)) {
         return ApiResponse.validationError(res, 'ID de factura inválido');
       }
@@ -541,7 +541,7 @@ class FacturasController {
 
     } catch (error) {
       console.error('❌ Error al duplicar factura:', error);
-      
+
       if (error.message.includes('no encontrada')) {
         return ApiResponse.notFound(res, error.message);
       }
@@ -569,15 +569,15 @@ class FacturasController {
   static async validarNumeroFactura(req, res) {
     try {
       const { numero } = req.params;
-      
+
       const existe = await Database.query(
         'SELECT id FROM facturas WHERE numero_factura = ?',
         [numero]
       );
 
-      return ApiResponse.success(res, { 
+      return ApiResponse.success(res, {
         existe: existe.length > 0,
-        numero_factura: numero 
+        numero_factura: numero
       }, 'Validación completada');
 
     } catch (error) {
@@ -592,7 +592,7 @@ class FacturasController {
   static async obtenerDetalles(req, res) {
     try {
       const { id } = req.params;
-      
+
       if (!id || isNaN(id)) {
         return ApiResponse.validationError(res, 'ID de factura inválido');
       }
@@ -615,12 +615,44 @@ class FacturasController {
   }
 
   /**
+   * Obtener datos de la empresa (MÉTODO ESTÁTICO CORREGIDO)
+   */
+  static async obtenerDatosEmpresa() {
+    try {
+      // Intentar obtener de base de datos
+      const empresa = await Database.query('SELECT * FROM configuracion_empresa LIMIT 1');
+
+      if (empresa && empresa.length > 0) {
+        return empresa[0];
+      }
+
+      // Datos por defecto si no hay en BD
+      return {
+        empresa_nombre: 'PROVEEDOR DE TELECOMUNICACIONES SAS.',
+        empresa_nit: '901.582.657-3',
+        empresa_direccion: 'VIA 40 #36-135',
+        empresa_telefono: '3303780',
+        resolucion_facturacion: 'Resolución DIAN 18764 del 15-SEP-2020'
+      };
+    } catch (error) {
+      console.warn('⚠️ Error obteniendo datos empresa, usando defaults:', error.message);
+      return {
+        empresa_nombre: 'PROVEEDOR DE TELECOMUNICACIONES SAS.',
+        empresa_nit: '901.582.657-3',
+        empresa_direccion: 'VIA 40 #36-135',
+        empresa_telefono: '3303780',
+        resolucion_facturacion: 'Resolución DIAN 18764 del 15-SEP-2020'
+      };
+    }
+  }
+
+  /**
    * Generar PDF de factura
    */
   static async generarPDF(req, res) {
     try {
       const { id } = req.params;
-      
+
       if (!id || isNaN(id)) {
         return ApiResponse.validationError(res, 'ID de factura inválido');
       }
@@ -630,9 +662,12 @@ class FacturasController {
         return ApiResponse.notFound(res, 'Factura no encontrada');
       }
 
-      // Generar PDF (implementar PDFGenerator)
-      const pdfBuffer = await PDFGenerator.generarFactura(factura);
-      
+      // Obtener datos de la empresa usando el método estático
+      const empresa = await FacturasController.obtenerDatosEmpresa();
+
+      // Generar PDF
+      const pdfBuffer = await PDFGenerator.generarFactura(factura, empresa);
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="factura_${factura.numero_factura}.pdf"`);
       res.send(pdfBuffer);
@@ -649,7 +684,7 @@ class FacturasController {
   static async verPDF(req, res) {
     try {
       const { id } = req.params;
-      
+
       if (!id || isNaN(id)) {
         return ApiResponse.validationError(res, 'ID de factura inválido');
       }
@@ -659,8 +694,11 @@ class FacturasController {
         return ApiResponse.notFound(res, 'Factura no encontrada');
       }
 
-      const pdfBuffer = await PDFGenerator.generarFactura(factura);
-      
+      // Obtener datos de la empresa usando el método estático
+      const empresa = await FacturasController.obtenerDatosEmpresa();
+
+      const pdfBuffer = await PDFGenerator.generarFactura(factura, empresa);
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="factura_${factura.numero_factura}.pdf"`);
       res.send(pdfBuffer);
@@ -672,21 +710,32 @@ class FacturasController {
   }
 
   /**
-   * Endpoint para probar PDF
+   * Endpoint para probar PDF (CORREGIDO)
    */
   static async probarPDF(req, res) {
     try {
-      // Datos de prueba
+      // Datos de prueba para factura
       const facturaTest = {
-        numero_factura: 'TEST001',
-        nombre_cliente: 'Cliente de Prueba',
-        identificacion_cliente: '12345678',
-        total: 100000,
-        fecha_emision: new Date().toISOString().split('T')[0]
+        numero_factura: 'PSI124450',
+        fecha_emision: new Date('2025-05-06'),
+        fecha_vencimiento: new Date('2025-05-11'),
+        periodo_facturacion: '06/05/2025 - 05/06/2025',
+        nombre_cliente: 'JUAN SEBASTIAN GALEANO GALAN',
+        identificacion_cliente: '1140886424',
+        direccion_cliente: 'CRA 50 76 - 19',
+        telefono_cliente: '3147783510',
+        internet: 59900,
+        total: 59900
       };
 
-      const pdfBuffer = await PDFGenerator.generarFactura(facturaTest);
-      
+      // Obtener datos de la empresa usando el método estático
+      const empresa = await FacturasController.obtenerDatosEmpresa();
+
+      console.log('🔧 Generando PDF de prueba...');
+
+      // Generar PDF con ambos parámetros
+      const pdfBuffer = await PDFGenerator.generarFactura(facturaTest, empresa);
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'inline; filename="test_factura.pdf"');
       res.send(pdfBuffer);
@@ -703,9 +752,9 @@ class FacturasController {
   static async procesarFacturacionMasiva(req, res) {
     try {
       console.log('🔄 Iniciando facturación masiva...');
-      
+
       const resultado = await FacturacionAutomaticaService.generarFacturacionMensual();
-      
+
       return ApiResponse.success(res, resultado, 'Facturación masiva procesada');
 
     } catch (error) {

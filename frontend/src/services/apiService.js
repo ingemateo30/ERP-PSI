@@ -45,16 +45,55 @@ class ApiService {
         }
       }
 
-      const data = await response.json();
+      // CORREGIDO: Verificar si la respuesta es binaria (PDF, imágenes, etc.)
+      const contentType = response.headers.get('Content-Type') || '';
+      const isBlob = contentType.includes('application/pdf') || 
+                    contentType.includes('application/octet-stream') ||
+                    contentType.includes('image/') ||
+                    contentType.includes('video/') ||
+                    contentType.includes('audio/') ||
+                    options.responseType === 'blob';
+
+      let data;
+      
+      if (isBlob) {
+        // Para respuestas binarias, usar blob()
+        data = await response.blob();
+      } else {
+        // Para respuestas JSON normales
+        data = await response.json();
+      }
 
       if (!response.ok) {
-        // Mejor manejo de errores de validación
-        if (data.validationErrors) {
+        // Si es un blob con error, intentar convertir a JSON para obtener el mensaje
+        if (isBlob && data.type === 'application/json') {
+          try {
+            const errorText = await data.text();
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+          } catch (parseError) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+          }
+        }
+        
+        // Mejor manejo de errores de validación para respuestas JSON
+        if (!isBlob && data.validationErrors) {
           const error = new Error(data.message || 'Error de validación');
           error.validationErrors = data.validationErrors;
           throw error;
         }
+        
         throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
+      }
+
+      // CORREGIDO: Para respuestas blob, devolver un objeto con información útil
+      if (isBlob) {
+        return {
+          data: data,
+          headers: response.headers,
+          status: response.status,
+          type: contentType
+        };
       }
 
       return data;
@@ -71,6 +110,20 @@ class ApiService {
     
     return this.request(url, {
       method: 'GET',
+    });
+  }
+
+  // NUEVO: Método específico para descargar PDFs y archivos
+  async getBlob(endpoint, params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString ? `${endpoint}?${queryString}` : endpoint;
+    
+    return this.request(url, {
+      method: 'GET',
+      responseType: 'blob',
+      headers: {
+        'Accept': 'application/pdf, application/octet-stream, */*'
+      }
     });
   }
 
@@ -240,7 +293,7 @@ export const invoicesService = {
   delete: (id) => apiService.delete(`/invoices/${id}`),
   getByClient: (clientId, params) => apiService.get(`/clients/${clientId}/invoices`, params),
   markAsPaid: (id, paymentData) => apiService.patch(`/invoices/${id}/pay`, paymentData),
-  generatePDF: (id) => apiService.get(`/invoices/${id}/pdf`),
+  generatePDF: (id) => apiService.getBlob(`/invoices/${id}/pdf`), // CORREGIDO: Usar getBlob
 };
 
 export const paymentsService = {
@@ -271,8 +324,8 @@ export const reportsService = {
   getClients: (params) => apiService.get('/reports/clients', params),
   getServices: (params) => apiService.get('/reports/services', params),
   getCustom: (reportType, params) => apiService.get(`/reports/${reportType}`, params),
-  exportToPDF: (reportType, params) => apiService.get(`/reports/${reportType}/pdf`, params),
-  exportToExcel: (reportType, params) => apiService.get(`/reports/${reportType}/excel`, params),
+  exportToPDF: (reportType, params) => apiService.getBlob(`/reports/${reportType}/pdf`, params), // CORREGIDO
+  exportToExcel: (reportType, params) => apiService.getBlob(`/reports/${reportType}/excel`, params), // CORREGIDO
 };
 
 export const installationsService = {

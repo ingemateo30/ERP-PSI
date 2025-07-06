@@ -2,14 +2,14 @@
 import apiService from './apiService';
 
 class FacturasService {
-  
+
   // Obtener factura por ID (método faltante)
   static async obtenerFacturaPorId(id) {
     try {
       if (!id) throw new Error('ID de factura requerido');
-      
+
       console.log(`📄 Obteniendo factura por ID ${id}...`);
-      
+
       const response = await apiService.get(`/facturas/${id}`);
       return response.data || response;
     } catch (error) {
@@ -22,10 +22,10 @@ class FacturasService {
   static async obtenerFacturas(filtros = {}) {
     try {
       console.log('📡 Obteniendo facturas con filtros:', filtros);
-      
+
       // Limpiar filtros para evitar duplicados en query params
       const filtrosLimpios = this.limpiarFiltros(filtros);
-      
+
       const params = new URLSearchParams();
       Object.keys(filtrosLimpios).forEach(key => {
         const value = filtrosLimpios[key];
@@ -36,13 +36,13 @@ class FacturasService {
 
       const queryString = params.toString();
       const url = queryString ? `/facturas?${queryString}` : '/facturas';
-      
+
       console.log('🔗 URL de consulta:', url);
-      
+
       const response = await apiService.get(url);
-      
+
       console.log('📥 Respuesta del servidor:', response);
-      
+
       return response.data || response;
     } catch (error) {
       console.error('❌ Error al obtener facturas:', error);
@@ -53,10 +53,10 @@ class FacturasService {
   // Limpiar filtros duplicados y vacíos
   static limpiarFiltros(filtros) {
     const filtrosLimpios = {};
-    
+
     Object.keys(filtros).forEach(key => {
       const value = filtros[key];
-      
+
       // Solo incluir valores válidos
       if (value !== '' && value !== null && value !== undefined && value !== false) {
         // Convertir booleanos a string si es necesario
@@ -67,7 +67,7 @@ class FacturasService {
         }
       }
     });
-    
+
     return filtrosLimpios;
   }
 
@@ -75,9 +75,9 @@ class FacturasService {
   static async obtenerFactura(id) {
     try {
       if (!id) throw new Error('ID de factura requerido');
-      
+
       console.log(`📄 Obteniendo factura ${id}...`);
-      
+
       const response = await apiService.get(`/facturas/${id}`);
       return response.data || response;
     } catch (error) {
@@ -90,9 +90,9 @@ class FacturasService {
   static async crearFactura(datosFactura) {
     try {
       console.log('📝 Creando nueva factura...', datosFactura);
-      
+
       const response = await apiService.post('/facturas', datosFactura);
-      
+
       console.log('✅ Factura creada exitosamente');
       return response.data || response;
     } catch (error) {
@@ -105,11 +105,11 @@ class FacturasService {
   static async actualizarFactura(id, datosFactura) {
     try {
       if (!id) throw new Error('ID de factura requerido para actualizar');
-      
+
       console.log(`📝 Actualizando factura ${id}...`, datosFactura);
-      
+
       const response = await apiService.put(`/facturas/${id}`, datosFactura);
-      
+
       console.log('✅ Factura actualizada exitosamente');
       return response.data || response;
     } catch (error) {
@@ -123,9 +123,9 @@ class FacturasService {
     try {
       if (!id) throw new Error('ID de factura requerido');
       if (!datosPago?.metodo_pago) throw new Error('Método de pago requerido');
-      
+
       console.log(`💰 Marcando factura ${id} como pagada...`, datosPago);
-      
+
       // Validar datos de pago
       const datosValidados = {
         metodo_pago: datosPago.metodo_pago,
@@ -133,9 +133,9 @@ class FacturasService {
         referencia_pago: datosPago.referencia_pago || null,
         banco_id: datosPago.banco_id || null
       };
-      
+
       const response = await apiService.patch(`/facturas/${id}/pagar`, datosValidados);
-      
+
       console.log('✅ Factura marcada como pagada exitosamente');
       return response.data || response;
     } catch (error) {
@@ -151,11 +151,11 @@ class FacturasService {
       if (!motivo || motivo.trim().length < 10) {
         throw new Error('Motivo de anulación debe tener al menos 10 caracteres');
       }
-      
+
       console.log(`🚫 Anulando factura ${id}...`, { motivo });
-      
+
       const response = await apiService.patch(`/facturas/${id}/anular`, { motivo: motivo.trim() });
-      
+
       console.log('✅ Factura anulada exitosamente');
       return response.data || response;
     } catch (error) {
@@ -168,11 +168,11 @@ class FacturasService {
   static async duplicarFactura(id, datos = {}) {
     try {
       if (!id) throw new Error('ID de factura requerido para duplicar');
-      
+
       console.log(`📋 Duplicando factura ${id}...`);
-      
+
       const response = await apiService.post(`/facturas/${id}/duplicar`, datos);
-      
+
       console.log('✅ Factura duplicada exitosamente');
       return response.data || response;
     } catch (error) {
@@ -185,9 +185,9 @@ class FacturasService {
   static async descargarPDF(id, nombreCliente = 'factura') {
     try {
       if (!id) throw new Error('ID de factura requerido para descargar PDF');
-      
+
       console.log(`📥 Descargando PDF de factura ${id}...`);
-      
+
       const response = await apiService.get(`/facturas/${id}/pdf`, {
         responseType: 'blob',
         headers: {
@@ -198,16 +198,16 @@ class FacturasService {
       // Crear blob y descargar
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
-      
+
       const link = document.createElement('a');
       link.href = url;
       link.download = `factura_${id}_${nombreCliente.replace(/\s+/g, '_')}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       window.URL.revokeObjectURL(url);
-      
+
       console.log('✅ PDF descargado exitosamente');
       return { success: true, message: 'PDF descargado exitosamente' };
     } catch (error) {
@@ -220,9 +220,9 @@ class FacturasService {
   static async verPDF(id) {
     try {
       if (!id) throw new Error('ID de factura requerido para ver PDF');
-      
+
       console.log(`👁️ Abriendo PDF de factura ${id}...`);
-      
+
       const response = await apiService.get(`/facturas/${id}/ver-pdf`, {
         responseType: 'blob',
         headers: {
@@ -233,17 +233,17 @@ class FacturasService {
       // Crear URL del blob y abrir en nueva ventana
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
-      
+
       const ventana = window.open(url, '_blank');
       if (!ventana) {
         throw new Error('No se pudo abrir la ventana. Verifica que no esté bloqueada por el navegador.');
       }
-      
+
       // Limpiar URL después de un tiempo
       setTimeout(() => {
         window.URL.revokeObjectURL(url);
       }, 60000);
-      
+
       console.log('✅ PDF abierto exitosamente');
       return { success: true, message: 'PDF abierto exitosamente' };
     } catch (error) {
@@ -258,11 +258,11 @@ class FacturasService {
       if (!termino || termino.trim().length < 2) {
         throw new Error('El término de búsqueda debe tener al menos 2 caracteres');
       }
-      
+
       console.log('🔍 Buscando facturas...', { termino, filtros });
-      
+
       const params = new URLSearchParams({ q: termino.trim() });
-      
+
       Object.keys(filtros).forEach(key => {
         if (filtros[key] && filtros[key] !== '') {
           params.append(key, filtros[key]);
@@ -281,7 +281,7 @@ class FacturasService {
   static async obtenerEstadisticas() {
     try {
       console.log('📊 Obteniendo estadísticas de facturas...');
-      
+
       const response = await apiService.get('/facturas/stats');
       return response.data || response;
     } catch (error) {
@@ -294,7 +294,7 @@ class FacturasService {
   static async obtenerVencidas() {
     try {
       console.log('⚠️ Obteniendo facturas vencidas...');
-      
+
       const response = await apiService.get('/facturas/vencidas');
       return response.data || response;
     } catch (error) {
@@ -307,7 +307,7 @@ class FacturasService {
   static async generarNumeroFactura() {
     try {
       console.log('🔢 Generando número de factura...');
-      
+
       const response = await apiService.get('/facturas/generar-numero');
       return response.data || response;
     } catch (error) {
@@ -320,9 +320,9 @@ class FacturasService {
   static async validarNumeroFactura(numero) {
     try {
       if (!numero) throw new Error('Número de factura requerido');
-      
+
       console.log(`🔍 Validando número de factura ${numero}...`);
-      
+
       const response = await apiService.get(`/facturas/validate/${numero}`);
       return response.data || response;
     } catch (error) {
@@ -335,9 +335,37 @@ class FacturasService {
   static async probarPDF() {
     try {
       console.log('🧪 Probando generación de PDF...');
-      
-      const response = await apiService.get('/facturas/test-pdf');
-      return response.data || response;
+
+      const response = await apiService.get('/facturas/test-pdf', {
+        responseType: 'blob',
+        headers: {
+          'Accept': 'application/pdf'
+        }
+      });
+
+      // Crear blob y mostrar/descargar el PDF
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+
+      // Abrir en nueva ventana para visualizar
+      const ventana = window.open(url, '_blank');
+      if (!ventana) {
+        // Si no se puede abrir ventana, descargar automáticamente
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'factura_test.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      // Limpiar URL después de un tiempo
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 60000);
+
+      console.log('✅ PDF de prueba generado exitosamente');
+      return { success: true, message: 'PDF de prueba generado exitosamente' };
     } catch (error) {
       console.error('❌ Error al probar PDF:', error);
       throw this.manejarError(error, 'probar PDF');
@@ -349,7 +377,7 @@ class FacturasService {
     if (valor === null || valor === undefined || isNaN(valor)) {
       return '$0';
     }
-    
+
     const numero = parseFloat(valor);
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -364,7 +392,7 @@ class FacturasService {
     if (valor === null || valor === undefined || isNaN(valor)) {
       return '0';
     }
-    
+
     const numero = parseFloat(valor);
     return new Intl.NumberFormat('es-CO').format(numero);
   }
@@ -372,7 +400,7 @@ class FacturasService {
   // Formatear fecha
   static formatearFecha(fecha) {
     if (!fecha) return 'N/A';
-    
+
     try {
       const fechaObj = new Date(fecha);
       return fechaObj.toLocaleDateString('es-CO', {
@@ -388,7 +416,7 @@ class FacturasService {
   // Formatear fecha y hora
   static formatearFechaHora(fecha) {
     if (!fecha) return 'N/A';
-    
+
     try {
       const fechaObj = new Date(fecha);
       return fechaObj.toLocaleString('es-CO', {
@@ -438,7 +466,7 @@ class FacturasService {
   // Calcular días de vencimiento
   static calcularDiasVencimiento(fechaVencimiento) {
     if (!fechaVencimiento) return null;
-    
+
     try {
       const hoy = new Date();
       const vencimiento = new Date(fechaVencimiento);
@@ -473,7 +501,7 @@ class FacturasService {
     if (datos.fecha_emision && datos.fecha_vencimiento) {
       const emision = new Date(datos.fecha_emision);
       const vencimiento = new Date(datos.fecha_vencimiento);
-      
+
       if (vencimiento <= emision) {
         errores.push('La fecha de vencimiento debe ser posterior a la fecha de emisión');
       }
@@ -485,7 +513,7 @@ class FacturasService {
   // Generar filtros de URL
   static generarFiltrosURL(filtros) {
     const params = new URLSearchParams();
-    
+
     Object.keys(filtros).forEach(key => {
       const value = filtros[key];
       if (value !== '' && value !== null && value !== undefined && value !== false) {
@@ -503,12 +531,12 @@ class FacturasService {
   // Manejar errores de manera consistente
   static manejarError(error, accion) {
     let mensaje = `Error al ${accion}`;
-    
+
     if (error.response) {
       // Error de respuesta del servidor
       const status = error.response.status;
       const data = error.response.data;
-      
+
       switch (status) {
         case 400:
           mensaje = data?.message || 'Datos inválidos proporcionados';
@@ -541,7 +569,7 @@ class FacturasService {
       // Error personalizado
       mensaje = error.message;
     }
-    
+
     return new Error(mensaje);
   }
 }

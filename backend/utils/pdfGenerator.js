@@ -1,11 +1,11 @@
-// utils/psiInvoicePDFGenerator.js - Factura PSI Una Sola Hoja Minimalista
+// utils/PDFGenerator.js - Factura PSI Una Sola Hoja Minimalista
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
-class PSIInvoicePDFGenerator {
+class PDFGenerator {
 
-    static async generar(factura, empresa, logoPath = null) {
+    static async generarFactura(factura, empresa, logoPath = null) {
         return new Promise((resolve, reject) => {
             try {
                 console.log('🔧 Generando factura PSI en una sola hoja...');
@@ -421,7 +421,7 @@ class PSIInvoicePDFGenerator {
             resolucion_facturacion: 'Resolución DIAN 18764 del 15-SEP-2020'
         };
 
-        return await this.generar(facturaEjemplo, empresaEjemplo);
+        return await this.generarFactura(facturaEjemplo, empresaEjemplo);
     }
 
     static async guardarPDF(pdfBuffer, nombreArchivo = 'factura_psi_simple.pdf') {
@@ -443,4 +443,4 @@ class PSIInvoicePDFGenerator {
     }
 }
 
-module.exports = PSIInvoicePDFGenerator;
+module.exports = PDFGenerator;
