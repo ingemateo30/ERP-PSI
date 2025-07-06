@@ -1,648 +1,339 @@
-// backend/controllers/FacturasController.js - VERSIÓN CORREGIDA
-const Factura = require('../models/factura');
+// backend/controllers/FacturasController.js
 const FacturacionAutomaticaService = require('../services/FacturacionAutomaticaService');
 const { Database } = require('../models/Database');
-const ApiResponse = require('../utils/responses');
-const PDFGenerator = require('../utils/PDFGenerator');
+
+// Importaciones opcionales
+let PDFGenerator;
+
+try {
+  PDFGenerator = require('./utils/pdfGenerator');
+  console.log('✅ PDFGenerator cargado en FacturasController');
+} catch (error) {
+  console.log('⚠️ PDFGenerator no disponible en FacturasController');
+}
 
 class FacturasController {
 
   /**
-   * Obtener todas las facturas con filtros mejorados
+   * Generar facturación mensual masiva
    */
-  static async obtenerTodas(req, res) {
+  static async generarFacturacionMensual(req, res) {
     try {
-      console.log('🔍 GET /facturas - Parámetros recibidos:', req.query);
-
-      const {
-        page = 1,
-        limit = 10,
-        numero_factura,
-        identificacion_cliente,
-        nombre_cliente,
-        estado,
-        periodo_facturacion,
-        fecha_desde,
-        fecha_hasta,
-        ruta,
-        vencidas,
-        search
-      } = req.query;
-
-      // Validar parámetros de paginación
-      const pageNum = Math.max(1, parseInt(page) || 1);
-      const limitNum = Math.min(50, Math.max(1, parseInt(limit) || 10));
-      const offset = (pageNum - 1) * limitNum;
-
-      // Construir filtros dinámicamente
-      let whereClause = 'WHERE f.activo = "1"';
-      const params = [];
-
-      // Filtros específicos
-      if (numero_factura && numero_factura.trim()) {
-        whereClause += ' AND f.numero_factura LIKE ?';
-        params.push(`%${numero_factura.trim()}%`);
+      console.log('🔄 Iniciando facturación mensual masiva...');
+      
+      const { fecha_referencia, solo_preview } = req.body;
+      const fechaRef = fecha_referencia ? new Date(fecha_referencia) : new Date();
+      
+      // Si es solo preview, mostrar qué se facturaría sin generar
+      if (solo_preview) {
+        const preview = await FacturacionAutomaticaService.previewFacturacionMensual(fechaRef);
+        return res.json({
+          success: true,
+          data: preview,
+          message: 'Preview de facturación mensual generado',
+          timestamp: new Date().toISOString()
+        });
       }
-
-      if (identificacion_cliente && identificacion_cliente.trim()) {
-        whereClause += ' AND f.identificacion_cliente LIKE ?';
-        params.push(`%${identificacion_cliente.trim()}%`);
-      }
-
-      if (nombre_cliente && nombre_cliente.trim()) {
-        whereClause += ' AND f.nombre_cliente LIKE ?';
-        params.push(`%${nombre_cliente.trim()}%`);
-      }
-
-      if (estado && estado.trim()) {
-        whereClause += ' AND f.estado = ?';
-        params.push(estado.trim());
-      }
-
-      if (periodo_facturacion && periodo_facturacion.trim()) {
-        whereClause += ' AND f.periodo_facturacion = ?';
-        params.push(periodo_facturacion.trim());
-      }
-
-      if (fecha_desde && fecha_desde.trim()) {
-        whereClause += ' AND f.fecha_emision >= ?';
-        params.push(fecha_desde.trim());
-      }
-
-      if (fecha_hasta && fecha_hasta.trim()) {
-        whereClause += ' AND f.fecha_emision <= ?';
-        params.push(fecha_hasta.trim());
-      }
-
-      if (ruta && ruta.trim()) {
-        whereClause += ' AND f.ruta = ?';
-        params.push(ruta.trim());
-      }
-
-      // Filtro de facturas vencidas
-      if (vencidas === 'true' || vencidas === true) {
-        whereClause += ' AND f.fecha_vencimiento < CURDATE() AND f.estado = "pendiente"';
-      }
-
-      // Búsqueda general
-      if (search && search.trim()) {
-        whereClause += ` AND (
-          f.numero_factura LIKE ? OR 
-          f.identificacion_cliente LIKE ? OR 
-          f.nombre_cliente LIKE ?
-        )`;
-        const searchTerm = `%${search.trim()}%`;
-        params.push(searchTerm, searchTerm, searchTerm);
-      }
-
-      // Consulta principal con JOIN optimizado
-      const baseQuery = `
-        FROM facturas f
-        LEFT JOIN clientes c ON f.cliente_id = c.id
-        ${whereClause}
-      `;
-
-      // Obtener total de registros
-      const countQuery = `SELECT COUNT(f.id) as total ${baseQuery}`;
-      const [countResult] = await Database.query(countQuery, params);
-      const total = countResult.total || 0;
-
-      // Obtener facturas con paginación
-      const facturesQuery = `
-        SELECT 
-          f.*,
-          c.telefono as cliente_telefono,
-          c.correo as cliente_email,
-          c.estrato as cliente_estrato,
-          CASE 
-            WHEN f.fecha_vencimiento < CURDATE() AND f.estado = 'pendiente' THEN 'vencida'
-            ELSE f.estado 
-          END as estado_real,
-          DATEDIFF(CURDATE(), f.fecha_vencimiento) as dias_vencimiento
-        ${baseQuery}
-        ORDER BY f.created_at DESC, f.id DESC
-        LIMIT ? OFFSET ?
-      `;
-
-      const facturas = await Database.query(facturesQuery, [...params, limitNum, offset]);
-
-      // Preparar respuesta con paginación
-      const respuesta = {
+      
+      const resultado = await FacturacionAutomaticaService.generarFacturacionMensual(fechaRef);
+      
+      res.json({
         success: true,
-        data: {
-          facturas: facturas || [],
-          pagination: {
-            currentPage: pageNum,
-            totalPages: Math.ceil(total / limitNum),
-            totalItems: total,
-            itemsPerPage: limitNum,
-            hasNextPage: pageNum < Math.ceil(total / limitNum),
-            hasPrevPage: pageNum > 1
-          }
-        },
-        message: `${facturas?.length || 0} facturas encontradas`,
+        data: resultado,
+        message: `Facturación mensual procesada: ${resultado.exitosas} exitosas, ${resultado.fallidas} fallidas`,
         timestamp: new Date().toISOString()
-      };
-
-      console.log(`📊 Facturas encontradas: ${facturas?.length || 0} de ${total} total`);
-      return res.status(200).json(respuesta);
-
-    } catch (error) {
-      console.error('❌ Error al obtener facturas:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Buscar facturas (endpoint específico para búsquedas)
-   */
-  static async buscar(req, res) {
-    try {
-      const { q, tipo = 'general', limit = 10 } = req.query;
-
-      if (!q || q.trim().length < 2) {
-        return ApiResponse.success(res, [], 'Término de búsqueda muy corto');
-      }
-
-      const termino = q.trim();
-      const limitNum = Math.min(20, parseInt(limit) || 10);
-
-      let query, params;
-
-      switch (tipo) {
-        case 'numero':
-          query = `
-            SELECT * FROM facturas 
-            WHERE numero_factura LIKE ? AND activo = '1'
-            ORDER BY created_at DESC LIMIT ?
-          `;
-          params = [`%${termino}%`, limitNum];
-          break;
-
-        case 'cliente':
-          query = `
-            SELECT * FROM facturas 
-            WHERE (identificacion_cliente LIKE ? OR nombre_cliente LIKE ?) 
-            AND activo = '1'
-            ORDER BY created_at DESC LIMIT ?
-          `;
-          params = [`%${termino}%`, `%${termino}%`, limitNum];
-          break;
-
-        default:
-          query = `
-            SELECT * FROM facturas 
-            WHERE (
-              numero_factura LIKE ? OR 
-              identificacion_cliente LIKE ? OR 
-              nombre_cliente LIKE ?
-            ) AND activo = '1'
-            ORDER BY created_at DESC LIMIT ?
-          `;
-          params = [`%${termino}%`, `%${termino}%`, `%${termino}%`, limitNum];
-      }
-
-      const facturas = await Database.query(query, params);
-      return ApiResponse.success(res, facturas, `${facturas.length} facturas encontradas`);
-
-    } catch (error) {
-      console.error('❌ Error en búsqueda de facturas:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Obtener estadísticas de facturas
-   */
-  static async obtenerEstadisticas(req, res) {
-    try {
-      const { periodo } = req.query;
-      let whereClause = 'WHERE activo = "1"';
-      const params = [];
-
-      if (periodo) {
-        whereClause += ' AND periodo_facturacion = ?';
-        params.push(periodo);
-      }
-
-      const estadisticas = await Database.query(`
-        SELECT 
-          COUNT(*) as total_facturas,
-          COUNT(CASE WHEN estado = 'pendiente' THEN 1 END) as pendientes,
-          COUNT(CASE WHEN estado = 'pagada' THEN 1 END) as pagadas,
-          COUNT(CASE WHEN estado = 'anulada' THEN 1 END) as anuladas,
-          COUNT(CASE WHEN estado = 'pendiente' AND fecha_vencimiento < CURDATE() THEN 1 END) as vencidas,
-          COALESCE(SUM(CASE WHEN estado = 'pendiente' THEN total ELSE 0 END), 0) as valor_pendiente,
-          COALESCE(SUM(CASE WHEN estado = 'pagada' THEN total ELSE 0 END), 0) as valor_pagado,
-          COALESCE(SUM(total), 0) as valor_total
-        FROM facturas 
-        ${whereClause}
-      `, params);
-
-      return ApiResponse.success(res, estadisticas[0], 'Estadísticas obtenidas');
-
-    } catch (error) {
-      console.error('❌ Error obteniendo estadísticas:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Obtener facturas vencidas
-   */
-  static async obtenerVencidas(req, res) {
-    try {
-      const { dias_vencimiento, limit = 50 } = req.query;
-
-      let whereClause = `
-        WHERE estado = 'pendiente' 
-        AND fecha_vencimiento < CURDATE() 
-        AND activo = '1'
-      `;
-      const params = [];
-
-      if (dias_vencimiento) {
-        whereClause += ' AND DATEDIFF(CURDATE(), fecha_vencimiento) >= ?';
-        params.push(parseInt(dias_vencimiento));
-      }
-
-      const facturas = await Database.query(`
-        SELECT *,
-          DATEDIFF(CURDATE(), fecha_vencimiento) as dias_vencidas
-        FROM facturas 
-        ${whereClause}
-        ORDER BY fecha_vencimiento ASC, total DESC
-        LIMIT ?
-      `, [...params, parseInt(limit)]);
-
-      return ApiResponse.success(res, facturas, `${facturas.length} facturas vencidas encontradas`);
-
-    } catch (error) {
-      console.error('❌ Error obteniendo facturas vencidas:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Obtener factura por ID
-   */
-  static async obtenerPorId(req, res) {
-    try {
-      const { id } = req.params;
-
-      if (!id || isNaN(id)) {
-        return ApiResponse.validationError(res, 'ID de factura inválido');
-      }
-
-      const factura = await Factura.obtenerPorId(id);
-
-      if (!factura) {
-        return ApiResponse.notFound(res, 'Factura no encontrada');
-      }
-
-      return ApiResponse.success(res, factura, 'Factura obtenida exitosamente');
-
-    } catch (error) {
-      console.error('❌ Error al obtener factura:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Obtener factura por número
-   */
-  static async obtenerPorNumero(req, res) {
-    try {
-      const { numero } = req.params;
-
-      if (!numero) {
-        return ApiResponse.validationError(res, 'Número de factura requerido');
-      }
-
-      const factura = await Database.query(
-        'SELECT * FROM facturas WHERE numero_factura = ? AND activo = "1"',
-        [numero]
-      );
-
-      if (factura.length === 0) {
-        return ApiResponse.notFound(res, 'Factura no encontrada');
-      }
-
-      return ApiResponse.success(res, factura[0], 'Factura obtenida exitosamente');
-
-    } catch (error) {
-      console.error('❌ Error al obtener factura por número:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Crear nueva factura (MEJORADO con validaciones)
-   */
-  static async crear(req, res) {
-    try {
-      const datosFactura = {
-        ...req.body,
-        created_by: req.user?.id
-      };
-
-      // Validar datos requeridos
-      const camposRequeridos = ['cliente_id'];
-      const camposFaltantes = camposRequeridos.filter(campo => !datosFactura[campo]);
-
-      if (camposFaltantes.length > 0) {
-        return ApiResponse.validationError(res,
-          `Campos requeridos faltantes: ${camposFaltantes.join(', ')}`
-        );
-      }
-
-      console.log('📝 Creando nueva factura:', datosFactura);
-
-      // Si no se especifican fechas, usar facturación automática
-      if (!datosFactura.fecha_emision) {
-        const facturaAutomatica = await FacturacionAutomaticaService.crearFacturaInicialCliente(
-          datosFactura.cliente_id
-        );
-        return ApiResponse.created(res, facturaAutomatica, 'Factura automática creada exitosamente');
-      }
-
-      // Crear factura manual
-      const nuevaFactura = await Factura.crear(datosFactura);
-      return ApiResponse.created(res, nuevaFactura, 'Factura creada exitosamente');
-
-    } catch (error) {
-      console.error('❌ Error al crear factura:', error);
-
-      if (error.message.includes('ya existe')) {
-        return ApiResponse.conflict(res, error.message);
-      }
-
-      if (error.message.includes('Cliente no encontrado')) {
-        return ApiResponse.notFound(res, error.message);
-      }
-
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Actualizar factura (CORREGIDO)
-   */
-  static async actualizar(req, res) {
-    try {
-      const { id } = req.params;
-      const datosActualizacion = req.body;
-
-      if (!id || isNaN(id)) {
-        return ApiResponse.validationError(res, 'ID de factura inválido');
-      }
-
-      // Verificar que la factura existe
-      const facturaExistente = await Factura.obtenerPorId(id);
-      if (!facturaExistente) {
-        return ApiResponse.notFound(res, 'Factura no encontrada');
-      }
-
-      // Verificar que se puede editar
-      if (facturaExistente.estado === 'pagada') {
-        return ApiResponse.forbidden(res, 'No se puede editar una factura pagada');
-      }
-
-      if (facturaExistente.estado === 'anulada') {
-        return ApiResponse.forbidden(res, 'No se puede editar una factura anulada');
-      }
-
-      console.log(`📝 Actualizando factura ${id}:`, datosActualizacion);
-
-      const facturaActualizada = await Factura.actualizar(id, datosActualizacion);
-
-      return ApiResponse.updated(res, facturaActualizada, 'Factura actualizada exitosamente');
-
-    } catch (error) {
-      console.error('❌ Error al actualizar factura:', error);
-
-      if (error.message.includes('no encontrada')) {
-        return ApiResponse.notFound(res, error.message);
-      }
-
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Marcar como pagada (CORREGIDO)
-   */
-  static async marcarComoPagada(req, res) {
-    try {
-      const { id } = req.params;
-      const { metodo_pago, fecha_pago, referencia_pago, banco_id } = req.body;
-
-      if (!id || isNaN(id)) {
-        return ApiResponse.validationError(res, 'ID de factura inválido');
-      }
-
-      if (!metodo_pago) {
-        return ApiResponse.validationError(res, 'Método de pago requerido');
-      }
-
-      // Validar método de pago
-      const metodosValidos = ['efectivo', 'transferencia', 'cheque', 'tarjeta_credito', 'tarjeta_debito'];
-      if (!metodosValidos.includes(metodo_pago)) {
-        return ApiResponse.validationError(res, 'Método de pago inválido');
-      }
-
-      const datosPago = {
-        fecha_pago: fecha_pago || new Date().toISOString().split('T')[0],
-        metodo_pago,
-        referencia_pago: referencia_pago || null,
-        banco_id: banco_id || null
-      };
-
-      console.log(`💰 Marcando factura ${id} como pagada:`, datosPago);
-
-      const facturaActualizada = await Factura.marcarComoPagada(id, datosPago);
-
-      return ApiResponse.updated(res, facturaActualizada, 'Factura marcada como pagada exitosamente');
-
-    } catch (error) {
-      console.error('❌ Error al marcar factura como pagada:', error);
-
-      if (error.message.includes('no encontrada')) {
-        return ApiResponse.notFound(res, error.message);
-      }
-
-      if (error.message.includes('ya está pagada')) {
-        return ApiResponse.conflict(res, error.message);
-      }
-
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Anular factura
-   */
-  static async anular(req, res) {
-    try {
-      const { id } = req.params;
-      const { motivo } = req.body;
-
-      if (!id || isNaN(id)) {
-        return ApiResponse.validationError(res, 'ID de factura inválido');
-      }
-
-      if (!motivo || motivo.trim().length < 10) {
-        return ApiResponse.validationError(res,
-          'Motivo de anulación requerido (mínimo 10 caracteres)'
-        );
-      }
-
-      console.log(`🚫 Anulando factura ${id} con motivo: ${motivo}`);
-
-      const facturaAnulada = await Factura.anular(id, motivo.trim());
-
-      return ApiResponse.updated(res, facturaAnulada, 'Factura anulada exitosamente');
-
-    } catch (error) {
-      console.error('❌ Error al anular factura:', error);
-
-      if (error.message.includes('no encontrada')) {
-        return ApiResponse.notFound(res, error.message);
-      }
-
-      if (error.message.includes('no se puede anular')) {
-        return ApiResponse.forbidden(res, error.message);
-      }
-
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Duplicar factura
-   */
-  static async duplicar(req, res) {
-    try {
-      const { id } = req.params;
-      const datosAdicionales = req.body;
-
-      if (!id || isNaN(id)) {
-        return ApiResponse.validationError(res, 'ID de factura inválido');
-      }
-
-      console.log(`📋 Duplicando factura ${id}`);
-
-      const nuevaFactura = await Factura.duplicar(id, {
-        ...datosAdicionales,
-        created_by: req.user?.id
       });
 
-      return ApiResponse.created(res, nuevaFactura, 'Factura duplicada exitosamente');
-
     } catch (error) {
-      console.error('❌ Error al duplicar factura:', error);
+      console.error('❌ Error en facturación mensual:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error procesando facturación mensual',
+        error: error.message
+      });
+    }
+  }
 
-      if (error.message.includes('no encontrada')) {
-        return ApiResponse.notFound(res, error.message);
+  /**
+   * Generar factura individual para un cliente
+   */
+  static async generarFacturaIndividual(req, res) {
+    try {
+      const { clienteId } = req.params;
+      const { fecha_inicio, generar_orden_instalacion, generar_contrato } = req.body;
+      
+      if (!clienteId || isNaN(clienteId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID de cliente inválido'
+        });
       }
 
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Generar número de factura
-   */
-  static async generarNumeroFactura(req, res) {
-    try {
-      const numero = await FacturacionAutomaticaService.generarNumeroFactura();
-      return ApiResponse.success(res, { numero_factura: numero }, 'Número generado');
-    } catch (error) {
-      console.error('❌ Error generando número de factura:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
-    }
-  }
-
-  /**
-   * Validar número de factura
-   */
-  static async validarNumeroFactura(req, res) {
-    try {
-      const { numero } = req.params;
-
-      const existe = await Database.query(
-        'SELECT id FROM facturas WHERE numero_factura = ?',
-        [numero]
+      console.log(`🧾 Generando factura individual para cliente ${clienteId}...`);
+      
+      // Generar factura
+      const factura = await FacturacionAutomaticaService.generarFacturaClienteIndividual(
+        clienteId, 
+        fecha_inicio
       );
 
-      return ApiResponse.success(res, {
-        existe: existe.length > 0,
-        numero_factura: numero
-      }, 'Validación completada');
+      // Generar documentos adicionales si se solicita
+      const documentosGenerados = {
+        factura: factura,
+        orden_instalacion: null,
+        contrato: null
+      };
+
+      if (generar_orden_instalacion) {
+        documentosGenerados.orden_instalacion = await this.generarOrdenInstalacion(clienteId);
+      }
+
+      if (generar_contrato) {
+        documentosGenerados.contrato = await this.generarContrato(clienteId);
+      }
+      
+      res.json({
+        success: true,
+        data: documentosGenerados,
+        message: `Factura generada exitosamente: ${factura.numero_factura}`,
+        timestamp: new Date().toISOString()
+      });
 
     } catch (error) {
-      console.error('❌ Error validando número de factura:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
+      console.error(`❌ Error generando factura individual:`, error);
+      res.status(500).json({
+        success: false,
+        message: 'Error generando factura individual',
+        error: error.message
+      });
     }
   }
 
   /**
-   * Obtener detalles de factura
+   * Obtener facturas con filtros y paginación
    */
-  static async obtenerDetalles(req, res) {
+  static async obtenerFacturas(req, res) {
+    try {
+      const {
+        page = 1,
+        limit = 20,
+        cliente_id,
+        estado,
+        fecha_desde,
+        fecha_hasta,
+        numero_factura,
+        sort_by = 'fecha_factura',
+        sort_order = 'DESC'
+      } = req.query;
+
+      const offset = (parseInt(page) - 1) * parseInt(limit);
+
+      let whereClause = ['f.activo = 1'];
+      let params = [];
+
+      // Aplicar filtros
+      if (cliente_id) {
+        whereClause.push('f.cliente_id = ?');
+        params.push(cliente_id);
+      }
+
+      if (estado) {
+        whereClause.push('f.estado = ?');
+        params.push(estado);
+      }
+
+      if (fecha_desde) {
+        whereClause.push('DATE(f.fecha_factura) >= ?');
+        params.push(fecha_desde);
+      }
+
+      if (fecha_hasta) {
+        whereClause.push('DATE(f.fecha_factura) <= ?');
+        params.push(fecha_hasta);
+      }
+
+      if (numero_factura) {
+        whereClause.push('f.numero_factura LIKE ?');
+        params.push(`%${numero_factura}%`);
+      }
+
+      const whereSQL = whereClause.length > 0 ? `WHERE ${whereClause.join(' AND ')}` : '';
+
+      const conexion = await Database.conexion();
+
+      try {
+        // Obtener total de registros
+        const [countResult] = await conexion.execute(`
+          SELECT COUNT(*) as total
+          FROM facturas f
+          LEFT JOIN clientes c ON f.cliente_id = c.id
+          ${whereSQL}
+        `, params);
+
+        const total = countResult[0].total;
+
+        // Obtener facturas paginadas
+        const [facturas] = await conexion.execute(`
+          SELECT 
+            f.*,
+            CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+            c.documento,
+            c.telefono,
+            c.email
+          FROM facturas f
+          LEFT JOIN clientes c ON f.cliente_id = c.id
+          ${whereSQL}
+          ORDER BY f.${sort_by} ${sort_order}
+          LIMIT ? OFFSET ?
+        `, [...params, parseInt(limit), offset]);
+
+        res.json({
+          success: true,
+          data: {
+            facturas,
+            pagination: {
+              current_page: parseInt(page),
+              per_page: parseInt(limit),
+              total: total,
+              total_pages: Math.ceil(total / parseInt(limit))
+            }
+          },
+          message: 'Facturas obtenidas exitosamente'
+        });
+
+      } finally {
+        conexion.release();
+      }
+
+    } catch (error) {
+      console.error('❌ Error obteniendo facturas:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error obteniendo facturas',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Obtener detalles completos de una factura
+   */
+  static async obtenerFacturaPorId(req, res) {
     try {
       const { id } = req.params;
 
       if (!id || isNaN(id)) {
-        return ApiResponse.validationError(res, 'ID de factura inválido');
+        return res.status(400).json({
+          success: false,
+          message: 'ID de factura inválido'
+        });
       }
 
-      const detalles = await Database.query(`
-        SELECT df.*, sc.estado as estado_servicio, ps.nombre as plan_nombre
-        FROM detalle_facturas df
-        LEFT JOIN servicios_cliente sc ON df.servicio_cliente_id = sc.id
-        LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-        WHERE df.factura_id = ?
-        ORDER BY df.id
-      `, [id]);
+      const factura = await this.obtenerDetallesFactura(id);
 
-      return ApiResponse.success(res, detalles, 'Detalles obtenidos');
+      if (!factura) {
+        return res.status(404).json({
+          success: false,
+          message: 'Factura no encontrada'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: factura,
+        message: 'Factura obtenida exitosamente'
+      });
 
     } catch (error) {
-      console.error('❌ Error obteniendo detalles:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
+      console.error('❌ Error obteniendo factura:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error obteniendo factura',
+        error: error.message
+      });
     }
   }
 
   /**
-   * Obtener datos de la empresa (MÉTODO ESTÁTICO CORREGIDO)
+   * Anular una factura
    */
-  static async obtenerDatosEmpresa() {
+  static async anularFactura(req, res) {
     try {
-      // Intentar obtener de base de datos
-      const empresa = await Database.query('SELECT * FROM configuracion_empresa LIMIT 1');
+      const { id } = req.params;
+      const { motivo_anulacion } = req.body;
+      const usuario_id = req.user.id;
 
-      if (empresa && empresa.length > 0) {
-        return empresa[0];
+      if (!id || isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID de factura inválido'
+        });
       }
 
-      // Datos por defecto si no hay en BD
-      return {
-        empresa_nombre: 'PROVEEDOR DE TELECOMUNICACIONES SAS.',
-        empresa_nit: '901.582.657-3',
-        empresa_direccion: 'VIA 40 #36-135',
-        empresa_telefono: '3303780',
-        resolucion_facturacion: 'Resolución DIAN 18764 del 15-SEP-2020'
-      };
+      if (!motivo_anulacion || motivo_anulacion.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'El motivo de anulación es requerido'
+        });
+      }
+
+      const conexion = await Database.conexion();
+
+      try {
+        await conexion.beginTransaction();
+
+        // Verificar que la factura existe y está pendiente
+        const [facturaExistente] = await conexion.execute(`
+          SELECT id, estado, total FROM facturas WHERE id = ? AND activo = 1
+        `, [id]);
+
+        if (facturaExistente.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Factura no encontrada'
+          });
+        }
+
+        if (facturaExistente[0].estado !== 'pendiente') {
+          return res.status(400).json({
+            success: false,
+            message: 'Solo se pueden anular facturas pendientes'
+          });
+        }
+
+        // Anular la factura
+        await conexion.execute(`
+          UPDATE facturas 
+          SET estado = 'anulada', 
+              motivo_anulacion = ?,
+              fecha_anulacion = NOW(),
+              usuario_anulacion = ?,
+              updated_at = NOW()
+          WHERE id = ?
+        `, [motivo_anulacion, usuario_id, id]);
+
+        await conexion.commit();
+
+        res.json({
+          success: true,
+          message: 'Factura anulada exitosamente',
+          data: { factura_id: id }
+        });
+
+      } catch (error) {
+        await conexion.rollback();
+        throw error;
+      } finally {
+        conexion.release();
+      }
+
     } catch (error) {
-      console.warn('⚠️ Error obteniendo datos empresa, usando defaults:', error.message);
-      return {
-        empresa_nombre: 'PROVEEDOR DE TELECOMUNICACIONES SAS.',
-        empresa_nit: '901.582.657-3',
-        empresa_direccion: 'VIA 40 #36-135',
-        empresa_telefono: '3303780',
-        resolucion_facturacion: 'Resolución DIAN 18764 del 15-SEP-2020'
-      };
+      console.error('❌ Error anulando factura:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error anulando factura',
+        error: error.message
+      });
     }
   }
 
@@ -653,28 +344,35 @@ class FacturasController {
     try {
       const { id } = req.params;
 
-      if (!id || isNaN(id)) {
-        return ApiResponse.validationError(res, 'ID de factura inválido');
+      if (!PDFGenerator) {
+        return res.status(503).json({
+          success: false,
+          message: 'Servicio de PDF no disponible'
+        });
       }
 
-      const factura = await Factura.obtenerPorId(id);
+      const factura = await this.obtenerDetallesFactura(id);
       if (!factura) {
-        return ApiResponse.notFound(res, 'Factura no encontrada');
+        return res.status(404).json({
+          success: false,
+          message: 'Factura no encontrada'
+        });
       }
 
-      // Obtener datos de la empresa usando el método estático
-      const empresa = await FacturasController.obtenerDatosEmpresa();
-
-      // Generar PDF
-      const pdfBuffer = await PDFGenerator.generarFactura(factura, empresa);
+      // Usar tu PDFGenerator existente
+      const pdfBuffer = await PDFGenerator.generarFacturaPDF(factura);
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="factura_${factura.numero_factura}.pdf"`);
+      res.setHeader('Content-Disposition', `attachment; filename="Factura_${factura.numero_factura}.pdf"`);
       res.send(pdfBuffer);
 
     } catch (error) {
       console.error('❌ Error generando PDF:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
+      res.status(500).json({
+        success: false,
+        message: 'Error generando PDF',
+        error: error.message
+      });
     }
   }
 
@@ -685,81 +383,430 @@ class FacturasController {
     try {
       const { id } = req.params;
 
-      if (!id || isNaN(id)) {
-        return ApiResponse.validationError(res, 'ID de factura inválido');
+      if (!PDFGenerator) {
+        return res.status(503).json({
+          success: false,
+          message: 'Servicio de PDF no disponible'
+        });
       }
 
-      const factura = await Factura.obtenerPorId(id);
+      const factura = await this.obtenerDetallesFactura(id);
       if (!factura) {
-        return ApiResponse.notFound(res, 'Factura no encontrada');
+        return res.status(404).json({
+          success: false,
+          message: 'Factura no encontrada'
+        });
       }
 
-      // Obtener datos de la empresa usando el método estático
-      const empresa = await FacturasController.obtenerDatosEmpresa();
-
-      const pdfBuffer = await PDFGenerator.generarFactura(factura, empresa);
+      // Usar tu PDFGenerator existente
+      const pdfBuffer = await PDFGenerator.generarFacturaPDF(factura);
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="factura_${factura.numero_factura}.pdf"`);
+      res.setHeader('Content-Disposition', `inline; filename="Factura_${factura.numero_factura}.pdf"`);
       res.send(pdfBuffer);
 
     } catch (error) {
       console.error('❌ Error mostrando PDF:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
+      res.status(500).json({
+        success: false,
+        message: 'Error mostrando PDF',
+        error: error.message
+      });
     }
   }
 
   /**
-   * Endpoint para probar PDF (CORREGIDO)
+   * Registrar pago de factura
    */
-  static async probarPDF(req, res) {
+  static async registrarPago(req, res) {
     try {
-      // Datos de prueba para factura
-      const facturaTest = {
-        numero_factura: 'PSI124450',
-        fecha_emision: new Date('2025-05-06'),
-        fecha_vencimiento: new Date('2025-05-11'),
-        periodo_facturacion: '06/05/2025 - 05/06/2025',
-        nombre_cliente: 'JUAN SEBASTIAN GALEANO GALAN',
-        identificacion_cliente: '1140886424',
-        direccion_cliente: 'CRA 50 76 - 19',
-        telefono_cliente: '3147783510',
-        internet: 59900,
-        total: 59900
+      const { id } = req.params;
+      const {
+        valor_pagado,
+        metodo_pago,
+        referencia_pago,
+        observaciones,
+        fecha_pago
+      } = req.body;
+      const usuario_id = req.user.id;
+
+      // Validaciones
+      if (!valor_pagado || valor_pagado <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'El valor pagado debe ser mayor a cero'
+        });
+      }
+
+      if (!metodo_pago) {
+        return res.status(400).json({
+          success: false,
+          message: 'El método de pago es requerido'
+        });
+      }
+
+      const conexion = await Database.conexion();
+
+      try {
+        await conexion.beginTransaction();
+
+        // Obtener datos de la factura
+        const [factura] = await conexion.execute(`
+          SELECT id, cliente_id, total, estado 
+          FROM facturas 
+          WHERE id = ? AND activo = 1
+        `, [id]);
+
+        if (factura.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Factura no encontrada'
+          });
+        }
+
+        const facturaData = factura[0];
+
+        if (facturaData.estado === 'pagada') {
+          return res.status(400).json({
+            success: false,
+            message: 'La factura ya está pagada'
+          });
+        }
+
+        if (facturaData.estado === 'anulada') {
+          return res.status(400).json({
+            success: false,
+            message: 'No se puede registrar pago en factura anulada'
+          });
+        }
+
+        // Registrar el pago
+        await conexion.execute(`
+          INSERT INTO pagos (
+            factura_id, cliente_id, valor_pagado, metodo_pago,
+            referencia_pago, fecha_pago, observaciones,
+            usuario_registro, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        `, [
+          id,
+          facturaData.cliente_id,
+          valor_pagado,
+          metodo_pago,
+          referencia_pago || null,
+          fecha_pago || new Date(),
+          observaciones || null,
+          usuario_id
+        ]);
+
+        // Actualizar estado de la factura
+        const nuevoEstado = valor_pagado >= facturaData.total ? 'pagada' : 'abono';
+        
+        await conexion.execute(`
+          UPDATE facturas 
+          SET estado = ?, fecha_pago = ?, updated_at = NOW()
+          WHERE id = ?
+        `, [nuevoEstado, fecha_pago || new Date(), id]);
+
+        await conexion.commit();
+
+        res.json({
+          success: true,
+          message: `Pago registrado exitosamente. Estado: ${nuevoEstado}`,
+          data: {
+            factura_id: id,
+            valor_pagado,
+            nuevo_estado: nuevoEstado
+          }
+        });
+
+      } catch (error) {
+        await conexion.rollback();
+        throw error;
+      } finally {
+        conexion.release();
+      }
+
+    } catch (error) {
+      console.error('❌ Error registrando pago:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error registrando pago',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Generar orden de instalación
+   */
+  static async generarOrdenInstalacion(clienteId) {
+    const conexion = await Database.conexion();
+    
+    try {
+      // Obtener datos del cliente y servicios
+      const [cliente] = await conexion.execute(`
+        SELECT * FROM clientes WHERE id = ? AND activo = 1
+      `, [clienteId]);
+
+      if (cliente.length === 0) {
+        throw new Error('Cliente no encontrado');
+      }
+
+      const [servicios] = await conexion.execute(`
+        SELECT s.*, p.nombre_plan, p.modalidad_plan, p.tecnologia
+        FROM servicios s
+        JOIN planes p ON s.plan_id = p.id
+        WHERE s.cliente_id = ? AND s.activo = 1
+      `, [clienteId]);
+
+      // Generar número de orden
+      const numeroOrden = await this.generarNumeroOrden();
+
+      // Crear orden de instalación
+      const [resultado] = await conexion.execute(`
+        INSERT INTO ordenes_instalacion (
+          numero_orden, cliente_id, fecha_orden, estado,
+          tecnico_asignado, observaciones, created_at, updated_at
+        ) VALUES (?, ?, NOW(), 'pendiente', NULL, ?, NOW(), NOW())
+      `, [
+        numeroOrden,
+        clienteId,
+        `Orden automática para servicios: ${servicios.map(s => s.nombre_plan).join(', ')}`
+      ]);
+
+      return {
+        id: resultado.insertId,
+        numero_orden: numeroOrden,
+        cliente_id: clienteId,
+        servicios: servicios
       };
 
-      // Obtener datos de la empresa usando el método estático
-      const empresa = await FacturasController.obtenerDatosEmpresa();
-
-      console.log('🔧 Generando PDF de prueba...');
-
-      // Generar PDF con ambos parámetros
-      const pdfBuffer = await PDFGenerator.generarFactura(facturaTest, empresa);
-
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline; filename="test_factura.pdf"');
-      res.send(pdfBuffer);
-
-    } catch (error) {
-      console.error('❌ Error en prueba PDF:', error);
-      return ApiResponse.error(res, 'Error generando PDF de prueba', 500, error.message);
+    } finally {
+      conexion.release();
     }
   }
 
   /**
-   * Procesar facturación masiva
+   * Generar contrato
    */
-  static async procesarFacturacionMasiva(req, res) {
+  static async generarContrato(clienteId) {
+    const conexion = await Database.conexion();
+    
     try {
-      console.log('🔄 Iniciando facturación masiva...');
+      // Obtener configuración para número de contrato
+      const [config] = await conexion.execute(`
+        SELECT consecutivo_contrato FROM configuracion_empresa WHERE id = 1
+      `);
 
-      const resultado = await FacturacionAutomaticaService.generarFacturacionMensual();
+      const consecutivo = config[0]?.consecutivo_contrato || 1;
+      const numeroContrato = `CNT${consecutivo.toString().padStart(6, '0')}`;
 
-      return ApiResponse.success(res, resultado, 'Facturación masiva procesada');
+      // Actualizar consecutivo
+      await conexion.execute(`
+        UPDATE configuracion_empresa 
+        SET consecutivo_contrato = consecutivo_contrato + 1 
+        WHERE id = 1
+      `);
+
+      // Crear contrato
+      const [resultado] = await conexion.execute(`
+        INSERT INTO contratos (
+          numero_contrato, cliente_id, fecha_contrato, 
+          estado, vigencia_meses, created_at, updated_at
+        ) VALUES (?, ?, NOW(), 'activo', 12, NOW(), NOW())
+      `, [numeroContrato, clienteId]);
+
+      return {
+        id: resultado.insertId,
+        numero_contrato: numeroContrato,
+        cliente_id: clienteId
+      };
+
+    } finally {
+      conexion.release();
+    }
+  }
+
+  /**
+   * Obtener detalles completos de una factura
+   */
+  static async obtenerDetallesFactura(facturaId) {
+    const conexion = await Database.conexion();
+    
+    try {
+      // Obtener factura principal
+      const [factura] = await conexion.execute(`
+        SELECT 
+          f.*,
+          CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+          c.documento, c.tipo_documento, c.telefono, c.email,
+          c.direccion, c.barrio, c.estrato
+        FROM facturas f
+        LEFT JOIN clientes c ON f.cliente_id = c.id
+        WHERE f.id = ? AND f.activo = 1
+      `, [facturaId]);
+
+      if (factura.length === 0) {
+        return null;
+      }
+
+      const facturaData = factura[0];
+
+      // Obtener detalles de la factura
+      const [detalles] = await conexion.execute(`
+        SELECT 
+          df.*,
+          cf.nombre as concepto_nombre,
+          cf.codigo as concepto_codigo
+        FROM detalles_factura df
+        LEFT JOIN conceptos_facturacion cf ON df.concepto_id = cf.id
+        WHERE df.factura_id = ?
+        ORDER BY df.id
+      `, [facturaId]);
+
+      facturaData.detalles = detalles;
+
+      // Obtener pagos asociados
+      const [pagos] = await conexion.execute(`
+        SELECT * FROM pagos 
+        WHERE factura_id = ? 
+        ORDER BY fecha_pago DESC
+      `, [facturaId]);
+
+      facturaData.pagos = pagos;
+
+      return facturaData;
+
+    } finally {
+      conexion.release();
+    }
+  }
+
+  /**
+   * Generar número de orden
+   */
+  static async generarNumeroOrden() {
+    const conexion = await Database.conexion();
+    try {
+      const [config] = await conexion.execute(`
+        SELECT consecutivo_orden_instalacion FROM configuracion_empresa WHERE id = 1
+      `);
+      
+      const consecutivo = config[0]?.consecutivo_orden_instalacion || 1;
+      
+      await conexion.execute(`
+        UPDATE configuracion_empresa 
+        SET consecutivo_orden_instalacion = consecutivo_orden_instalacion + 1 
+        WHERE id = 1
+      `);
+      
+      return `ORD${consecutivo.toString().padStart(6, '0')}`;
+    } finally {
+      conexion.release();
+    }
+  }
+
+  /**
+   * Obtener reportes de facturación
+   */
+  static async obtenerReportes(req, res) {
+    try {
+      const {
+        tipo_reporte,
+        fecha_desde,
+        fecha_hasta,
+        cliente_id,
+        estado
+      } = req.query;
+
+      const conexion = await Database.conexion();
+
+      try {
+        let consulta = '';
+        let params = [];
+
+        switch (tipo_reporte) {
+          case 'ventas_diarias':
+            consulta = `
+              SELECT 
+                DATE(fecha_factura) as fecha,
+                COUNT(*) as total_facturas,
+                SUM(subtotal) as subtotal,
+                SUM(iva) as iva,
+                SUM(total) as total
+              FROM facturas 
+              WHERE fecha_factura BETWEEN ? AND ?
+                AND estado != 'anulada'
+              GROUP BY DATE(fecha_factura)
+              ORDER BY fecha DESC
+            `;
+            params = [fecha_desde, fecha_hasta];
+            break;
+
+          case 'facturas_pendientes':
+            consulta = `
+              SELECT 
+                f.id, f.numero_factura, f.fecha_factura, f.fecha_vencimiento,
+                f.total, CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                c.telefono, c.email,
+                DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencida
+              FROM facturas f
+              LEFT JOIN clientes c ON f.cliente_id = c.id
+              WHERE f.estado = 'pendiente'
+                AND f.activo = 1
+              ORDER BY f.fecha_vencimiento ASC
+            `;
+            break;
+
+          case 'clientes_morosos':
+            consulta = `
+              SELECT 
+                c.id, CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                c.documento, c.telefono, c.email,
+                COUNT(f.id) as facturas_pendientes,
+                SUM(f.total) as total_deuda,
+                MIN(f.fecha_vencimiento) as deuda_mas_antigua
+              FROM clientes c
+              INNER JOIN facturas f ON c.id = f.cliente_id
+              WHERE f.estado = 'pendiente'
+                AND f.fecha_vencimiento < NOW()
+                AND f.activo = 1
+              GROUP BY c.id
+              HAVING total_deuda > 0
+              ORDER BY deuda_mas_antigua ASC
+            `;
+            break;
+
+          default:
+            return res.status(400).json({
+              success: false,
+              message: 'Tipo de reporte no válido'
+            });
+        }
+
+        const [resultados] = await conexion.execute(consulta, params);
+
+        res.json({
+          success: true,
+          data: {
+            tipo_reporte,
+            resultados,
+            total_registros: resultados.length
+          },
+          message: 'Reporte generado exitosamente'
+        });
+
+      } finally {
+        conexion.release();
+      }
 
     } catch (error) {
-      console.error('❌ Error en facturación masiva:', error);
-      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
+      console.error('❌ Error generando reporte:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error generando reporte',
+        error: error.message
+      });
     }
   }
 }

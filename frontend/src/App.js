@@ -33,6 +33,7 @@ const PQRManagement = lazy(() => import('./components/PQR/PQRManagement'));// CO
 const IncidenciasManagement = lazy(() => import('./components/Incidencias/IncidenciasManagement'));
 const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
 const InstalacionesManagement = lazy(() => import('./components/Instalaciones/InstalacionesManagement'));
+const FacturacionAutomatica = lazy(() => import('./components/Facturas/FacturacionAutomatica'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -327,6 +328,16 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/facturacion-automatica"
+                element={
+                  <Suspense fallback={<LoadingFallback message="Cargando Facturación Automática..." />}>
+                    <MainLayout title="Facturación Automática" subtitle="Sistema automatizado de facturación mensual">
+                      <FacturacionAutomatica />
+                    </MainLayout>
+                  </Suspense>
+                }
+              />
 
               <Route
                 path="/services"
@@ -339,12 +350,12 @@ function App() {
                 }
               />
 
-             <Route
+              <Route
                 path="/instalaciones"
                 element={
                   <ProtectedRoute requiredRole="administrador">
-                    <MainLayout 
-                      title="Gestión de Instalaciones" 
+                    <MainLayout
+                      title="Gestión de Instalaciones"
                       subtitle="Administra las instalaciones de servicios de internet y televisión"
                     >
                       <InstalacionesManagement />

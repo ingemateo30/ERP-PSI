@@ -208,7 +208,7 @@ try {
   app.use('/api/v1/config', configRoutes);
   console.log('✅ Rutas de configuración cargadas: /api/v1/config');
 
-   console.log('📋 Cargando rutas de conceptos...');
+  console.log('📋 Cargando rutas de conceptos...');
   const conceptosRoutes = require('./routes/conceptos');
   app.use('/api/v1/conceptos', conceptosRoutes);
   console.log('✅ Rutas de conceptos cargadas: /api/v1/conceptos');
@@ -231,11 +231,11 @@ try {
   app.use('/api/v1/config/plantillas-correo', plantillasCorreoRoutes);
   console.log('✅ Rutas de plantillas de correo cargadas: /api/v1/config/plantillas-correo');
 
-  // Rutas de facturas
+  /*
   console.log('💰 Cargando rutas de facturas...');
   const facturasRoutes = require('./routes/factura');
   app.use('/api/v1/facturas', facturasRoutes);
-  console.log('✅ Rutas de facturas cargadas: /api/v1/facturas');
+  console.log('✅ Rutas de facturas cargadas: /api/v1/facturas');*/
 
   // CORREGIDO: Rutas de reportes regulatorios
   console.log('📊 Cargando rutas de reportes regulatorios...');
@@ -259,6 +259,45 @@ try {
   console.log('🔧 Cargando rutas de instalaciones...');
   const instalacionesRoutes = require('./routes/instalaciones');
   app.use('/api/v1/instalaciones', instalacionesRoutes);
+
+  const CronJobs = require('./utils/cronJobs');
+
+  console.log('🧾 Cargando rutas de facturación automática...');
+  const facturacionRoutes = require('./routes/facturacion');
+  app.use('/api/v1/facturacion', facturacionRoutes);
+  console.log('✅ Rutas de facturación automática cargadas: /api/v1/facturacion');
+
+  console.log('🕐 Configurando sistema de facturación automática...');
+
+  const inicializarFacturacionAutomatica = () => {
+    const cronEnabled = process.env.NODE_ENV === 'production' ||
+      process.env.FACTURACION_CRON_ENABLED === 'true';
+
+    if (cronEnabled) {
+      try {
+        console.log('⚙️ Inicializando tareas programadas de facturación...');
+        CronJobs.inicializar();
+        console.log('✅ Tareas programadas de facturación configuradas');
+        console.log('   📅 Facturación mensual: Día 1 de cada mes a las 06:00');
+        console.log('   🔄 Actualización estados: Diario a las 02:00');
+        console.log('   💰 Cálculo intereses: Diario a las 03:00');
+        console.log('   📧 Notificaciones: Diario a las 08:00');
+        console.log('   💾 Backup diario: Diario a las 01:00');
+        console.log('   🧹 Limpieza: Domingos a las 04:00');
+        console.log('   📊 Reportes: Día 2 de cada mes a las 07:00');
+      } catch (cronError) {
+        console.warn('⚠️ Error configurando tareas programadas:', cronError.message);
+        console.warn('💡 El sistema funcionará sin automatización. Para habilitar: FACTURACION_CRON_ENABLED=true');
+      }
+    } else {
+      console.log('ℹ️ Tareas programadas de facturación deshabilitadas');
+      console.log('💡 Para habilitar en desarrollo: FACTURACION_CRON_ENABLED=true en .env');
+      console.log('🔧 Facturación manual disponible en /api/v1/facturacion');
+    }
+  };
+
+  // Llamar después de configurar la base de datos
+  inicializarFacturacionAutomatica();
 
   // Rutas de reportes (si existe)
   try {
