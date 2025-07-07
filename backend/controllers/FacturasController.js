@@ -29,6 +29,10 @@ class FacturasController {
   /**
    * Obtener todas las facturas con filtros y paginación
    */
+   /**
+   * Obtener todas las facturas con filtros y paginación
+   * CORREGIDO: Usando columnas reales de la tabla facturas
+   */
   static async obtenerTodas(req, res) {
     try {
       const { 
@@ -47,12 +51,23 @@ class FacturasController {
       const limitNum = parseInt(limit);
       const offset = (pageNum - 1) * limitNum;
 
+      console.log('📋 Obteniendo facturas con parámetros:', {
+        page: pageNum,
+        limit: limitNum,
+        fecha_desde,
+        fecha_hasta,
+        estado,
+        cliente_id,
+        numero_factura
+      });
+
       // Verificar si existe la tabla facturas
       let tablaExiste = true;
       try {
         await Database.query('SELECT 1 FROM facturas LIMIT 1');
       } catch (error) {
         tablaExiste = false;
+        console.log('⚠️ Tabla facturas no existe');
       }
 
       if (!tablaExiste) {
@@ -61,12 +76,12 @@ class FacturasController {
           data: {
             facturas: [],
             pagination: {
-              current_page: pageNum,
-              per_page: limitNum,
+              page: pageNum,
+              limit: limitNum,
               total: 0,
-              total_pages: 0,
-              has_next_page: false,
-              has_prev_page: false
+              totalPages: 0,
+              hasNextPage: false,
+              hasPrevPage: false
             }
           },
           message: 'Tabla facturas no existe - retornando datos vacíos'
@@ -74,8 +89,8 @@ class FacturasController {
       }
 
       // Construir WHERE clause dinámicamente
-      let whereConditions = ['f.activo = 1'];
-      let queryParams = [];
+      let whereConditions = ['f.activo = ?'];
+      let queryParams = ['1'];
 
       if (fecha_desde && fecha_hasta) {
         whereConditions.push('f.fecha_emision BETWEEN ? AND ?');
@@ -109,12 +124,15 @@ class FacturasController {
 
       const total = totalResult[0]?.total || 0;
 
-      // Validar columna de ordenamiento
-      const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente'];
+      // Validar columna de ordenamiento usando columnas reales
+      const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente', 'id'];
       const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
       const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-      // Obtener facturas paginadas
+      // Agregar parámetros para LIMIT y OFFSET
+      queryParams.push(limitNum, offset);
+
+      // Obtener facturas paginadas usando SOLO columnas que existen en la tabla
       const facturas = await Database.query(`
         SELECT 
           f.id,
@@ -122,47 +140,60 @@ class FacturasController {
           f.cliente_id,
           f.identificacion_cliente,
           f.nombre_cliente,
-          f.telefono_cliente,
-          f.direccion_cliente,
-          f.email_cliente,
           f.periodo_facturacion,
           f.fecha_emision,
           f.fecha_vencimiento,
+          f.fecha_desde,
+          f.fecha_hasta,
           f.fecha_pago,
+          f.internet,
+          f.television,
+          f.saldo_anterior,
+          f.interes,
+          f.reconexion,
+          f.descuento,
+          f.varios,
+          f.publicidad,
           f.subtotal,
-          f.descuentos,
           f.iva,
           f.total,
           f.estado,
           f.metodo_pago,
           f.referencia_pago,
+          f.banco_id,
+          f.ruta,
           f.observaciones,
-          f.saldo_anterior,
-          f.intereses_mora,
-          DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencimiento,
+          f.created_at,
+          f.updated_at,
+          DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencido,
           CASE 
             WHEN f.estado = 'pagada' THEN 'Pagada'
             WHEN f.estado = 'anulada' THEN 'Anulada'
             WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' THEN 'Vencida'
-            ELSE 'Vigente'
+            ELSE 'Pendiente'
           END as estado_descripcion
         FROM facturas f
         ${whereClause}
         ORDER BY f.${sortColumn} ${sortDirection}
         LIMIT ? OFFSET ?
-      `, [...queryParams, limitNum, offset]);
+      `, queryParams);
+
+      // Calcular paginación
+      const totalPages = Math.ceil(total / limitNum);
+      const hasNextPage = pageNum < totalPages;
+      const hasPrevPage = pageNum > 1;
 
       res.json({
         success: true,
         data: {
           facturas,
           pagination: {
-            current_page: pageNum,
-            per_page: limitNum,
+            page: pageNum,
+            limit: limitNum,
             total: total,
-            total_pages: Math.ceil(total / limitNum),
-            has_next_page: (pageNum * limitNum) < total,
-            has_prev_page: pageNum > 1
+            totalPages: totalPages,
+            hasNextPage: hasNextPage,
+            hasPrevPage: hasPrevPage
           }
         },
         message: 'Facturas obtenidas exitosamente'

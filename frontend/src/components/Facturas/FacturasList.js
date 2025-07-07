@@ -1,110 +1,284 @@
-// components/Facturas/FacturasList.js
+// components/Facturas/FacturasList.js - Corregido
 import React, { useState } from 'react';
-import FacturasService from '../../services/facturacionManualService';
+import { 
+  FileText, 
+  Eye, 
+  Download, 
+  Edit, 
+  Copy, 
+  DollarSign, 
+  X, 
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  MoreHorizontal,
+  Calendar,
+  User,
+  MapPin
+} from 'lucide-react';
 
 const FacturasList = ({
-  facturas,
+  facturas = [],
   loading,
-  pagination,
-  onCambiarPagina,
+  pagination = {},
   onEditarFactura,
   onMarcarPagada,
   onAnularFactura,
   onDuplicarFactura,
   onDescargarPDF,
-  onVerPDF
+  onVerPDF,
+  onCambiarPagina,
+  actionLoading
 }) => {
   const [facturaExpandida, setFacturaExpandida] = useState(null);
-  const [motivoAnulacion, setMotivoAnulacion] = useState('');
-  const [mostrarMotivoAnulacion, setMostrarMotivoAnulacion] = useState(null);
+  const [menuAbierto, setMenuAbierto] = useState(null);
 
-  // Expandir/contraer detalles de factura
-  const toggleExpandir = (facturaId) => {
-    setFacturaExpandida(facturaExpandida === facturaId ? null : facturaId);
+  // Formatear moneda
+  const formatearMoneda = (valor) => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(valor || 0);
   };
 
-  // Manejar anulación
-  const handleAnular = (factura) => {
-    setMostrarMotivoAnulacion(factura.id);
-    setMotivoAnulacion('');
-  };
-
-  const confirmarAnulacion = (facturaId) => {
-    onAnularFactura(facturaId, motivoAnulacion);
-    setMostrarMotivoAnulacion(null);
-    setMotivoAnulacion('');
-  };
-
-  const cancelarAnulacion = () => {
-    setMostrarMotivoAnulacion(null);
-    setMotivoAnulacion('');
+  // Formatear fecha
+  const formatearFecha = (fecha) => {
+    if (!fecha) return 'N/A';
+    return new Date(fecha).toLocaleDateString('es-CO');
   };
 
   // Obtener badge de estado
-  const obtenerBadgeEstado = (estado) => {
-    const estilos = {
-      'pendiente': 'bg-yellow-100 text-yellow-800',
-      'pagada': 'bg-green-100 text-green-800',
-      'vencida': 'bg-red-100 text-red-800',
-      'anulada': 'bg-gray-100 text-gray-800'
+  const getBadgeEstado = (estado) => {
+    const badges = {
+      pendiente: {
+        bg: 'bg-yellow-100',
+        text: 'text-yellow-800',
+        icon: Clock,
+        label: 'Pendiente'
+      },
+      pagada: {
+        bg: 'bg-green-100',
+        text: 'text-green-800',
+        icon: CheckCircle,
+        label: 'Pagada'
+      },
+      vencida: {
+        bg: 'bg-red-100',
+        text: 'text-red-800',
+        icon: AlertTriangle,
+        label: 'Vencida'
+      },
+      anulada: {
+        bg: 'bg-gray-100',
+        text: 'text-gray-800',
+        icon: X,
+        label: 'Anulada'
+      },
+      parcial: {
+        bg: 'bg-blue-100',
+        text: 'text-blue-800',
+        icon: DollarSign,
+        label: 'Pago Parcial'
+      }
     };
 
+    const badge = badges[estado] || badges.pendiente;
+    const IconComponent = badge.icon;
+
     return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${estilos[estado] || 'bg-gray-100 text-gray-800'}`}>
-        {estado?.toUpperCase() || 'DESCONOCIDO'}
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
+        <IconComponent className="w-3 h-3 mr-1" />
+        {badge.label}
       </span>
     );
   };
 
-  // Calcular días de vencimiento
-  const calcularVencimiento = (fechaVencimiento, estado) => {
-    if (estado === 'pagada' || estado === 'anulada') return null;
-    
-    const vencimiento = FacturasService.calcularDiasVencimiento(fechaVencimiento);
-    
-    if (vencimiento.vencida) {
-      return (
-        <span className="text-red-600 text-sm font-medium">
-          ⚠️ {vencimiento.mensaje}
-        </span>
-      );
-    } else if (vencimiento.dias <= 3) {
-      return (
-        <span className="text-orange-600 text-sm font-medium">
-          ⏰ {vencimiento.mensaje}
-        </span>
-      );
+  // Manejar expansión de factura
+  const toggleExpansion = (facturaId) => {
+    setFacturaExpandida(facturaExpandida === facturaId ? null : facturaId);
+  };
+
+  // Manejar menú de acciones
+  const toggleMenu = (facturaId, e) => {
+    e.stopPropagation();
+    setMenuAbierto(menuAbierto === facturaId ? null : facturaId);
+  };
+
+  // Cerrar menús al hacer click fuera
+  React.useEffect(() => {
+    const handleClickOutside = () => {
+      setMenuAbierto(null);
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // Componente de paginación
+  const Pagination = () => {
+    if (!pagination.totalPages || pagination.totalPages <= 1) return null;
+
+    const pages = [];
+    const currentPage = pagination.page || 1;
+    const totalPages = pagination.totalPages;
+
+    // Calcular páginas a mostrar
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+
+    if (endPage - startPage < 4) {
+      if (startPage === 1) {
+        endPage = Math.min(totalPages, startPage + 4);
+      } else if (endPage === totalPages) {
+        startPage = Math.max(1, endPage - 4);
+      }
     }
-    
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
     return (
-      <span className="text-gray-600 text-sm">
-        {vencimiento.mensaje}
-      </span>
+      <div className="flex items-center justify-between px-6 py-3 bg-white border-t border-gray-200">
+        <div className="flex-1 flex justify-between sm:hidden">
+          <button
+            onClick={() => onCambiarPagina && onCambiarPagina(currentPage - 1)}
+            disabled={currentPage <= 1}
+            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Anterior
+          </button>
+          <button
+            onClick={() => onCambiarPagina && onCambiarPagina(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Siguiente
+          </button>
+        </div>
+        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-gray-700">
+              Mostrando{' '}
+              <span className="font-medium">
+                {((currentPage - 1) * (pagination.limit || 10)) + 1}
+              </span>{' '}
+              a{' '}
+              <span className="font-medium">
+                {Math.min(currentPage * (pagination.limit || 10), pagination.total || 0)}
+              </span>{' '}
+              de{' '}
+              <span className="font-medium">{pagination.total || 0}</span>{' '}
+              resultados
+            </p>
+          </div>
+          <div>
+            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+              <button
+                onClick={() => onCambiarPagina && onCambiarPagina(currentPage - 1)}
+                disabled={currentPage <= 1}
+                className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ‹
+              </button>
+              {pages.map((page) => (
+                <button
+                  key={page}
+                  onClick={() => onCambiarPagina && onCambiarPagina(page)}
+                  className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                    page === currentPage
+                      ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                      : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => onCambiarPagina && onCambiarPagina(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ›
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
     );
   };
 
   if (loading) {
     return (
-      <div className="p-8 text-center">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <p className="mt-2 text-gray-600">Cargando facturas...</p>
+      <div className="bg-white rounded-lg shadow-md">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+            <FileText className="h-5 w-5 mr-2" />
+            Lista de Facturas
+          </h3>
+        </div>
+        <div className="p-6">
+          <div className="space-y-4">
+            {[...Array(5)].map((_, index) => (
+              <div key={index} className="animate-pulse">
+                <div className="flex items-center space-x-4">
+                  <div className="h-4 bg-gray-200 rounded w-20"></div>
+                  <div className="h-4 bg-gray-200 rounded w-32"></div>
+                  <div className="h-4 bg-gray-200 rounded w-24"></div>
+                  <div className="h-4 bg-gray-200 rounded w-16"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!facturas || facturas.length === 0) {
     return (
-      <div className="p-8 text-center text-gray-500">
-        <div className="text-4xl mb-4">📄</div>
-        <h3 className="text-lg font-medium mb-2">No hay facturas</h3>
-        <p>No se encontraron facturas con los filtros aplicados.</p>
+      <div className="bg-white rounded-lg shadow-md">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+            <FileText className="h-5 w-5 mr-2" />
+            Lista de Facturas
+          </h3>
+        </div>
+        <div className="p-12 text-center">
+          <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay facturas</h3>
+          <p className="text-gray-500 mb-4">
+            No se encontraron facturas con los criterios seleccionados.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Refrescar
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden">
-      {/* Tabla para pantallas grandes */}
+    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+            <FileText className="h-5 w-5 mr-2" />
+            Lista de Facturas ({facturas.length})
+          </h3>
+          <div className="text-sm text-gray-500">
+            Total facturado: {formatearMoneda(facturas.reduce((sum, f) => sum + (parseFloat(f.total) || 0), 0))}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Table */}
       <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -116,7 +290,7 @@ const FacturasList = ({
                 Cliente
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Período
+                Fecha
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Total
@@ -135,7 +309,10 @@ const FacturasList = ({
           <tbody className="bg-white divide-y divide-gray-200">
             {facturas.map((factura) => (
               <React.Fragment key={factura.id}>
-                <tr className="hover:bg-gray-50">
+                <tr 
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => toggleExpansion(factura.id)}
+                >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
                       {factura.numero_factura}
@@ -154,185 +331,223 @@ const FacturasList = ({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {FacturasService.formatearFecha(factura.fecha_desde)} -
+                      {formatearFecha(factura.fecha_emision)}
                     </div>
+                    {factura.ruta && (
+                      <div className="text-sm text-gray-500 flex items-center">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {factura.ruta}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-bold text-gray-900">
+                      {formatearMoneda(factura.total)}
+                    </div>
+                    {factura.saldo_pendiente > 0 && (
+                      <div className="text-xs text-red-600">
+                        Pendiente: {formatearMoneda(factura.saldo_pendiente)}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getBadgeEstado(factura.estado)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {FacturasService.formatearFecha(factura.fecha_hasta)}
+                      {formatearFecha(factura.fecha_vencimiento)}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {FacturasService.formatearMoneda(factura.total)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {obtenerBadgeEstado(factura.estado)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {FacturasService.formatearFecha(factura.fecha_vencimiento)}
-                    </div>
-                    {calcularVencimiento(factura.fecha_vencimiento, factura.estado)}
+                    {factura.dias_vencido > 0 && (
+                      <div className="text-xs text-red-600">
+                        {factura.dias_vencido} días vencida
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end gap-2">
-                      {/* Botón expandir */}
+                    <div className="relative inline-block">
                       <button
-                        onClick={() => toggleExpandir(factura.id)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Ver detalles"
+                        onClick={(e) => toggleMenu(factura.id, e)}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                        disabled={actionLoading}
                       >
-                        {facturaExpandida === factura.id ? '👁️‍🗨️' : '👁️'}
+                        <MoreHorizontal className="h-5 w-5" />
                       </button>
-
-                      {/* Descargar PDF */}
-                      <button
-                        onClick={() => onDescargarPDF(factura)}
-                        className="text-green-600 hover:text-green-900"
-                        title="Descargar PDF"
-                      >
-                        📥
-                      </button>
-
-                      {/* Ver PDF */}
-                      <button
-                        onClick={() => onVerPDF(factura.id)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Ver PDF"
-                      >
-                        📄
-                      </button>
-
-                      {/* Editar (solo si no está pagada o anulada) */}
-                      {factura.estado === 'pendiente' && (
-                        <button
-                          onClick={() => onEditarFactura(factura)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          title="Editar"
-                        >
-                          ✏️
-                        </button>
-                      )}
-
-                      {/* Marcar como pagada */}
-                      {factura.estado === 'pendiente' && (
-                        <button
-                          onClick={() => onMarcarPagada(factura)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Marcar como pagada"
-                        >
-                          💰
-                        </button>
-                      )}
-
-                      {/* Duplicar */}
-                      <button
-                        onClick={() => onDuplicarFactura(factura.id)}
-                        className="text-purple-600 hover:text-purple-900"
-                        title="Duplicar factura"
-                      >
-                        📋
-                      </button>
-
-                      {/* Anular */}
-                      {factura.estado !== 'anulada' && factura.estado !== 'pagada' && (
-                        <button
-                          onClick={() => handleAnular(factura)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Anular factura"
-                        >
-                          ❌
-                        </button>
+                      
+                      {menuAbierto === factura.id && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                          <div className="py-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onVerPDF && onVerPDF(factura.id);
+                                setMenuAbierto(null);
+                              }}
+                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver PDF
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDescargarPDF && onDescargarPDF(factura.id);
+                                setMenuAbierto(null);
+                              }}
+                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Descargar PDF
+                            </button>
+                            
+                            {factura.estado !== 'pagada' && factura.estado !== 'anulada' && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEditarFactura && onEditarFactura(factura);
+                                    setMenuAbierto(null);
+                                  }}
+                                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Editar
+                                </button>
+                                
+                                {factura.estado === 'pendiente' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onMarcarPagada && onMarcarPagada(factura);
+                                      setMenuAbierto(null);
+                                    }}
+                                    className="flex items-center px-4 py-2 text-sm text-green-700 hover:bg-green-50 w-full text-left"
+                                  >
+                                    <DollarSign className="h-4 w-4 mr-2" />
+                                    Registrar Pago
+                                  </button>
+                                )}
+                                
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onAnularFactura && onAnularFactura(factura);
+                                    setMenuAbierto(null);
+                                  }}
+                                  className="flex items-center px-4 py-2 text-sm text-red-700 hover:bg-red-50 w-full text-left"
+                                >
+                                  <X className="h-4 w-4 mr-2" />
+                                  Anular
+                                </button>
+                              </>
+                            )}
+                            
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDuplicarFactura && onDuplicarFactura(factura.id);
+                                setMenuAbierto(null);
+                              }}
+                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                            >
+                              <Copy className="h-4 w-4 mr-2" />
+                              Duplicar
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </td>
                 </tr>
-
+                
                 {/* Fila expandida con detalles */}
                 {facturaExpandida === factura.id && (
                   <tr>
                     <td colSpan="7" className="px-6 py-4 bg-gray-50">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <h4 className="font-medium text-gray-900 mb-2">Información del Cliente</h4>
-                          <p className="text-sm text-gray-600">
-                            <strong>Dirección:</strong> {factura.cliente_direccion || 'No disponible'}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            <strong>Teléfono:</strong> {factura.cliente_telefono || 'No disponible'}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            <strong>Sector:</strong> {factura.sector_nombre || 'No asignado'}
-                          </p>
+                          <h4 className="font-medium text-gray-900 mb-2">Servicios</h4>
+                          <div className="space-y-1 text-sm">
+                            {factura.internet > 0 && (
+                              <div className="flex justify-between">
+                                <span>Internet:</span>
+                                <span>{formatearMoneda(factura.internet)}</span>
+                              </div>
+                            )}
+                            {factura.television > 0 && (
+                              <div className="flex justify-between">
+                                <span>Televisión:</span>
+                                <span>{formatearMoneda(factura.television)}</span>
+                              </div>
+                            )}
+                            {factura.varios > 0 && (
+                              <div className="flex justify-between">
+                                <span>Varios:</span>
+                                <span>{formatearMoneda(factura.varios)}</span>
+                              </div>
+                            )}
+                            {factura.publicidad > 0 && (
+                              <div className="flex justify-between">
+                                <span>Publicidad:</span>
+                                <span>{formatearMoneda(factura.publicidad)}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
+                        
                         <div>
-                          <h4 className="font-medium text-gray-900 mb-2">Detalles de Facturación</h4>
-                          <p className="text-sm text-gray-600">
-                            <strong>Internet:</strong> {FacturasService.formatearMoneda(factura.internet)}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            <strong>Televisión:</strong> {FacturasService.formatearMoneda(factura.television)}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            <strong>Saldo Anterior:</strong> {FacturasService.formatearMoneda(factura.saldo_anterior)}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            <strong>Ruta:</strong> {factura.ruta || 'No asignada'}
-                          </p>
+                          <h4 className="font-medium text-gray-900 mb-2">Otros Conceptos</h4>
+                          <div className="space-y-1 text-sm">
+                            {factura.saldo_anterior > 0 && (
+                              <div className="flex justify-between">
+                                <span>Saldo Anterior:</span>
+                                <span>{formatearMoneda(factura.saldo_anterior)}</span>
+                              </div>
+                            )}
+                            {factura.interes > 0 && (
+                              <div className="flex justify-between">
+                                <span>Intereses:</span>
+                                <span>{formatearMoneda(factura.interes)}</span>
+                              </div>
+                            )}
+                            {factura.reconexion > 0 && (
+                              <div className="flex justify-between">
+                                <span>Reconexión:</span>
+                                <span>{formatearMoneda(factura.reconexion)}</span>
+                              </div>
+                            )}
+                            {factura.descuento > 0 && (
+                              <div className="flex justify-between text-red-600">
+                                <span>Descuento:</span>
+                                <span>-{formatearMoneda(factura.descuento)}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
+                        
                         <div>
-                          <h4 className="font-medium text-gray-900 mb-2">Información de Pago</h4>
-                          {factura.estado === 'pagada' && (
-                            <>
-                              <p className="text-sm text-gray-600">
-                                <strong>Fecha de Pago:</strong> {FacturasService.formatearFecha(factura.fecha_pago)}
-                              </p>
-                              <p className="text-sm text-gray-600">
-                                <strong>Método:</strong> {factura.metodo_pago}
-                              </p>
-                              <p className="text-sm text-gray-600">
-                                <strong>Referencia:</strong> {factura.referencia_pago || 'N/A'}
-                              </p>
-                            </>
-                          )}
-                          {factura.observaciones && (
-                            <p className="text-sm text-gray-600">
-                              <strong>Observaciones:</strong> {factura.observaciones}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-
-                {/* Modal inline para motivo de anulación */}
-                {mostrarMotivoAnulacion === factura.id && (
-                  <tr>
-                    <td colSpan="7" className="px-6 py-4 bg-red-50">
-                      <div className="max-w-md">
-                        <h4 className="font-medium text-red-900 mb-2">Anular Factura</h4>
-                        <textarea
-                          value={motivoAnulacion}
-                          onChange={(e) => setMotivoAnulacion(e.target.value)}
-                          placeholder="Ingrese el motivo de anulación (mínimo 10 caracteres)"
-                          className="w-full p-2 border border-red-300 rounded text-sm"
-                          rows="3"
-                        />
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            onClick={() => confirmarAnulacion(factura.id)}
-                            disabled={motivoAnulacion.length < 10}
-                            className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 disabled:opacity-50"
-                          >
-                            Confirmar Anulación
-                          </button>
-                          <button
-                            onClick={cancelarAnulacion}
-                            className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
-                          >
-                            Cancelar
-                          </button>
+                          <h4 className="font-medium text-gray-900 mb-2">Información Adicional</h4>
+                          <div className="space-y-1 text-sm">
+                            {factura.periodo_facturacion && (
+                              <div>
+                                <span className="text-gray-600">Período:</span>
+                                <span className="ml-2">{factura.periodo_facturacion}</span>
+                              </div>
+                            )}
+                            {factura.fecha_desde && factura.fecha_hasta && (
+                              <div>
+                                <span className="text-gray-600">Servicio:</span>
+                                <span className="ml-2">
+                                  {formatearFecha(factura.fecha_desde)} - {formatearFecha(factura.fecha_hasta)}
+                                </span>
+                              </div>
+                            )}
+                            {factura.observaciones && (
+                              <div>
+                                <span className="text-gray-600">Observaciones:</span>
+                                <p className="mt-1 text-gray-900">{factura.observaciones}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -344,135 +559,67 @@ const FacturasList = ({
         </table>
       </div>
 
-      {/* Vista para móviles */}
+      {/* Mobile Cards */}
       <div className="md:hidden">
         {facturas.map((factura) => (
           <div key={factura.id} className="border-b border-gray-200 p-4">
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <h3 className="font-medium text-gray-900">{factura.numero_factura}</h3>
-                <p className="text-sm text-gray-600">{factura.nombre_cliente}</p>
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-medium text-gray-900">
+                {factura.numero_factura}
               </div>
-              <div className="text-right">
-                {obtenerBadgeEstado(factura.estado)}
-                <p className="text-sm font-medium text-gray-900 mt-1">
-                  {FacturasService.formatearMoneda(factura.total)}
-                </p>
-              </div>
+              {getBadgeEstado(factura.estado)}
             </div>
             
             <div className="text-sm text-gray-600 mb-2">
-              <p>Vence: {FacturasService.formatearFecha(factura.fecha_vencimiento)}</p>
-              {calcularVencimiento(factura.fecha_vencimiento, factura.estado)}
+              <div className="flex items-center">
+                <User className="h-4 w-4 mr-1" />
+                {factura.nombre_cliente}
+              </div>
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => onDescargarPDF(factura)}
-                className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs"
-              >
-                📥 PDF
-              </button>
-              <button
-                onClick={() => onVerPDF(factura.id)}
-                className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
-              >
-                👁️ Ver
-              </button>
-              {factura.estado === 'pendiente' && (
-                <>
+            
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm text-gray-600 flex items-center">
+                <Calendar className="h-4 w-4 mr-1" />
+                {formatearFecha(factura.fecha_emision)}
+              </div>
+              <div className="text-lg font-bold text-gray-900">
+                {formatearMoneda(factura.total)}
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Vence: {formatearFecha(factura.fecha_vencimiento)}
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => onVerPDF && onVerPDF(factura.id)}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                >
+                  <Eye className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => onDescargarPDF && onDescargarPDF(factura.id)}
+                  className="p-2 text-gray-600 hover:bg-gray-50 rounded"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+                {factura.estado === 'pendiente' && (
                   <button
-                    onClick={() => onEditarFactura(factura)}
-                    className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs"
+                    onClick={() => onMarcarPagada && onMarcarPagada(factura)}
+                    className="p-2 text-green-600 hover:bg-green-50 rounded"
                   >
-                    ✏️ Editar
+                    <DollarSign className="h-4 w-4" />
                   </button>
-                  <button
-                    onClick={() => onMarcarPagada(factura)}
-                    className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs"
-                  >
-                    💰 Pagar
-                  </button>
-                </>
-              )}
+                )}
+              </div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Paginación */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => onCambiarPagina(pagination.currentPage - 1)}
-                disabled={pagination.currentPage <= 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => onCambiarPagina(pagination.currentPage + 1)}
-                disabled={pagination.currentPage >= pagination.totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                Siguiente
-              </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Mostrando{' '}
-                  <span className="font-medium">
-                    {(pagination.currentPage - 1) * pagination.itemsPerPage + 1}
-                  </span>{' '}
-                  a{' '}
-                  <span className="font-medium">
-                    {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)}
-                  </span>{' '}
-                  de{' '}
-                  <span className="font-medium">{pagination.totalItems}</span> facturas
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                  <button
-                    onClick={() => onCambiarPagina(pagination.currentPage - 1)}
-                    disabled={pagination.currentPage <= 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Anterior
-                  </button>
-                  {[...Array(pagination.totalPages)].map((_, index) => {
-                    const page = index + 1;
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => onCambiarPagina(page)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          page === pagination.currentPage
-                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    );
-                  })}
-                  <button
-                    onClick={() => onCambiarPagina(pagination.currentPage + 1)}
-                    disabled={pagination.currentPage >= pagination.totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Siguiente
-                  </button>
-                </nav>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <Pagination />
     </div>
   );
 };

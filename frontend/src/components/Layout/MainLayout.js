@@ -69,7 +69,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       permission: null
     },
     {
-      icon: <Users size={22} />,
+      icon: <UserCheck size={22} />,
       label: 'Usuarios sistema',
       path: '/admin/users',
       permission: 'supervisor'
@@ -82,13 +82,13 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
     },
     {
-      icon:  <Users size={22} />,
+      icon:  <Activity size={22} />,
       label: 'Facturación Automática',
       path: '/facturacion-automatica',
       permission: 'administrador' // o 'administrador' según tus necesidades
     },
      {
-      icon:  <Users size={22} />,
+      icon:  <TrendingUp size={22} />,
       label: 'Facturas',
       path: '/facturas',
       permission: 'administrador' // o 'administrador' según tus necesidades

@@ -1,11 +1,12 @@
-// components/Facturas/FacturaModal.js
+// components/Facturas/FacturaModal.js - Corregido
 import React, { useState, useEffect } from 'react';
-import { useFacturacionManual } from '../../hooks/useFacturacionManual';
+import { useFacturasAcciones, useFormularioFactura, useFacturasUtilidades } from '../../hooks/useFacturacionManual';
 import clientService from '../../services/clientService';
 import FacturasService from '../../services/facturacionManualService';
 
 const FacturaModal = ({ isOpen, isEditing, factura, onClose, onSuccess }) => {
-  const { crearFactura, actualizarFactura, loading, error, clearError } = useFacturacionManual();
+  const { crearFactura, actualizarFactura, loading, error, clearError } = useFacturasAcciones();
+  const { generarNumero } = useFacturasUtilidades();
 
   const [formData, setFormData] = useState({
     cliente_id: '',
@@ -59,22 +60,23 @@ const FacturaModal = ({ isOpen, isEditing, factura, onClose, onSuccess }) => {
         setBusquedaCliente(factura.nombre_cliente || '');
         setClienteSeleccionado({
           id: factura.cliente_id,
-          nombre: factura.nombre_cliente,
-          identificacion: factura.identificacion_cliente
+          nombre: factura.nombre_cliente
         });
       } else {
-        // Resetear para nueva factura
-        const fechaActual = new Date().toISOString().split('T')[0];
+        // Generar número de factura para nueva factura
+        generarNumeroFactura();
+        
+        // Formulario limpio para nueva factura
         const fechaVencimiento = new Date();
         fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
         
         setFormData({
           cliente_id: '',
-          periodo_facturacion: new Date().toISOString().substr(0, 7), // YYYY-MM
-          fecha_emision: fechaActual,
+          periodo_facturacion: '',
+          fecha_emision: new Date().toISOString().split('T')[0],
           fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
-          fecha_desde: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-          fecha_hasta: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0],
+          fecha_desde: '',
+          fecha_hasta: '',
           internet: 0,
           television: 0,
           saldo_anterior: 0,
@@ -93,6 +95,18 @@ const FacturaModal = ({ isOpen, isEditing, factura, onClose, onSuccess }) => {
       clearError();
     }
   }, [isOpen, isEditing, factura, clearError]);
+
+  // Generar número de factura automáticamente
+  const generarNumeroFactura = async () => {
+    try {
+      const numero = await generarNumero();
+      if (numero) {
+        setFormData(prev => ({ ...prev, numero_factura: numero }));
+      }
+    } catch (error) {
+      console.error('Error generando número de factura:', error);
+    }
+  };
 
   // Buscar clientes
   const buscarClientes = async (termino) => {
@@ -176,466 +190,499 @@ const FacturaModal = ({ isOpen, isEditing, factura, onClose, onSuccess }) => {
                    (formData.reconexion || 0) + (formData.varios || 0) + (formData.publicidad || 0);
     const descuentos = formData.descuento || 0;
     
-    return Math.max(0, servicios + cargos - descuentos);
+    const subtotal = servicios + cargos - descuentos;
+    const iva = subtotal > 0 ? subtotal * 0.19 : 0;
+    const total = subtotal + iva;
+    
+    return {
+      servicios: servicios.toFixed(2),
+      cargos: cargos.toFixed(2),
+      descuentos: descuentos.toFixed(2),
+      subtotal: subtotal.toFixed(2),
+      iva: iva.toFixed(2),
+      total: total.toFixed(2)
+    };
   };
 
   // Validar formulario
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.cliente_id || !clienteSeleccionado) {
-      newErrors.cliente_id = 'Debe seleccionar un cliente';
+  const validarFormulario = () => {
+    const nuevosErrores = {};
+    
+    if (!formData.cliente_id) {
+      nuevosErrores.cliente_id = 'Debe seleccionar un cliente';
     }
-
-    if (!formData.periodo_facturacion) {
-      newErrors.periodo_facturacion = 'Período de facturación es requerido';
+    
+    if (!formData.fecha_emision) {
+      nuevosErrores.fecha_emision = 'La fecha de emisión es requerida';
     }
-
+    
     if (!formData.fecha_vencimiento) {
-      newErrors.fecha_vencimiento = 'Fecha de vencimiento es requerida';
+      nuevosErrores.fecha_vencimiento = 'La fecha de vencimiento es requerida';
     }
-
-    if (!formData.fecha_desde) {
-      newErrors.fecha_desde = 'Fecha desde es requerida';
+    
+    // Validar que la fecha de vencimiento sea posterior a la de emisión
+    if (formData.fecha_emision && formData.fecha_vencimiento) {
+      const emision = new Date(formData.fecha_emision);
+      const vencimiento = new Date(formData.fecha_vencimiento);
+      
+      if (vencimiento <= emision) {
+        nuevosErrores.fecha_vencimiento = 'La fecha de vencimiento debe ser posterior a la de emisión';
+      }
     }
-
-    if (!formData.fecha_hasta) {
-      newErrors.fecha_hasta = 'Fecha hasta es requerida';
+    
+    // Validar que al menos un servicio tenga valor
+    const tieneServicios = (formData.internet || 0) > 0 || 
+                          (formData.television || 0) > 0 || 
+                          (formData.varios || 0) > 0 || 
+                          (formData.publicidad || 0) > 0;
+    
+    if (!tieneServicios) {
+      nuevosErrores.servicios = 'Debe especificar al menos un servicio o concepto';
     }
-
-    // Validar que fecha_hasta sea mayor que fecha_desde
-    if (formData.fecha_desde && formData.fecha_hasta && formData.fecha_desde > formData.fecha_hasta) {
-      newErrors.fecha_hasta = 'La fecha hasta debe ser mayor que la fecha desde';
-    }
-
-    // Validar que el total no sea 0
-    const total = calcularTotal();
-    if (total <= 0) {
-      newErrors.total = 'El total de la factura debe ser mayor a $0';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    
+    setErrors(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
   };
 
   // Manejar envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    if (!validarFormulario()) {
       return;
     }
-
+    
     try {
-      const datosFactura = {
-        ...formData,
-        total: calcularTotal()
-      };
-
-      if (isEditing) {
-        await actualizarFactura(factura.id, datosFactura);
+      setCalculandoTotal(true);
+      
+      // Usar el service para formatear y calcular totales
+      const datosFormateados = FacturasService.formatearDatosFactura(formData);
+      
+      let resultado;
+      if (isEditing && factura) {
+        resultado = await actualizarFactura(factura.id, datosFormateados);
       } else {
-        await crearFactura(datosFactura);
+        resultado = await crearFactura(datosFormateados);
       }
       
-      onSuccess();
+      if (resultado && onSuccess) {
+        onSuccess(resultado);
+      }
+      
+      if (onClose) {
+        onClose();
+      }
     } catch (error) {
       console.error('Error al guardar factura:', error);
+    } finally {
+      setCalculandoTotal(false);
     }
   };
 
-  if (!isOpen) {
-    return null;
-  }
+  // Manejar cierre del modal
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    }
+  };
 
-  const total = calcularTotal();
+  const totales = calcularTotal();
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-gray-900">
-              {isEditing ? `Editar Factura ${factura?.numero_factura}` : 'Nueva Factura'}
-            </h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl"
-            >
-              ✕
-            </button>
+        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {isEditing ? 'Editar Factura' : 'Nueva Factura'}
+            </h2>
+            <p className="text-gray-600 mt-1">
+              {isEditing 
+                ? `Modificar factura ${factura?.numero_factura || 'N/A'}`
+                : 'Crear una nueva factura manual'
+              }
+            </p>
           </div>
+          <button
+            onClick={handleClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        {/* Formulario */}
-        <form onSubmit={handleSubmit} className="px-6 py-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Columna izquierda - Información general */}
-            <div className="space-y-4">
-              <h4 className="text-lg font-medium text-gray-900 border-b pb-2">
-                Información General
-              </h4>
-
-              {/* Búsqueda de cliente */}
-              <div className="relative">
-                <label htmlFor="busqueda_cliente" className="block text-sm font-medium text-gray-700 mb-1">
-                  Cliente *
-                </label>
-                <input
-                  type="text"
-                  id="busqueda_cliente"
-                  value={busquedaCliente}
-                  onChange={handleBusquedaCliente}
-                  onFocus={() => setMostrarListaClientes(true)}
-                  placeholder="Buscar cliente por nombre o identificación..."
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.cliente_id ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  disabled={isEditing}
-                />
-                
-                {/* Lista de clientes */}
-                {mostrarListaClientes && clientes.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    {clientes.map((cliente) => (
-                      <button
-                        key={cliente.id}
-                        type="button"
-                        onClick={() => seleccionarCliente(cliente)}
-                        className="w-full px-4 py-2 text-left hover:bg-blue-50 focus:outline-none focus:bg-blue-50"
-                      >
-                        <div className="font-medium text-gray-900">{cliente.nombre}</div>
-                        <div className="text-sm text-gray-600">{cliente.identificacion}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                
-                {/* Cliente seleccionado */}
-                {clienteSeleccionado && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded border">
-                    <div className="text-sm">
-                      <strong>Cliente:</strong> {clienteSeleccionado.nombre}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      <strong>ID:</strong> {clienteSeleccionado.identificacion}
-                    </div>
-                  </div>
-                )}
-                
-                {errors.cliente_id && (
-                  <p className="text-red-600 text-sm mt-1">{errors.cliente_id}</p>
-                )}
-              </div>
-
-              {/* Período de facturación */}
-              <div>
-                <label htmlFor="periodo_facturacion" className="block text-sm font-medium text-gray-700 mb-1">
-                  Período de Facturación *
-                </label>
-                <input
-                  type="month"
-                  id="periodo_facturacion"
-                  name="periodo_facturacion"
-                  value={formData.periodo_facturacion}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.periodo_facturacion ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  required
-                />
-                {errors.periodo_facturacion && (
-                  <p className="text-red-600 text-sm mt-1">{errors.periodo_facturacion}</p>
-                )}
-              </div>
-
-              {/* Fechas */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="fecha_desde" className="block text-sm font-medium text-gray-700 mb-1">
-                    Fecha Desde *
-                  </label>
-                  <input
-                    type="date"
-                    id="fecha_desde"
-                    name="fecha_desde"
-                    value={formData.fecha_desde}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.fecha_desde ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    required
-                  />
-                  {errors.fecha_desde && (
-                    <p className="text-red-600 text-sm mt-1">{errors.fecha_desde}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="fecha_hasta" className="block text-sm font-medium text-gray-700 mb-1">
-                    Fecha Hasta *
-                  </label>
-                  <input
-                    type="date"
-                    id="fecha_hasta"
-                    name="fecha_hasta"
-                    value={formData.fecha_hasta}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.fecha_hasta ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    required
-                  />
-                  {errors.fecha_hasta && (
-                    <p className="text-red-600 text-sm mt-1">{errors.fecha_hasta}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Fecha de vencimiento */}
-              <div>
-                <label htmlFor="fecha_vencimiento" className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha de Vencimiento *
-                </label>
-                <input
-                  type="date"
-                  id="fecha_vencimiento"
-                  name="fecha_vencimiento"
-                  value={formData.fecha_vencimiento}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.fecha_vencimiento ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  required
-                />
-                {errors.fecha_vencimiento && (
-                  <p className="text-red-600 text-sm mt-1">{errors.fecha_vencimiento}</p>
-                )}
-              </div>
-
-              {/* Ruta y observaciones */}
-              <div>
-                <label htmlFor="ruta" className="block text-sm font-medium text-gray-700 mb-1">
-                  Ruta
-                </label>
-                <input
-                  type="text"
-                  id="ruta"
-                  name="ruta"
-                  value={formData.ruta}
-                  onChange={handleInputChange}
-                  placeholder="Ej: R01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="observaciones" className="block text-sm font-medium text-gray-700 mb-1">
-                  Observaciones
-                </label>
-                <textarea
-                  id="observaciones"
-                  name="observaciones"
-                  value={formData.observaciones}
-                  onChange={handleInputChange}
-                  rows="3"
-                  placeholder="Información adicional sobre la factura..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+        {/* Error display */}
+        {error && (
+          <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Error</h3>
+                <div className="mt-2 text-sm text-red-700">{error}</div>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Columna derecha - Conceptos y valores */}
-            <div className="space-y-4">
-              <h4 className="text-lg font-medium text-gray-900 border-b pb-2">
-                Conceptos y Valores
-              </h4>
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Información del Cliente */}
+            <div className="md:col-span-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Información del Cliente</h3>
+            </div>
 
-              {/* Servicios */}
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h5 className="font-medium text-blue-900 mb-3">Servicios</h5>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="internet" className="block text-sm font-medium text-gray-700 mb-1">
-                      Internet
-                    </label>
-                    <input
-                      type="number"
-                      id="internet"
-                      name="internet"
-                      value={formData.internet}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="television" className="block text-sm font-medium text-gray-700 mb-1">
-                      Televisión
-                    </label>
-                    <input
-                      type="number"
-                      id="television"
-                      name="television"
-                      value={formData.television}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+            {/* Búsqueda de Cliente */}
+            <div className="md:col-span-2 relative">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cliente *
+              </label>
+              <input
+                type="text"
+                value={busquedaCliente}
+                onChange={handleBusquedaCliente}
+                placeholder="Buscar cliente por nombre o identificación..."
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.cliente_id ? 'border-red-500' : ''
+                }`}
+              />
+              {errors.cliente_id && (
+                <p className="mt-1 text-sm text-red-600">{errors.cliente_id}</p>
+              )}
+              
+              {/* Lista de clientes */}
+              {mostrarListaClientes && clientes.length > 0 && (
+                <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
+                  {clientes.map((cliente) => (
+                    <div
+                      key={cliente.id}
+                      onClick={() => seleccionarCliente(cliente)}
+                      className="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    >
+                      <div className="font-medium text-gray-900">{cliente.nombre}</div>
+                      <div className="text-sm text-gray-600">{cliente.identificacion}</div>
+                      {cliente.direccion && (
+                        <div className="text-xs text-gray-500">{cliente.direccion}</div>
+                      )}
+                    </div>
+                  ))}
                 </div>
+              )}
+            </div>
+
+            {/* Información de Facturación */}
+            <div className="md:col-span-2 mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Información de Facturación</h3>
+            </div>
+
+            {/* Período de Facturación */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Período de Facturación
+              </label>
+              <input
+                type="month"
+                name="periodo_facturacion"
+                value={formData.periodo_facturacion}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Ruta */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ruta
+              </label>
+              <input
+                type="text"
+                name="ruta"
+                value={formData.ruta}
+                onChange={handleInputChange}
+                placeholder="Ej: Ruta 1, Centro, etc."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Fecha de Emisión */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Fecha de Emisión *
+              </label>
+              <input
+                type="date"
+                name="fecha_emision"
+                value={formData.fecha_emision}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.fecha_emision ? 'border-red-500' : ''
+                }`}
+              />
+              {errors.fecha_emision && (
+                <p className="mt-1 text-sm text-red-600">{errors.fecha_emision}</p>
+              )}
+            </div>
+
+            {/* Fecha de Vencimiento */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Fecha de Vencimiento *
+              </label>
+              <input
+                type="date"
+                name="fecha_vencimiento"
+                value={formData.fecha_vencimiento}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.fecha_vencimiento ? 'border-red-500' : ''
+                }`}
+              />
+              {errors.fecha_vencimiento && (
+                <p className="mt-1 text-sm text-red-600">{errors.fecha_vencimiento}</p>
+              )}
+            </div>
+
+            {/* Fecha Desde */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Período Desde
+              </label>
+              <input
+                type="date"
+                name="fecha_desde"
+                value={formData.fecha_desde}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Fecha Hasta */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Período Hasta
+              </label>
+              <input
+                type="date"
+                name="fecha_hasta"
+                value={formData.fecha_hasta}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Servicios y Conceptos */}
+            <div className="md:col-span-2 mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Servicios y Conceptos</h3>
+            </div>
+
+            {/* Internet */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Internet ($)
+              </label>
+              <input
+                type="number"
+                name="internet"
+                value={formData.internet}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Televisión */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Televisión ($)
+              </label>
+              <input
+                type="number"
+                name="television"
+                value={formData.television}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Saldo Anterior */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Saldo Anterior ($)
+              </label>
+              <input
+                type="number"
+                name="saldo_anterior"
+                value={formData.saldo_anterior}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Interés */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Interés ($)
+              </label>
+              <input
+                type="number"
+                name="interes"
+                value={formData.interes}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Reconexión */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Reconexión ($)
+              </label>
+              <input
+                type="number"
+                name="reconexion"
+                value={formData.reconexion}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Descuento */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Descuento ($)
+              </label>
+              <input
+                type="number"
+                name="descuento"
+                value={formData.descuento}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Varios */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Varios ($)
+              </label>
+              <input
+                type="number"
+                name="varios"
+                value={formData.varios}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Publicidad */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Publicidad ($)
+              </label>
+              <input
+                type="number"
+                name="publicidad"
+                value={formData.publicidad}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Observaciones */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Observaciones
+              </label>
+              <textarea
+                name="observaciones"
+                value={formData.observaciones}
+                onChange={handleInputChange}
+                rows="3"
+                placeholder="Observaciones adicionales sobre la factura..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Error de servicios */}
+            {errors.servicios && (
+              <div className="md:col-span-2">
+                <p className="text-sm text-red-600">{errors.servicios}</p>
               </div>
+            )}
+          </div>
 
-              {/* Cargos adicionales */}
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <h5 className="font-medium text-yellow-900 mb-3">Cargos Adicionales</h5>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="saldo_anterior" className="block text-sm font-medium text-gray-700 mb-1">
-                      Saldo Anterior
-                    </label>
-                    <input
-                      type="number"
-                      id="saldo_anterior"
-                      name="saldo_anterior"
-                      value={formData.saldo_anterior}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="interes" className="block text-sm font-medium text-gray-700 mb-1">
-                      Intereses
-                    </label>
-                    <input
-                      type="number"
-                      id="interes"
-                      name="interes"
-                      value={formData.interes}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="reconexion" className="block text-sm font-medium text-gray-700 mb-1">
-                      Reconexión
-                    </label>
-                    <input
-                      type="number"
-                      id="reconexion"
-                      name="reconexion"
-                      value={formData.reconexion}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="varios" className="block text-sm font-medium text-gray-700 mb-1">
-                      Varios
-                    </label>
-                    <input
-                      type="number"
-                      id="varios"
-                      name="varios"
-                      value={formData.varios}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="publicidad" className="block text-sm font-medium text-gray-700 mb-1">
-                      Publicidad
-                    </label>
-                    <input
-                      type="number"
-                      id="publicidad"
-                      name="publicidad"
-                      value={formData.publicidad}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="descuento" className="block text-sm font-medium text-gray-700 mb-1">
-                      Descuento
-                    </label>
-                    <input
-                      type="number"
-                      id="descuento"
-                      name="descuento"
-                      value={formData.descuento}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
+          {/* Resumen de Totales */}
+          <div className="mt-8 bg-gray-50 p-6 rounded-lg">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumen de Totales</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Servicios:</span>
+                <span className="font-medium">${totales.servicios}</span>
               </div>
-
-              {/* Total */}
-              <div className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
-                <h5 className="font-medium text-green-900 mb-2">Total de la Factura</h5>
-                <div className="text-2xl font-bold text-green-700">
-                  {FacturasService.formatearMoneda(total)}
-                </div>
-                {errors.total && (
-                  <p className="text-red-600 text-sm mt-1">{errors.total}</p>
-                )}
+              <div className="flex justify-between">
+                <span className="text-gray-600">Otros Cargos:</span>
+                <span className="font-medium">${totales.cargos}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Descuentos:</span>
+                <span className="font-medium text-red-600">-${totales.descuentos}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Subtotal:</span>
+                <span className="font-medium">${totales.subtotal}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">IVA (19%):</span>
+                <span className="font-medium">${totales.iva}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2">
+                <span className="text-lg font-bold text-gray-900">Total:</span>
+                <span className="text-lg font-bold text-blue-600">${totales.total}</span>
               </div>
             </div>
           </div>
 
-          {/* Error general */}
-          {error && (
-            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-red-600">{error}</p>
-            </div>
-          )}
-
           {/* Botones */}
-          <div className="flex gap-4 mt-8 pt-6 border-t border-gray-200">
+          <div className="flex justify-end space-x-4 mt-8">
             <button
               type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
+              onClick={handleClose}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+              disabled={loading || calculandoTotal}
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={loading || total <= 0}
-              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center gap-2"
+              disabled={loading || calculandoTotal}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  {isEditing ? 'Actualizando...' : 'Creando...'}
-                </>
+              {loading || calculandoTotal ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  {calculandoTotal ? 'Calculando...' : 'Guardando...'}
+                </div>
               ) : (
-                <>
-                  {isEditing ? '✏️ Actualizar Factura' : '💾 Crear Factura'}
-                </>
+                isEditing ? 'Actualizar Factura' : 'Crear Factura'
               )}
             </button>
           </div>

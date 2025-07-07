@@ -24,7 +24,8 @@ export const facturacionManualService = {
     try {
       console.log('🔍 Obteniendo facturas con parámetros:', params);
       
-      const response = await apiService.get(API_BASE, { params });
+      // CORREGIDO: Enviar parámetros directamente sin anidar en params
+      const response = await apiService.get(API_BASE, params);
       
       // Manejar diferentes estructuras de respuesta
       if (response?.data?.facturas) {
@@ -226,7 +227,8 @@ export const facturacionManualService = {
     try {
       console.log('🔍 Buscando facturas con criterios:', criterios);
       
-      const response = await apiService.get(`${API_BASE}/search`, { params: criterios });
+      // CORREGIDO: Enviar parámetros directamente
+      const response = await apiService.get(`${API_BASE}/search`, criterios);
       return response;
     } catch (error) {
       console.error('❌ Error buscando facturas:', error);
@@ -242,7 +244,8 @@ export const facturacionManualService = {
     try {
       console.log('⏰ Obteniendo facturas vencidas');
       
-      const response = await apiService.get(`${API_BASE}/vencidas`, { params });
+      // CORREGIDO: Enviar parámetros directamente
+      const response = await apiService.get(`${API_BASE}/vencidas`, params);
       return response;
     } catch (error) {
       console.error('❌ Error obteniendo facturas vencidas:', error);
@@ -262,7 +265,8 @@ export const facturacionManualService = {
     try {
       console.log('📊 Obteniendo estadísticas de facturas');
       
-      const response = await apiService.get(`${API_BASE}/stats`, { params });
+      // CORREGIDO: Enviar parámetros directamente
+      const response = await apiService.get(`${API_BASE}/stats`, params);
       return response;
     } catch (error) {
       console.error('❌ Error obteniendo estadísticas:', error);

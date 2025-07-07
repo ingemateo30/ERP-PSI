@@ -1,830 +1,326 @@
 // frontend/src/hooks/useFacturacionManual.js
-// Hook personalizado para gestión de facturación manual
+// Hooks específicos para componentes en carpeta Facturas/
+// Conecta con facturacionManualService.js y backend/routes/factura.js
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import facturacionManualService, { ESTADOS_FACTURA, METODOS_PAGO } from '../services/facturacionManualService';
 import { useAuth } from '../contexts/AuthContext';
 
-/**
- * Hook personalizado para gestión de facturación manual
- * Proporciona todas las funcionalidades necesarias para CRUD de facturas
- */
-export const useFacturacionManual = () => {
-  // Estados principales
+// ==========================================
+// HOOK PRINCIPAL PARA FacturasManagement.js
+// ==========================================
+export const useFacturas = () => {
   const [facturas, setFacturas] = useState([]);
-  const [facturaActual, setFacturaActual] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  
-  // Estados de paginación y filtros
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
     total: 0,
     totalPages: 0
   });
-  
-  const [filtros, setFiltros] = useState({
-    search: '',
-    estado: '',
-    fecha_desde: '',
-    fecha_hasta: '',
-    cliente_id: '',
-    ruta: ''
-  });
+  const [filtrosActivos, setFiltrosActivos] = useState({ page: 1, limit: 10 });
 
-  // Estados de estadísticas
-  const [estadisticas, setEstadisticas] = useState(null);
+  // Memoizar filtros para evitar re-renders innecesarios
+  const filtrosMemoizados = useMemo(() => filtrosActivos, [filtrosActivos]);
 
-  // Contexto de autenticación
-  const { user, hasPermission } = useAuth();
-
-  // ==========================================
-  // UTILIDADES DE ESTADO
-  // ==========================================
-
-  /**
-   * Limpiar errores
-   */
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  /**
-   * Limpiar mensajes de éxito
-   */
-  const clearSuccess = useCallback(() => {
-    setSuccess(null);
-  }, []);
-
-  /**
-   * Limpiar todos los mensajes
-   */
-  const clearMessages = useCallback(() => {
-    setError(null);
-    setSuccess(null);
-  }, []);
-
-  /**
-   * Manejar errores de forma centralizada
-   */
-  const handleError = useCallback((error, defaultMessage = 'Error desconocido') => {
-    console.error('❌ Error en hook facturación manual:', error);
-    
-    let errorMessage = defaultMessage;
-    
-    if (typeof error === 'string') {
-      errorMessage = error;
-    } else if (error?.message) {
-      errorMessage = error.message;
-    } else if (error?.response?.data?.message) {
-      errorMessage = error.response.data.message;
-    }
-    
-    setError(errorMessage);
-    setLoading(false);
-  }, []);
-
-  /**
-   * Manejar éxito
-   */
-  const handleSuccess = useCallback((message) => {
-    setSuccess(message);
-    setError(null);
-  }, []);
-
-  // ==========================================
-  // OPERACIONES CRUD
-  // ==========================================
-
-  /**
-   * Cargar lista de facturas con filtros
-   */
-  const cargarFacturas = useCallback(async (params = {}) => {
+  // Función principal para cargar facturas - CONECTA CON facturacionManualService
+  const cargarFacturas = useCallback(async (filtros = filtrosMemoizados) => {
     try {
       setLoading(true);
       setError(null);
-
-      const parametros = {
-        ...filtros,
-        ...params,
-        page: params.page || pagination.page,
-        limit: params.limit || pagination.limit
-      };
-
-      console.log('📋 Cargando facturas con parámetros:', parametros);
-
-      const response = await facturacionManualService.obtenerFacturas(parametros);
-
+      
+      console.log('🔍 [FacturasManagement] Cargando facturas con filtros:', filtros);
+      
+      // CONECTA: useFacturacionManual -> facturacionManualService -> backend/routes/factura.js
+      const response = await facturacionManualService.obtenerFacturas(filtros);
+      
+      console.log('✅ [FacturasManagement] Respuesta del service:', response);
+      
+      // Manejar estructura de respuesta
       if (response?.facturas) {
         setFacturas(response.facturas);
-        
         if (response.pagination) {
-          setPagination(prev => ({
-            ...prev,
-            ...response.pagination
-          }));
-        }
-        
-        if (response.stats) {
-          setEstadisticas(response.stats);
+          setPagination(response.pagination);
         }
       } else if (Array.isArray(response?.data)) {
         setFacturas(response.data);
+      } else if (Array.isArray(response)) {
+        setFacturas(response);
+      } else {
+        setFacturas([]);
       }
-
-      console.log('✅ Facturas cargadas exitosamente');
-    } catch (error) {
-      handleError(error, 'Error cargando facturas');
+      
+      // Actualizar filtros activos
+      setFiltrosActivos(filtros);
+      
+    } catch (err) {
+      console.error('❌ [FacturasManagement] Error cargando facturas:', err);
+      let errorMessage = 'Error desconocido';
+      
+      if (err?.response) {
+        switch (err.response.status) {
+          case 401:
+            errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente.';
+            break;
+          case 404:
+            errorMessage = 'Servicio de facturas no disponible.';
+            break;
+          case 500:
+            errorMessage = 'Error interno del servidor.';
+            break;
+          default:
+            errorMessage = err.response.data?.message || `Error del servidor: ${err.response.status}`;
+        }
+      } else if (err?.request) {
+        errorMessage = 'No se pudo conectar con el servidor.';
+      } else {
+        errorMessage = err.message || 'Error desconocido';
+      }
+      
+      setError(errorMessage);
       setFacturas([]);
     } finally {
       setLoading(false);
     }
-  }, [filtros, pagination.page, pagination.limit, handleError]);
+  }, [filtrosMemoizados]);
 
-  /**
-   * Cargar factura específica por ID
-   */
-  const cargarFactura = useCallback(async (id) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log(`🔍 Cargando factura ID: ${id}`);
-
-      const response = await facturacionManualService.obtenerFacturaPorId(id);
-      
-      if (response?.data) {
-        setFacturaActual(response.data);
-        console.log('✅ Factura cargada exitosamente');
-        return response.data;
-      }
-      
-      return null;
-    } catch (error) {
-      handleError(error, 'Error cargando factura');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [handleError]);
-
-  /**
-   * Crear nueva factura manual
-   */
-  const crearFactura = useCallback(async (datosFactura) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log('➕ Creando nueva factura manual');
-
-      // Formatear datos antes de enviar
-      const datosFormateados = facturacionManualService.formatearDatosFactura(datosFactura);
-
-      const response = await facturacionManualService.crearFacturaManual(datosFormateados);
-
-      if (response?.data) {
-        // Agregar a la lista local
-        setFacturas(prev => [response.data, ...prev]);
-        setFacturaActual(response.data);
-        
-        handleSuccess('Factura creada exitosamente');
-        
-        console.log('✅ Factura creada exitosamente');
-        return response.data;
-      }
-
-      return null;
-    } catch (error) {
-      handleError(error, 'Error creando factura');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [handleError, handleSuccess]);
-
-  /**
-   * Actualizar factura existente
-   */
-  const actualizarFactura = useCallback(async (id, datosFactura) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log(`✏️ Actualizando factura ID: ${id}`);
-
-      // Formatear datos antes de enviar
-      const datosFormateados = facturacionManualService.formatearDatosFactura(datosFactura);
-
-      const response = await facturacionManualService.actualizarFactura(id, datosFormateados);
-
-      if (response?.data) {
-        // Actualizar en la lista local
-        setFacturas(prev => 
-          prev.map(factura => 
-            factura.id === id ? { ...factura, ...response.data } : factura
-          )
-        );
-        
-        setFacturaActual(response.data);
-        
-        handleSuccess('Factura actualizada exitosamente');
-        
-        console.log('✅ Factura actualizada exitosamente');
-        return response.data;
-      }
-
-      return null;
-    } catch (error) {
-      handleError(error, 'Error actualizando factura');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [handleError, handleSuccess]);
-
-  /**
-   * Duplicar factura existente
-   */
-  const duplicarFactura = useCallback(async (id) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log(`📋 Duplicando factura ID: ${id}`);
-
-      const response = await facturacionManualService.duplicarFactura(id);
-
-      if (response?.data) {
-        // Agregar copia a la lista local
-        setFacturas(prev => [response.data, ...prev]);
-        setFacturaActual(response.data);
-        
-        handleSuccess('Factura duplicada exitosamente');
-        
-        console.log('✅ Factura duplicada exitosamente');
-        return response.data;
-      }
-
-      return null;
-    } catch (error) {
-      handleError(error, 'Error duplicando factura');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [handleError, handleSuccess]);
-
-  // ==========================================
-  // GESTIÓN DE PAGOS
-  // ==========================================
-
-  /**
-   * Registrar pago de factura
-   */
-  const registrarPago = useCallback(async (facturaId, datosPago) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log(`💰 Registrando pago para factura: ${facturaId}`);
-
-      const response = await facturacionManualService.registrarPago(facturaId, datosPago);
-
-      if (response?.data) {
-        // Actualizar estado de la factura en la lista local
-        setFacturas(prev => 
-          prev.map(factura => 
-            factura.id === facturaId 
-              ? { 
-                  ...factura, 
-                  estado: response.data.nuevo_estado || 'pagada',
-                  fecha_pago: new Date().toISOString().split('T')[0],
-                  valor_pagado: response.data.valor_pagado,
-                  saldo_pendiente: response.data.saldo_pendiente || 0
-                }
-              : factura
-          )
-        );
-        
-        // Actualizar factura actual si es la misma
-        if (facturaActual?.id === facturaId) {
-          setFacturaActual(prev => ({
-            ...prev,
-            estado: response.data.nuevo_estado || 'pagada',
-            fecha_pago: new Date().toISOString().split('T')[0],
-            valor_pagado: response.data.valor_pagado,
-            saldo_pendiente: response.data.saldo_pendiente || 0
-          }));
-        }
-        
-        handleSuccess('Pago registrado exitosamente');
-        
-        console.log('✅ Pago registrado exitosamente');
-        return response.data;
-      }
-
-      return null;
-    } catch (error) {
-      handleError(error, 'Error registrando pago');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [facturaActual, handleError, handleSuccess]);
-
-  /**
-   * Anular factura
-   */
-  const anularFactura = useCallback(async (id, motivo = '') => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log(`❌ Anulando factura ID: ${id}`);
-
-      const response = await facturacionManualService.anularFactura(id, motivo);
-
-      if (response?.success) {
-        // Actualizar estado en la lista local
-        setFacturas(prev => 
-          prev.map(factura => 
-            factura.id === id 
-              ? { ...factura, estado: 'anulada', motivo_anulacion: motivo }
-              : factura
-          )
-        );
-        
-        // Actualizar factura actual si es la misma
-        if (facturaActual?.id === id) {
-          setFacturaActual(prev => ({
-            ...prev,
-            estado: 'anulada',
-            motivo_anulacion: motivo
-          }));
-        }
-        
-        handleSuccess('Factura anulada exitosamente');
-        
-        console.log('✅ Factura anulada exitosamente');
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      handleError(error, 'Error anulando factura');
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [facturaActual, handleError, handleSuccess]);
-
-  // ==========================================
-  // BÚSQUEDAS Y FILTROS
-  // ==========================================
-
-  /**
-   * Buscar facturas con criterios específicos
-   */
-  const buscarFacturas = useCallback(async (criterios = {}) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log('🔍 Buscando facturas con criterios:', criterios);
-
-      const response = await facturacionManualService.buscarFacturas(criterios);
-
-      if (response?.data) {
-        setFacturas(Array.isArray(response.data) ? response.data : []);
-        
-        if (response.pagination) {
-          setPagination(prev => ({
-            ...prev,
-            ...response.pagination
-          }));
-        }
-        
-        console.log('✅ Búsqueda completada exitosamente');
-        return response.data;
-      }
-
-      return [];
-    } catch (error) {
-      handleError(error, 'Error buscando facturas');
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, [handleError]);
-
-  /**
-   * Obtener facturas vencidas
-   */
-  const cargarFacturasVencidas = useCallback(async (params = {}) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log('⏰ Cargando facturas vencidas');
-
-      const response = await facturacionManualService.obtenerFacturasVencidas(params);
-
-      if (response?.data) {
-        // Si es una búsqueda específica, no reemplazar la lista principal
-        if (params.separateList) {
-          console.log('✅ Facturas vencidas cargadas exitosamente');
-          return response.data;
-        } else {
-          setFacturas(Array.isArray(response.data) ? response.data : []);
-        }
-        
-        if (response.pagination) {
-          setPagination(prev => ({
-            ...prev,
-            ...response.pagination
-          }));
-        }
-      }
-
-      return response?.data || [];
-    } catch (error) {
-      handleError(error, 'Error cargando facturas vencidas');
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, [handleError]);
-
-  // ==========================================
-  // ESTADÍSTICAS Y REPORTES
-  // ==========================================
-
-  /**
-   * Cargar estadísticas de facturas
-   */
-  const cargarEstadisticas = useCallback(async (params = {}) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log('📊 Cargando estadísticas de facturas');
-
-      const response = await facturacionManualService.obtenerEstadisticas(params);
-
-      if (response?.data) {
-        setEstadisticas(response.data);
-        console.log('✅ Estadísticas cargadas exitosamente');
-        return response.data;
-      }
-
-      return null;
-    } catch (error) {
-      handleError(error, 'Error cargando estadísticas');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [handleError]);
-
-  // ==========================================
-  // GENERACIÓN DE DOCUMENTOS
-  // ==========================================
-
-  /**
-   * Generar y descargar PDF de factura
-   */
-  const descargarPDF = useCallback(async (id) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log(`📄 Descargando PDF de factura: ${id}`);
-
-      await facturacionManualService.generarPDF(id, true);
-      
-      handleSuccess('PDF descargado exitosamente');
-      console.log('✅ PDF descargado exitosamente');
-      
-      return true;
-    } catch (error) {
-      handleError(error, 'Error descargando PDF');
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [handleError, handleSuccess]);
-
-  /**
-   * Ver PDF en navegador
-   */
-  const verPDF = useCallback(async (id) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log(`👁️ Visualizando PDF de factura: ${id}`);
-
-      await facturacionManualService.verPDF(id);
-      
-      console.log('✅ PDF visualizado exitosamente');
-      return true;
-    } catch (error) {
-      handleError(error, 'Error visualizando PDF');
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [handleError]);
-
-  // ==========================================
-  // UTILIDADES
-  // ==========================================
-
-  /**
-   * Generar número de factura
-   */
-  const generarNumeroFactura = useCallback(async () => {
-    try {
-      setError(null);
-
-      console.log('🔢 Generando número de factura');
-
-      const response = await facturacionManualService.generarNumeroFactura();
-
-      if (response?.data?.numero) {
-        console.log('✅ Número de factura generado:', response.data.numero);
-        return response.data.numero;
-      }
-
-      return null;
-    } catch (error) {
-      handleError(error, 'Error generando número de factura');
-      return null;
-    }
-  }, [handleError]);
-
-  /**
-   * Validar número de factura
-   */
-  const validarNumeroFactura = useCallback(async (numero) => {
-    try {
-      setError(null);
-
-      console.log(`✅ Validando número de factura: ${numero}`);
-
-      const response = await facturacionManualService.validarNumeroFactura(numero);
-
-      return response?.data?.valido || false;
-    } catch (error) {
-      console.error('Error validando número de factura:', error);
-      return false;
-    }
-  }, []);
-
-  /**
-   * Calcular totales de factura
-   */
-  const calcularTotales = useCallback((datosFactura) => {
-    return facturacionManualService.calcularTotales(datosFactura);
-  }, []);
-
-  // ==========================================
-  // GESTIÓN DE FILTROS Y PAGINACIÓN
-  // ==========================================
-
-  /**
-   * Actualizar filtros
-   */
-  const actualizarFiltros = useCallback((nuevosFiltros) => {
-    setFiltros(prev => ({
-      ...prev,
-      ...nuevosFiltros
-    }));
-    
-    // Resetear paginación al cambiar filtros
-    setPagination(prev => ({
-      ...prev,
-      page: 1
-    }));
-  }, []);
-
-  /**
-   * Limpiar filtros
-   */
-  const limpiarFiltros = useCallback(() => {
-    setFiltros({
-      search: '',
-      estado: '',
-      fecha_desde: '',
-      fecha_hasta: '',
-      cliente_id: '',
-      ruta: ''
-    });
-    
-    setPagination(prev => ({
-      ...prev,
-      page: 1
-    }));
-  }, []);
-
-  /**
-   * Cambiar página
-   */
+  // Cambiar página sin duplicar filtros
   const cambiarPagina = useCallback((nuevaPagina) => {
-    setPagination(prev => ({
-      ...prev,
-      page: nuevaPagina
-    }));
-  }, []);
+    const nuevosFiltros = { ...filtrosActivos, page: nuevaPagina };
+    cargarFacturas(nuevosFiltros);
+  }, [cargarFacturas, filtrosActivos]);
 
-  /**
-   * Cambiar límite por página
-   */
-  const cambiarLimite = useCallback((nuevoLimite) => {
-    setPagination(prev => ({
-      ...prev,
-      limit: nuevoLimite,
-      page: 1 // Resetear a primera página
-    }));
-  }, []);
+  // Aplicar filtros sin duplicar - PARA FacturasFilters.js
+  const aplicarFiltros = useCallback((nuevosFiltros) => {
+    const filtrosCombinados = { 
+      ...filtrosActivos, 
+      ...nuevosFiltros, 
+      page: 1 // Resetear página al aplicar filtros
+    };
+    cargarFacturas(filtrosCombinados);
+  }, [cargarFacturas, filtrosActivos]);
 
-  // ==========================================
-  // FACTURACIÓN AUTOMÁTICA
-  // ==========================================
+  // Limpiar filtros completamente
+  const limpiarFiltros = useCallback(() => {
+    const filtrosLimpios = { page: 1, limit: 10 };
+    setFiltrosActivos(filtrosLimpios);
+    cargarFacturas(filtrosLimpios);
+  }, [cargarFacturas]);
 
-  /**
-   * Generar facturación mensual masiva
-   */
-  const generarFacturacionMensual = useCallback(async (params = {}) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log('🔄 Iniciando facturación mensual masiva');
-
-      const response = await facturacionManualService.generarFacturacionMensual(params);
-
-      if (response?.data) {
-        handleSuccess(`Facturación mensual completada: ${response.data.exitosas} exitosas, ${response.data.fallidas} fallidas`);
-        
-        // Recargar lista de facturas
-        await cargarFacturas();
-        
-        console.log('✅ Facturación mensual completada');
-        return response.data;
-      }
-
-      return null;
-    } catch (error) {
-      handleError(error, 'Error en facturación mensual');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [handleError, handleSuccess, cargarFacturas]);
-
-  /**
-   * Generar factura individual para cliente
-   */
-  const generarFacturaIndividual = useCallback(async (clienteId, params = {}) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log(`🧾 Generando factura individual para cliente: ${clienteId}`);
-
-      const response = await facturacionManualService.generarFacturaIndividual(clienteId, params);
-
-      if (response?.data) {
-        // Agregar nueva factura a la lista
-        setFacturas(prev => [response.data, ...prev]);
-        
-        handleSuccess('Factura individual generada exitosamente');
-        
-        console.log('✅ Factura individual generada');
-        return response.data;
-      }
-
-      return null;
-    } catch (error) {
-      handleError(error, 'Error generando factura individual');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [handleError, handleSuccess]);
-
-  // ==========================================
-  // EFECTOS
-  // ==========================================
-
-  /**
-   * Cargar facturas al montar el componente o cambiar filtros/paginación
-   */
-  useEffect(() => {
+  // Refrescar manteniendo filtros actuales
+  const refrescar = useCallback(() => {
     cargarFacturas();
   }, [cargarFacturas]);
 
-  /**
-   * Limpiar mensajes después de un tiempo
-   */
+  // Carga inicial solo una vez
   useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => {
-        setSuccess(null);
-      }, 5000);
-      
-      return () => clearTimeout(timer);
+    if (facturas.length === 0 && !loading && !error) {
+      console.log('🚀 [FacturasManagement] Cargando facturas iniciales...');
+      cargarFacturas();
     }
-  }, [success]);
-
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => {
-        setError(null);
-      }, 8000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [error]);
-
-  // ==========================================
-  // RETURN DEL HOOK
-  // ==========================================
+  }, []); // Solo al montar
 
   return {
-    // Estados principales
     facturas,
-    facturaActual,
     loading,
     error,
-    success,
-    estadisticas,
     pagination,
-    filtros,
-
-    // Operaciones CRUD
+    filtros: filtrosActivos,
     cargarFacturas,
-    cargarFactura,
-    crearFactura,
-    actualizarFactura,
-    duplicarFactura,
-
-    // Gestión de pagos
-    registrarPago,
-    anularFactura,
-
-    // Búsquedas y filtros
-    buscarFacturas,
-    cargarFacturasVencidas,
-
-    // Estadísticas y reportes
-    cargarEstadisticas,
-
-    // Documentos
-    descargarPDF,
-    verPDF,
-
-    // Utilidades
-    generarNumeroFactura,
-    validarNumeroFactura,
-    calcularTotales,
-
-    // Gestión de filtros y paginación
-    actualizarFiltros,
-    limpiarFiltros,
     cambiarPagina,
-    cambiarLimite,
-
-    // Facturación automática
-    generarFacturacionMensual,
-    generarFacturaIndividual,
-
-    // Gestión de mensajes
-    clearError,
-    clearSuccess,
-    clearMessages,
-
-    // Constantes útiles
-    ESTADOS_FACTURA,
-    METODOS_PAGO,
-
-    // Información del usuario
-    user,
-    hasPermission
+    aplicarFiltros,
+    limpiarFiltros,
+    refrescar
   };
 };
 
 // ==========================================
-// HOOK ESPECIALIZADO PARA FORMULARIOS
+// HOOK PARA ACCIONES - FacturaModal.js, PagoModal.js, AnularModal.js
 // ==========================================
+export const useFacturasAcciones = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-/**
- * Hook especializado para formularios de factura
- */
+  const ejecutarAccion = useCallback(async (accion, nombreAccion = 'acción') => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log(`🔄 [FacturasAcciones] Ejecutando ${nombreAccion}...`);
+      
+      const resultado = await accion();
+      console.log(`✅ [FacturasAcciones] ${nombreAccion} completada exitosamente`);
+      return resultado;
+    } catch (err) {
+      console.error(`❌ [FacturasAcciones] Error en ${nombreAccion}:`, err);
+      let errorMessage = `Error al ${nombreAccion}`;
+      
+      if (err?.message) {
+        errorMessage = err.message;
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      }
+      
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // CREAR FACTURA - Para FacturaModal.js
+  const crearFactura = useCallback(async (datosFactura) => {
+    return ejecutarAccion(
+      () => facturacionManualService.crearFacturaManual(datosFactura),
+      'crear factura'
+    );
+  }, [ejecutarAccion]);
+
+  // ACTUALIZAR FACTURA - Para FacturaModal.js
+  const actualizarFactura = useCallback(async (id, datosFactura) => {
+    if (!id) throw new Error('ID de factura requerido para actualizar');
+    return ejecutarAccion(
+      () => facturacionManualService.actualizarFactura(id, datosFactura),
+      'actualizar factura'
+    );
+  }, [ejecutarAccion]);
+
+  // REGISTRAR PAGO - Para PagoModal.js
+  const marcarComoPagada = useCallback(async (facturaId, datosPago = {}) => {
+    if (!facturaId) throw new Error('ID de factura requerido para pago');
+    
+    // Valores por defecto para pago
+    const datosCompletos = {
+      valor_pagado: datosPago.valor_pagado || datosPago.monto || 0,
+      metodo_pago: datosPago.metodo_pago || 'efectivo',
+      fecha_pago: datosPago.fecha_pago || new Date().toISOString().split('T')[0],
+      observaciones: datosPago.observaciones || '',
+      ...datosPago
+    };
+    
+    return ejecutarAccion(
+      () => facturacionManualService.registrarPago(facturaId, datosCompletos),
+      'registrar pago'
+    );
+  }, [ejecutarAccion]);
+
+  // ANULAR FACTURA - Para AnularModal.js
+  const anularFactura = useCallback(async (id, motivo = '') => {
+    if (!id) throw new Error('ID de factura requerido para anular');
+    return ejecutarAccion(
+      () => facturacionManualService.anularFactura(id, motivo),
+      'anular factura'
+    );
+  }, [ejecutarAccion]);
+
+  // DUPLICAR FACTURA - Para FacturasList.js
+  const duplicarFactura = useCallback(async (id) => {
+    if (!id) throw new Error('ID de factura requerido para duplicar');
+    return ejecutarAccion(
+      () => facturacionManualService.duplicarFactura(id),
+      'duplicar factura'
+    );
+  }, [ejecutarAccion]);
+
+  // DESCARGAR PDF - Para FacturasList.js
+  const descargarPDF = useCallback(async (facturaId) => {
+    if (!facturaId) throw new Error('ID de factura requerido');
+    return ejecutarAccion(
+      () => facturacionManualService.generarPDF(facturaId, true),
+      'descargar PDF'
+    );
+  }, [ejecutarAccion]);
+
+  // VER PDF - Para FacturasList.js
+  const verPDF = useCallback(async (facturaId) => {
+    if (!facturaId) throw new Error('ID de factura requerido');
+    try {
+      await facturacionManualService.verPDF(facturaId);
+    } catch (error) {
+      console.error('Error visualizando PDF:', error);
+      setError('Error al visualizar PDF');
+    }
+  }, []);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return {
+    loading,
+    error,
+    crearFactura,
+    actualizarFactura,
+    marcarComoPagada,
+    anularFactura,
+    duplicarFactura,
+    descargarPDF,
+    verPDF,
+    clearError
+  };
+};
+
+// ==========================================
+// HOOK PARA ESTADÍSTICAS - FacturasStats.js
+// ==========================================
+export const useFacturasEstadisticas = () => {
+  const [estadisticas, setEstadisticas] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const cargarEstadisticas = useCallback(async (params = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('📊 [FacturasStats] Cargando estadísticas de facturas...');
+      
+      // CONECTA: FacturasStats -> facturacionManualService -> backend/routes/factura.js
+      const response = await facturacionManualService.obtenerEstadisticas(params);
+      
+      if (response?.data) {
+        setEstadisticas(response.data);
+      } else if (response) {
+        setEstadisticas(response);
+      }
+      
+      console.log('✅ [FacturasStats] Estadísticas cargadas exitosamente');
+    } catch (err) {
+      console.error('❌ [FacturasStats] Error cargando estadísticas:', err);
+      let errorMessage = 'Error al cargar estadísticas';
+      
+      if (err?.message) {
+        errorMessage = err.message;
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const refrescar = useCallback(() => {
+    cargarEstadisticas();
+  }, [cargarEstadisticas]);
+
+  useEffect(() => {
+    cargarEstadisticas();
+  }, [cargarEstadisticas]);
+
+  return {
+    estadisticas,
+    loading,
+    error,
+    cargarEstadisticas,
+    refrescar
+  };
+};
+
+// ==========================================
+// HOOK PARA FORMULARIOS - FacturaModal.js
+// ==========================================
 export const useFormularioFactura = (facturaInicial = null) => {
   const [datosFactura, setDatosFactura] = useState({
     cliente_id: '',
@@ -857,9 +353,7 @@ export const useFormularioFactura = (facturaInicial = null) => {
     total: 0
   });
 
-  /**
-   * Actualizar campo específico del formulario
-   */
+  // Actualizar campo específico del formulario
   const actualizarCampo = useCallback((campo, valor) => {
     setDatosFactura(prev => ({
       ...prev,
@@ -875,9 +369,7 @@ export const useFormularioFactura = (facturaInicial = null) => {
     }
   }, [erroresValidacion]);
 
-  /**
-   * Actualizar múltiples campos
-   */
+  // Actualizar múltiples campos
   const actualizarCampos = useCallback((nuevosDatos) => {
     setDatosFactura(prev => ({
       ...prev,
@@ -885,9 +377,7 @@ export const useFormularioFactura = (facturaInicial = null) => {
     }));
   }, []);
 
-  /**
-   * Resetear formulario
-   */
+  // Resetear formulario
   const resetearFormulario = useCallback(() => {
     setDatosFactura({
       cliente_id: '',
@@ -911,9 +401,7 @@ export const useFormularioFactura = (facturaInicial = null) => {
     setErroresValidacion({});
   }, []);
 
-  /**
-   * Validar formulario
-   */
+  // Validar formulario
   const validarFormulario = useCallback(() => {
     const errores = {};
 
@@ -952,9 +440,7 @@ export const useFormularioFactura = (facturaInicial = null) => {
     return Object.keys(errores).length === 0;
   }, [datosFactura]);
 
-  /**
-   * Calcular totales automáticamente
-   */
+  // Calcular totales automáticamente - USA facturacionManualService
   useEffect(() => {
     const totales = facturacionManualService.calcularTotales(datosFactura);
     setTotalesCalculados(totales);
@@ -972,5 +458,168 @@ export const useFormularioFactura = (facturaInicial = null) => {
   };
 };
 
-// Exports
-export default useFacturacionManual;
+// ==========================================
+// HOOKS ADICIONALES PARA CASOS ESPECÍFICOS
+// ==========================================
+
+/**
+ * Hook para búsquedas - FacturasFilters.js
+ */
+export const useFacturasBusqueda = () => {
+  const [resultados, setResultados] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const buscar = useCallback(async (criterios) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔍 [FacturasFilters] Buscando facturas con criterios:', criterios);
+      
+      const response = await facturacionManualService.buscarFacturas(criterios);
+      
+      if (response?.data) {
+        setResultados(Array.isArray(response.data) ? response.data : []);
+      } else if (Array.isArray(response)) {
+        setResultados(response);
+      } else {
+        setResultados([]);
+      }
+      
+      console.log('✅ [FacturasFilters] Búsqueda completada');
+    } catch (err) {
+      console.error('❌ [FacturasFilters] Error en búsqueda:', err);
+      setError(err.message || 'Error en búsqueda');
+      setResultados([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const limpiarResultados = useCallback(() => {
+    setResultados([]);
+    setError(null);
+  }, []);
+
+  return {
+    resultados,
+    loading,
+    error,
+    buscar,
+    limpiarResultados
+  };
+};
+
+/**
+ * Hook para facturas vencidas
+ */
+export const useFacturasVencidas = () => {
+  const [facturasVencidas, setFacturasVencidas] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const cargarVencidas = useCallback(async (params = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('⏰ Cargando facturas vencidas...');
+      
+      const response = await facturacionManualService.obtenerFacturasVencidas(params);
+      
+      if (response?.data) {
+        setFacturasVencidas(Array.isArray(response.data) ? response.data : []);
+      } else if (Array.isArray(response)) {
+        setFacturasVencidas(response);
+      } else {
+        setFacturasVencidas([]);
+      }
+      
+      console.log('✅ Facturas vencidas cargadas');
+    } catch (err) {
+      console.error('❌ Error cargando facturas vencidas:', err);
+      setError(err.message || 'Error cargando facturas vencidas');
+      setFacturasVencidas([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const refrescar = useCallback(() => {
+    cargarVencidas();
+  }, [cargarVencidas]);
+
+  useEffect(() => {
+    cargarVencidas();
+  }, [cargarVencidas]);
+
+  return {
+    facturasVencidas,
+    loading,
+    error,
+    cargarVencidas,
+    refrescar
+  };
+};
+
+/**
+ * Hook para utilidades de facturación
+ */
+export const useFacturasUtilidades = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const generarNumero = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const numero = await facturacionManualService.generarNumeroFactura();
+      return numero;
+    } catch (err) {
+      console.error('❌ Error generando número:', err);
+      setError(err.message || 'Error generando número de factura');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const validarNumero = useCallback(async (numero) => {
+    try {
+      const esValido = await facturacionManualService.validarNumeroFactura(numero);
+      return esValido;
+    } catch (err) {
+      console.error('❌ Error validando número:', err);
+      return false;
+    }
+  }, []);
+
+  const calcularTotales = useCallback((datosFactura) => {
+    return facturacionManualService.calcularTotales(datosFactura);
+  }, []);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return {
+    loading,
+    error,
+    generarNumero,
+    validarNumero,
+    calcularTotales,
+    clearError
+  };
+};
+
+// ==========================================
+// EXPORTS PARA COMPONENTES FACTURAS
+// ==========================================
+
+// Exports principales que usan los componentes
+export default useFacturas;
+
+// Re-exports de constantes
+export { ESTADOS_FACTURA, METODOS_PAGO } from '../services/facturacionManualService';

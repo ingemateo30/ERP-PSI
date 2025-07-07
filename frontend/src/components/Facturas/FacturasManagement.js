@@ -1,6 +1,6 @@
 // components/Facturas/FacturasManagement.js - Componente principal corregido
 import React, { useState, useCallback, useEffect } from 'react';
-import { useFacturacionManual } from '../../hooks/useFacturacionManual';
+import { useFacturas, useFacturasAcciones } from '../../hooks/useFacturacionManual';
 import FacturasStats from './FacturasStats';
 import FacturasFilters from './FacturasFilters';
 import FacturasList from './FacturasList';
@@ -20,7 +20,7 @@ const FacturasManagement = () => {
     cambiarPagina,
     limpiarFiltros,
     refrescar
-  } = useFacturacionManual();
+  } = useFacturas();
 
   const {
     loading: actionLoading,
@@ -32,7 +32,7 @@ const FacturasManagement = () => {
     verPDF,
     actualizarFactura,
     clearError
-  } = useFacturacionManual();
+  } = useFacturasAcciones();
 
   // Estados de modales
   const [modalState, setModalState] = useState({
@@ -199,11 +199,11 @@ const FacturasManagement = () => {
     }
   }, [duplicarFactura, refrescar, mostrarNotificacion]);
 
-  const handleDescargarPDF = useCallback(async (factura) => {
+  const handleDescargarPDF = useCallback(async (facturaId) => {
     try {
-      console.log('📥 Descargando PDF:', factura.id);
+      console.log('📄 Descargando PDF:', facturaId);
       
-      await descargarPDF(factura.id, factura.nombre_cliente);
+      await descargarPDF(facturaId);
       
       mostrarNotificacion('PDF descargado exitosamente', 'success');
     } catch (error) {
@@ -214,91 +214,53 @@ const FacturasManagement = () => {
 
   const handleVerPDF = useCallback(async (facturaId) => {
     try {
-      console.log('👁️ Abriendo PDF:', facturaId);
+      console.log('👁️ Visualizando PDF:', facturaId);
       
       await verPDF(facturaId);
-      
-      mostrarNotificacion('PDF abierto exitosamente', 'success');
     } catch (error) {
-      console.error('❌ Error al ver PDF:', error);
-      mostrarNotificacion(error.message || 'Error al ver PDF', 'error');
+      console.error('❌ Error al visualizar PDF:', error);
+      mostrarNotificacion(error.message || 'Error al visualizar PDF', 'error');
     }
   }, [verPDF, mostrarNotificacion]);
 
-  const handleFacturaGuardada = useCallback(async (datosFactura) => {
-    try {
-      if (modalState.editar && modalState.facturaSeleccionada) {
-        console.log('📝 Actualizando factura:', datosFactura);
-        await actualizarFactura(modalState.facturaSeleccionada.id, datosFactura);
-        mostrarNotificacion('Factura actualizada exitosamente', 'success');
-      } else {
-        console.log('📝 Creando nueva factura:', datosFactura);
-        // Aquí iría la lógica para crear factura
-        mostrarNotificacion('Factura creada exitosamente', 'success');
-      }
-      
-      handleCerrarModal();
-      refrescar();
-    } catch (error) {
-      console.error('❌ Error al guardar factura:', error);
-      mostrarNotificacion(error.message || 'Error al guardar factura', 'error');
-    }
-  }, [modalState, actualizarFactura, handleCerrarModal, refrescar, mostrarNotificacion]);
+  const handleFacturaGuardada = useCallback(() => {
+    handleCerrarModal();
+    refrescar();
+    mostrarNotificacion('Factura guardada exitosamente', 'success');
+  }, [handleCerrarModal, refrescar, mostrarNotificacion]);
 
-  // Probar PDF para desarrollo
   const handleProbarPDF = useCallback(async () => {
     try {
+      console.log('🧪 Probando generación de PDF...');
+      
       await FacturasService.probarPDF();
+      
       mostrarNotificacion('PDF de prueba generado exitosamente', 'success');
     } catch (error) {
       console.error('❌ Error al probar PDF:', error);
-      mostrarNotificacion(error.message || 'Error al probar PDF', 'error');
+      mostrarNotificacion(error.message || 'Error al generar PDF de prueba', 'error');
     }
   }, [mostrarNotificacion]);
 
-  // Manejar errores
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 shadow-md">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <span className="text-2xl">❌</span>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-lg font-medium text-red-800">
-                  Error al cargar las facturas
-                </h3>
-                <p className="text-red-600 mt-2">{error}</p>
-                <div className="mt-4 flex space-x-3">
-                  <button
-                    onClick={refrescar}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
-                  >
-                    🔄 Reintentar
-                  </button>
-                  <button
-                    onClick={handleLimpiarFiltros}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
-                  >
-                    🗑️ Limpiar Filtros
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Manejo de errores global
+  useEffect(() => {
+    if (error) {
+      mostrarNotificacion(error, 'error');
+    }
+  }, [error, mostrarNotificacion]);
+
+  useEffect(() => {
+    if (actionError) {
+      mostrarNotificacion(actionError, 'error');
+    }
+  }, [actionError, mostrarNotificacion]);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Notificaciones */}
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        {/* Notificación */}
         {notificacion && (
-          <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-md ${
+          <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
             notificacion.tipo === 'success' 
               ? 'bg-green-50 border border-green-200 text-green-800' 
               : 'bg-red-50 border border-red-200 text-red-800'
@@ -343,13 +305,13 @@ const FacturasManagement = () => {
               onClick={handleCrearFactura}
               className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors font-medium"
             >
-               Nueva Factura
+              ➕ Nueva Factura
             </button>
             <button
               onClick={handleProbarPDF}
               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors font-medium"
             >
-              Probar PDF
+              🧪 Probar PDF
             </button>
           </div>
         </div>

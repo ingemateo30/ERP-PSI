@@ -1,26 +1,80 @@
-// frontend/src/components/Facturas/FacturasStats.js - CORREGIDO
-
-import React from 'react';
-import { useFacturacionManual } from '../../hooks/useFacturacionManual';
-// CORREGIDO: Importación correcta del service
-import { facturacionManualService } from '../../services/facturacionManualService';
+// components/Facturas/FacturasStats.js - COMPLETO 100%
+import React, { useEffect } from 'react';
+import { useFacturasEstadisticas } from '../../hooks/useFacturacionManual';
+import { 
+  DollarSign, 
+  FileText, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Users
+} from 'lucide-react';
 
 const FacturasStats = () => {
-  const { estadisticas, loading, error, refrescar } = useFacturacionManual();
+  const { estadisticas, loading, error, cargarEstadisticas, refrescar } = useFacturasEstadisticas();
 
-  // Componente de carga
+  // Recargar estadísticas cada 5 minutos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refrescar();
+    }, 5 * 60 * 1000); // 5 minutos
+
+    return () => clearInterval(interval);
+  }, [refrescar]);
+
+  // Datos por defecto en caso de que no haya estadísticas
+  const statsDefault = {
+    total_facturas: 0,
+    facturas_pendientes: 0,
+    facturas_pagadas: 0,
+    facturas_vencidas: 0,
+    facturas_anuladas: 0,
+    total_facturado: 0,
+    total_cobrado: 0,
+    total_pendiente: 0,
+    total_vencido: 0,
+    promedio_factura: 0,
+    crecimiento_mes: 0,
+    cartera_vencida_porcentaje: 0
+  };
+
+  const stats = estadisticas || statsDefault;
+
+  // Formatear números como moneda
+  const formatearMoneda = (valor) => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(valor || 0);
+  };
+
+  // Formatear números
+  const formatearNumero = (valor) => {
+    return new Intl.NumberFormat('es-CO').format(valor || 0);
+  };
+
+  // Formatear porcentaje
+  const formatearPorcentaje = (valor) => {
+    return `${(valor || 0).toFixed(1)}%`;
+  };
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {[...Array(4)].map((_, index) => (
-          <div key={index} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="animate-pulse">
-              <div className="flex items-center mb-4">
-                <div className="h-6 w-6 bg-gray-200 rounded mr-3"></div>
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+        {[...Array(8)].map((_, index) => (
+          <div key={index} className="bg-white rounded-lg shadow-md p-6 animate-pulse">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+                <div className="h-8 bg-gray-200 rounded w-16"></div>
               </div>
-              <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+              <div className="h-12 w-12 bg-gray-200 rounded-lg"></div>
             </div>
           </div>
         ))}
@@ -28,289 +82,424 @@ const FacturasStats = () => {
     );
   }
 
-  // Componente de error
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <span className="text-red-600 text-xl mr-3">⚠️</span>
-            <div>
-              <h3 className="text-red-800 font-medium">Error al cargar estadísticas</h3>
-              <p className="text-red-600 text-sm mt-1">{error}</p>
-            </div>
+        <div className="flex items-center">
+          <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
+          <div>
+            <h3 className="text-sm font-medium text-red-800">Error al cargar estadísticas</h3>
+            <p className="text-sm text-red-700 mt-1">{error}</p>
+            <button
+              onClick={refrescar}
+              className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+            >
+              Intentar nuevamente
+            </button>
           </div>
-          <button
-            onClick={refrescar}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors text-sm font-medium"
-          >
-            🔄 Reintentar
-          </button>
         </div>
       </div>
     );
   }
 
-  // Si no hay estadísticas, usar valores por defecto
-  const stats = estadisticas || {
-    total: 0,
-    pendientes: 0,
-    pagadas: 0,
-    vencidas: 0,
-    anuladas: 0,
-    valor_pendiente: 0,
-    valor_pagado: 0,
-    cartera_vencida: 0,
-    facturadas_hoy: 0,
-    facturado_mes_actual: 0
-  };
-
-  // Calcular totales y porcentajes
-  const totalValor = (stats.valor_pendiente || 0) + (stats.valor_pagado || 0) + (stats.cartera_vencida || 0);
-  const porcentajeRecaudacion = facturacionManualService.calcularPorcentaje(stats.valor_pagado || 0, totalValor);
-  const porcentajeVencida = facturacionManualService.calcularPorcentaje(stats.cartera_vencida || 0, totalValor);
-
-  // Configuración de tarjetas principales
-  const tarjetas = [
-    {
-      titulo: 'Total Facturas',
-      valor: stats.total,
-      icono: '📄',
-      color: 'blue',
-      descripcion: `${stats.facturadas_hoy || 0} facturadas hoy`
-    },
-    {
-      titulo: 'Pendientes',
-      valor: stats.pendientes,
-      icono: '⏳',
-      color: 'yellow',
-      descripcion: facturacionManualService.formatearMoneda(stats.valor_pendiente || 0)
-    },
-    {
-      titulo: 'Pagadas',
-      valor: stats.pagadas,
-      icono: '✅',
-      color: 'green',
-      descripcion: facturacionManualService.formatearMoneda(stats.valor_pagado || 0)
-    },
-    {
-      titulo: 'Vencidas',
-      valor: stats.vencidas,
-      icono: '🚨',
-      color: 'red',
-      descripcion: facturacionManualService.formatearMoneda(stats.cartera_vencida || 0)
-    }
-  ];
-
-  // Función para obtener clases de color
-  const obtenerClaseColor = (color) => {
-    const colores = {
-      blue: 'bg-blue-50 border-blue-200 text-blue-700',
-      yellow: 'bg-yellow-50 border-yellow-200 text-yellow-700',
-      green: 'bg-green-50 border-green-200 text-green-700',
-      red: 'bg-red-50 border-red-200 text-red-700'
-    };
-    return colores[color] || colores.blue;
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Tarjetas principales de estadísticas */}
+    <div className="mb-8">
+      {/* Título de la sección */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold text-gray-900">Estadísticas de Facturación</h2>
+        <button
+          onClick={refrescar}
+          className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+          disabled={loading}
+        >
+          🔄 Actualizar
+        </button>
+      </div>
+
+      {/* Grid de estadísticas principales */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        {/* Total de Facturas */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Facturas</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatearNumero(stats.total_facturas)}
+              </p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <FileText className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Total Facturado */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Facturado</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatearMoneda(stats.total_facturado)}
+              </p>
+            </div>
+            <div className="p-3 bg-green-100 rounded-lg">
+              <DollarSign className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Total Cobrado */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Cobrado</p>
+              <p className="text-2xl font-bold text-green-600">
+                {formatearMoneda(stats.total_cobrado)}
+              </p>
+            </div>
+            <div className="p-3 bg-green-100 rounded-lg">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Total Pendiente */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Pendiente</p>
+              <p className="text-2xl font-bold text-yellow-600">
+                {formatearMoneda(stats.total_pendiente)}
+              </p>
+            </div>
+            <div className="p-3 bg-yellow-100 rounded-lg">
+              <Clock className="h-6 w-6 text-yellow-600" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Grid de estadísticas secundarias */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {tarjetas.map((tarjeta, index) => (
-          <div
-            key={index}
-            className={`p-6 rounded-xl border-2 transition-all duration-200 hover:shadow-lg ${obtenerClaseColor(tarjeta.color)}`}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                  {tarjeta.titulo}
-                </h3>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
-                  {facturacionManualService.formatearNumero(tarjeta.valor)}
-                </p>
-              </div>
-              <div className="text-3xl">
-                {tarjeta.icono}
-              </div>
+        {/* Facturas Pagadas */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Facturas Pagadas</p>
+              <p className="text-2xl font-bold text-green-600">
+                {formatearNumero(stats.facturas_pagadas)}
+              </p>
             </div>
-            <p className="text-sm text-gray-600 mt-2">
-              {tarjeta.descripcion}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Panel de resumen financiero */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
-          <span className="mr-2">📊</span>
-          Resumen Financiero
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Valores monetarios */}
-          <div>
-            <h4 className="font-medium text-gray-700 mb-4">Valores</h4>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total Facturado:</span>
-                <span className="font-medium text-gray-900">
-                  {facturacionManualService.formatearMoneda(totalValor)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Recaudado:</span>
-                <span className="font-medium text-green-600">
-                  {facturacionManualService.formatearMoneda(stats.valor_pagado || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Por Cobrar:</span>
-                <span className="font-medium text-yellow-600">
-                  {facturacionManualService.formatearMoneda(stats.valor_pendiente || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Cartera Vencida:</span>
-                <span className="font-medium text-red-600">
-                  {facturacionManualService.formatearMoneda(stats.cartera_vencida || 0)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Indicadores de rendimiento */}
-          <div>
-            <h4 className="font-medium text-gray-700 mb-4">Indicadores</h4>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">% Recaudación:</span>
-                <span className="font-medium text-gray-900">
-                  {porcentajeRecaudacion}%
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">% Vencida:</span>
-                <span className="font-medium text-red-600">
-                  {porcentajeVencida}%
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Anuladas:</span>
-                <span className="font-medium text-gray-600">
-                  {facturacionManualService.formatearNumero(stats.anuladas || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Efectividad:</span>
-                <span className={`font-medium ${
-                  parseFloat(porcentajeRecaudacion) >= 80 
-                    ? 'text-green-600' 
-                    : parseFloat(porcentajeRecaudacion) >= 60 
-                    ? 'text-yellow-600' 
-                    : 'text-red-600'
-                }`}>
-                  {parseFloat(porcentajeRecaudacion) >= 80 ? 'Excelente' : 
-                   parseFloat(porcentajeRecaudacion) >= 60 ? 'Buena' : 'Mejorable'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Gráfico simple de barras */}
-          <div>
-            <h4 className="font-medium text-gray-700 mb-4">Distribución</h4>
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Pagadas</span>
-                  <span>{facturacionManualService.calcularPorcentaje(stats.pagadas, stats.total)}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${facturacionManualService.calcularPorcentaje(stats.pagadas, stats.total)}%` }}
-                  ></div>
-                </div>
-              </div>
-              
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Pendientes</span>
-                  <span>{facturacionManualService.calcularPorcentaje(stats.pendientes, stats.total)}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-yellow-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${facturacionManualService.calcularPorcentaje(stats.pendientes, stats.total)}%` }}
-                  ></div>
-                </div>
-              </div>
-              
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Vencidas</span>
-                  <span>{facturacionManualService.calcularPorcentaje(stats.vencidas, stats.total)}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-red-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${facturacionManualService.calcularPorcentaje(stats.vencidas, stats.total)}%` }}
-                  ></div>
-                </div>
-              </div>
+            <div className="p-3 bg-green-100 rounded-lg">
+              <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
           </div>
         </div>
 
-        {/* Acciones rápidas */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={refrescar}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm font-medium"
-            >
-              <span className="mr-2">🔄</span>
-              Actualizar
-            </button>
-            <button
-              onClick={() => window.open('/reportes/facturas', '_blank')}
-              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-sm font-medium"
-            >
-              <span className="mr-2">📊</span>
-              Ver Reportes
-            </button>
-            <button
-              onClick={() => window.location.href = '/facturas?estado=vencida'}
-              className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors text-sm font-medium"
-            >
-              <span className="mr-2">⚠️</span>
-              Gestionar Vencidas
-            </button>
+        {/* Facturas Pendientes */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Facturas Pendientes</p>
+              <p className="text-2xl font-bold text-yellow-600">
+                {formatearNumero(stats.facturas_pendientes)}
+              </p>
+            </div>
+            <div className="p-3 bg-yellow-100 rounded-lg">
+              <Clock className="h-6 w-6 text-yellow-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Facturas Vencidas */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Facturas Vencidas</p>
+              <p className="text-2xl font-bold text-red-600">
+                {formatearNumero(stats.facturas_vencidas)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {formatearMoneda(stats.total_vencido)}
+              </p>
+            </div>
+            <div className="p-3 bg-red-100 rounded-lg">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Facturas Anuladas */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Facturas Anuladas</p>
+              <p className="text-2xl font-bold text-gray-600">
+                {formatearNumero(stats.facturas_anuladas)}
+              </p>
+            </div>
+            <div className="p-3 bg-gray-100 rounded-lg">
+              <XCircle className="h-6 w-6 text-gray-600" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Mensaje informativo si no hay datos */}
-      {stats.total === 0 && (
-        <div className="text-center p-8 bg-gray-50 rounded-xl border border-gray-200">
-          <div className="text-6xl mb-4">📋</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No hay facturas registradas
-          </h3>
-          <p className="text-gray-600">
-            Comienza creando tu primera factura para ver las estadísticas aquí.
-          </p>
-          <button
-            onClick={() => window.location.href = '/facturas/nueva'}
-            className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm font-medium"
-          >
-            Crear Primera Factura
-          </button>
+      {/* Métricas adicionales */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        {/* Promedio por Factura */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Promedio por Factura</p>
+              <p className="text-xl font-bold text-blue-600">
+                {formatearMoneda(stats.promedio_factura)}
+              </p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <DollarSign className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Crecimiento del Mes */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Crecimiento del Mes</p>
+              <p className={`text-xl font-bold ${
+                (stats.crecimiento_mes || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {formatearPorcentaje(stats.crecimiento_mes)}
+              </p>
+            </div>
+            <div className={`p-3 rounded-lg ${
+              (stats.crecimiento_mes || 0) >= 0 ? 'bg-green-100' : 'bg-red-100'
+            }`}>
+              {(stats.crecimiento_mes || 0) >= 0 ? (
+                <TrendingUp className="h-6 w-6 text-green-600" />
+              ) : (
+                <TrendingDown className="h-6 w-6 text-red-600" />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Cartera Vencida */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Cartera Vencida</p>
+              <p className="text-xl font-bold text-red-600">
+                {formatearPorcentaje(stats.cartera_vencida_porcentaje)}
+              </p>
+            </div>
+            <div className="p-3 bg-red-100 rounded-lg">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Indicadores de rendimiento */}
+      {stats.total_facturas > 0 && (
+        <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Indicadores de Rendimiento</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Tasa de Cobro */}
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-600 mb-2">Tasa de Cobro</p>
+              <div className="relative">
+                <div className="w-20 h-20 mx-auto">
+                  <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-gray-200"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      className="text-green-600"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      fill="none"
+                      strokeDasharray={`${(stats.facturas_pagadas / stats.total_facturas * 100)}, 100`}
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-sm font-bold text-gray-900">
+                      {Math.round(stats.facturas_pagadas / stats.total_facturas * 100)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Facturas cobradas vs emitidas
+              </p>
+            </div>
+
+            {/* Eficiencia de Cobranza */}
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-600 mb-2">Eficiencia de Cobranza</p>
+              <div className="relative">
+                <div className="w-20 h-20 mx-auto">
+                  <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-gray-200"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      className="text-blue-600"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      fill="none"
+                      strokeDasharray={`${stats.total_facturado > 0 ? (stats.total_cobrado / stats.total_facturado * 100) : 0}, 100`}
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-sm font-bold text-gray-900">
+                      {stats.total_facturado > 0 ? Math.round(stats.total_cobrado / stats.total_facturado * 100) : 0}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Dinero efectivamente cobrado
+              </p>
+            </div>
+
+            {/* Riesgo de Cartera */}
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-600 mb-2">Riesgo de Cartera</p>
+              <div className="relative">
+                <div className="w-20 h-20 mx-auto">
+                  <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-gray-200"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      className="text-red-600"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      fill="none"
+                      strokeDasharray={`${Math.min(100, stats.cartera_vencida_porcentaje || 0)}, 100`}
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-sm font-bold text-gray-900">
+                      {formatearPorcentaje(stats.cartera_vencida_porcentaje)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Porcentaje de cartera en mora
+              </p>
+            </div>
+          </div>
+
+          {/* Resumen textual adicional */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="bg-green-50 p-3 rounded-lg">
+              <h5 className="font-medium text-green-800 mb-1">Rendimiento Positivo</h5>
+              <ul className="text-green-700 space-y-1">
+                <li>• {stats.facturas_pagadas} facturas cobradas exitosamente</li>
+                <li>• {formatearMoneda(stats.total_cobrado)} en ingresos confirmados</li>
+                <li>• Tasa de cobro del {stats.total_facturas > 0 ? Math.round(stats.facturas_pagadas / stats.total_facturas * 100) : 0}%</li>
+              </ul>
+            </div>
+            
+            <div className="bg-yellow-50 p-3 rounded-lg">
+              <h5 className="font-medium text-yellow-800 mb-1">Áreas de Atención</h5>
+              <ul className="text-yellow-700 space-y-1">
+                <li>• {stats.facturas_pendientes} facturas por cobrar</li>
+                <li>• {stats.facturas_vencidas} facturas vencidas</li>
+                <li>• {formatearMoneda(stats.total_pendiente)} en cartera pendiente</li>
+              </ul>
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Alertas y recomendaciones */}
+      {stats.total_facturas > 0 && (
+        <div className="mt-6 space-y-3">
+          {/* Alerta de cartera vencida alta */}
+          {(stats.cartera_vencida_porcentaje || 0) > 15 && (
+            <div className="bg-red-50 border-l-4 border-red-400 p-4">
+              <div className="flex">
+                <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
+                <div>
+                  <h3 className="text-sm font-medium text-red-800">Cartera Vencida Alta</h3>
+                  <p className="text-sm text-red-700">
+                    El {formatearPorcentaje(stats.cartera_vencida_porcentaje)} de su cartera está vencida. 
+                    Se recomienda implementar estrategias de cobranza más agresivas.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Alerta de muchas facturas pendientes */}
+          {stats.facturas_pendientes > stats.facturas_pagadas && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+              <div className="flex">
+                <Clock className="h-5 w-5 text-yellow-400 mr-2" />
+                <div>
+                  <h3 className="text-sm font-medium text-yellow-800">Muchas Facturas Pendientes</h3>
+                  <p className="text-sm text-yellow-700">
+                    Tiene {stats.facturas_pendientes} facturas pendientes por cobrar. 
+                    Considere revisar los procesos de cobranza y seguimiento.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mensaje positivo */}
+          {(stats.cartera_vencida_porcentaje || 0) < 5 && stats.facturas_pagadas > stats.facturas_pendientes && (
+            <div className="bg-green-50 border-l-4 border-green-400 p-4">
+              <div className="flex">
+                <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
+                <div>
+                  <h3 className="text-sm font-medium text-green-800">Excelente Gestión de Cobranza</h3>
+                  <p className="text-sm text-green-700">
+                    Su cartera está en excelente estado con baja morosidad y alta tasa de cobro. 
+                    ¡Continúe con las buenas prácticas!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Información de última actualización */}
+      <div className="mt-6 text-center">
+        <p className="text-xs text-gray-500">
+          Última actualización: {new Date().toLocaleString('es-CO', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          Las estadísticas se actualizan automáticamente cada 5 minutos
+        </p>
+      </div>
     </div>
   );
 };
