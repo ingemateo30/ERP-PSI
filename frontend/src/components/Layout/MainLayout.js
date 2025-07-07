@@ -87,6 +87,12 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       path: '/facturacion-automatica',
       permission: 'administrador' // o 'administrador' según tus necesidades
     },
+     {
+      icon:  <Users size={22} />,
+      label: 'Facturas',
+      path: '/facturas',
+      permission: 'administrador' // o 'administrador' según tus necesidades
+    },
     {
       icon: <Wifi size={22} />,
       label: 'Servicios',

@@ -317,7 +317,16 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-
+              <Route
+                path="/facturas"
+                element={
+                  <ProtectedRoute requiredRole="administrador" >
+                    <MainLayout title="Facturas" subtitle="Sistema de facturación mensual">
+                      <FacturasManagement />
+                    </MainLayout>
+                  </ ProtectedRoute>
+                }
+              />
               <Route
                 path="/facturacion-automatica"
                 element={

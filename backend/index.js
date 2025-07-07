@@ -231,11 +231,11 @@ try {
   app.use('/api/v1/config/plantillas-correo', plantillasCorreoRoutes);
   console.log('✅ Rutas de plantillas de correo cargadas: /api/v1/config/plantillas-correo');
 
-  /*
+  
   console.log('💰 Cargando rutas de facturas...');
   const facturasRoutes = require('./routes/factura');
   app.use('/api/v1/facturas', facturasRoutes);
-  console.log('✅ Rutas de facturas cargadas: /api/v1/facturas');*/
+  console.log('✅ Rutas de facturas cargadas: /api/v1/facturas');
 
   // CORREGIDO: Rutas de reportes regulatorios
   console.log('📊 Cargando rutas de reportes regulatorios...');

@@ -1,7 +1,9 @@
-// components/Facturas/FacturasStats.js - Componente de estadísticas corregido
+// frontend/src/components/Facturas/FacturasStats.js - CORREGIDO
+
 import React from 'react';
 import { useFacturasEstadisticas } from '../../hooks/useFacturas';
-import FacturasService from '../../services/facturasService';
+// CORREGIDO: Importación correcta del service
+import { facturasService } from '../../services/facturasService';
 
 const FacturasStats = () => {
   const { estadisticas, loading, error, refrescar } = useFacturasEstadisticas();
@@ -63,6 +65,11 @@ const FacturasStats = () => {
     facturado_mes_actual: 0
   };
 
+  // Calcular totales y porcentajes
+  const totalValor = (stats.valor_pendiente || 0) + (stats.valor_pagado || 0) + (stats.cartera_vencida || 0);
+  const porcentajeRecaudacion = facturasService.calcularPorcentaje(stats.valor_pagado || 0, totalValor);
+  const porcentajeVencida = facturasService.calcularPorcentaje(stats.cartera_vencida || 0, totalValor);
+
   // Configuración de tarjetas principales
   const tarjetas = [
     {
@@ -77,149 +84,98 @@ const FacturasStats = () => {
       valor: stats.pendientes,
       icono: '⏳',
       color: 'yellow',
-      descripcion: FacturasService.formatearMoneda(stats.valor_pendiente || 0)
+      descripcion: facturasService.formatearMoneda(stats.valor_pendiente || 0)
     },
     {
       titulo: 'Pagadas',
       valor: stats.pagadas,
       icono: '✅',
       color: 'green',
-      descripcion: FacturasService.formatearMoneda(stats.valor_pagado || 0)
+      descripcion: facturasService.formatearMoneda(stats.valor_pagado || 0)
     },
     {
-      titulo: 'Cartera Vencida',
+      titulo: 'Vencidas',
       valor: stats.vencidas,
-      icono: '⚠️',
+      icono: '🚨',
       color: 'red',
-      descripcion: FacturasService.formatearMoneda(stats.cartera_vencida || 0)
+      descripcion: facturasService.formatearMoneda(stats.cartera_vencida || 0)
     }
   ];
 
-  // Función para obtener colores de tarjetas
-  const obtenerColorTarjeta = (color) => {
+  // Función para obtener clases de color
+  const obtenerClaseColor = (color) => {
     const colores = {
-      blue: {
-        bg: 'bg-blue-50',
-        border: 'border-blue-200',
-        icon: 'text-blue-600',
-        title: 'text-blue-900',
-        value: 'text-blue-800',
-        desc: 'text-blue-600'
-      },
-      yellow: {
-        bg: 'bg-yellow-50',
-        border: 'border-yellow-200',
-        icon: 'text-yellow-600',
-        title: 'text-yellow-900',
-        value: 'text-yellow-800',
-        desc: 'text-yellow-600'
-      },
-      green: {
-        bg: 'bg-green-50',
-        border: 'border-green-200',
-        icon: 'text-green-600',
-        title: 'text-green-900',
-        value: 'text-green-800',
-        desc: 'text-green-600'
-      },
-      red: {
-        bg: 'bg-red-50',
-        border: 'border-red-200',
-        icon: 'text-red-600',
-        title: 'text-red-900',
-        value: 'text-red-800',
-        desc: 'text-red-600'
-      }
+      blue: 'bg-blue-50 border-blue-200 text-blue-700',
+      yellow: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+      green: 'bg-green-50 border-green-200 text-green-700',
+      red: 'bg-red-50 border-red-200 text-red-700'
     };
     return colores[color] || colores.blue;
   };
 
-  // Calcular porcentajes para indicadores
-  const totalValor = (stats.valor_pendiente || 0) + (stats.valor_pagado || 0);
-  const porcentajeRecaudacion = totalValor > 0 
-    ? ((stats.valor_pagado || 0) / totalValor * 100).toFixed(1)
-    : '0';
-  
-  const porcentajeVencida = (stats.valor_pendiente || 0) > 0
-    ? ((stats.cartera_vencida || 0) / (stats.valor_pendiente || 0) * 100).toFixed(1)
-    : '0';
-
-  const promedioMes = stats.facturado_mes_actual && new Date().getDate() > 0
-    ? FacturasService.formatearMoneda(Math.round(stats.facturado_mes_actual / new Date().getDate()))
-    : FacturasService.formatearMoneda(0);
-
   return (
-    <div className="mb-8">
-      {/* Tarjetas de estadísticas principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {tarjetas.map((tarjeta, index) => {
-          const colores = obtenerColorTarjeta(tarjeta.color);
-          
-          return (
-            <div
-              key={index}
-              className={`${colores.bg} ${colores.border} border rounded-lg p-6 transition-all duration-200 hover:shadow-md`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <span className={`text-2xl ${colores.icon} mr-3`}>
-                    {tarjeta.icono}
-                  </span>
-                  <div>
-                    <p className={`text-sm font-medium ${colores.title}`}>
-                      {tarjeta.titulo}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className={`text-2xl font-bold ${colores.value}`}>
-                    {FacturasService.formatearNumero(tarjeta.valor)}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-3">
-                <p className={`text-sm ${colores.desc}`}>
-                  {tarjeta.descripcion}
+    <div className="space-y-6">
+      {/* Tarjetas principales de estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {tarjetas.map((tarjeta, index) => (
+          <div
+            key={index}
+            className={`p-6 rounded-xl border-2 transition-all duration-200 hover:shadow-lg ${obtenerClaseColor(tarjeta.color)}`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+                  {tarjeta.titulo}
+                </h3>
+                <p className="text-3xl font-bold text-gray-900 mt-2">
+                  {facturasService.formatearNumero(tarjeta.valor)}
                 </p>
               </div>
+              <div className="text-3xl">
+                {tarjeta.icono}
+              </div>
             </div>
-          );
-        })}
+            <p className="text-sm text-gray-600 mt-2">
+              {tarjeta.descripcion}
+            </p>
+          </div>
+        ))}
       </div>
 
       {/* Panel de resumen financiero */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          📊 Resumen Financiero
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+          <span className="mr-2">📊</span>
+          Resumen Financiero
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Valores monetarios */}
           <div>
-            <h4 className="font-medium text-gray-700 mb-3">Valores</h4>
-            <div className="space-y-3">
+            <h4 className="font-medium text-gray-700 mb-4">Valores</h4>
+            <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Total Facturado:</span>
                 <span className="font-medium text-gray-900">
-                  {FacturasService.formatearMoneda(totalValor)}
+                  {facturasService.formatearMoneda(totalValor)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Recaudado:</span>
                 <span className="font-medium text-green-600">
-                  {FacturasService.formatearMoneda(stats.valor_pagado || 0)}
+                  {facturasService.formatearMoneda(stats.valor_pagado || 0)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Por Cobrar:</span>
                 <span className="font-medium text-yellow-600">
-                  {FacturasService.formatearMoneda(stats.valor_pendiente || 0)}
+                  {facturasService.formatearMoneda(stats.valor_pendiente || 0)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Cartera Vencida:</span>
                 <span className="font-medium text-red-600">
-                  {FacturasService.formatearMoneda(stats.cartera_vencida || 0)}
+                  {facturasService.formatearMoneda(stats.cartera_vencida || 0)}
                 </span>
               </div>
             </div>
@@ -227,8 +183,8 @@ const FacturasStats = () => {
 
           {/* Indicadores de rendimiento */}
           <div>
-            <h4 className="font-medium text-gray-700 mb-3">Indicadores</h4>
-            <div className="space-y-3">
+            <h4 className="font-medium text-gray-700 mb-4">Indicadores</h4>
+            <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">% Recaudación:</span>
                 <span className="font-medium text-gray-900">
@@ -244,7 +200,7 @@ const FacturasStats = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Anuladas:</span>
                 <span className="font-medium text-gray-600">
-                  {FacturasService.formatearNumero(stats.anuladas || 0)}
+                  {facturasService.formatearNumero(stats.anuladas || 0)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -263,116 +219,75 @@ const FacturasStats = () => {
             </div>
           </div>
 
-          {/* Facturación del mes */}
+          {/* Gráfico simple de barras */}
           <div>
-            <h4 className="font-medium text-gray-700 mb-3">Este Mes</h4>
+            <h4 className="font-medium text-gray-700 mb-4">Distribución</h4>
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Facturado:</span>
-                <span className="font-medium text-blue-600">
-                  {FacturasService.formatearMoneda(stats.facturado_mes_actual || 0)}
-                </span>
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Pagadas</span>
+                  <span>{facturasService.calcularPorcentaje(stats.pagadas, stats.total)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${facturasService.calcularPorcentaje(stats.pagadas, stats.total)}%` }}
+                  ></div>
+                </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Nuevas Hoy:</span>
-                <span className="font-medium text-green-600">
-                  {FacturasService.formatearNumero(stats.facturadas_hoy || 0)}
-                </span>
+              
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Pendientes</span>
+                  <span>{facturasService.calcularPorcentaje(stats.pendientes, stats.total)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-yellow-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${facturasService.calcularPorcentaje(stats.pendientes, stats.total)}%` }}
+                  ></div>
+                </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Promedio/Día:</span>
-                <span className="font-medium text-gray-600">
-                  {promedioMes}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Meta Mes:</span>
-                <span className="font-medium text-purple-600">
-                  {FacturasService.formatearMoneda((stats.facturado_mes_actual || 0) * 1.2)}
-                </span>
+              
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Vencidas</span>
+                  <span>{facturasService.calcularPorcentaje(stats.vencidas, stats.total)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-red-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${facturasService.calcularPorcentaje(stats.vencidas, stats.total)}%` }}
+                  ></div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Barra de progreso visual */}
-        {totalValor > 0 && (
-          <div className="mt-8">
-            <div className="flex justify-between items-center mb-2">
-              <h4 className="font-medium text-gray-700">Estado de Facturación</h4>
-              <span className="text-sm text-gray-600">
-                {FacturasService.formatearMoneda(totalValor)} total
-              </span>
-            </div>
-            
-            <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-              <div className="flex h-4">
-                {/* Pagado */}
-                <div
-                  className="bg-green-500 transition-all duration-300"
-                  style={{
-                    width: `${(stats.valor_pagado / totalValor) * 100}%`
-                  }}
-                  title={`Pagado: ${FacturasService.formatearMoneda(stats.valor_pagado || 0)}`}
-                ></div>
-                
-                {/* Vencido */}
-                <div
-                  className="bg-red-500 transition-all duration-300"
-                  style={{
-                    width: `${(stats.cartera_vencida / totalValor) * 100}%`
-                  }}
-                  title={`Vencido: ${FacturasService.formatearMoneda(stats.cartera_vencida || 0)}`}
-                ></div>
-                
-                {/* Pendiente */}
-                <div
-                  className="bg-yellow-500 transition-all duration-300"
-                  style={{
-                    width: `${((stats.valor_pendiente - stats.cartera_vencida) / totalValor) * 100}%`
-                  }}
-                  title={`Pendiente: ${FacturasService.formatearMoneda((stats.valor_pendiente || 0) - (stats.cartera_vencida || 0))}`}
-                ></div>
-              </div>
-            </div>
-            
-            <div className="flex justify-between items-center text-xs text-gray-600 mt-2">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-green-500 rounded-full mr-1"></div>
-                <span>Pagado ({porcentajeRecaudacion}%)</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full mr-1"></div>
-                <span>Pendiente</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-red-500 rounded-full mr-1"></div>
-                <span>Vencido ({porcentajeVencida}%)</span>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Acciones rápidas */}
-        <div className="mt-6 pt-4 border-t border-gray-200">
+        <div className="mt-8 pt-6 border-t border-gray-200">
           <div className="flex flex-wrap gap-3">
             <button
               onClick={refrescar}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm font-medium"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm font-medium"
             >
-              🔄 Actualizar
+              <span className="mr-2">🔄</span>
+              Actualizar
             </button>
             <button
               onClick={() => window.open('/reportes/facturas', '_blank')}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-sm font-medium"
+              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-sm font-medium"
             >
-              📊 Ver Reportes
+              <span className="mr-2">📊</span>
+              Ver Reportes
             </button>
             <button
               onClick={() => window.location.href = '/facturas?estado=vencida'}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors text-sm font-medium"
+              className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors text-sm font-medium"
             >
-              ⚠️ Gestionar Vencidas
+              <span className="mr-2">⚠️</span>
+              Gestionar Vencidas
             </button>
           </div>
         </div>
@@ -380,14 +295,20 @@ const FacturasStats = () => {
 
       {/* Mensaje informativo si no hay datos */}
       {stats.total === 0 && (
-        <div className="mt-6 text-center p-8 bg-gray-50 rounded-lg border border-gray-200">
-          <span className="text-4xl mb-4 block">📋</span>
+        <div className="text-center p-8 bg-gray-50 rounded-xl border border-gray-200">
+          <div className="text-6xl mb-4">📋</div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             No hay facturas registradas
           </h3>
           <p className="text-gray-600">
             Comienza creando tu primera factura para ver las estadísticas aquí.
           </p>
+          <button
+            onClick={() => window.location.href = '/facturas/nueva'}
+            className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm font-medium"
+          >
+            Crear Primera Factura
+          </button>
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-// frontend/src/components/Facturas/FacturacionAutomatica.js - CORREGIDO
+// frontend/src/components/Facturas/FacturacionAutomatica.js - ESTILO MEJORADO Y CONSISTENTE
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -17,7 +17,11 @@ import {
   Clock,
   TrendingUp,
   Loader2,
-  AlertCircle as AlertIcon
+  AlertCircle as AlertIcon,
+  Settings,
+  Activity,
+  CreditCard,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { facturasService } from '../../services/facturasService';
@@ -34,19 +38,21 @@ const FacturacionAutomatica = () => {
     errores: 0
   });
   const [facturas, setFacturas] = useState([]);
+  
+  // Inicializar fechas correctamente
   const [filtros, setFiltros] = useState({
     fecha_desde: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     fecha_hasta: new Date().toISOString().split('T')[0],
     estado: '',
     cliente_id: ''
   });
+  
   const [paginacion, setPaginacion] = useState({
     page: 1,
     limit: 20,
     total: 0
   });
 
-  // CORREGIDO: usar 'user' en lugar de 'currentUser'
   const { user, hasPermission } = useAuth();
 
   // Estados para el componente
@@ -68,10 +74,15 @@ const FacturacionAutomatica = () => {
 
   const cargarEstadisticas = async () => {
     try {
-      const response = await facturasService.getEstadisticas({
+      const params = {
         fecha_desde: filtros.fecha_desde,
         fecha_hasta: filtros.fecha_hasta
-      });
+      };
+
+      console.log('📊 Cargando estadísticas con parámetros:', params);
+      
+      const response = await facturasService.getEstadisticas(params);
+      
       setEstadisticas(response.data || {
         total_clientes: 0,
         facturas_generadas: 0,
@@ -96,10 +107,26 @@ const FacturacionAutomatica = () => {
       const params = {
         page: paginacion.page,
         limit: paginacion.limit,
-        ...filtros
+        fecha_desde: filtros.fecha_desde,
+        fecha_hasta: filtros.fecha_hasta
       };
 
+      if (filtros.estado) {
+        params.estado = filtros.estado;
+      }
+      if (filtros.cliente_id) {
+        params.cliente_id = filtros.cliente_id;
+      }
+
+      console.log('📋 Cargando facturas con parámetros:', params);
+      
       const response = await facturasService.getFacturas(params);
+      
+      setFacturas(response.data?.facturas || []);
+      setPaginacion(prev => ({
+        ...prev,
+        total: response.data?.pagination?.total || 0
+      }));
       
       setFacturasData({
         facturas: response.data?.facturas || [],
@@ -107,436 +134,508 @@ const FacturacionAutomatica = () => {
         error: null
       });
       
-      setPaginacion(prev => ({
-        ...prev,
-        total: response.data?.total || 0
-      }));
-      
     } catch (error) {
       console.error('Error cargando facturas:', error);
       setFacturasData({
         facturas: [],
         loading: false,
-        error: error.message || 'Error al cargar facturas'
+        error: error.message
       });
     }
   };
 
-  const generarPreview = async () => {
-    setLoading(true);
+  const generarFacturacionMensual = async () => {
     try {
-      const response = await facturasService.getPreviewFacturacion({
-        periodo: new Date().toISOString().slice(0, 7)
-      });
-      setPreview(response.data);
-    } catch (error) {
-      console.error('Error generando preview:', error);
-      setPreview({ error: error.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const ejecutarFacturacion = async () => {
-    const confirmacion = window.confirm(
-      'Esta acción generará la facturación mensual para todos los clientes activos. ' +
-      'Esta acción no se puede deshacer.'
-    );
-
-    if (!confirmacion) return;
-
-    setLoading(true);
-    try {
-      const response = await facturasService.generarFacturacionMensual({
-        periodo: new Date().toISOString().slice(0, 7)
-      });
-      setResultado(response.data);
-      await cargarFacturas();
-      await cargarEstadisticas();
-    } catch (error) {
-      console.error('Error ejecutando facturación:', error);
-      setResultado({ error: error.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const exportarFacturas = async () => {
-    try {
-      const response = await facturasService.exportarFacturas({
-        ...filtros,
-        formato: 'excel'
-      });
+      setLoading(true);
       
-      // Crear blob y descargar
-      const blob = new Blob([response.data], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-      });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `facturas-${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const params = {
+        fecha_referencia: new Date().toISOString(),
+        solo_preview: false
+      };
+
+      console.log('🚀 Generando facturación mensual con parámetros:', params);
+      
+      const response = await facturasService.generarFacturacionMensual(params);
+      
+      setResultado(response.data);
+      
+      // Recargar datos
+      await cargarEstadisticas();
+      await cargarFacturas();
+      
     } catch (error) {
-      console.error('Error exportando facturas:', error);
+      console.error('Error generando facturación:', error);
+      setResultado({
+        success: false,
+        message: error.message,
+        errores: [error.message]
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const actualizarFiltros = (campo, valor) => {
+  const obtenerPreview = async () => {
+    try {
+      setLoading(true);
+      
+      const params = {
+        periodo: new Date().toISOString().slice(0, 7) // YYYY-MM
+      };
+
+      console.log('👁️ Obteniendo preview con parámetros:', params);
+      
+      const response = await facturasService.getPreviewFacturacionMensual(params);
+      setPreview(response.data);
+      
+    } catch (error) {
+      console.error('Error obteniendo preview:', error);
+      setPreview({
+        success: false,
+        message: error.message
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==========================================
+  // MANEJADORES DE EVENTOS
+  // ==========================================
+
+  const handleFiltroChange = (campo, valor) => {
     setFiltros(prev => ({
       ...prev,
       [campo]: valor
     }));
+    setPaginacion(prev => ({ ...prev, page: 1 }));
+  };
+
+  const cambiarPagina = (nuevaPagina) => {
     setPaginacion(prev => ({
       ...prev,
-      page: 1
+      page: nuevaPagina
     }));
   };
 
   // ==========================================
-  // COMPONENTES DE UI
+  // FUNCIONES DE UTILIDAD
   // ==========================================
 
-  // Componente para tarjetas de estadísticas
-  const TarjetaEstadistica = ({ titulo, valor, icono: IconComponent, color, subtitulo }) => (
-    <div className="bg-white rounded-lg shadow-md p-6 border-l-4" style={{ borderLeftColor: color }}>
-      <div className="flex items-center">
-        <div className="flex-shrink-0">
-          <IconComponent className="h-8 w-8" style={{ color }} />
-        </div>
-        <div className="ml-5 w-0 flex-1">
-          <dl>
-            <dt className="text-sm font-medium text-gray-500 truncate">{titulo}</dt>
-            <dd className="text-lg font-medium text-gray-900">{valor}</dd>
-            {subtitulo && <dd className="text-sm text-gray-500">{subtitulo}</dd>}
-          </dl>
-        </div>
-      </div>
-    </div>
-  );
+  const formatearMoneda = (valor) => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0
+    }).format(valor || 0);
+  };
 
-  // Componente para la tabla de facturas
-  const TablaFacturas = () => (
-    <div className="bg-white rounded-lg shadow-md">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Facturas Recientes
-          </h3>
-          <button
-            onClick={exportarFacturas}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Exportar
-          </button>
-        </div>
-      </div>
+  const formatearFecha = (fecha) => {
+    if (!fecha) return 'N/A';
+    return new Date(fecha).toLocaleDateString('es-CO');
+  };
 
-      <div className="p-6">
-        {/* Filtros */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fecha Desde
-            </label>
-            <input
-              type="date"
-              value={filtros.fecha_desde}
-              onChange={(e) => actualizarFiltros('fecha_desde', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fecha Hasta
-            </label>
-            <input
-              type="date"
-              value={filtros.fecha_hasta}
-              onChange={(e) => actualizarFiltros('fecha_hasta', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estado
-            </label>
-            <select
-              value={filtros.estado}
-              onChange={(e) => actualizarFiltros('estado', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos</option>
-              <option value="pendiente">Pendiente</option>
-              <option value="pagada">Pagada</option>
-              <option value="vencida">Vencida</option>
-              <option value="anulada">Anulada</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Cliente ID
-            </label>
-            <input
-              type="text"
-              value={filtros.cliente_id}
-              onChange={(e) => actualizarFiltros('cliente_id', e.target.value)}
-              placeholder="ID del cliente"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        {/* Contenido de la tabla */}
-        {facturasData.loading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-          </div>
-        ) : facturasData.error ? (
-          <div className="text-center py-8 text-red-600">
-            <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
-            <p>{facturasData.error}</p>
-          </div>
-        ) : facturasData.facturas.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <FileText className="h-8 w-8 mx-auto mb-2" />
-            <p>No hay facturas para mostrar</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Factura
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cliente
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fecha
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {facturasData.facturas.map((factura) => (
-                  <tr key={factura.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {factura.numero_factura}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {factura.cliente_nombre}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(factura.fecha_emision).toLocaleDateString('es-CO')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ${factura.total?.toLocaleString('es-CO') || '0'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        factura.estado === 'pagada' ? 'bg-green-100 text-green-800' :
-                        factura.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                        factura.estado === 'vencida' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {factura.estado}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const obtenerColorEstado = (estado) => {
+    const colores = {
+      'pagada': 'bg-green-100 text-green-800 border-green-200',
+      'pendiente': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'vencida': 'bg-red-100 text-red-800 border-red-200',
+      'anulada': 'bg-gray-100 text-gray-800 border-gray-200'
+    };
+    return colores[estado] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
 
   // ==========================================
-  // RENDER PRINCIPAL
+  // RENDER
   // ==========================================
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Facturación Automática</h1>
-              <p className="mt-2 text-gray-600">
-                Generación masiva y control de facturación mensual
-              </p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Principal */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-lg">
+                <Activity className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Facturación Automática</h1>
+                <p className="text-sm text-gray-500">Gestión y generación automática de facturas mensuales</p>
+              </div>
             </div>
-            <button
-              onClick={() => {
-                cargarEstadisticas();
-                cargarFacturas();
-              }}
-              disabled={loading}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Actualizar
-            </button>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={obtenerPreview}
+                disabled={loading}
+                className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-lg text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+              >
+                {loading ? 
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 
+                  <Eye className="w-4 h-4 mr-2" />
+                }
+                Vista Previa
+              </button>
+              
+              <button
+                onClick={generarFacturacionMensual}
+                disabled={loading || !hasPermission('facturas')}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+              >
+                {loading ? 
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 
+                  <Play className="w-4 h-4 mr-2" />
+                }
+                Generar Facturación
+              </button>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Estadísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <TarjetaEstadistica
-            titulo="Total Clientes"
-            valor={estadisticas.total_clientes?.toLocaleString('es-CO') || '0'}
-            icono={Users}
-            color="#3B82F6"
-          />
-          <TarjetaEstadistica
-            titulo="Facturas Generadas"
-            valor={estadisticas.facturas_generadas?.toLocaleString('es-CO') || '0'}
-            icono={FileText}
-            color="#10B981"
-          />
-          <TarjetaEstadistica
-            titulo="Monto Total"
-            valor={`$${estadisticas.monto_total?.toLocaleString('es-CO') || '0'}`}
-            icono={DollarSign}
-            color="#F59E0B"
-          />
-          <TarjetaEstadistica
-            titulo="Errores"
-            valor={estadisticas.errores?.toLocaleString('es-CO') || '0'}
-            icono={AlertTriangle}
-            color="#EF4444"
-          />
-        </div>
-
-        {/* Acciones principales */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Panel de Preview */}
-          <Card>
-            <CardContent>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Preview de Facturación
-                </h3>
-                <Eye className="w-5 h-5 text-gray-500" />
+      {/* Contenido Principal */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-8">
+          
+          {/* Estadísticas Principales */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-200">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-xl">
+                      <Users className="w-6 h-6 text-blue-600" />
+                    </div>
+                  </div>
+                  <div className="ml-4 flex-1">
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Total Clientes</p>
+                    <p className="text-2xl font-bold text-gray-900">{estadisticas.total_clientes?.toLocaleString('es-CO') || '0'}</p>
+                  </div>
+                </div>
               </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Revisa qué facturas se generarán antes de ejecutar el proceso
-              </p>
-              <button
-                onClick={generarPreview}
-                disabled={loading}
-                className="w-full inline-flex items-center justify-center px-4 py-2 border border-blue-600 rounded-lg shadow-sm text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                Generar Preview
-              </button>
-            </CardContent>
-          </Card>
+            </div>
 
-          {/* Panel de Ejecución */}
-          <Card>
-            <CardContent>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Facturación Mensual
-                </h3>
-                <Play className="w-5 h-5 text-gray-500" />
+            <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-200">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-xl">
+                      <FileText className="w-6 h-6 text-green-600" />
+                    </div>
+                  </div>
+                  <div className="ml-4 flex-1">
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Facturas Generadas</p>
+                    <p className="text-2xl font-bold text-gray-900">{estadisticas.facturas_generadas?.toLocaleString('es-CO') || '0'}</p>
+                  </div>
+                </div>
               </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Ejecuta la facturación mensual para todos los clientes activos
-              </p>
-              <button
-                onClick={ejecutarFacturacion}
-                disabled={loading}
-                className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Play className="w-4 h-4 mr-2" />
-                )}
-                Ejecutar Facturación
-              </button>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
 
-        {/* Resultados del Preview */}
-        {preview && (
-          <Card className="mb-8">
-            <CardContent>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Resultado del Preview
-              </h3>
-              {preview.error ? (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <XCircle className="w-5 h-5 text-red-500 mr-2" />
-                    <p className="text-red-700">{preview.error}</p>
+            <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-200">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-xl">
+                      <DollarSign className="w-6 h-6 text-purple-600" />
+                    </div>
+                  </div>
+                  <div className="ml-4 flex-1">
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Monto Total</p>
+                    <p className="text-2xl font-bold text-gray-900">{formatearMoneda(estadisticas.monto_total)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-200">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-xl">
+                      <AlertTriangle className="w-6 h-6 text-red-600" />
+                    </div>
+                  </div>
+                  <div className="ml-4 flex-1">
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Errores</p>
+                    <p className="text-2xl font-bold text-gray-900">{estadisticas.errores || '0'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Filtros Mejorados */}
+          <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center space-x-2">
+                <Settings className="w-5 h-5 text-gray-400" />
+                <h3 className="text-lg font-medium text-gray-900">Filtros de Búsqueda</h3>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Fecha Desde
+                  </label>
+                  <input
+                    type="date"
+                    value={filtros.fecha_desde}
+                    onChange={(e) => handleFiltroChange('fecha_desde', e.target.value)}
+                    className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Fecha Hasta
+                  </label>
+                  <input
+                    type="date"
+                    value={filtros.fecha_hasta}
+                    onChange={(e) => handleFiltroChange('fecha_hasta', e.target.value)}
+                    className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Estado
+                  </label>
+                  <select
+                    value={filtros.estado}
+                    onChange={(e) => handleFiltroChange('estado', e.target.value)}
+                    className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">Todos los estados</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="pagada">Pagada</option>
+                    <option value="vencida">Vencida</option>
+                    <option value="anulada">Anulada</option>
+                  </select>
+                </div>
+                
+                <div className="flex items-end">
+                  <button
+                    onClick={() => {
+                      cargarEstadisticas();
+                      cargarFacturas();
+                    }}
+                    className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Actualizar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Resultados y Preview */}
+          {(resultado || preview) && (
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900">
+                  {preview ? 'Vista Previa de Facturación' : 'Resultado de Facturación'}
+                </h3>
+              </div>
+              <div className="p-6">
+                <div className={`rounded-xl p-6 border-2 ${
+                  (resultado?.success !== false && preview?.success !== false) ? 
+                  'bg-green-50 border-green-200' : 
+                  'bg-red-50 border-red-200'
+                }`}>
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      {(resultado?.success !== false && preview?.success !== false) ? 
+                        <CheckCircle className="w-6 h-6 text-green-600" /> :
+                        <XCircle className="w-6 h-6 text-red-600" />
+                      }
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-medium text-gray-900">
+                        {resultado?.message || preview?.message || 'Proceso completado'}
+                      </h4>
+                      
+                      {preview?.resumen && (
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-white rounded-lg p-4 border border-gray-200">
+                            <div className="text-sm font-medium text-gray-500">Clientes a facturar</div>
+                            <div className="text-2xl font-bold text-gray-900">{preview.resumen.total_clientes}</div>
+                          </div>
+                          <div className="bg-white rounded-lg p-4 border border-gray-200">
+                            <div className="text-sm font-medium text-gray-500">Monto estimado</div>
+                            <div className="text-2xl font-bold text-gray-900">{formatearMoneda(preview.resumen.monto_total_estimado)}</div>
+                          </div>
+                          <div className="bg-white rounded-lg p-4 border border-gray-200">
+                            <div className="text-sm font-medium text-gray-500">Servicios totales</div>
+                            <div className="text-2xl font-bold text-gray-900">{preview.resumen.servicios_totales || 0}</div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {(resultado?.errores || preview?.errores) && (
+                        <div className="mt-4">
+                          <h5 className="text-sm font-medium text-red-800 mb-2">Errores encontrados:</h5>
+                          <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                            {(resultado?.errores || preview?.errores).map((error, index) => (
+                              <li key={index}>{error}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Lista de Facturas */}
+          <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <FileSpreadsheet className="w-5 h-5 text-gray-400" />
+                  <h3 className="text-lg font-medium text-gray-900">Facturas Recientes</h3>
+                </div>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  {paginacion.total} facturas en total
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-hidden">
+              {facturasData.loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="flex items-center space-x-3">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    <span className="text-sm text-gray-600">Cargando facturas...</span>
+                  </div>
+                </div>
+              ) : facturasData.error ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <AlertIcon className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Error al cargar facturas</h3>
+                    <p className="text-sm text-gray-500">{facturasData.error}</p>
+                  </div>
+                </div>
+              ) : facturas.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron facturas</h3>
+                    <p className="text-sm text-gray-500">Ajusta los filtros o genera nuevas facturas</p>
                   </div>
                 </div>
               ) : (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center mb-2">
-                    <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                    <p className="text-green-700 font-medium">Preview generado exitosamente</p>
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Número
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Cliente
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Fecha Emisión
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Vencimiento
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Monto
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Estado
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {facturas.map((factura) => (
+                          <tr key={factura.id} className="hover:bg-gray-50 transition-colors duration-150">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{factura.numero_factura}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{factura.nombre_cliente}</div>
+                              <div className="text-sm text-gray-500">{factura.identificacion_cliente}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatearFecha(factura.fecha_emision)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatearFecha(factura.fecha_vencimiento)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{formatearMoneda(factura.total)}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${obtenerColorEstado(factura.estado)}`}>
+                                {factura.estado_descripcion || factura.estado}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <div className="text-sm text-green-600">
-                    <p>Clientes a facturar: {preview.clientes_count || 0}</p>
-                    <p>Monto total estimado: ${preview.monto_total?.toLocaleString('es-CO') || '0'}</p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Resultados de la Facturación */}
-        {resultado && (
-          <Card className="mb-8">
-            <CardContent>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Resultado de la Facturación
-              </h3>
-              {resultado.error ? (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <XCircle className="w-5 h-5 text-red-500 mr-2" />
-                    <p className="text-red-700">{resultado.error}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center mb-2">
-                    <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                    <p className="text-green-700 font-medium">Facturación ejecutada exitosamente</p>
-                  </div>
-                  <div className="text-sm text-green-600">
-                    <p>Facturas generadas: {resultado.facturas_generadas || 0}</p>
-                    <p>Monto total: ${resultado.monto_total?.toLocaleString('es-CO') || '0'}</p>
-                    <p>Errores: {resultado.errores || 0}</p>
-                  </div>
-                </div>
+                  {/* Paginación Mejorada */}
+                  {paginacion.total > paginacion.limit && (
+                    <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center text-sm text-gray-700">
+                          <span>
+                            Mostrando{' '}
+                            <span className="font-medium">
+                              {((paginacion.page - 1) * paginacion.limit) + 1}
+                            </span>
+                            {' '}a{' '}
+                            <span className="font-medium">
+                              {Math.min(paginacion.page * paginacion.limit, paginacion.total)}
+                            </span>
+                            {' '}de{' '}
+                            <span className="font-medium">{paginacion.total}</span>
+                            {' '}resultados
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => cambiarPagina(paginacion.page - 1)}
+                            disabled={paginacion.page === 1}
+                            className="relative inline-flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Anterior
+                          </button>
+                          
+                          <span className="relative inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-blue-600 rounded-lg">
+                            {paginacion.page}
+                          </span>
+                          
+                          <button
+                            onClick={() => cambiarPagina(paginacion.page + 1)}
+                            disabled={paginacion.page * paginacion.limit >= paginacion.total}
+                            className="relative inline-flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Siguiente
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </div>
 
-        {/* Tabla de Facturas */}
-        <TablaFacturas />
+        </div>
       </div>
     </div>
   );
