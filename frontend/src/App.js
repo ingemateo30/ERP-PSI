@@ -26,14 +26,14 @@ const InventoryManagement = lazy(() => import('./components/Inventory/InventoryM
 
 // Lazy loading de componentes de gestión
 const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagement'));
-//const FacturasManagement = lazy(() => import('./components/Facturas/FacturasManagement'));// CORREGIDO: Importación correcta del componente FacturasManagement'./components/Facturas/FacturasManagement';from './components/Facturas/FacturasManagement';
+const FacturasManagement = lazy(() => import('./components/Facturas/FacturasManagement'));// CORREGIDO: Importación correcta del componente FacturasManagement'./components/Facturas/FacturasManagement';from './components/Facturas/FacturasManagement';
 
 const ReportesRegulatorios = lazy(() => import('./components/Reports/ReportesRegulatorios'));// CORREGIDO: Importación correcta del componente ReportesRegulatorios'from './components/Reports/ReportesRegulatorios';
 const PQRManagement = lazy(() => import('./components/PQR/PQRManagement'));// CORREGIDO: Importación correcta del componente PQRManagement' from './components/PQR/PQRManagement';
 const IncidenciasManagement = lazy(() => import('./components/Incidencias/IncidenciasManagement'));
 const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
 const InstalacionesManagement = lazy(() => import('./components/Instalaciones/InstalacionesManagement'));
-const FacturacionAutomatica = lazy(() => import('./components/Facturas/FacturacionAutomatica'));
+//const FacturacionAutomatica = lazy(() => import('./components/Facturas/FacturacionAutomatica'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -321,11 +321,11 @@ function App() {
               <Route
                 path="/facturacion-automatica"
                 element={
-                  <Suspense fallback={<LoadingFallback message="Cargando Facturación Automática..." />}>
+                  <ProtectedRoute requiredRole="supervisor" >
                     <MainLayout title="Facturación Automática" subtitle="Sistema automatizado de facturación mensual">
-                      <FacturacionAutomatica />
+                      <FacturasManagement />
                     </MainLayout>
-                  </Suspense>
+                  </ ProtectedRoute>
                 }
               />
 
