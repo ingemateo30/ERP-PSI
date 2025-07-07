@@ -1,13 +1,80 @@
-// frontend/src/services/facturasService.js
-// Servicio para manejar las APIs de facturación automática - CORREGIDO SOLO EL ERROR
+// frontend/src/services/facturasService.js - COMPLETO
 
-import { useState } from 'react';
-import apiServiceDefault from './apiService';
+import apiService from './apiService';
 
 const API_BASE = '/facturacion';
 
 export const facturasService = {
   
+  // ==========================================
+  // CRUD BÁSICO DE FACTURAS
+  // ==========================================
+
+  /**
+   * Obtener todas las facturas con filtros y paginación
+   */
+  async getFacturas(params = {}) {
+    try {
+      const response = await apiService.get(`${API_BASE}`, { params });
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo facturas:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener una factura por ID
+   */
+  async getFactura(id) {
+    try {
+      const response = await apiService.get(`${API_BASE}/${id}`);
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo factura:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Crear una nueva factura
+   */
+  async createFactura(facturaData) {
+    try {
+      const response = await apiService.post(`${API_BASE}`, facturaData);
+      return response;
+    } catch (error) {
+      console.error('Error creando factura:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Actualizar una factura
+   */
+  async updateFactura(id, facturaData) {
+    try {
+      const response = await apiService.put(`${API_BASE}/${id}`, facturaData);
+      return response;
+    } catch (error) {
+      console.error('Error actualizando factura:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Eliminar una factura
+   */
+  async deleteFactura(id) {
+    try {
+      const response = await apiService.delete(`${API_BASE}/${id}`);
+      return response;
+    } catch (error) {
+      console.error('Error eliminando factura:', error);
+      throw error;
+    }
+  },
+
   // ==========================================
   // FACTURACIÓN AUTOMÁTICA
   // ==========================================
@@ -17,7 +84,7 @@ export const facturasService = {
    */
   async generarFacturacionMensual(params = {}) {
     try {
-      const response = await apiServiceDefault.post(`${API_BASE}/generar-mensual`, params);
+      const response = await apiService.post(`${API_BASE}/facturacion/generar-mensual`, params);
       return response;
     } catch (error) {
       console.error('Error generando facturación mensual:', error);
@@ -30,7 +97,7 @@ export const facturasService = {
    */
   async generarFacturaIndividual(clienteId, params = {}) {
     try {
-      const response = await apiServiceDefault.post(`${API_BASE}/cliente/${clienteId}`, params);
+      const response = await apiService.post(`${API_BASE}/facturacion/cliente/${clienteId}`, params);
       return response;
     } catch (error) {
       console.error('Error generando factura individual:', error);
@@ -39,14 +106,27 @@ export const facturasService = {
   },
 
   /**
-   * Obtener preview de facturación para un cliente
+   * Obtener preview de facturación para un cliente específico
    */
   async getPreviewCliente(clienteId) {
     try {
-      const response = await apiServiceDefault.get(`${API_BASE}/preview/${clienteId}`);
+      const response = await apiService.get(`${API_BASE}/facturacion/preview/${clienteId}`);
       return response;
     } catch (error) {
-      console.error('Error obteniendo preview:', error);
+      console.error('Error obteniendo preview de cliente:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener preview de facturación mensual general
+   */
+  async getPreviewFacturacion(params = {}) {
+    try {
+      const response = await apiService.post(`${API_BASE}/facturacion/preview`, params);
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo preview de facturación:', error);
       throw error;
     }
   },
@@ -57,87 +137,16 @@ export const facturasService = {
   async validarIntegridadDatos(clienteId = null) {
     try {
       const params = clienteId ? { cliente_id: clienteId } : {};
-      const response = await apiServiceDefault.get(`${API_BASE}/validar-datos`, { params });
+      const response = await apiService.post(`${API_BASE}/facturacion/validar-integridad`, params);
       return response;
     } catch (error) {
-      console.error('Error validando datos:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Regenerar una factura específica
-   */
-  async regenerarFactura(facturaId, motivo) {
-    try {
-      const response = await apiServiceDefault.post(`${API_BASE}/regenerar/${facturaId}`, { motivo });
-      return response;
-    } catch (error) {
-      console.error('Error regenerando factura:', error);
+      console.error('Error validando integridad:', error);
       throw error;
     }
   },
 
   // ==========================================
-  // CONSULTA DE FACTURAS
-  // ==========================================
-
-  /**
-   * Obtener lista de facturas con filtros y paginación
-   */
-  async getAll(params = {}) {
-    try {
-      const response = await apiServiceDefault.get(`${API_BASE}/facturas`, { params });
-      return response;
-    } catch (error) {
-      console.error('Error obteniendo facturas:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Obtener una factura específica por ID
-   */
-  async getById(id) {
-    try {
-      const response = await apiServiceDefault.get(`${API_BASE}/facturas/${id}`);
-      return response;
-    } catch (error) {
-      console.error('Error obteniendo factura:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Registrar pago de una factura
-   */
-  async registrarPago(facturaId, pagoData) {
-    try {
-      const response = await apiServiceDefault.post(`${API_BASE}/facturas/${facturaId}/pagar`, pagoData);
-      return response;
-    } catch (error) {
-      console.error('Error registrando pago:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Anular una factura
-   */
-  async anularFactura(facturaId, motivo) {
-    try {
-      const response = await apiServiceDefault.put(`${API_BASE}/facturas/${facturaId}/anular`, { 
-        motivo_anulacion: motivo 
-      });
-      return response;
-    } catch (error) {
-      console.error('Error anulando factura:', error);
-      throw error;
-    }
-  },
-
-  // ==========================================
-  // REPORTES Y ESTADÍSTICAS
+  // ESTADÍSTICAS Y REPORTES
   // ==========================================
 
   /**
@@ -145,7 +154,7 @@ export const facturasService = {
    */
   async getEstadisticas(params = {}) {
     try {
-      const response = await apiServiceDefault.get(`${API_BASE}/estadisticas`, { params });
+      const response = await apiService.get(`${API_BASE}/estadisticas`, { params });
       return response;
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
@@ -154,92 +163,148 @@ export const facturasService = {
   },
 
   /**
-   * Obtener resumen ejecutivo de facturación
+   * Obtener resumen de facturación por período
    */
-  async getResumenEjecutivo(periodo = null) {
+  async getResumenPeriodo(params = {}) {
     try {
-      const params = periodo ? { periodo } : {};
-      const response = await apiServiceDefault.get(`${API_BASE}/reportes/resumen`, { params });
+      const response = await apiService.get(`${API_BASE}/resumen-periodo`, { params });
       return response;
     } catch (error) {
-      console.error('Error obteniendo resumen:', error);
+      console.error('Error obteniendo resumen por período:', error);
       throw error;
     }
   },
 
   /**
-   * Obtener reporte de cartera vencida
+   * Obtener facturas vencidas
    */
-  async getCarteraVencida(params = {}) {
+  async getFacturasVencidas(params = {}) {
     try {
-      const response = await apiServiceDefault.get(`${API_BASE}/reportes/cartera`, { params });
+      const response = await apiService.get(`${API_BASE}/vencidas`, { params });
       return response;
     } catch (error) {
-      console.error('Error obteniendo cartera vencida:', error);
+      console.error('Error obteniendo facturas vencidas:', error);
       throw error;
     }
   },
 
   // ==========================================
-  // ARCHIVOS Y DOCUMENTOS
+  // PAGOS Y GESTIÓN DE ESTADO
   // ==========================================
 
   /**
-   * Generar y descargar PDF de factura
+   * Registrar pago de factura
    */
-  async descargarPDF(facturaId) {
+  async registrarPago(facturaId, pagoData) {
     try {
-      const response = await apiServiceDefault.getBlob(`${API_BASE}/facturas/${facturaId}/pdf`);
-      
-      // Crear enlace de descarga
-      const url = window.URL.createObjectURL(response);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Factura_${facturaId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Error descargando PDF:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Ver PDF de factura en nueva ventana
-   */
-  verPDF(facturaId) {
-    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-    const url = `${baseURL}/api/v1${API_BASE}/facturas/${facturaId}/ver-pdf`;
-    window.open(url, '_blank');
-  },
-
-  // ==========================================
-  // UTILIDADES
-  // ==========================================
-
-  /**
-   * Verificar estado de salud del sistema de facturación
-   */
-  async checkHealth() {
-    try {
-      const response = await apiServiceDefault.get(`${API_BASE}/health`);
+      const response = await apiService.post(`${API_BASE}/${facturaId}/pagos`, pagoData);
       return response;
     } catch (error) {
-      console.error('Error verificando salud del sistema:', error);
+      console.error('Error registrando pago:', error);
       throw error;
     }
   },
+
+  /**
+   * Obtener historial de pagos de una factura
+   */
+  async getPagosFactura(facturaId) {
+    try {
+      const response = await apiService.get(`${API_BASE}/${facturaId}/pagos`);
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo pagos de factura:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Anular factura
+   */
+  async anularFactura(facturaId, motivo) {
+    try {
+      const response = await apiService.post(`${API_BASE}/${facturaId}/anular`, { motivo });
+      return response;
+    } catch (error) {
+      console.error('Error anulando factura:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Cambiar estado de factura
+   */
+  async cambiarEstado(facturaId, nuevoEstado, observaciones = '') {
+    try {
+      const response = await apiService.put(`${API_BASE}/${facturaId}/estado`, {
+        estado: nuevoEstado,
+        observaciones
+      });
+      return response;
+    } catch (error) {
+      console.error('Error cambiando estado de factura:', error);
+      throw error;
+    }
+  },
+
+  // ==========================================
+  // IMPORTACIÓN Y EXPORTACIÓN
+  // ==========================================
+
+  /**
+   * Exportar facturas a Excel
+   */
+  async exportarFacturas(params = {}) {
+    try {
+      const response = await apiService.get(`${API_BASE}/exportar`, {
+        params,
+        responseType: 'blob'
+      });
+      return response;
+    } catch (error) {
+      console.error('Error exportando facturas:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Generar PDF de factura
+   */
+  async generarPDF(facturaId) {
+    try {
+      const response = await apiService.get(`${API_BASE}/${facturaId}/pdf`, {
+        responseType: 'blob'
+      });
+      return response;
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Enviar factura por email
+   */
+  async enviarEmail(facturaId, emailData = {}) {
+    try {
+      const response = await apiService.post(`${API_BASE}/${facturaId}/enviar-email`, emailData);
+      return response;
+    } catch (error) {
+      console.error('Error enviando email:', error);
+      throw error;
+    }
+  },
+
+  // ==========================================
+  // CONFIGURACIÓN Y PARÁMETROS
+  // ==========================================
 
   /**
    * Obtener configuración de facturación
    */
   async getConfiguracion() {
     try {
-      const response = await apiServiceDefault.get('/config/company');
+      const response = await apiService.get(`${API_BASE}/configuracion`);
       return response;
     } catch (error) {
       console.error('Error obteniendo configuración:', error);
@@ -248,169 +313,149 @@ export const facturasService = {
   },
 
   /**
-   * Formatear número de factura para mostrar
+   * Actualizar configuración de facturación
    */
-  formatearNumeroFactura(numero) {
-    if (!numero) return '';
-    return numero.toString().toUpperCase();
-  },
-
-  /**
-   * Formatear estado de factura para mostrar
-   */
-  formatearEstadoFactura(estado) {
-    const estados = {
-      'pendiente': { texto: 'Pendiente', color: 'yellow' },
-      'pagada': { texto: 'Pagada', color: 'green' },
-      'vencida': { texto: 'Vencida', color: 'red' },
-      'anulada': { texto: 'Anulada', color: 'gray' }
-    };
-    return estados[estado] || { texto: estado, color: 'gray' };
-  },
-
-  /**
-   * Formatear moneda
-   */
-  formatearMoneda(valor) {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
-    }).format(valor || 0);
-  },
-
-  /**
-   * Calcular días de vencimiento
-   */
-  calcularDiasVencimiento(fechaVencimiento) {
-    if (!fechaVencimiento) return 0;
-    const hoy = new Date();
-    const vencimiento = new Date(fechaVencimiento);
-    const diffTime = hoy.getTime() - vencimiento.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
-  },
-
-  /**
-   * Validar datos de pago
-   */
-  validarDatosPago(datosPago) {
-    const errores = [];
-
-    if (!datosPago.valor_pagado || datosPago.valor_pagado <= 0) {
-      errores.push('El valor pagado debe ser mayor a cero');
-    }
-
-    if (!datosPago.metodo_pago) {
-      errores.push('El método de pago es requerido');
-    }
-
-    if (datosPago.metodo_pago === 'transferencia' && !datosPago.referencia_pago) {
-      errores.push('La referencia de pago es requerida para transferencias');
-    }
-
-    return {
-      valido: errores.length === 0,
-      errores
-    };
-  },
-
-  /**
-   * Exportar facturas a Excel
-   */
-  async exportarExcel(filtros = {}) {
+  async updateConfiguracion(configData) {
     try {
-      const response = await apiServiceDefault.getBlob(`${API_BASE}/facturas/export/excel`, { params: filtros });
-      
-      // Crear enlace de descarga
-      const url = window.URL.createObjectURL(response);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `facturas_${new Date().toISOString().split('T')[0]}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      
-      return { success: true };
+      const response = await apiService.put(`${API_BASE}/configuracion`, configData);
+      return response;
     } catch (error) {
-      console.error('Error exportando a Excel:', error);
+      console.error('Error actualizando configuración:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener próximo número de factura
+   */
+  async getProximoNumero() {
+    try {
+      const response = await apiService.get(`${API_BASE}/proximo-numero`);
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo próximo número:', error);
+      throw error;
+    }
+  },
+
+  // ==========================================
+  // UTILIDADES Y VALIDACIONES
+  // ==========================================
+
+  /**
+   * Validar datos de factura antes de crear
+   */
+  async validarFactura(facturaData) {
+    try {
+      const response = await apiService.post(`${API_BASE}/validar`, facturaData);
+      return response;
+    } catch (error) {
+      console.error('Error validando factura:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Recalcular totales de factura
+   */
+  async recalcularTotales(facturaData) {
+    try {
+      const response = await apiService.post(`${API_BASE}/recalcular-totales`, facturaData);
+      return response;
+    } catch (error) {
+      console.error('Error recalculando totales:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Buscar facturas por múltiples criterios
+   */
+  async buscarFacturas(criterios) {
+    try {
+      const response = await apiService.post(`${API_BASE}/buscar`, criterios);
+      return response;
+    } catch (error) {
+      console.error('Error buscando facturas:', error);
+      throw error;
+    }
+  },
+
+  // ==========================================
+  // GESTIÓN DE CORTES Y RECONEXIONES
+  // ==========================================
+
+  /**
+   * Obtener facturas pendientes para corte
+   */
+  async getFacturasPendientesCorte(params = {}) {
+    try {
+      const response = await apiService.get(`${API_BASE}/pendientes-corte`, { params });
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo facturas pendientes de corte:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Generar orden de corte masiva
+   */
+  async generarOrdenCorteMasiva(facturaIds, params = {}) {
+    try {
+      const response = await apiService.post(`${API_BASE}/generar-corte-masivo`, {
+        factura_ids: facturaIds,
+        ...params
+      });
+      return response;
+    } catch (error) {
+      console.error('Error generando orden de corte masiva:', error);
+      throw error;
+    }
+  },
+
+  // ==========================================
+  // REPORTES ESPECIALIZADOS
+  // ==========================================
+
+  /**
+   * Reporte de cartera por edades
+   */
+  async getReporteCarteraEdades(params = {}) {
+    try {
+      const response = await apiService.get(`${API_BASE}/reportes/cartera-edades`, { params });
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo reporte de cartera por edades:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Reporte de facturación por período
+   */
+  async getReporteFacturacionPeriodo(params = {}) {
+    try {
+      const response = await apiService.get(`${API_BASE}/reportes/facturacion-periodo`, { params });
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo reporte de facturación por período:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Reporte de eficiencia de cobranza
+   */
+  async getReporteEficienciaCobranza(params = {}) {
+    try {
+      const response = await apiService.get(`${API_BASE}/reportes/eficiencia-cobranza`, { params });
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo reporte de eficiencia de cobranza:', error);
       throw error;
     }
   }
-};
-
-// ==========================================
-// HOOKS PERSONALIZADOS PARA FACTURAS
-// ==========================================
-
-export const useFacturas = () => {
-  const [facturas, setFacturas] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0
-  });
-
-  const cargarFacturas = async (filtros = {}) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await facturasService.getAll({
-        ...filtros,
-        page: pagination.page,
-        limit: pagination.limit
-      });
-      setFacturas(response.data.facturas);
-      setPagination(prev => ({
-        ...prev,
-        total: response.data.pagination.total
-      }));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return {
-    facturas,
-    loading,
-    error,
-    pagination,
-    setPagination,
-    cargarFacturas
-  };
-};
-
-export const useEstadisticasFacturacion = () => {
-  const [estadisticas, setEstadisticas] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const cargarEstadisticas = async (periodo = null) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await facturasService.getEstadisticas(
-        periodo ? { periodo } : {}
-      );
-      setEstadisticas(response.data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return {
-    estadisticas,
-    loading,
-    error,
-    cargarEstadisticas
-  };
 };
 
 export default facturasService;

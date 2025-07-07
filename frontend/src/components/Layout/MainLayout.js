@@ -82,10 +82,10 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
     },
     {
-      icon: DollarSign,
+      icon:  <Users size={22} />,
       label: 'Facturación Automática',
       path: '/facturacion-automatica',
-      permission: 'supervisor,administrador' // o 'administrador' según tus necesidades
+      permission: 'administrador' // o 'administrador' según tus necesidades
     },
     {
       icon: <Wifi size={22} />,

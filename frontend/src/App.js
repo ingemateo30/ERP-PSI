@@ -14,7 +14,7 @@ const UserProfile = lazy(() => import('./components/UserProfile'));
 
 // CORREGIDO: Importación correcta del componente Users
 const UsersManagement = lazy(() => import('./components/Users/UsersManagement'));
-
+//
 // Lazy loading de componentes de configuración
 const ConfigMain = lazy(() => import('./components/Config/ConfigMain'));
 const CompanyConfig = lazy(() => import('./components/Config/CompanyConfig'));
@@ -33,7 +33,7 @@ const PQRManagement = lazy(() => import('./components/PQR/PQRManagement'));// CO
 const IncidenciasManagement = lazy(() => import('./components/Incidencias/IncidenciasManagement'));
 const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
 const InstalacionesManagement = lazy(() => import('./components/Instalaciones/InstalacionesManagement'));
-//const FacturacionAutomatica = lazy(() => import('./components/Facturas/FacturacionAutomatica'));
+const FacturacionAutomatica = lazy(() => import('./components/Facturas/FacturacionAutomatica'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -321,9 +321,9 @@ function App() {
               <Route
                 path="/facturacion-automatica"
                 element={
-                  <ProtectedRoute requiredRole="supervisor" >
+                  <ProtectedRoute requiredRole="administrador" >
                     <MainLayout title="Facturación Automática" subtitle="Sistema automatizado de facturación mensual">
-                      <FacturasManagement />
+                      <FacturacionAutomatica />
                     </MainLayout>
                   </ ProtectedRoute>
                 }
