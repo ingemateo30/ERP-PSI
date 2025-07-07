@@ -1,12 +1,12 @@
 // frontend/src/components/Facturas/FacturasStats.js - CORREGIDO
 
 import React from 'react';
-import { useFacturasEstadisticas } from '../../hooks/useFacturas';
+import { useFacturacionManual } from '../../hooks/useFacturacionManual';
 // CORREGIDO: Importación correcta del service
-import { facturasService } from '../../services/facturasService';
+import { facturacionManualService } from '../../services/facturacionManualService';
 
 const FacturasStats = () => {
-  const { estadisticas, loading, error, refrescar } = useFacturasEstadisticas();
+  const { estadisticas, loading, error, refrescar } = useFacturacionManual();
 
   // Componente de carga
   if (loading) {
@@ -67,8 +67,8 @@ const FacturasStats = () => {
 
   // Calcular totales y porcentajes
   const totalValor = (stats.valor_pendiente || 0) + (stats.valor_pagado || 0) + (stats.cartera_vencida || 0);
-  const porcentajeRecaudacion = facturasService.calcularPorcentaje(stats.valor_pagado || 0, totalValor);
-  const porcentajeVencida = facturasService.calcularPorcentaje(stats.cartera_vencida || 0, totalValor);
+  const porcentajeRecaudacion = facturacionManualService.calcularPorcentaje(stats.valor_pagado || 0, totalValor);
+  const porcentajeVencida = facturacionManualService.calcularPorcentaje(stats.cartera_vencida || 0, totalValor);
 
   // Configuración de tarjetas principales
   const tarjetas = [
@@ -84,21 +84,21 @@ const FacturasStats = () => {
       valor: stats.pendientes,
       icono: '⏳',
       color: 'yellow',
-      descripcion: facturasService.formatearMoneda(stats.valor_pendiente || 0)
+      descripcion: facturacionManualService.formatearMoneda(stats.valor_pendiente || 0)
     },
     {
       titulo: 'Pagadas',
       valor: stats.pagadas,
       icono: '✅',
       color: 'green',
-      descripcion: facturasService.formatearMoneda(stats.valor_pagado || 0)
+      descripcion: facturacionManualService.formatearMoneda(stats.valor_pagado || 0)
     },
     {
       titulo: 'Vencidas',
       valor: stats.vencidas,
       icono: '🚨',
       color: 'red',
-      descripcion: facturasService.formatearMoneda(stats.cartera_vencida || 0)
+      descripcion: facturacionManualService.formatearMoneda(stats.cartera_vencida || 0)
     }
   ];
 
@@ -128,7 +128,7 @@ const FacturasStats = () => {
                   {tarjeta.titulo}
                 </h3>
                 <p className="text-3xl font-bold text-gray-900 mt-2">
-                  {facturasService.formatearNumero(tarjeta.valor)}
+                  {facturacionManualService.formatearNumero(tarjeta.valor)}
                 </p>
               </div>
               <div className="text-3xl">
@@ -157,25 +157,25 @@ const FacturasStats = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Total Facturado:</span>
                 <span className="font-medium text-gray-900">
-                  {facturasService.formatearMoneda(totalValor)}
+                  {facturacionManualService.formatearMoneda(totalValor)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Recaudado:</span>
                 <span className="font-medium text-green-600">
-                  {facturasService.formatearMoneda(stats.valor_pagado || 0)}
+                  {facturacionManualService.formatearMoneda(stats.valor_pagado || 0)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Por Cobrar:</span>
                 <span className="font-medium text-yellow-600">
-                  {facturasService.formatearMoneda(stats.valor_pendiente || 0)}
+                  {facturacionManualService.formatearMoneda(stats.valor_pendiente || 0)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Cartera Vencida:</span>
                 <span className="font-medium text-red-600">
-                  {facturasService.formatearMoneda(stats.cartera_vencida || 0)}
+                  {facturacionManualService.formatearMoneda(stats.cartera_vencida || 0)}
                 </span>
               </div>
             </div>
@@ -200,7 +200,7 @@ const FacturasStats = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Anuladas:</span>
                 <span className="font-medium text-gray-600">
-                  {facturasService.formatearNumero(stats.anuladas || 0)}
+                  {facturacionManualService.formatearNumero(stats.anuladas || 0)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -226,12 +226,12 @@ const FacturasStats = () => {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span>Pagadas</span>
-                  <span>{facturasService.calcularPorcentaje(stats.pagadas, stats.total)}%</span>
+                  <span>{facturacionManualService.calcularPorcentaje(stats.pagadas, stats.total)}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${facturasService.calcularPorcentaje(stats.pagadas, stats.total)}%` }}
+                    style={{ width: `${facturacionManualService.calcularPorcentaje(stats.pagadas, stats.total)}%` }}
                   ></div>
                 </div>
               </div>
@@ -239,12 +239,12 @@ const FacturasStats = () => {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span>Pendientes</span>
-                  <span>{facturasService.calcularPorcentaje(stats.pendientes, stats.total)}%</span>
+                  <span>{facturacionManualService.calcularPorcentaje(stats.pendientes, stats.total)}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-yellow-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${facturasService.calcularPorcentaje(stats.pendientes, stats.total)}%` }}
+                    style={{ width: `${facturacionManualService.calcularPorcentaje(stats.pendientes, stats.total)}%` }}
                   ></div>
                 </div>
               </div>
@@ -252,12 +252,12 @@ const FacturasStats = () => {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span>Vencidas</span>
-                  <span>{facturasService.calcularPorcentaje(stats.vencidas, stats.total)}%</span>
+                  <span>{facturacionManualService.calcularPorcentaje(stats.vencidas, stats.total)}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-red-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${facturasService.calcularPorcentaje(stats.vencidas, stats.total)}%` }}
+                    style={{ width: `${facturacionManualService.calcularPorcentaje(stats.vencidas, stats.total)}%` }}
                   ></div>
                 </div>
               </div>

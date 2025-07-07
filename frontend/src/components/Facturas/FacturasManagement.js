@@ -1,13 +1,13 @@
 // components/Facturas/FacturasManagement.js - Componente principal corregido
 import React, { useState, useCallback, useEffect } from 'react';
-import { useFacturas, useFacturasAcciones } from '../../hooks/useFacturas';
+import { useFacturacionManual } from '../../hooks/useFacturacionManual';
 import FacturasStats from './FacturasStats';
 import FacturasFilters from './FacturasFilters';
 import FacturasList from './FacturasList';
 import FacturaModal from './FacturaModal';
 import PagoModal from './PagoModal';
 import AnularModal from './AnularModal';
-import FacturasService from '../../services/facturasService';
+import FacturasService from '../../services/facturacionManualService';
 
 const FacturasManagement = () => {
   const {
@@ -20,7 +20,7 @@ const FacturasManagement = () => {
     cambiarPagina,
     limpiarFiltros,
     refrescar
-  } = useFacturas();
+  } = useFacturacionManual();
 
   const {
     loading: actionLoading,
@@ -32,7 +32,7 @@ const FacturasManagement = () => {
     verPDF,
     actualizarFactura,
     clearError
-  } = useFacturasAcciones();
+  } = useFacturacionManual();
 
   // Estados de modales
   const [modalState, setModalState] = useState({
@@ -322,7 +322,7 @@ const FacturasManagement = () => {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              📋 Gestión de Facturas
+              Gestión de Facturas
             </h1>
             <p className="text-gray-600 mt-2">
               Administra facturas, pagos y genera reportes del sistema PSI
@@ -343,13 +343,13 @@ const FacturasManagement = () => {
               onClick={handleCrearFactura}
               className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors font-medium"
             >
-              ➕ Nueva Factura
+               Nueva Factura
             </button>
             <button
               onClick={handleProbarPDF}
               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors font-medium"
             >
-              🧪 Probar PDF
+              Probar PDF
             </button>
           </div>
         </div>

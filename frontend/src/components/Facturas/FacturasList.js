@@ -1,6 +1,6 @@
 // components/Facturas/FacturasList.js
 import React, { useState } from 'react';
-import FacturasService from '../../services/facturasService';
+import FacturasService from '../../services/facturacionManualService';
 
 const FacturasList = ({
   facturas,

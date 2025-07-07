@@ -1,11 +1,11 @@
 // components/Facturas/FacturaModal.js
 import React, { useState, useEffect } from 'react';
-import { useFacturasAcciones } from '../../hooks/useFacturas';
+import { useFacturacionManual } from '../../hooks/useFacturacionManual';
 import clientService from '../../services/clientService';
-import FacturasService from '../../services/facturasService';
+import FacturasService from '../../services/facturacionManualService';
 
 const FacturaModal = ({ isOpen, isEditing, factura, onClose, onSuccess }) => {
-  const { crearFactura, actualizarFactura, loading, error, clearError } = useFacturasAcciones();
+  const { crearFactura, actualizarFactura, loading, error, clearError } = useFacturacionManual();
 
   const [formData, setFormData] = useState({
     cliente_id: '',

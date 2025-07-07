@@ -1,8 +1,11 @@
+// frontend/src/components/Clients/ClientsManagement.js - VERSIÓN CORREGIDA
+
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Download, RefreshCw } from 'lucide-react';
+import { Plus, Search, Filter, Download, RefreshCw, FileSpreadsheet, FileText } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROLE_PERMISSIONS } from '../../constants/clientConstants';
+import { clientService } from '../../services/clientService';
 import ClientsList from './ClientsList';
 import ClientForm from './ClientForm';
 import ClientFilters from './ClientFilters';
@@ -29,6 +32,10 @@ const ClientsManagement = () => {
   const [selectedClient, setSelectedClient] = useState(null);
   const [showClientModal, setShowClientModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // NUEVO: Estados para exportación
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Permisos del usuario actual
   const permissions = ROLE_PERMISSIONS[user?.role] || ROLE_PERMISSIONS.instalador;
@@ -74,6 +81,98 @@ const ClientsManagement = () => {
     refresh();
   };
 
+  // CORRECCIÓN: Función para exportar clientes
+  const handleExport = async (formato) => {
+    try {
+      setExporting(true);
+      setShowExportMenu(false);
+
+      console.log('🔄 Iniciando exportación de clientes...', formato);
+
+      // Preparar filtros para exportación
+      const filtrosExportacion = {
+        ...filters,
+        // Agregar filtros específicos si es necesario
+      };
+
+      console.log('📋 Filtros para exportación:', filtrosExportacion);
+
+      const resultado = await clientService.exportClients(formato, filtrosExportacion);
+
+      if (resultado.success) {
+        console.log('✅ Exportación exitosa');
+        
+        // Mostrar notificación de éxito
+        if (window.showNotification) {
+          window.showNotification('success', resultado.message || `Archivo ${formato} descargado exitosamente`);
+        } else {
+          alert(resultado.message || `Archivo ${formato} descargado exitosamente`);
+        }
+      } else {
+        throw new Error(resultado.message || 'Error en la exportación');
+      }
+
+    } catch (error) {
+      console.error('❌ Error en exportación:', error);
+      
+      const mensajeError = error.message || 'Error al exportar clientes';
+      
+      // Mostrar notificación de error
+      if (window.showNotification) {
+        window.showNotification('error', mensajeError);
+      } else {
+        alert(mensajeError);
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // CORRECCIÓN: Componente del menú de exportación
+  const ExportMenu = () => {
+    if (!showExportMenu) return null;
+
+    return (
+      <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+        <div className="py-2">
+          <div className="px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide border-b border-gray-100">
+            Formato de exportación
+          </div>
+          
+          <button
+            onClick={() => handleExport('excel')}
+            disabled={exporting}
+            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3 disabled:opacity-50"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-green-600" />
+            <div>
+              <div className="font-medium">Excel (.xlsx)</div>
+              <div className="text-xs text-gray-500">Recomendado para análisis</div>
+            </div>
+          </button>
+          
+          <button
+            onClick={() => handleExport('csv')}
+            disabled={exporting}
+            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3 disabled:opacity-50"
+          >
+            <FileText className="w-4 h-4 text-blue-600" />
+            <div>
+              <div className="font-medium">CSV (.csv)</div>
+              <div className="text-xs text-gray-500">Compatible con otros sistemas</div>
+            </div>
+          </button>
+        </div>
+        
+        {Object.keys(filters).length > 0 && (
+          <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-100">
+            Se aplicarán los filtros actuales
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -84,15 +183,32 @@ const ClientsManagement = () => {
             Administra la información de tus clientes
           </p>
         </div>
-
+        
         <div className="flex flex-wrap gap-2">
           {permissions.canExport && (
-            <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-              <Download className="w-4 h-4" />
-              Exportar
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={exporting || loading}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {exporting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Exportando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Exportar
+                  </>
+                )}
+              </button>
+              
+              <ExportMenu />
+            </div>
           )}
-
+          
           <button
             onClick={refresh}
             disabled={loading}
@@ -101,7 +217,7 @@ const ClientsManagement = () => {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Actualizar
           </button>
-
+          
           {permissions.canCreate && (
             <button
               onClick={() => setShowForm(true)}
@@ -113,6 +229,14 @@ const ClientsManagement = () => {
           )}
         </div>
       </div>
+
+      {/* Click outside para cerrar menú de exportación */}
+      {showExportMenu && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setShowExportMenu(false)}
+        />
+      )}
 
       {/* Estadísticas */}
       <ClientStats />
@@ -133,19 +257,20 @@ const ClientsManagement = () => {
               />
             </div>
           </div>
-
+          
           {/* Botón de filtros */}
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${showFilters || Object.keys(filters).length > 0
-              ? 'bg-blue-50 border-blue-300 text-blue-700'
-              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+              showFilters || Object.keys(filters).length > 0
+                ? 'bg-blue-50 border-blue-300 text-blue-700'
+                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
           >
             <Filter className="w-4 h-4" />
             Filtros
             {Object.keys(filters).length > 0 && (
-              <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-1">
+              <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                 {Object.keys(filters).length}
               </span>
             )}
@@ -154,11 +279,12 @@ const ClientsManagement = () => {
 
         {/* Panel de filtros */}
         {showFilters && (
-          <div className="mt-4 pt-4 border-t">
+          <div className="mt-4 pt-4 border-t border-gray-200">
             <ClientFilters
               filters={filters}
               onApplyFilters={applyFilters}
               onClearFilters={clearFilters}
+              onClose={() => setShowFilters(false)}
             />
           </div>
         )}
@@ -166,8 +292,20 @@ const ClientsManagement = () => {
 
       {/* Mensaje de error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
-          {error}
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-red-700">
+            <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <span className="font-medium">Error al cargar clientes</span>
+          </div>
+          <p className="mt-1 text-sm text-red-600">{error}</p>
+          <button
+            onClick={refresh}
+            className="mt-2 text-sm text-red-700 hover:text-red-800 underline"
+          >
+            Intentar de nuevo
+          </button>
         </div>
       )}
 
@@ -177,22 +315,13 @@ const ClientsManagement = () => {
         pagination={pagination}
         loading={loading}
         onClientSelect={handleClientSelect}
-        onEditClient={permissions.canEdit ? handleEditClient : null}
+        onEditClient={handleEditClient}
         onPageChange={changePage}
         onLimitChange={changeLimit}
         permissions={permissions}
       />
 
-      {/* Modal de formulario */}
-      {showForm && (
-        <ClientForm
-          client={selectedClient}
-          onClose={handleCloseForm}
-          onSave={handleClientSaved}
-        />
-      )}
-
-      {/* Modal de detalles del cliente */}
+      {/* Modal de cliente */}
       {showClientModal && selectedClient && (
         <ClientModal
           client={selectedClient}
@@ -200,8 +329,21 @@ const ClientsManagement = () => {
             setShowClientModal(false);
             setSelectedClient(null);
           }}
-          onEdit={permissions.canEdit ? handleEditClient : null}
-          onDelete={permissions.canDelete ? handleDeleteClient : null}
+          onEdit={() => {
+            setShowClientModal(false);
+            handleEditClient(selectedClient);
+          }}
+          onDelete={handleDeleteClient}
+          permissions={permissions}
+        />
+      )}
+
+      {/* Formulario de cliente */}
+      {showForm && (
+        <ClientForm
+          client={selectedClient}
+          onClose={handleCloseForm}
+          onSave={handleClientSaved}
           permissions={permissions}
         />
       )}
