@@ -269,6 +269,13 @@ try {
 
   console.log('🕐 Configurando sistema de facturación automática...');
 
+
+  
+  console.log('🧾 Cargando rutas de cliente completo...');
+  const Clientecompleto = require('./routes/clienteCompleto');
+  app.use('/api/v1/clientes-completo', Clientecompleto);
+  console.log('✅ Rutas de cliente completo cargadas: /api/v1/clientes-completo');
+
   const inicializarFacturacionAutomatica = () => {
     const cronEnabled = process.env.NODE_ENV === 'production' ||
       process.env.FACTURACION_CRON_ENABLED === 'true';
