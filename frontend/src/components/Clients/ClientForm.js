@@ -91,27 +91,63 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 }, [formData.ciudad_id]); 
 
   const cargarDatosIniciales = async () => {
-    try {
-      setLoading(true);
-      
-      // Cargar planes, sectores y ciudades en paralelo
-      const [planesResponse, sectoresResponse, ciudadesResponse] = await Promise.all([
-        configService.getServicePlans({ activo: true }),
-        clientService.getSectores(),
-        clientService.getCiudades()
-      ]);
+  try {
+    setLoading(true);
+    console.log('🔄 Iniciando carga de datos iniciales...');
+    
+    // Cargar planes, sectores y ciudades en paralelo
+    const [planesResponse, sectoresResponse, ciudadesResponse] = await Promise.all([
+      configService.getServicePlans(null, true), // Solo planes activos
+      clientService.getSectores(),
+      clientService.getCiudades()
+    ]);
 
-      setPlanesDisponibles(planesResponse.data || []);
-      setSectores(sectoresResponse.data || []);
-      setCiudades(ciudadesResponse.data || []);
+    console.log('📦 Respuesta de planes:', planesResponse);
+    console.log('🏘️ Respuesta de sectores:', sectoresResponse);
+    console.log('🏙️ Respuesta de ciudades:', ciudadesResponse);
 
-    } catch (error) {
-      console.error('Error cargando datos iniciales:', error);
-      setErrors({ general: 'Error cargando datos del formulario' });
-    } finally {
-      setLoading(false);
+    // Manejar la respuesta de planes
+    const planes = planesResponse?.data || [];
+    const sectores = sectoresResponse?.data || [];
+    const ciudades = ciudadesResponse?.data || [];
+
+    console.log('✅ Datos procesados:', { 
+      planesCount: planes.length, 
+      sectoresCount: sectores.length, 
+      ciudadesCount: ciudades.length 
+    });
+
+    setPlanesDisponibles(planes);
+    setSectores(sectores);
+    setCiudades(ciudades);
+
+    // Validar que se cargaron los planes
+    if (planes.length === 0) {
+      console.warn('⚠️ No se encontraron planes de servicio activos');
+      setErrors(prev => ({
+        ...prev,
+        planes: 'No hay planes de servicio disponibles. Verifique la configuración.'
+      }));
     }
-  };
+
+  } catch (error) {
+    console.error('❌ Error cargando datos iniciales:', error);
+    setErrors({ 
+      general: 'Error cargando datos del formulario. Verifique la conexión.' 
+    });
+    
+    // Mostrar detalles del error en desarrollo
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Detalles del error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   const cargarDatosCliente = async () => {
     if (!client) return;
