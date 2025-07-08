@@ -347,7 +347,87 @@ class ClientService {
       };
     }
   }
+ /**
+   * Obtener ciudades para formularios
+   */
+  async getCiudades() {
+    try {
+      this.log('Obteniendo ciudades');
+      
+      const response = await apiService.get('/api/geografia/ciudades');
+      
+      this.log('Ciudades obtenidas', response);
+      
+      return {
+        success: true,
+        data: response.data || []
+      };
+    } catch (error) {
+      this.log('Error obteniendo ciudades', error);
+      return {
+        success: false,
+        data: [],
+        message: error.message || 'Error obteniendo ciudades'
+      };
+    }
+  }
 
+  /**
+   * Obtener sectores para formularios
+   */
+  async getSectores() {
+    try {
+      this.log('Obteniendo sectores');
+      
+      const response = await apiService.get('/api/geografia/sectores');
+      
+      this.log('Sectores obtenidos', response);
+      
+      return {
+        success: true,
+        data: response.data || []
+      };
+    } catch (error) {
+      this.log('Error obteniendo sectores', error);
+      return {
+        success: false,
+        data: [],
+        message: error.message || 'Error obteniendo sectores'
+      };
+    }
+  }
+
+  /**
+   * Obtener sectores por ciudad
+   */
+  async getSectoresPorCiudad(ciudadId) {
+    try {
+      this.log('Obteniendo sectores por ciudad', ciudadId);
+      
+      if (!ciudadId) {
+        return {
+          success: true,
+          data: []
+        };
+      }
+      
+      const response = await apiService.get(`/api/geografia/ciudades/${ciudadId}/sectores`);
+      
+      this.log('Sectores por ciudad obtenidos', response);
+      
+      return {
+        success: true,
+        data: response.data || []
+      };
+    } catch (error) {
+      this.log('Error obteniendo sectores por ciudad', error);
+      return {
+        success: false,
+        data: [],
+        message: error.message || 'Error obteniendo sectores'
+      };
+    }
+  }
   // CORRECCIÓN: Exportar clientes
  // CORRECCIÓN: Método exportClients usando authService
 async exportClients(formato = 'excel', filtros = {}) {
@@ -450,6 +530,8 @@ async exportClients(formato = 'excel', filtros = {}) {
     return this.getClientStats();
   }
 }
+
+
 
 // Exportar instancia única
 export const clientService = new ClientService();
