@@ -354,7 +354,7 @@ class ClientService {
     try {
       this.log('Obteniendo ciudades');
       
-      const response = await apiService.get('/api/geografia/ciudades');
+      const response = await apiService.get('/config/cities');
       
       this.log('Ciudades obtenidas', response);
       
@@ -379,7 +379,7 @@ class ClientService {
     try {
       this.log('Obteniendo sectores');
       
-      const response = await apiService.get('/api/geografia/sectores');
+      const response = await apiService.get('/config/sectors');
       
       this.log('Sectores obtenidos', response);
       
@@ -411,7 +411,7 @@ class ClientService {
         };
       }
       
-      const response = await apiService.get(`/api/geografia/ciudades/${ciudadId}/sectores`);
+      const response = await apiService.get(`/config/sectors?ciudad_id=${ciudadId}`);
       
       this.log('Sectores por ciudad obtenidos', response);
       

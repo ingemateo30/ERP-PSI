@@ -55,6 +55,41 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     }
   }, [client]);
 
+
+  useEffect(() => {
+  // Recargar sectores cuando cambie la ciudad seleccionada
+  const cargarSectoresPorCiudad = async () => {
+    if (formData.ciudad_id) {
+      try {
+        const sectoresResponse = await clientService.getSectoresPorCiudad(formData.ciudad_id);
+        setSectores(sectoresResponse.data || []);
+        
+        // Limpiar sector seleccionado si no pertenece a la nueva ciudad
+        if (formData.sector_id) {
+          const sectorExiste = sectoresResponse.data?.find(s => s.id === parseInt(formData.sector_id));
+          if (!sectorExiste) {
+            handleInputChange('sector_id', '');
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando sectores por ciudad:', error);
+        setSectores([]);
+      }
+    } else {
+      // Si no hay ciudad seleccionada, cargar todos los sectores
+      try {
+        const sectoresResponse = await clientService.getSectores();
+        setSectores(sectoresResponse.data || []);
+      } catch (error) {
+        console.error('Error cargando todos los sectores:', error);
+        setSectores([]);
+      }
+    }
+  };
+
+  cargarSectoresPorCiudad();
+}, [formData.ciudad_id]); 
+
   const cargarDatosIniciales = async () => {
     try {
       setLoading(true);
