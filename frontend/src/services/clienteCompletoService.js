@@ -3,7 +3,7 @@
 
 import apiService from './apiService';
 
-const API_BASE = '/api/clientes-completo';
+const API_BASE = '/clientes-completo';
 
 export const clienteCompletoService = {
 

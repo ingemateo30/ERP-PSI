@@ -1,227 +1,528 @@
-// backend/routes/clienteCompletoRoutes.js
+// backend/routes/clienteCompleto.js
 // Rutas para gestión completa de clientes con servicios
 
 const express = require('express');
 const router = express.Router();
-const ClienteCompletoController = require('../controllers/clienteCompletoController');
+const ClienteCompletoService = require('../services/ClienteCompletoService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
-// Instanciar controlador
-const clienteCompletoController = new ClienteCompletoController();
-
 /**
  * ============================================
- * RUTAS PRINCIPALES
+ * RUTAS DE CREACIÓN COMPLETA DE CLIENTE
  * ============================================
  */
 
 /**
- * POST /api/clientes-completo/crear
- * Crear cliente completo con servicio y documentos automáticos
+ * @route POST /api/v1/clientes-completo/crear
+ * @desc Crear cliente completo con servicio y documentos automáticos
+ * @access Private (Administrador+)
  */
-router.post('/crear', 
+router.post('/crear',
   authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.crearClienteCompleto(req, res)
-);
+  requireRole('administrador'),
+  async (req, res) => {
+    try {
+      console.log('🚀 Solicitud de creación completa de cliente:', req.body);
 
-/**
- * POST /api/clientes-completo/previsualizar-factura
- * Previsualizar primera factura antes de crear cliente
- */
-router.post('/previsualizar-factura', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.previsualizarPrimeraFactura(req, res)
-);
+      // Validar datos de entrada
+      const { cliente, servicio, opciones } = req.body;
 
-/**
- * ============================================
- * GESTIÓN DE SERVICIOS
- * ============================================
- */
+      if (!cliente) {
+        return res.status(400).json({
+          success: false,
+          message: 'Datos del cliente son requeridos'
+        });
+      }
 
-/**
- * GET /api/clientes-completo/:clienteId/servicios
- * Obtener servicios de un cliente
- */
-router.get('/:clienteId/servicios', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor', 'instalador']),
-  (req, res) => clienteCompletoController.getServiciosCliente(req, res)
-);
+      if (!servicio) {
+        return res.status(400).json({
+          success: false,
+          message: 'Datos del servicio son requeridos'
+        });
+      }
 
-/**
- * PUT /api/clientes-completo/:clienteId/cambiar-plan
- * Cambiar plan de servicio de un cliente
- */
-router.put('/:clienteId/cambiar-plan', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.cambiarPlanCliente(req, res)
-);
+      // Procesar creación completa
+      const resultado = await ClienteCompletoService.crearClienteCompleto({
+        cliente,
+        servicio,
+        opciones: opciones || {}
+      });
 
-/**
- * PUT /api/clientes-completo/:clienteId/suspender
- * Suspender servicio de un cliente
- */
-router.put('/:clienteId/suspender', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.suspenderServicio(req, res)
-);
+      console.log('✅ Cliente completo creado exitosamente:', resultado);
 
-/**
- * PUT /api/clientes-completo/:clienteId/reactivar
- * Reactivar servicio de un cliente
- */
-router.put('/:clienteId/reactivar', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.reactivarServicio(req, res)
-);
+      res.status(201).json({
+        success: true,
+        message: 'Cliente completo creado exitosamente',
+        data: resultado
+      });
 
-/**
- * ============================================
- * CONSULTAS Y DETALLES
- * ============================================
- */
-
-/**
- * GET /api/clientes-completo/:clienteId/completo
- * Obtener detalles completos de un cliente con sus servicios
- */
-router.get('/:clienteId/completo', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor', 'instalador']),
-  (req, res) => clienteCompletoController.getClienteCompleto(req, res)
-);
-
-/**
- * GET /api/clientes-completo/:clienteId/historial-servicios
- * Obtener historial de servicios de un cliente
- */
-router.get('/:clienteId/historial-servicios', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.getHistorialServicios(req, res)
-);
-
-/**
- * GET /api/clientes-completo/:clienteId/estadisticas
- * Obtener estadísticas de un cliente
- */
-router.get('/:clienteId/estadisticas', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.getEstadisticasCliente(req, res)
-);
-
-/**
- * ============================================
- * DOCUMENTOS Y FACTURACIÓN
- * ============================================
- */
-
-/**
- * POST /api/clientes-completo/:clienteId/generar-contrato
- * Generar contrato para un cliente
- */
-router.post('/:clienteId/generar-contrato', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.generarContrato(req, res)
-);
-
-/**
- * POST /api/clientes-completo/:clienteId/generar-orden-instalacion
- * Generar orden de instalación
- */
-router.post('/:clienteId/generar-orden-instalacion', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.generarOrdenInstalacion(req, res)
-);
-
-/**
- * POST /api/clientes-completo/:clienteId/generar-factura
- * Generar factura inmediata para un cliente
- */
-router.post('/:clienteId/generar-factura', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.generarFacturaInmediata(req, res)
-);
-
-/**
- * ============================================
- * UTILIDADES
- * ============================================
- */
-
-/**
- * GET /api/clientes-completo/planes-disponibles
- * Obtener planes disponibles para asignación
- */
-router.get('/planes-disponibles', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor', 'instalador']),
-  (req, res) => clienteCompletoController.getPlanesDisponibles(req, res)
-);
-
-/**
- * GET /api/clientes-completo/verificar-identificacion
- * Verificar disponibilidad de identificación
- */
-router.get('/verificar-identificacion', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.verificarDisponibilidadIdentificacion(req, res)
-);
-
-/**
- * POST /api/clientes-completo/calcular-precio-plan
- * Calcular precio de plan con descuentos y promociones
- */
-router.post('/calcular-precio-plan', 
-  authenticateToken,
-  requireRole(['administrador', 'supervisor']),
-  (req, res) => clienteCompletoController.calcularPrecioPlan(req, res)
-);
-
-/**
- * ============================================
- * MANEJO DE ERRORES
- * ============================================
- */
-
-// Middleware para manejar errores específicos de este router
-router.use((error, req, res, next) => {
-  console.error('❌ Error en rutas de cliente completo:', error);
-  
-  // Errores de validación
-  if (error.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Error de validación',
-      errors: error.errors
-    });
+    } catch (error) {
+      console.error('❌ Error creando cliente completo:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error interno del servidor',
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
   }
-  
-  // Errores de base de datos
-  if (error.code === 'ER_DUP_ENTRY') {
-    return res.status(409).json({
-      success: false,
-      message: 'Ya existe un cliente con esta identificación'
-    });
+);
+
+/**
+ * @route GET /api/v1/clientes-completo/:id
+ * @desc Obtener cliente completo con todos sus datos y servicios
+ * @access Private
+ */
+router.get('/:id',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!id || isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID de cliente inválido'
+        });
+      }
+
+      const clienteCompleto = await ClienteCompletoService.obtenerClienteCompleto(id);
+
+      if (!clienteCompleto) {
+        return res.status(404).json({
+          success: false,
+          message: 'Cliente no encontrado'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: clienteCompleto
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo cliente completo:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error interno del servidor'
+      });
+    }
   }
-  
-  // Error genérico
-  res.status(500).json({
-    success: false,
-    message: 'Error interno del servidor',
-    error: process.env.NODE_ENV === 'development' ? error.message : undefined
-  });
-});
+);
+
+/**
+ * ============================================
+ * RUTAS DE DOCUMENTOS AUTOMÁTICOS
+ * ============================================
+ */
+
+/**
+ * @route POST /api/v1/clientes-completo/:id/generar-contrato
+ * @desc Generar contrato para un cliente
+ * @access Private (Supervisor+)
+ */
+router.post('/:id/generar-contrato',
+  authenticateToken,
+  requireRole('supervisor', 'administrador'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { tipo_contrato } = req.body;
+
+      const contrato = await ClienteCompletoService.generarContrato(
+        id, 
+        tipo_contrato || 'servicio'
+      );
+
+      res.json({
+        success: true,
+        message: 'Contrato generado exitosamente',
+        data: contrato
+      });
+
+    } catch (error) {
+      console.error('❌ Error generando contrato:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error generando contrato'
+      });
+    }
+  }
+);
+
+/**
+ * @route POST /api/v1/clientes-completo/:id/generar-orden-instalacion
+ * @desc Generar orden de instalación para un cliente
+ * @access Private (Instalador+)
+ */
+router.post('/:id/generar-orden-instalacion',
+  authenticateToken,
+  requireRole('instalador', 'supervisor', 'administrador'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { fecha_instalacion } = req.body;
+
+      const ordenInstalacion = await ClienteCompletoService.generarOrdenInstalacion(
+        id, 
+        fecha_instalacion
+      );
+
+      res.json({
+        success: true,
+        message: 'Orden de instalación generada exitosamente',
+        data: ordenInstalacion
+      });
+
+    } catch (error) {
+      console.error('❌ Error generando orden de instalación:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error generando orden de instalación'
+      });
+    }
+  }
+);
+
+/**
+ * @route POST /api/v1/clientes-completo/:id/generar-factura
+ * @desc Generar factura inmediata para un cliente
+ * @access Private (Supervisor+)
+ */
+router.post('/:id/generar-factura',
+  authenticateToken,
+  requireRole('supervisor', 'administrador'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { conceptos_adicionales } = req.body;
+
+      const factura = await ClienteCompletoService.generarFacturaInmediata(
+        id, 
+        conceptos_adicionales || []
+      );
+
+      res.json({
+        success: true,
+        message: 'Factura generada exitosamente',
+        data: factura
+      });
+
+    } catch (error) {
+      console.error('❌ Error generando factura:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error generando factura'
+      });
+    }
+  }
+);
+
+/**
+ * ============================================
+ * RUTAS DE GESTIÓN DE SERVICIOS
+ * ============================================
+ */
+
+/**
+ * @route GET /api/v1/clientes-completo/:id/servicios
+ * @desc Obtener servicios de un cliente
+ * @access Private
+ */
+router.get('/:id/servicios',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const servicios = await ClienteCompletoService.obtenerServiciosCliente(id);
+
+      res.json({
+        success: true,
+        data: servicios
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo servicios:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error obteniendo servicios'
+      });
+    }
+  }
+);
+
+/**
+ * @route PUT /api/v1/clientes-completo/:id/cambiar-plan
+ * @desc Cambiar plan de servicio de un cliente
+ * @access Private (Supervisor+)
+ */
+router.put('/:id/cambiar-plan',
+  authenticateToken,
+  requireRole('supervisor', 'administrador'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { plan_id, precio_personalizado, fecha_cambio, observaciones } = req.body;
+
+      if (!plan_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID del nuevo plan es requerido'
+        });
+      }
+
+      const resultado = await ClienteCompletoService.cambiarPlanCliente(id, {
+        plan_id,
+        precio_personalizado,
+        fecha_cambio: fecha_cambio || new Date(),
+        observaciones
+      });
+
+      res.json({
+        success: true,
+        message: 'Plan cambiado exitosamente',
+        data: resultado
+      });
+
+    } catch (error) {
+      console.error('❌ Error cambiando plan:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error cambiando plan'
+      });
+    }
+  }
+);
+
+/**
+ * @route PUT /api/v1/clientes-completo/:id/suspender
+ * @desc Suspender servicio de un cliente
+ * @access Private (Supervisor+)
+ */
+router.put('/:id/suspender',
+  authenticateToken,
+  requireRole('supervisor', 'administrador'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { motivo, fecha_suspension } = req.body;
+
+      const resultado = await ClienteCompletoService.suspenderServicio(id, {
+        motivo: motivo || 'Suspensión manual',
+        fecha_suspension: fecha_suspension || new Date()
+      });
+
+      res.json({
+        success: true,
+        message: 'Servicio suspendido exitosamente',
+        data: resultado
+      });
+
+    } catch (error) {
+      console.error('❌ Error suspendiendo servicio:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error suspendiendo servicio'
+      });
+    }
+  }
+);
+
+/**
+ * @route PUT /api/v1/clientes-completo/:id/reactivar
+ * @desc Reactivar servicio de un cliente
+ * @access Private (Supervisor+)
+ */
+router.put('/:id/reactivar',
+  authenticateToken,
+  requireRole('supervisor', 'administrador'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { observaciones } = req.body;
+
+      const resultado = await ClienteCompletoService.reactivarServicio(id, {
+        fecha_reactivacion: new Date(),
+        observaciones
+      });
+
+      res.json({
+        success: true,
+        message: 'Servicio reactivado exitosamente',
+        data: resultado
+      });
+
+    } catch (error) {
+      console.error('❌ Error reactivando servicio:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error reactivando servicio'
+      });
+    }
+  }
+);
+
+/**
+ * ============================================
+ * RUTAS DE PREVISUALIZACIÓN
+ * ============================================
+ */
+
+/**
+ * @route POST /api/v1/clientes-completo/previsualizar-factura
+ * @desc Previsualizar primera factura antes de crear cliente
+ * @access Private
+ */
+router.post('/previsualizar-factura',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { cliente, servicio } = req.body;
+
+      const preview = await ClienteCompletoService.previsualizarPrimeraFactura({
+        cliente,
+        servicio
+      });
+
+      res.json({
+        success: true,
+        data: preview
+      });
+
+    } catch (error) {
+      console.error('❌ Error en previsualización:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error en previsualización'
+      });
+    }
+  }
+);
+
+/**
+ * ============================================
+ * RUTAS DE FACTURACIÓN INTEGRADA
+ * ============================================
+ */
+
+/**
+ * @route GET /api/v1/clientes-completo/facturas
+ * @desc Obtener todas las facturas generadas desde cliente completo
+ * @access Private
+ */
+router.get('/facturas',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { page = 1, limit = 10, estado, cliente_id } = req.query;
+
+      const facturas = await ClienteCompletoService.obtenerFacturasGeneradas({
+        page: parseInt(page),
+        limit: parseInt(limit),
+        estado,
+        cliente_id
+      });
+
+      res.json({
+        success: true,
+        data: facturas
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo facturas:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error obteniendo facturas'
+      });
+    }
+  }
+);
+
+/**
+ * @route GET /api/v1/clientes-completo/facturas/:id
+ * @desc Obtener factura específica con detalles
+ * @access Private
+ */
+router.get('/facturas/:id',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const factura = await ClienteCompletoService.obtenerFacturaCompleta(id);
+
+      if (!factura) {
+        return res.status(404).json({
+          success: false,
+          message: 'Factura no encontrada'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: factura
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo factura:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error obteniendo factura'
+      });
+    }
+  }
+);
+
+/**
+ * ============================================
+ * RUTAS DE CONTRATOS
+ * ============================================
+ */
+
+/**
+ * @route GET /api/v1/clientes-completo/contratos
+ * @desc Obtener todos los contratos generados
+ * @access Private (Supervisor+)
+ */
+router.get('/contratos',
+  authenticateToken,
+  requireRole('supervisor', 'administrador'),
+  async (req, res) => {
+    try {
+      const { page = 1, limit = 10, cliente_id } = req.query;
+
+      const contratos = await ClienteCompletoService.obtenerContratosGenerados({
+        page: parseInt(page),
+        limit: parseInt(limit),
+        cliente_id
+      });
+
+      res.json({
+        success: true,
+        data: contratos
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo contratos:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error obteniendo contratos'
+      });
+    }
+  }
+);
 
 module.exports = router;

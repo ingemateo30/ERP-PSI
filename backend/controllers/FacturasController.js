@@ -1,7 +1,8 @@
 // backend/controllers/FacturasController.js - CORREGIDO PARA USAR Database.query
 
 const { Database } = require('../models/Database');
-
+const Factura = require('../models/factura');
+const FacturaPDFGenerator = require('../utils/pdfGenerator');
 // Importaciones opcionales con manejo de errores
 let FacturacionAutomaticaService;
 let PDFGenerator;
@@ -766,7 +767,52 @@ class FacturasController {
   }
 
   static async generarPDF(req, res) {
-    res.status(501).json({ success: false, message: 'Generación de PDF en desarrollo' });
+    try {
+      const { id } = req.params;
+      
+      if (!id || isNaN(id)) {
+        return ApiResponse.validationError(res, 'ID de factura inválido');
+      }
+
+      console.log(`🔍 Buscando factura con ID: ${id}`);
+      const factura = await Factura.obtenerPorId(id);
+      
+      if (!factura) {
+        return ApiResponse.notFound(res, 'Factura no encontrada');
+      }
+
+      console.log(`✅ Factura encontrada: ${factura.numero_factura}`);
+
+      // CORREGIDO: Usar Database en lugar de pool
+      const empresaQuery = 'SELECT * FROM configuracion_empresa WHERE id = 1';
+      const empresaResult = await Database.query(empresaQuery);
+      
+      if (!empresaResult || empresaResult.length === 0) {
+        return ApiResponse.error(res, 'Configuración de empresa no encontrada', 500);
+      }
+
+      const empresa = empresaResult[0];
+      console.log(`🏢 Empresa configurada: ${empresa.empresa_nombre}`);
+
+      // Generar PDF
+      const pdfBuffer = await FacturaPDFGenerator.generarFactura(factura, empresa);
+
+      // Configurar headers para descarga
+      const nombreArchivo = `Factura_${factura.numero_factura}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
+      console.log(`📥 Enviando PDF para descarga: ${nombreArchivo}`);
+      res.send(pdfBuffer);
+
+    } catch (error) {
+      console.error('❌ Error al generar PDF:', error);
+      return ApiResponse.error(res, 'Error interno del servidor', 500, error.message);
+    }
   }
 
   static async verPDF(req, res) {
