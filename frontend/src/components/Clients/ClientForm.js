@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { clientService } from '../../services/clientService';
 import configService, { ConfigService } from '../../services/configService';
+import clienteCompletoService from '../../services/clienteCompletoService';
 
 const ClientForm = ({ client, onClose, onSave, permissions }) => {
   const [loading, setLoading] = useState(false);
@@ -290,7 +291,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       }
     };
 
-    const response = await clientService.createClienteCompleto(datosCompletos);
+    const response = await clienteCompletoService.createClienteCompleto(datosCompletos);
     
     // Mostrar resumen de lo que se generó
     if (response.documentos_generados) {

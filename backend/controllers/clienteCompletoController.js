@@ -58,76 +58,122 @@ class ClienteCompletoController {
         }
       };
 
-      // Crear cliente completo
+      // Ejecutar creación completa
       const resultado = await ClienteCompletoService.crearClienteCompleto(datosCompletos);
 
       res.status(201).json({
         success: true,
-        message: 'Cliente creado exitosamente con todos los documentos',
+        message: 'Cliente creado exitosamente con todos los servicios',
         data: resultado
       });
 
     } catch (error) {
       console.error('❌ Error creando cliente completo:', error);
       
-      let statusCode = 500;
-      let message = 'Error interno del servidor';
-
+      // Manejo de errores específicos
       if (error.code === 'ER_DUP_ENTRY') {
-        statusCode = 409;
-        message = 'Ya existe un cliente con esta identificación';
-      } else if (error.message.includes('no encontrado')) {
-        statusCode = 404;
-        message = error.message;
-      } else if (error.message.includes('inválido') || error.message.includes('requerido')) {
-        statusCode = 400;
-        message = error.message;
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe un cliente con esta identificación'
+        });
       }
 
-      res.status(statusCode).json({
+      res.status(500).json({
         success: false,
-        message: message,
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: error.message || 'Error interno del servidor'
+      });
+    }
+  }
+
+  /**
+   * Previsualizar primera factura antes de crear cliente
+   */
+  async previsualizarPrimeraFactura(req, res) {
+    try {
+      console.log('👁️ Solicitud de previsualización de factura:', req.body);
+
+      const datosPreview = {
+        plan_id: req.body.plan_id,
+        precio_personalizado: req.body.precio_personalizado,
+        fecha_facturacion: req.body.fecha_facturacion || new Date().toISOString().split('T')[0],
+        conceptos_adicionales: req.body.conceptos_adicionales || []
+      };
+
+      const previewFactura = await ClienteCompletoService.previsualizarPrimeraFactura(datosPreview);
+
+      res.json({
+        success: true,
+        data: previewFactura
+      });
+
+    } catch (error) {
+      console.error('❌ Error en previsualización:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error generando previsualización'
       });
     }
   }
 
   /**
    * ============================================
-   * CAMBIAR PLAN DE CLIENTE
+   * GESTIÓN DE SERVICIOS
    * ============================================
    */
 
   /**
-   * Cambiar plan de servicio de un cliente existente
+   * Obtener servicios de un cliente
+   */
+  async getServiciosCliente(req, res) {
+    try {
+      const { clienteId } = req.params;
+
+      if (!clienteId) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID del cliente es requerido'
+        });
+      }
+
+      const servicios = await ClienteCompletoService.obtenerServiciosCliente(clienteId);
+
+      res.json({
+        success: true,
+        data: servicios
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo servicios:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error obteniendo servicios del cliente'
+      });
+    }
+  }
+
+  /**
+   * Cambiar plan de servicio de un cliente
    */
   async cambiarPlanCliente(req, res) {
     try {
-      const clienteId = parseInt(req.params.clienteId);
-      
-      if (!clienteId || isNaN(clienteId)) {
+      const { clienteId } = req.params;
+      const datosNuevoPlan = req.body;
+
+      if (!clienteId) {
         return res.status(400).json({
           success: false,
-          message: 'ID de cliente inválido'
+          message: 'ID del cliente es requerido'
         });
       }
 
-      const nuevosPlanData = {
-        plan_id: req.body.plan_id,
-        precio_personalizado: req.body.precio_personalizado,
-        fecha_activacion: req.body.fecha_activacion || new Date().toISOString().split('T')[0],
-        observaciones: req.body.observaciones
-      };
-
-      // Validar datos del nuevo plan
-      if (!nuevosPlanData.plan_id) {
+      if (!datosNuevoPlan.plan_id) {
         return res.status(400).json({
           success: false,
-          message: 'El ID del plan es requerido'
+          message: 'ID del nuevo plan es requerido'
         });
       }
 
-      const resultado = await ClienteCompletoService.cambiarPlanCliente(clienteId, nuevosPlanData);
+      const resultado = await ClienteCompletoService.cambiarPlanCliente(clienteId, datosNuevoPlan);
 
       res.json({
         success: true,
@@ -137,77 +183,340 @@ class ClienteCompletoController {
 
     } catch (error) {
       console.error('❌ Error cambiando plan:', error);
-      
-      let statusCode = 500;
-      let message = 'Error interno del servidor';
-
-      if (error.message.includes('no tiene servicios activos')) {
-        statusCode = 404;
-        message = 'Cliente no tiene servicios activos';
-      } else if (error.message.includes('no encontrado')) {
-        statusCode = 404;
-        message = error.message;
-      }
-
-      res.status(statusCode).json({
+      res.status(500).json({
         success: false,
-        message: message,
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: error.message || 'Error cambiando plan del cliente'
       });
     }
   }
 
   /**
-   * ============================================
-   * OBTENER SERVICIOS DE CLIENTE
-   * ============================================
+   * Suspender servicio de un cliente
    */
-
-  /**
-   * Obtener todos los servicios de un cliente
-   */
-  async obtenerServiciosCliente(req, res) {
+  async suspenderServicio(req, res) {
     try {
-      const clienteId = parseInt(req.params.clienteId);
-      
-      if (!clienteId || isNaN(clienteId)) {
+      const { clienteId } = req.params;
+      const { motivo } = req.body;
+
+      if (!clienteId) {
         return res.status(400).json({
           success: false,
-          message: 'ID de cliente inválido'
+          message: 'ID del cliente es requerido'
         });
       }
 
-      const servicios = await ClienteCompletoService.obtenerServiciosCliente(clienteId);
+      const resultado = await ClienteCompletoService.suspenderServicio(clienteId, motivo);
 
       res.json({
         success: true,
-        data: servicios,
-        total: servicios.length
+        message: 'Servicio suspendido exitosamente',
+        data: resultado
       });
 
     } catch (error) {
-      console.error('❌ Error obteniendo servicios:', error);
-      
+      console.error('❌ Error suspendiendo servicio:', error);
       res.status(500).json({
         success: false,
-        message: 'Error obteniendo servicios del cliente',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: error.message || 'Error suspendiendo servicio'
+      });
+    }
+  }
+
+  /**
+   * Reactivar servicio de un cliente
+   */
+  async reactivarServicio(req, res) {
+    try {
+      const { clienteId } = req.params;
+
+      if (!clienteId) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID del cliente es requerido'
+        });
+      }
+
+      const resultado = await ClienteCompletoService.reactivarServicio(clienteId);
+
+      res.json({
+        success: true,
+        message: 'Servicio reactivado exitosamente',
+        data: resultado
+      });
+
+    } catch (error) {
+      console.error('❌ Error reactivando servicio:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error reactivando servicio'
       });
     }
   }
 
   /**
    * ============================================
-   * PREVISUALIZACIÓN DE FACTURACIÓN
+   * CONSULTAS Y DETALLES
    * ============================================
    */
 
   /**
-   * Previsualizar primera factura antes de crear el cliente
+   * Obtener cliente completo con servicios
    */
-  async previsualizarPrimeraFactura(req, res) {
+  async getClienteCompleto(req, res) {
     try {
-      const { plan_id, precio_personalizado, estrato = '3', fecha_activacion } = req.body;
+      const { clienteId } = req.params;
+
+      if (!clienteId) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID del cliente es requerido'
+        });
+      }
+
+      const clienteCompleto = await ClienteCompletoService.obtenerClienteCompleto(clienteId);
+
+      res.json({
+        success: true,
+        data: clienteCompleto
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo cliente completo:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error obteniendo datos del cliente'
+      });
+    }
+  }
+
+  /**
+   * Obtener historial de servicios
+   */
+  async getHistorialServicios(req, res) {
+    try {
+      const { clienteId } = req.params;
+
+      if (!clienteId) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID del cliente es requerido'
+        });
+      }
+
+      const historial = await ClienteCompletoService.obtenerHistorialServicios(clienteId);
+
+      res.json({
+        success: true,
+        data: historial
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo historial:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error obteniendo historial de servicios'
+      });
+    }
+  }
+
+  /**
+   * Obtener estadísticas de cliente
+   */
+  async getEstadisticasCliente(req, res) {
+    try {
+      const { clienteId } = req.params;
+
+      if (!clienteId) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID del cliente es requerido'
+        });
+      }
+
+      const estadisticas = await ClienteCompletoService.obtenerEstadisticasCliente(clienteId);
+
+      res.json({
+        success: true,
+        data: estadisticas
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo estadísticas:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error obteniendo estadísticas del cliente'
+      });
+    }
+  }
+
+  /**
+   * ============================================
+   * DOCUMENTOS Y FACTURACIÓN
+   * ============================================
+   */
+
+  /**
+   * Generar contrato
+   */
+  async generarContrato(req, res) {
+    try {
+      const { clienteId } = req.params;
+      const { tipo_contrato } = req.body;
+
+      if (!clienteId) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID del cliente es requerido'
+        });
+      }
+
+      const contrato = await ClienteCompletoService.generarContrato(clienteId, tipo_contrato);
+
+      res.json({
+        success: true,
+        message: 'Contrato generado exitosamente',
+        data: contrato
+      });
+
+    } catch (error) {
+      console.error('❌ Error generando contrato:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error generando contrato'
+      });
+    }
+  }
+
+  /**
+   * Generar orden de instalación
+   */
+  async generarOrdenInstalacion(req, res) {
+    try {
+      const { clienteId } = req.params;
+      const { fecha_instalacion } = req.body;
+
+      if (!clienteId) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID del cliente es requerido'
+        });
+      }
+
+      const orden = await ClienteCompletoService.generarOrdenInstalacion(clienteId, fecha_instalacion);
+
+      res.json({
+        success: true,
+        message: 'Orden de instalación generada exitosamente',
+        data: orden
+      });
+
+    } catch (error) {
+      console.error('❌ Error generando orden:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error generando orden de instalación'
+      });
+    }
+  }
+
+  /**
+   * Generar factura inmediata
+   */
+  async generarFacturaInmediata(req, res) {
+    try {
+      const { clienteId } = req.params;
+      const { conceptos_adicionales } = req.body;
+
+      if (!clienteId) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID del cliente es requerido'
+        });
+      }
+
+      const factura = await ClienteCompletoService.generarFacturaInmediata(clienteId, conceptos_adicionales);
+
+      res.json({
+        success: true,
+        message: 'Factura generada exitosamente',
+        data: factura
+      });
+
+    } catch (error) {
+      console.error('❌ Error generando factura:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error generando factura'
+      });
+    }
+  }
+
+  /**
+   * ============================================
+   * UTILIDADES
+   * ============================================
+   */
+
+  /**
+   * Obtener planes disponibles
+   */
+  async getPlanesDisponibles(req, res) {
+    try {
+      const planes = await ClienteCompletoService.obtenerPlanesDisponibles();
+
+      res.json({
+        success: true,
+        data: planes
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo planes:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error obteniendo planes disponibles'
+      });
+    }
+  }
+
+  /**
+   * Verificar disponibilidad de identificación
+   */
+  async verificarDisponibilidadIdentificacion(req, res) {
+    try {
+      const { identificacion, tipo_documento } = req.query;
+
+      if (!identificacion) {
+        return res.status(400).json({
+          success: false,
+          message: 'Identificación es requerida'
+        });
+      }
+
+      const disponible = await ClienteCompletoService.verificarDisponibilidadIdentificacion(
+        identificacion, 
+        tipo_documento || 'cedula'
+      );
+
+      res.json({
+        success: true,
+        data: { disponible }
+      });
+
+    } catch (error) {
+      console.error('❌ Error verificando identificación:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error verificando disponibilidad'
+      });
+    }
+  }
+
+  /**
+   * Calcular precio de plan
+   */
+  async calcularPrecioPlan(req, res) {
+    try {
+      const { plan_id, datos_cliente } = req.body;
 
       if (!plan_id) {
         return res.status(400).json({
@@ -216,105 +525,18 @@ class ClienteCompletoController {
         });
       }
 
-      // Simular datos para cálculo
-      const datosSimulacion = {
-        plan_tipo: req.body.plan_tipo || 'internet',
-        plan_precio: parseFloat(precio_personalizado) || parseFloat(req.body.plan_precio) || 0,
-        estrato: estrato
-      };
-
-      // Calcular conceptos que se incluirían
-      const conceptos = ClienteCompletoService.calcularConceptosPrimeraFactura(
-        { ...datosSimulacion, plan_nombre: req.body.plan_nombre || 'Plan seleccionado' },
-        { precio_personalizado }
-      );
-
-      // Calcular totales
-      const totales = ClienteCompletoService.calcularTotalesFactura(conceptos, estrato);
-
-      // Calcular período de facturación
-      const fechaActivacionDate = new Date(fecha_activacion || new Date());
-      const fechaDesde = new Date(fechaActivacionDate);
-      const fechaHasta = new Date(fechaActivacionDate);
-      fechaHasta.setDate(fechaHasta.getDate() + 30);
+      const precio = await ClienteCompletoService.calcularPrecioPlan(plan_id, datos_cliente);
 
       res.json({
         success: true,
-        data: {
-          conceptos: conceptos.map(c => ({
-            concepto: c.concepto,
-            cantidad: c.cantidad,
-            precio_unitario: c.precio_unitario,
-            valor: c.valor,
-            iva: c.aplica_iva ? Math.round(c.valor * (c.porcentaje_iva / 100)) : 0,
-            total: c.valor + (c.aplica_iva ? Math.round(c.valor * (c.porcentaje_iva / 100)) : 0),
-            aplica_iva: c.aplica_iva
-          })),
-          totales: {
-            subtotal: totales.subtotal,
-            iva: totales.iva,
-            total: totales.total
-          },
-          periodo: {
-            fecha_desde: fechaDesde.toISOString().split('T')[0],
-            fecha_hasta: fechaHasta.toISOString().split('T')[0],
-            dias: 30
-          }
-        }
+        data: precio
       });
 
     } catch (error) {
-      console.error('❌ Error en previsualización:', error);
-      
+      console.error('❌ Error calculando precio:', error);
       res.status(500).json({
         success: false,
-        message: 'Error calculando previsualización',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
-  }
-
-  /**
-   * ============================================
-   * OBTENER PLANES DISPONIBLES
-   * ============================================
-   */
-
-  /**
-   * Obtener planes de servicio disponibles para asignación
-   */
-  async obtenerPlanesDisponibles(req, res) {
-    try {
-      const { Database } = require('../models/Database');
-      const conexion = await Database.conexion();
-
-      try {
-        const [planes] = await conexion.execute(`
-          SELECT 
-            id, codigo, nombre, tipo, precio, 
-            velocidad_subida, velocidad_bajada, canales_tv,
-            descripcion, aplica_iva, activo
-          FROM planes_servicio 
-          WHERE activo = 1 
-          ORDER BY tipo, precio
-        `);
-
-        res.json({
-          success: true,
-          data: planes
-        });
-
-      } finally {
-        conexion.release();
-      }
-
-    } catch (error) {
-      console.error('❌ Error obteniendo planes:', error);
-      
-      res.status(500).json({
-        success: false,
-        message: 'Error obteniendo planes disponibles',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: error.message || 'Error calculando precio del plan'
       });
     }
   }
@@ -331,125 +553,56 @@ class ClienteCompletoController {
   validarDatosClienteCompleto(datos) {
     const errores = [];
 
-    // Validar cliente
+    // Validar estructura de datos
     if (!datos.cliente) {
       errores.push('Datos del cliente son requeridos');
       return errores;
     }
 
-    if (!datos.cliente.identificacion) {
-      errores.push('Identificación del cliente es requerida');
-    }
-
-    if (!datos.cliente.nombre) {
-      errores.push('Nombre del cliente es requerido');
-    }
-
-    if (!datos.cliente.email) {
-      errores.push('Email del cliente es requerido');
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datos.cliente.email)) {
-      errores.push('Email del cliente no tiene formato válido');
-    }
-
-    if (!datos.cliente.telefono) {
-      errores.push('Teléfono del cliente es requerido');
-    }
-
-    if (!datos.cliente.direccion) {
-      errores.push('Dirección del cliente es requerida');
-    }
-
-    if (!datos.cliente.ciudad_id) {
-      errores.push('Ciudad del cliente es requerida');
-    }
-
-    // Validar servicio
     if (!datos.servicio) {
       errores.push('Datos del servicio son requeridos');
       return errores;
     }
 
-    if (!datos.servicio.plan_id) {
-      errores.push('Plan de servicio es requerido');
+    // Validar campos del cliente
+    if (!datos.cliente.identificacion) {
+      errores.push('La identificación del cliente es requerida');
     }
 
-    // Validar fecha de activación
-    if (datos.servicio.fecha_activacion) {
-      const fechaActivacion = new Date(datos.servicio.fecha_activacion);
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
+    if (!datos.cliente.nombre) {
+      errores.push('El nombre del cliente es requerido');
+    }
 
-      if (fechaActivacion < hoy) {
-        errores.push('La fecha de activación no puede ser anterior a hoy');
-      }
+    if (!datos.cliente.email) {
+      errores.push('El email del cliente es requerido');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datos.cliente.email)) {
+      errores.push('El formato del email no es válido');
+    }
+
+    if (!datos.cliente.telefono) {
+      errores.push('El teléfono del cliente es requerido');
+    }
+
+    if (!datos.cliente.direccion) {
+      errores.push('La dirección del cliente es requerida');
+    }
+
+    if (!datos.cliente.ciudad_id) {
+      errores.push('La ciudad del cliente es requerida');
+    }
+
+    // Validar campos del servicio
+    if (!datos.servicio.plan_id) {
+      errores.push('El plan de servicio es requerido');
+    }
+
+    if (!datos.servicio.fecha_activacion) {
+      errores.push('La fecha de activación del servicio es requerida');
     }
 
     return errores;
   }
-
-  /**
-   * ============================================
-   * ESTADÍSTICAS DE SERVICIOS
-   * ============================================
-   */
-
-  /**
-   * Obtener estadísticas de servicios por cliente
-   */
-  async obtenerEstadisticasServicios(req, res) {
-    try {
-      const { Database } = require('../models/Database');
-      const conexion = await Database.conexion();
-
-      try {
-        const [estadisticas] = await conexion.execute(`
-          SELECT 
-            COUNT(DISTINCT c.id) as total_clientes,
-            COUNT(sc.id) as total_servicios,
-            COUNT(CASE WHEN sc.estado = 'activo' THEN 1 END) as servicios_activos,
-            COUNT(CASE WHEN sc.estado = 'suspendido' THEN 1 END) as servicios_suspendidos,
-            COUNT(CASE WHEN sc.estado = 'cortado' THEN 1 END) as servicios_cortados,
-            AVG(COALESCE(sc.precio_personalizado, ps.precio)) as precio_promedio,
-            SUM(COALESCE(sc.precio_personalizado, ps.precio)) as facturacion_mensual_estimada
-          FROM clientes c
-          LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id
-          LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-          WHERE c.activo = 1
-        `);
-
-        const [serviciosPorTipo] = await conexion.execute(`
-          SELECT 
-            ps.tipo,
-            COUNT(sc.id) as cantidad,
-            AVG(COALESCE(sc.precio_personalizado, ps.precio)) as precio_promedio
-          FROM servicios_cliente sc
-          INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
-          WHERE sc.estado = 'activo'
-          GROUP BY ps.tipo
-        `);
-
-        res.json({
-          success: true,
-          data: {
-            resumen: estadisticas[0],
-            por_tipo: serviciosPorTipo
-          }
-        });
-
-      } finally {
-        conexion.release();
-      }
-
-    } catch (error) {
-      console.error('❌ Error obteniendo estadísticas:', error);
-      
-      res.status(500).json({
-        success: false,
-        message: 'Error obteniendo estadísticas de servicios',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
-  }
 }
 
-module.exports = new ClienteCompletoController();
+// CORREGIDO: Exportar la clase correctamente
+module.exports = ClienteCompletoController;
