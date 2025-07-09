@@ -2,6 +2,7 @@ import React from 'react';
 import { Eye, Edit, Phone, Mail, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CLIENT_STATE_LABELS, CLIENT_STATE_COLORS, PAGINATION_CONFIG } from '../../constants/clientConstants';
 
+
 const ClientsList = ({
   clients,
   pagination,

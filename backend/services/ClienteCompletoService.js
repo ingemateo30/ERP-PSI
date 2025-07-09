@@ -638,28 +638,66 @@ class ClienteCompletoService {
   /**
    * Generar número de factura único
    */
-  static async generarNumeroFactura(conexion) {
-    const año = new Date().getFullYear();
+ static async generarNumeroFactura(conexion) {
+  try {
+    console.log('📄 Generando número de factura usando configuración empresa...');
     
-    try {
-      const [ultimo] = await conexion.execute(`
-        SELECT numero_factura FROM facturas 
-        WHERE numero_factura LIKE '${año}%' 
-        ORDER BY id DESC LIMIT 1
+    // Obtener configuración de la empresa
+    const [configEmpresa] = await conexion.execute(`
+      SELECT 
+        prefijo_factura,
+        consecutivo_factura
+      FROM configuracion_empresa 
+      WHERE id = 1
+      LIMIT 1
+    `);
+
+    if (configEmpresa.length === 0) {
+      console.warn('⚠️ No hay configuración de empresa, creando configuración por defecto...');
+      
+      // Crear configuración por defecto
+      await conexion.execute(`
+        INSERT INTO configuracion_empresa (
+          id, licencia, empresa_nombre, prefijo_factura, consecutivo_factura
+        ) VALUES (1, 'DEFAULT', 'EMPRESA PSI', 'FAC', 1)
+        ON DUPLICATE KEY UPDATE
+        prefijo_factura = COALESCE(prefijo_factura, 'FAC'),
+        consecutivo_factura = COALESCE(consecutivo_factura, 1)
       `);
-
-      let siguiente = 1;
-      if (ultimo.length > 0) {
-        const numeroActual = parseInt(ultimo[0].numero_factura.slice(4));
-        siguiente = numeroActual + 1;
-      }
-
-      return `${año}${siguiente.toString().padStart(8, '0')}`;
-    } catch (error) {
-      // Si hay error, generar número básico
-      return `${año}${Date.now().toString().slice(-8)}`;
+      
+      // Usar valores por defecto
+      const numeroFactura = `FAC000001`;
+      console.log(`📄 Número generado con configuración por defecto: ${numeroFactura}`);
+      return numeroFactura;
     }
-  }  /**
+
+    const config = configEmpresa[0];
+    const prefijo = config.prefijo_factura || 'FAC';
+    const consecutivo = config.consecutivo_factura || 1;
+
+    // Generar número con formato: PREFIJO + CONSECUTIVO (6 dígitos)
+    const numeroFactura = `${prefijo}${consecutivo.toString().padStart(6, '0')}`;
+
+    // Actualizar el consecutivo para la próxima factura
+    await conexion.execute(`
+      UPDATE configuracion_empresa 
+      SET consecutivo_factura = consecutivo_factura + 1
+      WHERE id = 1
+    `);
+
+    console.log(`📄 Número de factura generado: ${numeroFactura} (próximo consecutivo: ${consecutivo + 1})`);
+    
+    return numeroFactura;
+
+  } catch (error) {
+    console.error('❌ Error generando número de factura:', error);
+    // Fallback con timestamp
+    const fallback = `FAC${Date.now().toString().slice(-6)}`;
+    console.log(`📄 Usando número de fallback: ${fallback}`);
+    return fallback;
+  }
+}
+  /**
    * Obtener servicios de un cliente
    */
   static async obtenerServiciosCliente(clienteId) {
