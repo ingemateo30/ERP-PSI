@@ -25,19 +25,19 @@ class CronJobs {
 
     // Facturación mensual automática - cada día 1 del mes a las 06:00
     this.facturacionMensualAutomatica();
-    
+
     // Actualización de estados de facturas - diario a las 02:00
     this.actualizacionEstadosFacturas();
-    
+
     // Cálculo de intereses por mora - diario a las 03:00
     this.calculoInteresesMora();
-    
+
     // Notificaciones de vencimiento - diario a las 08:00
     this.notificacionesVencimiento();
-    
+
     // Backup diario - diario a las 01:00
     this.backupDiario();
-    
+
     // Limpieza semanal - domingos a las 04:00
     this.limpiezaSemanal();
 
@@ -57,17 +57,17 @@ class CronJobs {
       try {
         console.log('🔄 INICIANDO FACTURACIÓN MENSUAL AUTOMÁTICA...');
         console.log(`📅 Fecha: ${new Date().toISOString()}`);
-        
+
         // Validar integridad de datos antes de facturar
         console.log('🔍 Validando integridad de datos...');
         const validacion = await FacturacionAutomaticaService.validarIntegridadDatos();
-        
+
         if (!validacion.valido) {
           console.warn('⚠️ Se encontraron errores de integridad:');
           validacion.errores.forEach((error, index) => {
             console.warn(`   ${index + 1}. ${error.descripcion} - Cliente: ${error.cliente_nombre || 'N/A'}`);
           });
-          
+
           // Registrar errores pero continuar con la facturación
           await this.registrarLogSistema('FACTURACION_VALIDACION_ERRORES', {
             total_errores: validacion.total_errores,
@@ -76,12 +76,12 @@ class CronJobs {
         }
 
         const resultado = await FacturacionAutomaticaService.generarFacturacionMensual();
-        
+
         console.log('📊 RESULTADO FACTURACIÓN MENSUAL:');
         console.log(`   ✅ Exitosas: ${resultado.exitosas}`);
         console.log(`   ❌ Fallidas: ${resultado.fallidas}`);
         console.log(`   💰 Facturas generadas: ${resultado.facturas_generadas.length}`);
-        
+
         if (resultado.errores.length > 0) {
           console.log('🚨 ERRORES ENCONTRADOS:');
           resultado.errores.forEach((error, index) => {
@@ -119,7 +119,7 @@ class CronJobs {
 
       } catch (error) {
         console.error('❌ ERROR EN FACTURACIÓN MENSUAL AUTOMÁTICA:', error);
-        
+
         await this.registrarLogSistema('FACTURACION_MENSUAL_ERROR', {
           error: error.message,
           stack: error.stack,
@@ -148,9 +148,9 @@ class CronJobs {
     cron.schedule('0 2 * * *', async () => {
       try {
         console.log('🔄 Actualizando estados de facturas...');
-        
+
         const conexion = await Database.conexion();
-        
+
         try {
           // Marcar facturas como vencidas
           const [facturasVencidas] = await conexion.execute(`
@@ -188,7 +188,7 @@ class CronJobs {
 
       } catch (error) {
         console.error('❌ Error actualizando estados de facturas:', error);
-        
+
         await this.registrarLogSistema('ACTUALIZACION_ESTADOS_ERROR', {
           error: error.message,
           fecha_error: new Date().toISOString()
@@ -209,9 +209,9 @@ class CronJobs {
     cron.schedule('0 3 * * *', async () => {
       try {
         console.log('🔄 Calculando intereses por mora...');
-        
+
         const conexion = await Database.conexion();
-        
+
         try {
           // Obtener facturas morosas (más de 30 días vencidas)
           const [facturasMorosas] = await conexion.execute(`
@@ -236,9 +236,9 @@ class CronJobs {
 
           for (const factura of facturasMorosas) {
             const saldoPendiente = factura.total - factura.total_pagado;
-            const tasaInteresDiaria = 0.00083; // ~2.5% mensual
+            const tasaInteresDiaria = 0.000666; // ~2.0% mensual
             const interesesDiarios = saldoPendiente * tasaInteresDiaria;
-            
+
             // Solo calcular intereses si han pasado al menos 30 días
             if (factura.dias_mora >= 30) {
               totalInteresesCalculados += interesesDiarios;
@@ -270,7 +270,7 @@ class CronJobs {
 
       } catch (error) {
         console.error('❌ Error calculando intereses por mora:', error);
-        
+
         await this.registrarLogSistema('CALCULO_INTERESES_ERROR', {
           error: error.message,
           fecha_error: new Date().toISOString()
@@ -291,9 +291,9 @@ class CronJobs {
     cron.schedule('0 8 * * *', async () => {
       try {
         console.log('🔔 Enviando notificaciones de vencimiento...');
-        
+
         const conexion = await Database.conexion();
-        
+
         try {
           // Facturas que vencen en 3 días
           const [facturasProximasVencer] = await conexion.execute(`
@@ -379,7 +379,7 @@ class CronJobs {
 
       } catch (error) {
         console.error('❌ Error enviando notificaciones:', error);
-        
+
         await this.registrarLogSistema('NOTIFICACIONES_ERROR', {
           error: error.message,
           fecha_error: new Date().toISOString()
@@ -400,13 +400,13 @@ class CronJobs {
     cron.schedule('0 1 * * *', async () => {
       try {
         console.log('💾 Iniciando backup diario de datos críticos...');
-        
+
         const conexion = await Database.conexion();
-        
+
         try {
           // Crear respaldo de facturas del día
           const fechaHoy = new Date().toISOString().split('T')[0];
-          
+
           const [facturasHoy] = await conexion.execute(`
             SELECT COUNT(*) as total FROM facturas 
             WHERE DATE(created_at) = ? AND activo = 1
@@ -443,7 +443,7 @@ class CronJobs {
 
       } catch (error) {
         console.error('❌ Error en backup diario:', error);
-        
+
         await this.registrarLogSistema('BACKUP_DIARIO_ERROR', {
           error: error.message,
           fecha_error: new Date().toISOString()
@@ -464,9 +464,9 @@ class CronJobs {
     cron.schedule('0 4 * * 0', async () => {
       try {
         console.log('🧹 Iniciando limpieza semanal...');
-        
+
         const conexion = await Database.conexion();
-        
+
         try {
           // Limpiar logs de sistema antiguos (más de 3 meses)
           const [logsEliminados] = await conexion.execute(`
@@ -506,7 +506,7 @@ class CronJobs {
 
       } catch (error) {
         console.error('❌ Error en limpieza semanal:', error);
-        
+
         await this.registrarLogSistema('LIMPIEZA_SEMANAL_ERROR', {
           error: error.message,
           fecha_error: new Date().toISOString()
@@ -527,7 +527,7 @@ class CronJobs {
     cron.schedule('0 7 2 * *', async () => {
       try {
         console.log('📊 Generando reportes mensuales automáticos...');
-        
+
         // Calcular período anterior
         const fechaActual = new Date();
         const mesAnterior = new Date(fechaActual.getFullYear(), fechaActual.getMonth() - 1, 1);
@@ -566,7 +566,7 @@ class CronJobs {
 
       } catch (error) {
         console.error('❌ Error generando reportes mensuales:', error);
-        
+
         await this.registrarLogSistema('REPORTE_MENSUAL_ERROR', {
           error: error.message,
           fecha_error: new Date().toISOString()
@@ -590,7 +590,7 @@ class CronJobs {
     try {
       const { Database } = require('../models/Database');
       const conexion = await Database.conexion();
-      
+
       try {
         await conexion.execute(`
           INSERT INTO logs_sistema (
@@ -617,7 +617,7 @@ class CronJobs {
     try {
       const { Database } = require('../models/Database');
       const conexion = await Database.conexion();
-      
+
       try {
         // Obtener emails de administradores
         const [administradores] = await conexion.execute(`
@@ -671,7 +671,7 @@ class CronJobs {
   static async enviarReporteMensual(reporte) {
     try {
       const asunto = `📊 Reporte Mensual de Facturación - ${reporte.periodo}`;
-      
+
       const contenido = {
         periodo: reporte.periodo,
         resumen: reporte.resumen_ejecutivo,
@@ -741,9 +741,9 @@ class CronJobs {
   static async ejecutarFacturacionManual(clienteId = null) {
     try {
       console.log('🧪 Ejecutando facturación manual para testing...');
-      
+
       let resultado;
-      
+
       if (clienteId) {
         console.log(`👤 Facturación individual para cliente ${clienteId}...`);
         resultado = await FacturacionAutomaticaService.generarFacturaClienteIndividual(clienteId);
@@ -751,7 +751,7 @@ class CronJobs {
         console.log('🏢 Facturación mensual completa...');
         resultado = await FacturacionAutomaticaService.generarFacturacionMensual();
       }
-      
+
       console.log('📊 Resultado facturación manual:');
       if (clienteId) {
         console.log(`   ✅ Factura generada: ${resultado.numero_factura}`);
@@ -760,7 +760,7 @@ class CronJobs {
         console.log(`   ✅ Exitosas: ${resultado.exitosas}`);
         console.log(`   ❌ Fallidas: ${resultado.fallidas}`);
       }
-      
+
       return resultado;
 
     } catch (error) {
@@ -775,10 +775,10 @@ class CronJobs {
   static async verificarConfiguracion() {
     try {
       console.log('🔧 Verificando configuración del sistema...');
-      
+
       const { Database } = require('../models/Database');
       const conexion = await Database.conexion();
-      
+
       try {
         // Verificar configuración de empresa
         const [configEmpresa] = await conexion.execute(`
@@ -919,7 +919,37 @@ class CronJobs {
       };
     }
   }
+  static procesoReconexionAutomatica() {
+    cron.schedule('0 2 3 * *', async () => { // Día 3 de cada mes a las 02:00
+      try {
+        console.log('🔌 Procesando reconexiones automáticas...');
 
+        const conexion = await Database.conexion();
+
+        try {
+          // Marcar clientes como inactivos si no se reconectaron
+          const [clientesSinReconexion] = await conexion.execute(`
+          UPDATE clientes c
+          JOIN cortes_servicio cs ON c.id = cs.cliente_id
+          SET c.estado = 'inactivo',
+              c.observaciones = CONCAT(COALESCE(c.observaciones, ''), 
+                                     '\n[SISTEMA] Inactivo por no reconexión - ', NOW())
+          WHERE cs.estado = 'activo'
+            AND cs.fecha_corte < DATE_SUB(CURDATE(), INTERVAL 3 DAY)
+            AND cs.fecha_reconexion IS NULL
+            AND c.estado = 'suspendido'
+        `);
+
+          console.log(`🔌 ${clientesSinReconexion.affectedRows} clientes marcados como inactivos`);
+
+        } finally {
+          conexion.release();
+        }
+      } catch (error) {
+        console.error('❌ Error en proceso de reconexión:', error);
+      }
+    });
+  }
   /**
    * Listar todas las tareas programadas disponibles
    */
@@ -973,6 +1003,5 @@ class CronJobs {
 
 module.exports = CronJobs;
 
-          
 
-          
+

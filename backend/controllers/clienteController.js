@@ -378,6 +378,23 @@ class ClienteController {
         message: 'Cliente creado exitosamente'
       });
 
+      const serviciosConInstalacion = serviciosCreados.filter(s => s.requiere_instalacion);
+      if (serviciosConInstalacion.length > 0) {
+        try {
+          await conexion.execute(`
+      INSERT INTO instalaciones (
+        cliente_id, tipo_instalacion, estado, fecha_programada,
+        observaciones, created_at
+      ) VALUES (?, 'nueva', 'programada', DATE_ADD(CURDATE(), INTERVAL 1 DAY),
+               'Instalación generada automáticamente', NOW())
+    `, [clienteId]);
+
+          console.log(`🔧 Instalación automática creada para cliente ${clienteId}`);
+        } catch (error) {
+          console.warn('⚠️ Error creando instalación automática:', error.message);
+        }
+      }
+
     } catch (error) {
       console.error('Error al crear cliente:', error);
 
