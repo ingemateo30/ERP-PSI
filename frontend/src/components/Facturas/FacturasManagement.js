@@ -1,5 +1,6 @@
 // components/Facturas/FacturasManagement.js - Componente principal corregido
 import React, { useState, useCallback, useEffect } from 'react';
+import { Info, Calculator, PieChart } from 'lucide-react';
 import { useFacturas, useFacturasAcciones } from '../../hooks/useFacturacionManual';
 import FacturasStats from './FacturasStats';
 import FacturasFilters from './FacturasFilters';
@@ -254,6 +255,15 @@ const FacturasManagement = () => {
       mostrarNotificacion(actionError, 'error');
     }
   }, [actionError, mostrarNotificacion]);
+
+  
+const formatearPesos = (valor) => {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0
+  }).format(valor || 0);
+};
 
   return (
     <div className="min-h-screen bg-gray-50">

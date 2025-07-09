@@ -1,279 +1,220 @@
+// ========================================
 // backend/services/FacturacionAutomaticaService.js
-// Servicio de Facturación Automática para PSI - Basado en estructura existente
-const { Database } = require('../models/Database');
+// Servicio completo de facturación automática con reglas correctas de IVA
+// ========================================
 
-// Importaciones opcionales para servicios que pueden no existir
-let PDFGenerator, EmailService;
-
-try {
-  PDFGenerator = require('./utils/pdfGenerator');
-  console.log('✅ PDFGenerator cargado correctamente');
-} catch (error) {
-  console.log('⚠️ PDFGenerator no disponible - funciones de PDF deshabilitadas');
-}
-
-try {
-  EmailService = require('../services/EmailService');
-  console.log('✅ EmailService cargado correctamente');
-} catch (error) {
-  console.log('⚠️ EmailService no disponible - notificaciones por email deshabilitadas');
-}
+const Database = require('../models/Database');
+const IVACalculatorService = require('./IVACalculatorService');
 
 class FacturacionAutomaticaService {
 
   /**
-   * Generar facturación mensual masiva para todos los clientes activos
+   * Generar factura automática para un cliente
+   * @param {number} clienteId - ID del cliente
+   * @param {object} opciones - Opciones adicionales
+   * @returns {object} Resultado de la facturación
    */
-  static async generarFacturacionMensual(fechaReferencia = new Date()) {
-    const conexion = await Database.conexion();
-    
-    try {
-      console.log('🔄 Iniciando facturación mensual automática...');
-      
-      // Obtener todos los clientes activos con servicios
-      const clientesActivos = await this.obtenerClientesParaFacturar(fechaReferencia);
-      
-      console.log(`📊 Clientes a facturar: ${clientesActivos.length}`);
-      
-      const resultados = {
-        exitosas: 0,
-        fallidas: 0,
-        facturas_generadas: [],
-        errores: []
-      };
-
-      // Procesar cada cliente
-      for (const cliente of clientesActivos) {
-        try {
-          console.log(`🧾 Procesando cliente: ${cliente.nombre} (ID: ${cliente.id})`);
-          
-          const facturaGenerada = await this.generarFacturaCliente(cliente, fechaReferencia);
-          
-          if (facturaGenerada) {
-            resultados.exitosas++;
-            resultados.facturas_generadas.push(facturaGenerada);
-            console.log(`✅ Factura generada: ${facturaGenerada.numero_factura}`);
-          }
-
-        } catch (error) {
-          console.error(`❌ Error procesando cliente ${cliente.id}:`, error.message);
-          resultados.fallidas++;
-          resultados.errores.push({
-            cliente_id: cliente.id,
-            nombre: cliente.nombre,
-            error: error.message
-          });
-        }
-      }
-
-      console.log(`📈 Facturación completada: ${resultados.exitosas} exitosas, ${resultados.fallidas} fallidas`);
-      return resultados;
-
-    } catch (error) {
-      console.error('❌ Error en facturación mensual:', error);
-      throw error;
-    } finally {
-      conexion.release();
-    }
-  }
-
-  /**
-   * Generar factura automática para un cliente específico
-   */
-  static async generarFacturaClienteIndividual(clienteId, fechaInicio = null) {
-    const conexion = await Database.conexion();
-    
-    try {
-      // Obtener información completa del cliente
-      const cliente = await this.obtenerDatosCompletosCliente(clienteId);
-      if (!cliente) {
-        throw new Error('Cliente no encontrado');
-      }
-
-      // Determinar fecha de referencia para la facturación
-      const fechaPeriodo = fechaInicio ? new Date(fechaInicio) : new Date();
-      
-      // Generar la factura
-      const factura = await this.generarFacturaCliente(cliente, fechaPeriodo);
-      
-      return factura;
-
-    } catch (error) {
-      console.error(`❌ Error generando factura para cliente ${clienteId}:`, error);
-      throw error;
-    } finally {
-      conexion.release();
-    }
-  }
-
-  /**
-   * Generar factura para un cliente específico según las reglas de negocio
-   */
-  static async generarFacturaCliente(cliente, fechaReferencia) {
+  static async generarFacturaAutomatica(clienteId, opciones = {}) {
     const conexion = await Database.conexion();
     
     try {
       await conexion.beginTransaction();
 
-      // 1. Calcular período de facturación según reglas específicas
-      const periodo = this.calcularPeriodoFacturacion(cliente, fechaReferencia);
-      
-      // 2. Verificar si ya existe factura para este período
-      const facturaExistente = await this.verificarFacturaExistente(
-        cliente.id, 
-        periodo.periodo_facturacion
-      );
-      
-      if (facturaExistente) {
-        console.log(`⚠️ Ya existe factura para el período ${periodo.periodo_facturacion}`);
-        await conexion.rollback();
-        return null;
+      // 1. Obtener datos del cliente
+      const cliente = await this.obtenerDatosCliente(clienteId);
+      if (!cliente) {
+        throw new Error('Cliente no encontrado');
       }
 
-      // 3. Obtener servicios activos del cliente
-      const serviciosActivos = await this.obtenerServiciosActivosCliente(cliente.id);
-      
-      if (serviciosActivos.length === 0) {
-        console.log(`⚠️ Cliente ${cliente.id} no tiene servicios activos`);
-        await conexion.rollback();
-        return null;
-      }
+      // 2. Calcular período de facturación
+      const periodo = await this.calcularPeriodoFacturacion(clienteId, opciones.fechaFacturacion);
 
-      // 4. Calcular conceptos de facturación
+      // 3. Generar número de factura
+      const numeroFactura = await this.generarNumeroFactura();
+
+      // 4. Obtener servicios activos del cliente
+      const serviciosActivos = await this.obtenerServiciosActivos(clienteId);
+
+      // 5. Calcular conceptos de facturación
       const conceptos = await this.calcularConceptosFacturacion(
         cliente, 
         serviciosActivos, 
         periodo
       );
 
-      // 5. Calcular totales de la factura
-      const totales = this.calcularTotalesFactura(conceptos, cliente);
+      // 6. Calcular totales con IVA correcto
+      const totales = await this.calcularTotalesConIVA(conceptos, cliente);
 
-      // 6. Generar número de factura
-      const numeroFactura = await this.generarNumeroFactura();
-
-      // 7. Crear registro principal de factura
+      // 7. Crear registro de factura
       const facturaId = await this.crearFacturaPrincipal({
         numeroFactura,
         cliente,
         periodo,
         totales,
-        serviciosActivos
+        conceptos
       });
 
-      // 8. Crear detalles de la factura
+      // 8. Crear detalles de factura
       await this.crearDetallesFactura(facturaId, conceptos);
 
-      // 9. Actualizar fecha de última facturación del cliente
-      await this.actualizarUltimaFacturacion(cliente.id, periodo.fecha_hasta);
-
-      // 10. Si es primera factura, generar orden de instalación y contrato
-      if (periodo.es_primera_factura) {
-        await this.generarDocumentosIniciales(cliente.id, facturaId);
-      }
+      // 9. Actualizar consecutivos
+      await this.actualizarConsecutivos();
 
       await conexion.commit();
 
-      console.log(`✅ Factura ${numeroFactura} creada con ID: ${facturaId}`);
-
       return {
-        id: facturaId,
+        success: true,
+        factura_id: facturaId,
         numero_factura: numeroFactura,
-        cliente_id: cliente.id,
-        cliente_nombre: cliente.nombre,
-        periodo: periodo.periodo_facturacion,
-        subtotal: totales.subtotal,
-        iva: totales.iva,
-        total: totales.total,
-        fecha_emision: periodo.fecha_emision,
-        fecha_vencimiento: periodo.fecha_vencimiento
+        cliente: {
+          id: cliente.id,
+          nombre: cliente.nombre_completo,
+          identificacion: cliente.numero_identificacion
+        },
+        periodo: periodo,
+        totales: totales,
+        conceptos: conceptos.length,
+        mensaje: 'Factura generada exitosamente'
       };
 
     } catch (error) {
       await conexion.rollback();
-      console.error(`❌ Error generando factura para cliente ${cliente.id}:`, error);
+      console.error('❌ Error generando factura automática:', error);
       throw error;
     } finally {
-      conexion.release();
+      await conexion.release();
     }
   }
 
   /**
-   * Calcular período de facturación según las reglas específicas del negocio
+   * Obtener datos completos del cliente incluyendo estrato
    */
-  static calcularPeriodoFacturacion(cliente, fechaReferencia) {
-    const fechaRef = new Date(fechaReferencia);
-    const fechaEmision = new Date(fechaRef);
+  static async obtenerDatosCliente(clienteId) {
+    const query = `
+      SELECT 
+        c.*,
+        COALESCE(c.estrato, 3) as estrato,
+        CONCAT(c.nombres, ' ', c.apellidos) as nombre_completo,
+        d.nombre as departamento,
+        cd.nombre as ciudad,
+        s.nombre as sector
+      FROM clientes c
+      LEFT JOIN departamentos d ON c.departamento_id = d.id
+      LEFT JOIN ciudades cd ON c.ciudad_id = cd.id  
+      LEFT JOIN sectores s ON c.sector_id = s.id
+      WHERE c.id = ? AND c.activo = 1
+    `;
+
+    const resultado = await Database.query(query, [clienteId]);
+    return resultado.length > 0 ? resultado[0] : null;
+  }
+
+  /**
+   * Calcular período de facturación según reglas del negocio
+   */
+  static async calcularPeriodoFacturacion(clienteId, fechaFacturacion = null) {
+    const fechaActual = fechaFacturacion ? new Date(fechaFacturacion) : new Date();
     
     // Obtener última factura del cliente
-    const ultimaFacturacion = cliente.fecha_ultima_facturacion ? 
-      new Date(cliente.fecha_ultima_facturacion) : null;
+    const ultimaFactura = await Database.query(`
+      SELECT fecha_hasta, DATE(fecha_hasta) as ultimo_dia_facturado
+      FROM facturas 
+      WHERE cliente_id = ? AND activo = 1 
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `, [clienteId]);
 
-    let fechaDesde, fechaHasta, esPrimeraFactura = false, esNivelacion = false;
+    let fechaDesde, fechaHasta, esPrimeraFactura = false;
 
-    if (!ultimaFacturacion) {
-      // PRIMERA FACTURA: Desde fecha de activación por 30 días
+    if (ultimaFactura.length === 0) {
+      // PRIMERA FACTURA: Desde fecha actual hasta 30 días después
       esPrimeraFactura = true;
-      fechaDesde = new Date(cliente.fecha_activacion || cliente.created_at);
-      fechaHasta = new Date(fechaDesde);
+      fechaDesde = new Date(fechaActual);
+      fechaHasta = new Date(fechaActual);
       fechaHasta.setDate(fechaHasta.getDate() + 30);
-      
-      console.log(`📅 Primera factura - Desde: ${this.formatearFecha(fechaDesde)} hasta: ${this.formatearFecha(fechaHasta)}`);
-    } 
-    else {
-      // SEGUNDA FACTURA O MÁS: Aplicar lógica de nivelación
-      fechaDesde = new Date(ultimaFacturacion);
+    } else {
+      // SEGUNDA FACTURA EN ADELANTE
+      const ultimoDiaFacturado = new Date(ultimaFactura[0].ultimo_dia_facturado);
+      fechaDesde = new Date(ultimoDiaFacturado);
       fechaDesde.setDate(fechaDesde.getDate() + 1);
-
-      // Verificar si ya está nivelado al final del mes
-      if (this.estaNiveladoAlFinDelMes(ultimaFacturacion)) {
-        // Facturación mensual regular (1 al 30/31)
-        fechaDesde = new Date(fechaRef.getFullYear(), fechaRef.getMonth(), 1);
-        fechaHasta = new Date(fechaRef.getFullYear(), fechaRef.getMonth() + 1, 0);
+      
+      // Para segunda factura: nivelar al final del mes
+      const esSegundaFactura = await this.esSegundaFactura(clienteId);
+      
+      if (esSegundaFactura) {
+        // Facturar hasta final del mes para nivelar
+        fechaHasta = new Date(fechaDesde.getFullYear(), fechaDesde.getMonth() + 1, 0);
       } else {
-        // Nivelación: facturar hasta fin de mes + días adicionales
-        esNivelacion = true;
-        const finDelMes = new Date(fechaRef.getFullYear(), fechaRef.getMonth() + 1, 0);
-        
-        // Calcular días del mes siguiente para completar 30 días
-        const diasFacturados = this.calcularDiasEntreFechas(fechaDesde, finDelMes);
-        const diasAdicionales = Math.max(0, 30 - diasFacturados);
-        
-        fechaHasta = new Date(finDelMes);
-        fechaHasta.setDate(fechaHasta.getDate() + diasAdicionales);
-        
-        console.log(`📅 Nivelación - Desde: ${this.formatearFecha(fechaDesde)} hasta: ${this.formatearFecha(fechaHasta)} (${diasFacturados + diasAdicionales} días)`);
+        // Facturas normales: ciclo mensual completo
+        fechaHasta = new Date(fechaDesde);
+        fechaHasta.setDate(fechaHasta.getDate() + 29); // 30 días
       }
     }
 
-    // Fecha de vencimiento: 30 días después de emisión
-    const fechaVencimiento = new Date(fechaEmision);
-    fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
-
-    // Período en formato YYYY-MM para agrupación
-    const periodoFacturacion = `${fechaRef.getFullYear()}-${(fechaRef.getMonth() + 1).toString().padStart(2, '0')}`;
+    const diasFacturados = Math.ceil((fechaHasta - fechaDesde) / (1000 * 60 * 60 * 24)) + 1;
 
     return {
-      fecha_emision: this.formatearFecha(fechaEmision),
-      fecha_vencimiento: this.formatearFecha(fechaVencimiento),
-      fecha_desde: this.formatearFecha(fechaDesde),
-      fecha_hasta: this.formatearFecha(fechaHasta),
-      periodo_facturacion: periodoFacturacion,
-      dias_facturados: this.calcularDiasEntreFechas(fechaDesde, fechaHasta),
+      fecha_desde: fechaDesde.toISOString().split('T')[0],
+      fecha_hasta: fechaHasta.toISOString().split('T')[0],
+      dias_facturados: diasFacturados,
       es_primera_factura: esPrimeraFactura,
-      es_nivelacion: esNivelacion
+      periodo_facturacion: `${fechaDesde.toISOString().split('T')[0]} al ${fechaHasta.toISOString().split('T')[0]}`
     };
   }
 
   /**
-   * Calcular conceptos de facturación para un cliente
+   * Verificar si es la segunda factura del cliente
+   */
+  static async esSegundaFactura(clienteId) {
+    const facturas = await Database.query(`
+      SELECT COUNT(*) as total 
+      FROM facturas 
+      WHERE cliente_id = ? AND activo = 1
+    `, [clienteId]);
+    
+    return facturas[0].total === 1;
+  }
+
+  /**
+   * Obtener servicios activos del cliente
+   */
+  static async obtenerServiciosActivos(clienteId) {
+    const query = `
+      SELECT 
+        sc.*,
+        p.codigo as codigo_plan,
+        p.nombre as nombre_plan,
+        p.tipo as tipo_plan,
+        p.precio as precio_plan,
+        p.precio_internet,
+        p.precio_television,
+        COALESCE(sc.precio_personalizado, p.precio) as precio_servicio,
+        CASE 
+          WHEN p.precio_internet > 0 AND p.precio_television > 0 THEN 'combo'
+          WHEN p.precio_internet > 0 THEN 'internet'
+          WHEN p.precio_television > 0 THEN 'television'
+          ELSE 'otro'
+        END as tipo
+      FROM servicios_cliente sc
+      INNER JOIN planes_servicio p ON sc.plan_id = p.id
+      WHERE sc.cliente_id = ? 
+        AND sc.estado = 'activo'
+        AND sc.activo = 1
+        AND p.activo = 1
+    `;
+
+    return await Database.query(query, [clienteId]);
+  }
+
+  /**
+   * Calcular conceptos de facturación con IVA correcto
    */
   static async calcularConceptosFacturacion(cliente, serviciosActivos, periodo) {
     const conceptos = [];
 
     // 1. SERVICIOS CONTRATADOS (Internet, TV, etc.)
     for (const servicio of serviciosActivos) {
-      const conceptoServicio = this.calcularConceptoServicio(servicio, periodo, cliente);
+      const conceptoServicio = await this.calcularConceptoServicio(servicio, periodo, cliente);
       if (conceptoServicio) {
         conceptos.push(conceptoServicio);
       }
@@ -291,19 +232,25 @@ class FacturacionAutomaticaService {
       conceptos.push({
         tipo: 'saldo_anterior',
         concepto: 'Saldo anterior',
+        cantidad: 1,
+        precio_unitario: saldoAnterior,
         valor: saldoAnterior,
-        aplica_iva: false
+        aplica_iva: false,
+        porcentaje_iva: 0
       });
     }
 
-    // 4. INTERESES POR MORA
+    // 4. INTERESES POR MORA (sin IVA según reglas)
     const interesesMora = await this.calcularInteresesMora(cliente.id);
     if (interesesMora > 0) {
       conceptos.push({
         tipo: 'interes',
         concepto: 'Intereses por mora',
+        cantidad: 1,
+        precio_unitario: interesesMora,
         valor: interesesMora,
-        aplica_iva: false
+        aplica_iva: false,
+        porcentaje_iva: 0
       });
     }
 
@@ -315,12 +262,12 @@ class FacturacionAutomaticaService {
   }
 
   /**
-   * Calcular concepto de servicio (Internet, TV, etc.)
+   * Calcular concepto de servicio con IVA correcto según estrato
    */
-  static calcularConceptoServicio(servicio, periodo, cliente) {
+  static async calcularConceptoServicio(servicio, periodo, cliente) {
     try {
       // Obtener precio del servicio (personalizado o del plan)
-      const precioServicio = servicio.precio_personalizado || servicio.precio_plan;
+      const precioServicio = servicio.precio_personalizado || servicio.precio_servicio;
       
       // Calcular valor proporcional según días facturados
       let valorServicio = precioServicio;
@@ -329,9 +276,8 @@ class FacturacionAutomaticaService {
         valorServicio = Math.round(valorServicio);
       }
 
-      // Determinar aplicación de IVA según reglas del negocio
-      const aplicaIva = this.determinarAplicacionIVA(servicio.tipo, cliente.estrato);
-      const porcentajeIva = aplicaIva ? 19 : 0;
+      // Determinar aplicación de IVA según reglas del negocio y estrato del cliente
+      const configuracionIVA = IVACalculatorService.determinarIVA(servicio.tipo, cliente.estrato);
 
       return {
         tipo: servicio.tipo,
@@ -339,10 +285,12 @@ class FacturacionAutomaticaService {
         cantidad: 1,
         precio_unitario: valorServicio,
         valor: valorServicio,
-        aplica_iva: aplicaIva,
-        porcentaje_iva: porcentajeIva,
+        aplica_iva: configuracionIVA.aplica,
+        porcentaje_iva: configuracionIVA.porcentaje,
         dias_facturados: periodo.dias_facturados,
-        servicio_cliente_id: servicio.id
+        servicio_cliente_id: servicio.id,
+        estrato_cliente: cliente.estrato,
+        descripcion_iva: IVACalculatorService.obtenerDescripcionIVA(servicio.tipo, cliente.estrato)
       };
 
     } catch (error) {
@@ -352,39 +300,10 @@ class FacturacionAutomaticaService {
   }
 
   /**
-   * Determinar aplicación de IVA según reglas específicas del negocio
-   */
-  static determinarAplicacionIVA(tipoServicio, estrato) {
-    const estratoNumerico = parseInt(estrato) || 4;
-
-    switch (tipoServicio) {
-      case 'internet':
-        // Internet: No aplica IVA en estratos 1, 2 y 3
-        return estratoNumerico > 3;
-      
-      case 'television':
-        // TV: Siempre aplica IVA del 19%
-        return true;
-      
-      case 'empaquetado':
-        // Empaquetado: Aplica IVA solo si estrato > 3
-        return estratoNumerico > 3;
-      
-      case 'publicidad':
-        // Publicidad: No aplica IVA según instrucciones
-        return false;
-      
-      default:
-        return false;
-    }
-  }
-
-  /**
-   * Calcular concepto de instalación (primera factura)
+   * Calcular concepto de instalación (primera factura) - Siempre con IVA 19%
    */
   static calcularConceptoInstalacion() {
     const valorInstalacion = 42016; // Valor fijo según instrucciones
-    const valorIva = Math.round(valorInstalacion * 0.19); // 19% IVA
 
     return {
       tipo: 'varios',
@@ -393,82 +312,51 @@ class FacturacionAutomaticaService {
       precio_unitario: valorInstalacion,
       valor: valorInstalacion,
       aplica_iva: true,
-      porcentaje_iva: 19
+      porcentaje_iva: 19,
+      descripcion_iva: 'INSTALACIÓN: IVA 19% (Todos los estratos)'
     };
   }
 
   /**
-   * Calcular totales de la factura según estructura existente
+   * Calcular totales de la factura con IVA correcto
    */
-  static calcularTotalesFactura(conceptos, cliente) {
-    let internet = 0, television = 0, varios = 0, publicidad = 0;
-    let descuento = 0, interes = 0, reconexion = 0, saldoAnterior = 0;
-    let s_internet = 0, s_television = 0, s_varios = 0, s_publicidad = 0;
-    let s_descuento = 0, s_interes = 0, s_reconexion = 0;
+  static async calcularTotalesConIVA(conceptos, cliente) {
+    // Usar el servicio de IVA para calcular conceptos con IVA correcto
+    const conceptosConIVA = await IVACalculatorService.calcularConceptosConIVA(conceptos, cliente);
+    
+    // Generar resumen de impuestos
+    const resumenImpuestos = IVACalculatorService.generarResumenImpuestos(conceptosConIVA);
 
-    conceptos.forEach(concepto => {
-      const valor = concepto.valor || 0;
-      const valorIva = concepto.aplica_iva ? Math.round(valor * (concepto.porcentaje_iva / 100)) : 0;
-
-      switch (concepto.tipo) {
-        case 'internet':
-          internet += valor;
-          s_internet += valorIva;
-          break;
-        case 'television':
-          television += valor;
-          s_television += valorIva;
-          break;
-        case 'varios':
-          varios += valor;
-          s_varios += valorIva;
-          break;
-        case 'publicidad':
-          publicidad += valor;
-          s_publicidad += valorIva;
-          break;
-        case 'descuento':
-          descuento += valor;
-          s_descuento += valorIva;
-          break;
-        case 'interes':
-          interes += valor;
-          s_interes += valorIva;
-          break;
-        case 'reconexion':
-          reconexion += valor;
-          s_reconexion += valorIva;
-          break;
-        case 'saldo_anterior':
-          saldoAnterior += valor;
-          break;
-      }
-    });
-
-    const subtotal = internet + television + varios + publicidad + interes + reconexion + saldoAnterior - descuento;
-    const totalIva = s_internet + s_television + s_varios + s_publicidad + s_interes + s_reconexion - s_descuento;
-    const total = subtotal + totalIva;
-
+    // Estructurar según formato actual de la base de datos
     return {
-      internet: Math.round(internet),
-      television: Math.round(television),
-      varios: Math.round(varios),
-      publicidad: Math.round(publicidad),
-      descuento: Math.round(descuento),
-      interes: Math.round(interes),
-      reconexion: Math.round(reconexion),
-      saldo_anterior: Math.round(saldoAnterior),
-      s_internet: Math.round(s_internet),
-      s_television: Math.round(s_television),
-      s_varios: Math.round(s_varios),
-      s_publicidad: Math.round(s_publicidad),
-      s_descuento: Math.round(s_descuento),
-      s_interes: Math.round(s_interes),
-      s_reconexion: Math.round(s_reconexion),
-      s_iva: Math.round(totalIva),
-      subtotal: Math.round(subtotal),
-      iva: Math.round(totalIva),
-      total: Math.round(total)
+      // Valores base sin IVA
+      internet: resumenImpuestos.desglose_iva.internet.base,
+      television: resumenImpuestos.desglose_iva.television.base,
+      varios: resumenImpuestos.desglose_iva.varios.base,
+      publicidad: resumenImpuestos.desglose_iva.publicidad.base,
+      descuento: resumenImpuestos.desglose_iva.descuento.base,
+      interes: resumenImpuestos.desglose_iva.interes.base,
+      reconexion: resumenImpuestos.desglose_iva.reconexion.base,
+      saldo_anterior: conceptos.find(c => c.tipo === 'saldo_anterior')?.valor || 0,
+
+      // Valores de IVA por categoría
+      s_internet: resumenImpuestos.desglose_iva.internet.iva,
+      s_television: resumenImpuestos.desglose_iva.television.iva,
+      s_varios: resumenImpuestos.desglose_iva.varios.iva,
+      s_publicidad: resumenImpuestos.desglose_iva.publicidad.iva,
+      s_descuento: resumenImpuestos.desglose_iva.descuento.iva,
+      s_interes: resumenImpuestos.desglose_iva.interes.iva,
+      s_reconexion: resumenImpuestos.desglose_iva.reconexion.iva,
+      s_iva: resumenImpuestos.total_iva,
+
+      // Totales
+      subtotal: resumenImpuestos.subtotal,
+      iva: resumenImpuestos.total_iva,
+      total: resumenImpuestos.total_con_iva,
+
+      // Información adicional
+      estrato_cliente: cliente.estrato,
+      conceptos_con_iva: conceptosConIVA
     };
   }
 
@@ -476,187 +364,103 @@ class FacturacionAutomaticaService {
    * Crear registro principal de factura
    */
   static async crearFacturaPrincipal(datos) {
-    const conexion = await Database.conexion();
-    
-    try {
-      const { numeroFactura, cliente, periodo, totales } = datos;
+    const { numeroFactura, cliente, periodo, totales } = datos;
 
-      const [resultado] = await conexion.execute(`
-        INSERT INTO facturas (
-          numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
-          periodo_facturacion, fecha_emision, fecha_vencimiento, 
-          fecha_desde, fecha_hasta,
-          internet, television, varios, publicidad, descuento, interes, reconexion, saldo_anterior,
-          s_internet, s_television, s_varios, s_publicidad, s_descuento, s_interes, s_reconexion, s_iva,
-          subtotal, iva, total, estado, ruta, consignacion,
-          observaciones, activo, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `, [
-        numeroFactura,
-        cliente.id,
-        cliente.identificacion,
-        cliente.nombre,
-        periodo.periodo_facturacion,
-        periodo.fecha_emision,
-        periodo.fecha_vencimiento,
-        periodo.fecha_desde,
-        periodo.fecha_hasta,
-        totales.internet,
-        totales.television,
-        totales.varios,
-        totales.publicidad,
-        totales.descuento,
-        totales.interes,
-        totales.reconexion,
-        totales.saldo_anterior,
-        totales.s_internet,
-        totales.s_television,
-        totales.s_varios,
-        totales.s_publicidad,
-        totales.s_descuento,
-        totales.s_interes,
-        totales.s_reconexion,
-        totales.s_iva,
-        totales.subtotal,
-        totales.iva,
-        totales.total,
-        'pendiente',
-        cliente.ruta || 'R01',
-        '1',
-        `Factura automática - Período: ${periodo.fecha_desde} al ${periodo.fecha_hasta}`,
-        1
-      ]);
+    const fechaEmision = new Date();
+    const fechaVencimiento = new Date();
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + 15); // 15 días para pagar
 
-      return resultado.insertId;
+    const query = `
+      INSERT INTO facturas (
+        numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
+        periodo_facturacion, fecha_emision, fecha_vencimiento, 
+        fecha_desde, fecha_hasta,
+        internet, television, varios, publicidad, descuento, interes, reconexion, saldo_anterior,
+        s_internet, s_television, s_varios, s_publicidad, s_descuento, s_interes, s_reconexion, s_iva,
+        subtotal, iva, total, estado, ruta, consignacion,
+        observaciones, activo, created_at, updated_at
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `;
 
-    } finally {
-      conexion.release();
-    }
+    const valores = [
+      numeroFactura,
+      cliente.id,
+      cliente.numero_identificacion,
+      cliente.nombre_completo,
+      periodo.periodo_facturacion,
+      fechaEmision.toISOString().split('T')[0],
+      fechaVencimiento.toISOString().split('T')[0],
+      periodo.fecha_desde,
+      periodo.fecha_hasta,
+      totales.internet,
+      totales.television,
+      totales.varios,
+      totales.publicidad,
+      totales.descuento,
+      totales.interes,
+      totales.reconexion,
+      totales.saldo_anterior,
+      totales.s_internet,
+      totales.s_television,
+      totales.s_varios,
+      totales.s_publicidad,
+      totales.s_descuento,
+      totales.s_interes,
+      totales.s_reconexion,
+      totales.s_iva,
+      totales.subtotal,
+      totales.iva,
+      totales.total,
+      'emitida',
+      cliente.ruta || '',
+      '',
+      `Factura generada automáticamente - Estrato ${cliente.estrato}`,
+      1,
+      new Date(),
+      new Date()
+    ];
+
+    const resultado = await Database.query(query, valores);
+    return resultado.insertId;
   }
 
   /**
-   * Crear detalles de la factura
+   * Crear detalles de factura con información de IVA
    */
   static async crearDetallesFactura(facturaId, conceptos) {
-    const conexion = await Database.conexion();
-    
-    try {
-      for (const concepto of conceptos) {
-        const valorIva = concepto.aplica_iva ? 
-          Math.round(concepto.valor * (concepto.porcentaje_iva / 100)) : 0;
+    const detalles = [];
 
-        await conexion.execute(`
-          INSERT INTO detalle_facturas (
-            factura_id, concepto_nombre, cantidad, precio_unitario,
-            descuento, subtotal, iva, total, servicio_cliente_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          facturaId,
-          concepto.concepto,
-          concepto.cantidad || 1,
-          concepto.precio_unitario || concepto.valor,
-          concepto.tipo === 'descuento' ? concepto.valor : 0,
-          concepto.valor,
-          valorIva,
-          concepto.valor + valorIva,
-          concepto.servicio_cliente_id || null
-        ]);
-      }
-    } finally {
-      conexion.release();
+    for (const concepto of conceptos) {
+      const valorIVA = concepto.aplica_iva ? 
+        Math.round(concepto.valor * (concepto.porcentaje_iva / 100)) : 0;
+
+      detalles.push([
+        facturaId,
+        concepto.tipo,
+        concepto.concepto,
+        concepto.cantidad || 1,
+        concepto.precio_unitario || concepto.valor,
+        concepto.valor,
+        concepto.aplica_iva ? 1 : 0,
+        concepto.porcentaje_iva || 0,
+        valorIVA,
+        concepto.valor + valorIVA,
+        concepto.descripcion_iva || '',
+        new Date(),
+        new Date()
+      ]);
     }
-  }
 
-  // ==========================================
-  // MÉTODOS AUXILIARES Y DE CONSULTA
-  // ==========================================
+    if (detalles.length > 0) {
+      const query = `
+        INSERT INTO facturas_detalle (
+          factura_id, tipo_concepto, concepto, cantidad, precio_unitario, 
+          valor_base, aplica_iva, porcentaje_iva, valor_iva, valor_total,
+          observaciones, created_at, updated_at
+        ) VALUES ?
+      `;
 
-  /**
-   * Obtener clientes activos para facturar
-   */
-  static async obtenerClientesParaFacturar(fechaReferencia) {
-    const conexion = await Database.conexion();
-    
-    try {
-      const [clientes] = await conexion.execute(`
-        SELECT DISTINCT
-          c.*,
-          MAX(f.fecha_hasta) as fecha_ultima_facturacion
-        FROM clientes c
-        INNER JOIN servicios_cliente sc ON c.id = sc.cliente_id
-        LEFT JOIN facturas f ON c.id = f.cliente_id
-        WHERE c.estado = 'activo' 
-          AND sc.estado = 'activo'
-        GROUP BY c.id
-        ORDER BY c.id
-      `);
-
-      return clientes;
-
-    } finally {
-      conexion.release();
-    }
-  }
-
-  /**
-   * Obtener datos completos de un cliente
-   */
-  static async obtenerDatosCompletosCliente(clienteId) {
-    const conexion = await Database.conexion();
-    
-    try {
-      const [cliente] = await conexion.execute(`
-        SELECT c.*, MAX(f.fecha_hasta) as fecha_ultima_facturacion
-        FROM clientes c
-        LEFT JOIN facturas f ON c.id = f.cliente_id
-        WHERE c.id = ? AND c.estado = 'activo'
-        GROUP BY c.id
-      `, [clienteId]);
-
-      return cliente.length > 0 ? cliente[0] : null;
-
-    } finally {
-      conexion.release();
-    }
-  }
-
-  /**
-   * Obtener servicios activos de un cliente
-   */
-  static async obtenerServiciosActivosCliente(clienteId) {
-    const conexion = await Database.conexion();
-    
-    try {
-      const [servicios] = await conexion.execute(`
-        SELECT sc.*, ps.nombre as nombre_plan, ps.precio as precio_plan, ps.tipo
-        FROM servicios_cliente sc
-        INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
-        WHERE sc.cliente_id = ? AND sc.estado = 'activo' AND ps.activo = 1
-      `, [clienteId]);
-
-      return servicios;
-
-    } finally {
-      conexion.release();
-    }
-  }
-
-  /**
-   * Verificar si ya existe factura para un período
-   */
-  static async verificarFacturaExistente(clienteId, periodoFacturacion) {
-    const conexion = await Database.conexion();
-    
-    try {
-      const [facturas] = await conexion.execute(`
-        SELECT id FROM facturas 
-        WHERE cliente_id = ? AND periodo_facturacion = ? AND activo = 1
-      `, [clienteId, periodoFacturacion]);
-
-      return facturas.length > 0;
-
-    } finally {
-      conexion.release();
+      await Database.query(query, [detalles]);
     }
   }
 
@@ -664,483 +468,322 @@ class FacturacionAutomaticaService {
    * Generar número de factura consecutivo
    */
   static async generarNumeroFactura() {
-    const conexion = await Database.conexion();
-    
-    try {
-      // Obtener último número de factura
-      const [ultimaFactura] = await conexion.execute(`
-        SELECT numero_factura FROM facturas 
-        WHERE numero_factura REGEXP '^FAC[0-9]+$'
-        ORDER BY CAST(SUBSTRING(numero_factura, 4) AS UNSIGNED) DESC 
-        LIMIT 1
-      `);
+    const config = await Database.query(`
+      SELECT consecutivo_factura, prefijo_factura 
+      FROM configuracion_empresa 
+      WHERE id = 1
+    `);
 
-      let consecutivo = 1;
-      if (ultimaFactura.length > 0) {
-        const ultimoNumero = ultimaFactura[0].numero_factura;
-        consecutivo = parseInt(ultimoNumero.substring(3)) + 1;
-      }
+    const consecutivo = config[0]?.consecutivo_factura || 1;
+    const prefijo = config[0]?.prefijo_factura || 'FAC';
 
-      return `FAC${consecutivo.toString().padStart(6, '0')}`;
-
-    } finally {
-      conexion.release();
-    }
+    return `${prefijo}${String(consecutivo).padStart(6, '0')}`;
   }
 
   /**
-   * Actualizar fecha de última facturación del cliente
+   * Actualizar consecutivos de facturación
    */
-  static async actualizarUltimaFacturacion(clienteId, fechaHasta) {
-    const conexion = await Database.conexion();
-    
-    try {
-      await conexion.execute(`
-        UPDATE clientes 
-        SET updated_at = NOW()
-        WHERE id = ?
-      `, [clienteId]);
-    } finally {
-      conexion.release();
-    }
+  static async actualizarConsecutivos() {
+    await Database.query(`
+      UPDATE configuracion_empresa 
+      SET consecutivo_factura = consecutivo_factura + 1,
+          updated_at = NOW()
+      WHERE id = 1
+    `);
   }
 
   /**
-   * Obtener saldo anterior pendiente
+   * Obtener saldo anterior del cliente
    */
   static async obtenerSaldoAnterior(clienteId) {
-    const conexion = await Database.conexion();
-    
-    try {
-      const [saldo] = await conexion.execute(`
-        SELECT COALESCE(SUM(total), 0) as saldo_pendiente
-        FROM facturas 
-        WHERE cliente_id = ? AND estado = 'pendiente' AND activo = 1
-      `, [clienteId]);
+    const saldo = await Database.query(`
+      SELECT COALESCE(SUM(total - COALESCE(pagado, 0)), 0) as saldo
+      FROM facturas 
+      WHERE cliente_id = ? 
+        AND estado IN ('emitida', 'vencida') 
+        AND activo = 1
+    `, [clienteId]);
 
-      return saldo.length > 0 ? parseFloat(saldo[0].saldo_pendiente) : 0;
-
-    } finally {
-      conexion.release();
-    }
+    return parseFloat(saldo[0]?.saldo) || 0;
   }
 
   /**
    * Calcular intereses por mora
    */
   static async calcularInteresesMora(clienteId) {
-    const conexion = await Database.conexion();
-    
-    try {
-      const [facturasMorosas] = await conexion.execute(`
-        SELECT total, DATEDIFF(NOW(), fecha_vencimiento) as dias_mora
-        FROM facturas 
-        WHERE cliente_id = ? 
-          AND estado = 'pendiente' 
-          AND fecha_vencimiento < NOW()
-          AND activo = 1
-      `, [clienteId]);
+    // Obtener configuración de intereses
+    const configInteres = await Database.query(`
+      SELECT porcentaje_interes, dias_mora_corte
+      FROM configuracion_empresa 
+      WHERE id = 1
+    `);
 
-      let totalIntereses = 0;
-      const tasaInteresDiaria = 0.00083; // Aproximadamente 2.5% mensual
+    const porcentajeInteres = parseFloat(configInteres[0]?.porcentaje_interes) || 0;
+    const diasMora = parseInt(configInteres[0]?.dias_mora_corte) || 30;
 
-      facturasMorosas.forEach(factura => {
-        if (factura.dias_mora > 0) {
-          const interes = factura.total * tasaInteresDiaria * factura.dias_mora;
-          totalIntereses += interes;
-        }
-      });
+    if (porcentajeInteres === 0) return 0;
 
-      return Math.round(totalIntereses);
+    // Calcular intereses sobre facturas vencidas
+    const facturasMora = await Database.query(`
+      SELECT 
+        total,
+        DATEDIFF(CURDATE(), fecha_vencimiento) as dias_vencido
+      FROM facturas 
+      WHERE cliente_id = ? 
+        AND estado = 'vencida'
+        AND DATEDIFF(CURDATE(), fecha_vencimiento) > ?
+        AND activo = 1
+    `, [clienteId, diasMora]);
 
-    } finally {
-      conexion.release();
-    }
+    let totalIntereses = 0;
+    facturasMora.forEach(factura => {
+      const interesDiario = (factura.total * porcentajeInteres) / (100 * 30);
+      totalIntereses += interesDiario * factura.dias_vencido;
+    });
+
+    return Math.round(totalIntereses);
   }
 
   /**
    * Obtener varios y descuentos pendientes
    */
   static async obtenerVariosDescuentosPendientes(clienteId) {
-    // Esta función se puede expandir para manejar varios y descuentos
-    // programados en una tabla específica
-    return [];
+    const conceptosPendientes = await Database.query(`
+      SELECT 
+        'varios' as tipo,
+        concepto,
+        valor,
+        observaciones
+      FROM conceptos_pendientes 
+      WHERE cliente_id = ? 
+        AND estado = 'pendiente'
+        AND activo = 1
+    `, [clienteId]);
+
+    return conceptosPendientes.map(concepto => ({
+      tipo: concepto.tipo,
+      concepto: concepto.concepto,
+      cantidad: 1,
+      precio_unitario: concepto.valor,
+      valor: concepto.valor,
+      aplica_iva: ['varios', 'reconexion'].includes(concepto.tipo),
+      porcentaje_iva: ['varios', 'reconexion'].includes(concepto.tipo) ? 19 : 0,
+      observaciones: concepto.observaciones
+    }));
   }
 
   /**
-   * Generar documentos iniciales (contrato y orden de instalación)
+   * Facturación masiva por período
    */
-  static async generarDocumentosIniciales(clienteId, facturaId) {
-    const conexion = await Database.conexion();
-    
+  static async facturacionMasiva(fechaFacturacion = null, filtros = {}) {
     try {
-      // Crear registro de instalación si no existe
-      const [instalacionExistente] = await conexion.execute(`
-        SELECT id FROM instalaciones WHERE cliente_id = ?
-      `, [clienteId]);
+      console.log('🔄 Iniciando facturación masiva...');
 
-      if (instalacionExistente.length === 0) {
-        await conexion.execute(`
-          INSERT INTO instalaciones (
-            cliente_id, fecha_programada, estado, observaciones, created_at
-          ) VALUES (?, DATE_ADD(NOW(), INTERVAL 3 DAY), 'programada', 'Instalación automática por facturación', NOW())
-        `, [clienteId]);
-
-        console.log(`📋 Orden de instalación creada para cliente ${clienteId}`);
-      }
-
-    } finally {
-      conexion.release();
-    }
-  }
-
-  // ==========================================
-  // MÉTODOS UTILITARIOS
-  // ==========================================
-
-  static formatearFecha(fecha) {
-    return fecha.toISOString().split('T')[0];
-  }
-
-  static calcularDiasEntreFechas(fechaInicio, fechaFin) {
-    const diffTime = fechaFin.getTime() - fechaInicio.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  }
-
-  static estaNiveladoAlFinDelMes(fecha) {
-    const ultimoDiaMes = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0);
-    const diferenciaDias = Math.abs(fecha.getDate() - ultimoDiaMes.getDate());
-    return diferenciaDias <= 2; // Considera nivelado si está dentro de 2 días del fin de mes
-  }
-
-  /**
-   * Preview de facturación mensual (sin generar facturas)
-   */
-  static async previewFacturacionMensual(fechaReferencia = new Date()) {
-    const conexion = await Database.conexion();
-    
-    try {
-      const clientesParaFacturar = await this.obtenerClientesParaFacturar(fechaReferencia);
+      // Obtener clientes activos para facturar
+      const clientesFacturar = await this.obtenerClientesParaFacturar(filtros);
       
-      const preview = {
-        total_clientes: clientesParaFacturar.length,
-        clientes_primera_factura: 0,
-        clientes_nivelacion: 0,
-        clientes_regulares: 0,
-        estimado_ingresos: 0,
-        detalles: []
+      const resultados = {
+        total_clientes: clientesFacturar.length,
+        facturas_generadas: 0,
+        facturas_fallidas: 0,
+        errores: [],
+        facturas_exitosas: []
       };
 
-      for (const cliente of clientesParaFacturar) {
+      for (const cliente of clientesFacturar) {
         try {
-          const periodo = this.calcularPeriodoFacturacion(cliente, fechaReferencia);
-          const serviciosActivos = await this.obtenerServiciosActivosCliente(cliente.id);
-          const conceptos = await this.calcularConceptosFacturacion(cliente, serviciosActivos, periodo);
-          const totales = this.calcularTotalesFactura(conceptos, cliente);
+          const resultadoFactura = await this.generarFacturaAutomatica(
+            cliente.id, 
+            { fechaFacturacion }
+          );
 
-          if (periodo.es_primera_factura) {
-            preview.clientes_primera_factura++;
-          } else if (periodo.es_nivelacion) {
-            preview.clientes_nivelacion++;
-          } else {
-            preview.clientes_regulares++;
-          }
-
-          preview.estimado_ingresos += totales.total;
-
-          preview.detalles.push({
+          resultados.facturas_generadas++;
+          resultados.facturas_exitosas.push({
             cliente_id: cliente.id,
-            cliente_nombre: cliente.nombre,
-            periodo: periodo.periodo_facturacion,
-            tipo_facturacion: periodo.es_primera_factura ? 'primera' : 
-                            periodo.es_nivelacion ? 'nivelacion' : 'regular',
-            dias_facturados: periodo.dias_facturados,
-            total_estimado: totales.total,
-            servicios: serviciosActivos.length
+            nombre: cliente.nombre_completo,
+            numero_factura: resultadoFactura.numero_factura,
+            total: resultadoFactura.totales.total
           });
 
+          console.log(`✅ Factura generada: ${cliente.nombre_completo} - ${resultadoFactura.numero_factura}`);
+
         } catch (error) {
-          console.error(`Error en preview para cliente ${cliente.id}:`, error.message);
+          resultados.facturas_fallidas++;
+          resultados.errores.push({
+            cliente_id: cliente.id,
+            nombre: cliente.nombre_completo,
+            error: error.message
+          });
+
+          console.error(`❌ Error facturando ${cliente.nombre_completo}:`, error.message);
         }
       }
 
-      return preview;
+      console.log(`📊 Facturación masiva completada: ${resultados.facturas_generadas} exitosas, ${resultados.facturas_fallidas} fallidas`);
+      
+      return resultados;
 
-    } finally {
-      conexion.release();
+    } catch (error) {
+      console.error('❌ Error en facturación masiva:', error);
+      throw error;
     }
   }
 
   /**
-   * Procesar facturación por lotes para mejorar rendimiento
+   * Obtener clientes que requieren facturación
    */
-  static async procesarFacturacionPorLotes(clientes, fechaReferencia, tamanoLote = 10) {
-    const resultados = {
-      exitosas: 0,
-      fallidas: 0,
-      facturas_generadas: [],
-      errores: []
-    };
+  static async obtenerClientesParaFacturar(filtros = {}) {
+    let whereConditions = ['c.activo = 1', 'c.estado = "activo"'];
+    let params = [];
 
-    // Dividir clientes en lotes
-    for (let i = 0; i < clientes.length; i += tamanoLote) {
-      const lote = clientes.slice(i, i + tamanoLote);
-      
-      console.log(`📦 Procesando lote ${Math.floor(i/tamanoLote) + 1} de ${Math.ceil(clientes.length/tamanoLote)} (${lote.length} clientes)`);
-
-      // Procesar lote en paralelo
-      const promesasLote = lote.map(cliente => 
-        this.generarFacturaCliente(cliente, fechaReferencia)
-          .then(factura => {
-            if (factura) {
-              resultados.exitosas++;
-              resultados.facturas_generadas.push(factura);
-            }
-            return { success: true, cliente_id: cliente.id };
-          })
-          .catch(error => {
-            resultados.fallidas++;
-            resultados.errores.push({
-              cliente_id: cliente.id,
-              nombre: cliente.nombre,
-              error: error.message
-            });
-            return { success: false, cliente_id: cliente.id, error: error.message };
-          })
-      );
-
-      await Promise.all(promesasLote);
-      
-      // Pausa pequeña entre lotes para no sobrecargar la base de datos
-      if (i + tamanoLote < clientes.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+    // Filtros opcionales
+    if (filtros.ruta) {
+      whereConditions.push('c.ruta = ?');
+      params.push(filtros.ruta);
     }
 
-    return resultados;
-  }
-
-  /**
-   * Validar integridad de datos antes de facturar
-   */
-  static async validarIntegridadDatos(clienteId = null) {
-    const conexion = await Database.conexion();
-    
-    try {
-      const errores = [];
-
-      // Validar clientes sin servicios activos
-      let consultaClientes = `
-        SELECT c.id, c.nombre 
-        FROM clientes c 
-        LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id AND sc.estado = 'activo'
-        WHERE c.estado = 'activo' AND sc.id IS NULL
-      `;
-      
-      if (clienteId) {
-        consultaClientes += ` AND c.id = ${clienteId}`;
-      }
-
-      const [clientesSinServicios] = await conexion.execute(consultaClientes);
-      
-      clientesSinServicios.forEach(cliente => {
-        errores.push({
-          tipo: 'cliente_sin_servicios',
-          cliente_id: cliente.id,
-          cliente_nombre: cliente.nombre,
-          descripcion: 'Cliente activo sin servicios activos'
-        });
-      });
-
-      // Validar servicios sin planes
-      let consultaServicios = `
-        SELECT sc.id, sc.cliente_id, c.nombre as cliente_nombre
-        FROM servicios_cliente sc
-        INNER JOIN clientes c ON sc.cliente_id = c.id
-        LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-        WHERE sc.estado = 'activo' AND (ps.id IS NULL OR ps.activo = 0)
-      `;
-
-      if (clienteId) {
-        consultaServicios += ` AND sc.cliente_id = ${clienteId}`;
-      }
-
-      const [serviciosSinPlanes] = await conexion.execute(consultaServicios);
-      
-      serviciosSinPlanes.forEach(servicio => {
-        errores.push({
-          tipo: 'servicio_sin_plan',
-          cliente_id: servicio.cliente_id,
-          cliente_nombre: servicio.cliente_nombre,
-          servicio_id: servicio.id,
-          descripcion: 'Servicio activo sin plan válido'
-        });
-      });
-
-      // Validar planes sin precio
-      let consultaPlanes = `
-        SELECT DISTINCT ps.id, ps.nombre, sc.cliente_id, c.nombre as cliente_nombre
-        FROM planes_servicio ps
-        INNER JOIN servicios_cliente sc ON ps.id = sc.plan_id AND sc.estado = 'activo'
-        INNER JOIN clientes c ON sc.cliente_id = c.id
-        WHERE ps.activo = 1 AND (ps.precio IS NULL OR ps.precio <= 0)
-      `;
-
-      if (clienteId) {
-        consultaPlanes += ` AND sc.cliente_id = ${clienteId}`;
-      }
-
-      const [planesSinPrecio] = await conexion.execute(consultaPlanes);
-      
-      planesSinPrecio.forEach(plan => {
-        errores.push({
-          tipo: 'plan_sin_precio',
-          cliente_id: plan.cliente_id,
-          cliente_nombre: plan.cliente_nombre,
-          plan_id: plan.id,
-          plan_nombre: plan.nombre,
-          descripcion: 'Plan activo sin precio configurado'
-        });
-      });
-
-      return {
-        valido: errores.length === 0,
-        errores: errores,
-        total_errores: errores.length
-      };
-
-    } finally {
-      conexion.release();
+    if (filtros.estrato) {
+      whereConditions.push('c.estrato = ?');
+      params.push(filtros.estrato);
     }
+
+    if (filtros.sector_id) {
+      whereConditions.push('c.sector_id = ?');
+      params.push(filtros.sector_id);
+    }
+
+    const query = `
+      SELECT 
+        c.id,
+        c.numero_identificacion,
+        CONCAT(c.nombres, ' ', c.apellidos) as nombre_completo,
+        c.estrato,
+        c.ruta,
+        -- Verificar si ya tiene factura del período actual
+        (SELECT COUNT(*) 
+         FROM facturas f 
+         WHERE f.cliente_id = c.id 
+           AND YEAR(f.fecha_emision) = YEAR(CURDATE())
+           AND MONTH(f.fecha_emision) = MONTH(CURDATE())
+           AND f.activo = 1
+        ) as facturas_mes_actual,
+        -- Verificar servicios activos
+        (SELECT COUNT(*) 
+         FROM servicios_cliente sc 
+         WHERE sc.cliente_id = c.id 
+           AND sc.estado = 'activo' 
+           AND sc.activo = 1
+        ) as servicios_activos
+      FROM clientes c
+      WHERE ${whereConditions.join(' AND ')}
+      HAVING facturas_mes_actual = 0 
+        AND servicios_activos > 0
+      ORDER BY c.ruta, c.nombres, c.apellidos
+    `;
+
+    return await Database.query(query, params);
   }
 
   /**
    * Obtener estadísticas de facturación
    */
-  static async obtenerEstadisticasFacturacion(fechaDesde, fechaHasta) {
-    const conexion = await Database.conexion();
-    
-    try {
-      // Estadísticas generales
-      const [estadisticasGenerales] = await conexion.execute(`
-        SELECT 
-          COUNT(*) as total_facturas,
-          SUM(total) as total_facturado,
-          SUM(CASE WHEN estado = 'pendiente' THEN total ELSE 0 END) as total_pendiente,
-          SUM(CASE WHEN estado = 'pagada' THEN total ELSE 0 END) as total_pagado,
-          AVG(total) as promedio_factura
-        FROM facturas 
-        WHERE fecha_emision BETWEEN ? AND ? AND activo = 1
-      `, [fechaDesde, fechaHasta]);
+  static async obtenerEstadisticasFacturacion(periodo = null) {
+    const fechaInicio = periodo?.fecha_inicio || 
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const fechaFin = periodo?.fecha_fin || 
+      new Date().toISOString().split('T')[0];
 
-      // Facturación por tipo de servicio
-      const [facturaciónPorTipo] = await conexion.execute(`
-        SELECT 
-          'Internet' as tipo,
-          SUM(internet) as total,
-          COUNT(*) as cantidad_facturas
-        FROM facturas 
-        WHERE fecha_emision BETWEEN ? AND ? AND activo = 1 AND internet > 0
+    const estadisticas = await Database.query(`
+      SELECT 
+        COUNT(*) as total_facturas,
+        SUM(total) as total_facturado,
+        SUM(CASE WHEN estado = 'pagada' THEN total ELSE 0 END) as total_pagado,
+        SUM(CASE WHEN estado = 'emitida' THEN total ELSE 0 END) as total_pendiente,
+        SUM(CASE WHEN estado = 'vencida' THEN total ELSE 0 END) as total_vencido,
+        AVG(total) as promedio_factura,
         
-        UNION ALL
+        -- Estadísticas por estrato
+        SUM(CASE WHEN c.estrato IN (1,2,3) THEN f.total ELSE 0 END) as facturado_estrato_bajo,
+        SUM(CASE WHEN c.estrato IN (4,5,6) THEN f.total ELSE 0 END) as facturado_estrato_alto,
         
-        SELECT 
-          'Televisión' as tipo,
-          SUM(television) as total,
-          COUNT(*) as cantidad_facturas
-        FROM facturas 
-        WHERE fecha_emision BETWEEN ? AND ? AND activo = 1 AND television > 0
+        -- Estadísticas de IVA
+        SUM(f.iva) as total_iva_recaudado,
+        SUM(f.s_internet) as iva_internet,
+        SUM(f.s_television) as iva_television,
+        SUM(f.s_varios) as iva_varios,
+        SUM(f.s_reconexion) as iva_reconexion,
         
-        UNION ALL
+        -- Distribución por tipo de servicio
+        SUM(f.internet) as total_internet,
+        SUM(f.television) as total_television,
+        SUM(f.varios) as total_varios,
+        SUM(f.reconexion) as total_reconexion
         
-        SELECT 
-          'Varios' as tipo,
-          SUM(varios) as total,
-          COUNT(*) as cantidad_facturas
-        FROM facturas 
-        WHERE fecha_emision BETWEEN ? AND ? AND activo = 1 AND varios > 0
-      `, [fechaDesde, fechaHasta, fechaDesde, fechaHasta, fechaDesde, fechaHasta]);
+      FROM facturas f
+      INNER JOIN clientes c ON f.cliente_id = c.id
+      WHERE f.fecha_emision BETWEEN ? AND ?
+        AND f.activo = 1
+    `, [fechaInicio, fechaFin]);
 
-      // Top 10 clientes por facturación
-      const [topClientes] = await conexion.execute(`
-        SELECT 
-          cliente_id,
-          nombre_cliente,
-          COUNT(*) as total_facturas,
-          SUM(total) as total_facturado
-        FROM facturas 
-        WHERE fecha_emision BETWEEN ? AND ? AND activo = 1
-        GROUP BY cliente_id, nombre_cliente
-        ORDER BY total_facturado DESC
-        LIMIT 10
-      `, [fechaDesde, fechaHasta]);
-
-      return {
-        periodo: { fecha_desde: fechaDesde, fecha_hasta: fechaHasta },
-        generales: estadisticasGenerales[0],
-        por_tipo_servicio: facturaciónPorTipo,
-        top_clientes: topClientes
-      };
-
-    } finally {
-      conexion.release();
-    }
+    return estadisticas[0] || {};
   }
 
   /**
-   * Regenerar factura (anular y crear nueva)
+   * Validar factura antes de crear
    */
-  static async regenerarFactura(facturaId, motivo) {
-    const conexion = await Database.conexion();
-    
-    try {
-      await conexion.beginTransaction();
+  static async validarFactura(clienteId, conceptos) {
+    const validaciones = {
+      valida: true,
+      errores: [],
+      advertencias: []
+    };
 
-      // Obtener datos de la factura original
-      const [facturaOriginal] = await conexion.execute(`
-        SELECT * FROM facturas WHERE id = ? AND activo = 1
-      `, [facturaId]);
-
-      if (facturaOriginal.length === 0) {
-        throw new Error('Factura no encontrada');
-      }
-
-      const factura = facturaOriginal[0];
-
-      // Anular factura original
-      await conexion.execute(`
-        UPDATE facturas 
-        SET estado = 'anulada', 
-            observaciones = CONCAT(observaciones, ' - ANULADA: ', ?),
-            updated_at = NOW()
-        WHERE id = ?
-      `, [motivo, facturaId]);
-
-      // Obtener cliente actualizado
-      const cliente = await this.obtenerDatosCompletosCliente(factura.cliente_id);
-      
-      // Regenerar factura con datos actuales
-      const nuevaFactura = await this.generarFacturaCliente(
-        cliente, 
-        new Date(factura.fecha_emision)
-      );
-
-      await conexion.commit();
-
-      console.log(`♻️ Factura ${factura.numero_factura} regenerada como ${nuevaFactura.numero_factura}`);
-
-      return {
-        factura_anulada: factura.numero_factura,
-        factura_nueva: nuevaFactura.numero_factura,
-        motivo: motivo
-      };
-
-    } catch (error) {
-      await conexion.rollback();
-      throw error;
-    } finally {
-      conexion.release();
+    // 1. Verificar que el cliente existe y está activo
+    const cliente = await this.obtenerDatosCliente(clienteId);
+    if (!cliente) {
+      validaciones.valida = false;
+      validaciones.errores.push('Cliente no encontrado o inactivo');
+      return validaciones;
     }
+
+    // 2. Verificar servicios activos
+    const serviciosActivos = await this.obtenerServiciosActivos(clienteId);
+    if (serviciosActivos.length === 0) {
+      validaciones.valida = false;
+      validaciones.errores.push('El cliente no tiene servicios activos');
+    }
+
+    // 3. Verificar si ya existe factura del período
+    const facturaExistente = await Database.query(`
+      SELECT id, numero_factura 
+      FROM facturas 
+      WHERE cliente_id = ? 
+        AND YEAR(fecha_emision) = YEAR(CURDATE())
+        AND MONTH(fecha_emision) = MONTH(CURDATE())
+        AND activo = 1
+      LIMIT 1
+    `, [clienteId]);
+
+    if (facturaExistente.length > 0) {
+      validaciones.advertencias.push(
+        `Ya existe factura ${facturaExistente[0].numero_factura} para este período`
+      );
+    }
+
+    // 4. Validar conceptos
+    if (!conceptos || conceptos.length === 0) {
+      validaciones.valida = false;
+      validaciones.errores.push('No hay conceptos para facturar');
+    }
+
+    // 5. Validar estrato del cliente
+    if (!cliente.estrato || cliente.estrato < 1 || cliente.estrato > 6) {
+      validaciones.advertencias.push(
+        `Estrato del cliente (${cliente.estrato}) puede ser incorrecto`
+      );
+    }
+
+    return validaciones;
   }
 }
 
