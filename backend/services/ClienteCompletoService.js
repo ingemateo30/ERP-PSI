@@ -5,13 +5,6 @@ const { Database } = require('../models/Database');
 const pool = require('../config/database');
 
 class ClienteCompletoService {
-
-  /**
-   * ============================================
-   * CREACIÓN COMPLETA DE CLIENTE
-   * ============================================
-   */
-
   /**
    * Crear cliente completo con servicio y documentos automáticos
    */
@@ -93,13 +86,6 @@ class ClienteCompletoService {
       return resultado;
     });
   }
-
-  /**
-   * ============================================
-   * MÉTODOS PRIVADOS DE CREACIÓN
-   * ============================================
-   */
-
   /**
    * Crear cliente en la base de datos
    */
@@ -166,9 +152,6 @@ class ClienteCompletoService {
       datosLimpios.sector_id,
       datosLimpios.observaciones
     ];
-
-    console.log('🔍 Query SQL:', query);
-    console.log('🔍 Valores a insertar:', valores);
 
     const [resultado] = await conexion.execute(query, valores);
     console.log('✅ Cliente insertado con ID:', resultado.insertId);
@@ -451,13 +434,6 @@ class ClienteCompletoService {
       return { enviado: false, error: error.message };
     }
   }
-
-  /**
-   * ============================================
-   * MÉTODOS PÚBLICOS DE GESTIÓN
-   * ============================================
-   */
-
   /**
    * Obtener cliente completo con todos sus datos
    */
@@ -545,15 +521,6 @@ class ClienteCompletoService {
     }
   }
 
-  /**
-   * ============================================
-   * MÉTODOS AUXILIARES
-   * ============================================
-   */
-
-  /**
-   * Limpiar datos para evitar undefined en MySQL
-   */
   static limpiarDatosParaMySQL(objeto) {
     const objetoLimpio = {};
     
@@ -570,9 +537,6 @@ class ClienteCompletoService {
     return objetoLimpio;
   }
 
-  /**
-   * Validar array de valores para MySQL
-   */
   static validarValoresParaMySQL(valores) {
     return valores.map((valor, index) => {
       if (valor === undefined) {
@@ -583,9 +547,6 @@ class ClienteCompletoService {
     });
   }
 
-  /**
-   * Generar número de contrato único
-   */
   static async generarNumeroContrato(conexion) {
     const año = new Date().getFullYear();
     

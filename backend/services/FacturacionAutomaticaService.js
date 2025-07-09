@@ -702,12 +702,6 @@ class FacturacionAutomaticaService {
       console.warn('⚠️ No se pudo registrar log de facturación:', error.message);
     }
   }
-
-  // ============================================
-// MÉTODO FALTANTE: calcularConceptoServicio()
-// Agregar este método a tu FacturacionAutomaticaService.js
-// ============================================
-
 /**
  * Calcular concepto de servicio con IVA correcto según estrato
  * MÉTODO FALTANTE - AGREGAR DESPUÉS DE calcularConceptosFacturacion()
