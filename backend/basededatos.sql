@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 09-07-2025 a las 17:25:57
+-- Tiempo de generación: 09-07-2025 a las 22:12:39
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.1.25
 
@@ -217,6 +217,41 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `ObtenerClientesParaFacturar` (IN `f
         (ultima_fecha_facturada IS NULL) OR 
         (ultima_fecha_facturada < DATE_SUB(fecha_referencia, INTERVAL 30 DAY))
     ORDER BY ultima_fecha_facturada ASC, c.id ASC;
+END$$
+
+--
+-- Funciones
+--
+CREATE DEFINER=`root`@`localhost` FUNCTION `calcular_precio_con_iva` (`tipo_servicio` VARCHAR(20), `precio_base` DECIMAL(10,2), `estrato_cliente` INT) RETURNS DECIMAL(10,2) DETERMINISTIC READS SQL DATA BEGIN
+  DECLARE precio_final DECIMAL(10,2) DEFAULT 0.00;
+  DECLARE aplica_iva BOOLEAN DEFAULT FALSE;
+  
+  -- Determinar si aplica IVA según tipo de servicio y estrato
+  CASE tipo_servicio
+    WHEN 'internet' THEN
+      SET aplica_iva = (estrato_cliente > 3);
+    WHEN 'television' THEN
+      SET aplica_iva = TRUE;
+    WHEN 'reconexion' THEN
+      SET aplica_iva = TRUE;
+    WHEN 'varios' THEN
+      SET aplica_iva = TRUE;
+    WHEN 'publicidad' THEN
+      SET aplica_iva = FALSE;
+    WHEN 'interes' THEN
+      SET aplica_iva = FALSE;
+    ELSE
+      SET aplica_iva = FALSE;
+  END CASE;
+  
+  -- Calcular precio final
+  IF aplica_iva THEN
+    SET precio_final = ROUND(precio_base * 1.19, 2);
+  ELSE
+    SET precio_final = precio_base;
+  END IF;
+  
+  RETURN precio_final;
 END$$
 
 DELIMITER ;
@@ -462,59 +497,60 @@ CREATE TABLE `conceptos_facturacion` (
   `tipo` enum('internet','television','reconexion','interes','descuento','varios','publicidad') NOT NULL,
   `activo` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `estrato_aplicable` varchar(10) DEFAULT NULL COMMENT 'Estratos donde aplica (ej: 1,2,3 o 4,5,6)'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `conceptos_facturacion`
 --
 
-INSERT INTO `conceptos_facturacion` (`id`, `codigo`, `nombre`, `valor_base`, `aplica_iva`, `porcentaje_iva`, `descripcion`, `tipo`, `activo`, `created_at`, `updated_at`) VALUES
-(80, '80', 'INTERNET', 59900.00, 0, 0.00, 'INTERNET 50 MEGAS HOGAR SOLO INTERNET', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(81, '81', 'INTERNET', 64900.00, 0, 0.00, 'INTERNET 100 MEGAS HOGAR SOLO INTERNET', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(82, '82', 'INTERNET', 59900.00, 0, 0.00, 'INTERNET 50 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(83, '83', 'INTERNET', 64900.00, 0, 0.00, 'INTERNET 100 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(84, '84', 'INTERNET', 74900.00, 0, 0.00, 'INTERNET 200 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(85, '85', 'INTERNET', 84900.00, 0, 0.00, 'INTERNET 400 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(86, '86', 'INTERNET', 39900.00, 0, 0.00, 'INTERNET 5 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(87, '87', 'INTERNET', 49900.00, 0, 0.00, 'INTERNET 10 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(88, '88', 'INTERNET', 69900.00, 0, 0.00, 'INTERNET 500 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(89, '89', 'INTERNET', 79900.00, 0, 0.00, 'INTERNET 900 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(90, '90', 'FIBRA COMERCIAL', 74900.00, 0, 0.00, 'INTERNET COMERCIAL 100 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(91, '91', 'FIBRA COMERCIAL', 71344.00, 1, 19.00, 'INTERNET COMERCIAL 200 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(92, '92', 'FIBRA COMERCIAL', 79747.00, 1, 19.00, 'INTERNET COMERCIAL 400 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(99, '99', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 200 MG RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(100, '100', 'TELEVISIÓN', 26807.00, 1, 19.00, 'Basico', 'television', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(105, '105', 'INTERNET', 64900.00, 0, 0.00, 'FIBRA 200 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(106, '106', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 200 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(116, '116', 'INTERNET', 67142.00, 1, 19.00, 'FIBRA 200 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(129, '129', 'INTERNET', 59900.00, 0, 0.00, 'FIBRA 100 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(130, '130', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 300 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(131, '131', 'INTERNET', 83949.00, 1, 19.00, 'FIBRA 300 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(132, '132', 'INTERNET', 75546.00, 1, 19.00, 'FIBRA 200 MEGAS COMERCIAL+ IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(140, '140', 'INTERNET', 64900.00, 0, 0.00, 'FIBRA 100 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(141, '141', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 150 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(145, '145', 'INTERNET', 79900.00, 0, 0.00, 'FIBRA 300 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(147, '147', 'INTERNET', 67142.00, 1, 19.00, 'INTERNET FIBRA 200 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(148, '148', 'INTERNET', 75546.00, 1, 19.00, 'INTERNET FIBRA 300 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(149, '149', 'INTERNET', 79900.00, 0, 0.00, 'FIBRA 400 MG RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(150, '150', 'INTERNET', 243697.00, 1, 19.00, 'INTERNET 10 MEGAS DEDICADO', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(152, '152', 'INTERNET', 67143.00, 1, 19.00, '500 MEGAS FIBRA INTERNET COMERCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(153, '153', 'INTERNET', 75546.00, 1, 19.00, '900 MEGAS FIBRA INTERNET COMERCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(154, '154', 'INTERNET', 58740.00, 1, 19.00, 'INTERNET FIBRA 50 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(200, '200', 'INTERNET', 49900.00, 0, 0.00, 'FIBRA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(300, '300', 'INTERNET', 38000.00, 0, 0.00, '30 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(302, '302', 'INTERNET', 0.00, 0, 0.00, '', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(514, '514', 'INTERNET', 149900.00, 0, 0.00, 'INTERNET 200 MEGAS RURAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(515, '515', 'INTERNET', 1672269.00, 1, 19.00, 'INTERNET 320 MEGAS DEDICADO', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(516, '516', 'INTERNET', 1252100.00, 1, 19.00, 'INTERNET 200 MEGAS DEDICADO', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(526, '526', 'TELEVISION', 176471.00, 1, 19.00, 'TELEVISION 21 PUNTOS', 'television', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(528, '528', 'TELEVISION', 8403.00, 1, 19.00, 'TELEVISION DUO', 'television', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(529, '529', 'TELEVISION', 38572.00, 1, 19.00, 'TELEVISION', 'television', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(530, '530', 'TELEVISION', 37731.00, 1, 19.00, 'TELEVISION ESTRATO 1,2 Y 3', 'television', 1, '2025-07-04 13:46:55', '2025-07-04 15:34:08'),
-(751, '751', 'INTERNET', 59900.00, 0, 0.00, 'FIBRA 200 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(910, '910', 'INTERNET', 1252100.00, 1, 19.00, '200 MEGAS DEDICADO + 10 PUNTOS DE TV', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
-(911, '911', 'INTERNET', 1252100.00, 1, 19.00, '200 MEGAS + 10 PUNTOS DE TV', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55');
+INSERT INTO `conceptos_facturacion` (`id`, `codigo`, `nombre`, `valor_base`, `aplica_iva`, `porcentaje_iva`, `descripcion`, `tipo`, `activo`, `created_at`, `updated_at`, `estrato_aplicable`) VALUES
+(80, '80', 'INTERNET', 59900.00, 0, 0.00, 'INTERNET 50 MEGAS HOGAR SOLO INTERNET', 'internet', 1, '2025-07-04 13:46:55', '2025-07-09 19:04:56', '1,2,3'),
+(81, '81', 'INTERNET', 64900.00, 0, 0.00, 'INTERNET 100 MEGAS HOGAR SOLO INTERNET', 'internet', 1, '2025-07-04 13:46:55', '2025-07-09 19:04:56', '1,2,3'),
+(82, '82', 'INTERNET', 59900.00, 0, 0.00, 'INTERNET 50 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-09 19:04:56', '1,2,3'),
+(83, '83', 'INTERNET', 64900.00, 0, 0.00, 'INTERNET 100 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-09 19:04:56', '1,2,3'),
+(84, '84', 'INTERNET', 74900.00, 0, 0.00, 'INTERNET 200 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-09 19:04:56', '1,2,3'),
+(85, '85', 'INTERNET', 84900.00, 0, 0.00, 'INTERNET 400 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(86, '86', 'INTERNET', 39900.00, 0, 0.00, 'INTERNET 5 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(87, '87', 'INTERNET', 49900.00, 0, 0.00, 'INTERNET 10 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(88, '88', 'INTERNET', 69900.00, 0, 0.00, 'INTERNET 500 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(89, '89', 'INTERNET', 79900.00, 0, 0.00, 'INTERNET 900 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(90, '90', 'FIBRA COMERCIAL', 74900.00, 0, 0.00, 'INTERNET COMERCIAL 100 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(91, '91', 'FIBRA COMERCIAL', 71344.00, 1, 19.00, 'INTERNET COMERCIAL 200 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(92, '92', 'FIBRA COMERCIAL', 79747.00, 1, 19.00, 'INTERNET COMERCIAL 400 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(99, '99', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 200 MG RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(100, '100', 'TELEVISIÓN', 26807.00, 1, 19.00, 'Basico', 'television', 1, '2025-07-04 13:46:55', '2025-07-09 19:04:56', 'TODOS'),
+(105, '105', 'INTERNET', 64900.00, 0, 0.00, 'FIBRA 200 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(106, '106', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 200 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(116, '116', 'INTERNET', 67142.00, 1, 19.00, 'FIBRA 200 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(129, '129', 'INTERNET', 59900.00, 0, 0.00, 'FIBRA 100 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(130, '130', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 300 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(131, '131', 'INTERNET', 83949.00, 1, 19.00, 'FIBRA 300 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(132, '132', 'INTERNET', 75546.00, 1, 19.00, 'FIBRA 200 MEGAS COMERCIAL+ IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(140, '140', 'INTERNET', 64900.00, 0, 0.00, 'FIBRA 100 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(141, '141', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 150 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(145, '145', 'INTERNET', 79900.00, 0, 0.00, 'FIBRA 300 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(147, '147', 'INTERNET', 67142.00, 1, 19.00, 'INTERNET FIBRA 200 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(148, '148', 'INTERNET', 75546.00, 1, 19.00, 'INTERNET FIBRA 300 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(149, '149', 'INTERNET', 79900.00, 0, 0.00, 'FIBRA 400 MG RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(150, '150', 'INTERNET', 243697.00, 1, 19.00, 'INTERNET 10 MEGAS DEDICADO', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(152, '152', 'INTERNET', 67143.00, 1, 19.00, '500 MEGAS FIBRA INTERNET COMERCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(153, '153', 'INTERNET', 75546.00, 1, 19.00, '900 MEGAS FIBRA INTERNET COMERCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(154, '154', 'INTERNET', 58740.00, 1, 19.00, 'INTERNET FIBRA 50 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(200, '200', 'INTERNET', 49900.00, 0, 0.00, 'FIBRA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(300, '300', 'INTERNET', 38000.00, 0, 0.00, '30 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(302, '302', 'INTERNET', 0.00, 0, 0.00, '', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(514, '514', 'INTERNET', 149900.00, 0, 0.00, 'INTERNET 200 MEGAS RURAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(515, '515', 'INTERNET', 1672269.00, 1, 19.00, 'INTERNET 320 MEGAS DEDICADO', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(516, '516', 'INTERNET', 1252100.00, 1, 19.00, 'INTERNET 200 MEGAS DEDICADO', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(526, '526', 'TELEVISION', 176471.00, 1, 19.00, 'TELEVISION 21 PUNTOS', 'television', 1, '2025-07-04 13:46:55', '2025-07-09 19:04:56', 'TODOS'),
+(528, '528', 'TELEVISION', 8403.00, 1, 19.00, 'TELEVISION DUO', 'television', 1, '2025-07-04 13:46:55', '2025-07-09 19:04:56', 'TODOS'),
+(529, '529', 'TELEVISION', 38572.00, 1, 19.00, 'TELEVISION', 'television', 1, '2025-07-04 13:46:55', '2025-07-09 19:04:56', 'TODOS'),
+(530, '530', 'TELEVISION', 37731.00, 1, 19.00, 'TELEVISION ESTRATO 1,2 Y 3', 'television', 1, '2025-07-04 13:46:55', '2025-07-09 19:04:56', 'TODOS'),
+(751, '751', 'INTERNET', 59900.00, 0, 0.00, 'FIBRA 200 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(910, '910', 'INTERNET', 1252100.00, 1, 19.00, '200 MEGAS DEDICADO + 10 PUNTOS DE TV', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL),
+(911, '911', 'INTERNET', 1252100.00, 1, 19.00, '200 MEGAS + 10 PUNTOS DE TV', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55', NULL);
 
 -- --------------------------------------------------------
 
@@ -582,7 +618,7 @@ CREATE TABLE `configuracion_facturacion` (
 INSERT INTO `configuracion_facturacion` (`id`, `parametro`, `valor`, `tipo`, `descripcion`, `categoria`, `activo`, `created_at`, `updated_at`) VALUES
 (1, 'FACTURACION_AUTOMATICA_ACTIVA', 'true', 'BOOLEAN', 'Activar/desactivar facturación automática mensual', 'AUTOMATIZACION', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
 (2, 'DIAS_VENCIMIENTO_FACTURA', '15', 'NUMBER', 'Días para vencimiento de facturas desde fecha de emisión', 'FACTURACION', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
-(3, 'PORCENTAJE_INTERES_MORA', '2.5', 'NUMBER', 'Porcentaje de interés mensual por mora', 'MORA', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(3, 'PORCENTAJE_INTERES_MORA', '2.0', 'NUMBER', 'Porcentaje de interés mensual por mora', 'MORA', 1, '2025-07-04 21:22:33', '2025-07-09 20:10:24'),
 (4, 'DIAS_CORTE_SERVICIO', '30', 'NUMBER', 'Días de mora antes del corte automático de servicio', 'CORTE', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
 (5, 'VALOR_INSTALACION_DEFAULT', '42016', 'NUMBER', 'Valor por defecto para instalaciones nuevas', 'SERVICIOS', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
 (6, 'GENERAR_PDF_AUTOMATICO', 'true', 'BOOLEAN', 'Generar PDF automáticamente al crear facturas', 'PDF', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
@@ -592,6 +628,39 @@ INSERT INTO `configuracion_facturacion` (`id`, `parametro`, `valor`, `tipo`, `de
 (10, 'REDONDEAR_CENTAVOS', 'true', 'BOOLEAN', 'Redondear valores a centavos más cercanos', 'CALCULO', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
 (11, 'PERMITIR_FACTURAS_CERO', 'false', 'BOOLEAN', 'Permitir crear facturas con valor $0', 'VALIDACION', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
 (12, 'BACKUP_ANTES_FACTURACION', 'true', 'BOOLEAN', 'Crear backup antes de facturación masiva', 'SEGURIDAD', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `configuracion_iva`
+--
+
+CREATE TABLE `configuracion_iva` (
+  `id` int(11) NOT NULL,
+  `tipo_servicio` enum('internet','television','reconexion','varios','publicidad','interes','descuento') NOT NULL,
+  `estrato_desde` int(11) NOT NULL,
+  `estrato_hasta` int(11) NOT NULL,
+  `aplica_iva` tinyint(1) NOT NULL DEFAULT 0,
+  `porcentaje_iva` decimal(5,2) NOT NULL DEFAULT 0.00,
+  `descripcion` text DEFAULT NULL,
+  `activo` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `configuracion_iva`
+--
+
+INSERT INTO `configuracion_iva` (`id`, `tipo_servicio`, `estrato_desde`, `estrato_hasta`, `aplica_iva`, `porcentaje_iva`, `descripcion`, `activo`, `created_at`, `updated_at`) VALUES
+(1, 'internet', 1, 3, 0, 0.00, 'Internet estratos 1,2,3 - Sin IVA', 1, '2025-07-09 19:04:56', '2025-07-09 19:04:56'),
+(2, 'internet', 4, 6, 1, 19.00, 'Internet estratos 4,5,6 - Con IVA 19%', 1, '2025-07-09 19:04:56', '2025-07-09 19:04:56'),
+(3, 'television', 1, 6, 1, 19.00, 'Televisión todos los estratos - Con IVA 19%', 1, '2025-07-09 19:04:56', '2025-07-09 19:04:56'),
+(4, 'reconexion', 1, 6, 1, 19.00, 'Reconexión todos los estratos - Con IVA 19%', 1, '2025-07-09 19:04:56', '2025-07-09 19:04:56'),
+(5, 'varios', 1, 6, 1, 19.00, 'Varios todos los estratos - Con IVA 19%', 1, '2025-07-09 19:04:56', '2025-07-09 19:04:56'),
+(6, 'publicidad', 1, 6, 0, 0.00, 'Publicidad todos los estratos - Sin IVA', 1, '2025-07-09 19:04:56', '2025-07-09 19:04:56'),
+(7, 'interes', 1, 6, 0, 0.00, 'Intereses todos los estratos - Sin IVA', 1, '2025-07-09 19:04:56', '2025-07-09 19:04:56'),
+(8, 'descuento', 1, 6, 0, 0.00, 'Descuentos todos los estratos - Sin IVA', 1, '2025-07-09 19:04:56', '2025-07-09 19:04:56');
 
 -- --------------------------------------------------------
 
@@ -973,20 +1042,46 @@ CREATE TABLE `planes_servicio` (
   `aplica_iva` tinyint(1) DEFAULT 1,
   `activo` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `precio_internet` decimal(10,2) DEFAULT NULL COMMENT 'Precio del componente internet (para combos)',
+  `precio_television` decimal(10,2) DEFAULT NULL COMMENT 'Precio del componente TV (para combos)',
+  `precio_instalacion` decimal(10,2) DEFAULT 42016.00 COMMENT 'Costo de instalación para este plan',
+  `requiere_instalacion` tinyint(1) DEFAULT 1 COMMENT 'Si requiere cobro de instalación',
+  `segmento` enum('residencial','empresarial') DEFAULT 'residencial' COMMENT 'Segmento del plan',
+  `tecnologia` varchar(50) DEFAULT 'Fibra Óptica' COMMENT 'Tecnología del servicio',
+  `permanencia_meses` int(11) DEFAULT 0 COMMENT 'Meses de permanencia mínima',
+  `descuento_combo` decimal(5,2) DEFAULT 0.00 COMMENT 'Porcentaje de descuento por combo',
+  `conceptos_incluidos` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'Conceptos incluidos en formato JSON' CHECK (json_valid(`conceptos_incluidos`)),
+  `orden_visualizacion` int(11) DEFAULT 0 COMMENT 'Orden para mostrar en listas',
+  `promocional` tinyint(1) DEFAULT 0 COMMENT 'Si es un plan promocional',
+  `fecha_inicio_promocion` date DEFAULT NULL COMMENT 'Inicio de promoción',
+  `fecha_fin_promocion` date DEFAULT NULL COMMENT 'Fin de promoción',
+  `aplica_iva_estrato_123` tinyint(1) DEFAULT 0 COMMENT 'Aplica IVA para estratos 1,2,3',
+  `aplica_iva_estrato_456` tinyint(1) DEFAULT 1 COMMENT 'Aplica IVA para estratos 4,5,6',
+  `precio_internet_sin_iva` decimal(10,2) DEFAULT 0.00 COMMENT 'Precio internet sin IVA',
+  `precio_television_sin_iva` decimal(10,2) DEFAULT 0.00 COMMENT 'Precio TV sin IVA',
+  `precio_internet_con_iva` decimal(10,2) DEFAULT 0.00 COMMENT 'Precio internet con IVA',
+  `precio_television_con_iva` decimal(10,2) DEFAULT 0.00 COMMENT 'Precio TV con IVA'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `planes_servicio`
 --
 
-INSERT INTO `planes_servicio` (`id`, `codigo`, `nombre`, `tipo`, `precio`, `velocidad_subida`, `velocidad_bajada`, `canales_tv`, `descripcion`, `aplica_iva`, `activo`, `created_at`, `updated_at`) VALUES
-(1, 'INT10', 'Internet 10MB', 'internet', 45000.00, 2, 10, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-06-11 13:15:09'),
-(2, 'INT30', 'Internet 30MB', 'internet', 65000.00, 5, 30, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
-(3, 'INT50', 'Internet 50MB', 'internet', 85000.00, 10, 50, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
-(4, 'TV_BAS', 'TV Básica', 'television', 25000.00, NULL, NULL, 80, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-29 22:23:56'),
-(5, 'TV_PREM', 'TV Premium', 'television', 45000.00, NULL, NULL, 100, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-29 22:24:00'),
-(6, 'COMBO1', 'Combo Internet 30MB + TV', 'combo', 75000.00, 5, 30, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46');
+INSERT INTO `planes_servicio` (`id`, `codigo`, `nombre`, `tipo`, `precio`, `velocidad_subida`, `velocidad_bajada`, `canales_tv`, `descripcion`, `aplica_iva`, `activo`, `created_at`, `updated_at`, `precio_internet`, `precio_television`, `precio_instalacion`, `requiere_instalacion`, `segmento`, `tecnologia`, `permanencia_meses`, `descuento_combo`, `conceptos_incluidos`, `orden_visualizacion`, `promocional`, `fecha_inicio_promocion`, `fecha_fin_promocion`, `aplica_iva_estrato_123`, `aplica_iva_estrato_456`, `precio_internet_sin_iva`, `precio_television_sin_iva`, `precio_internet_con_iva`, `precio_television_con_iva`) VALUES
+(1, 'INT10', 'Internet 10MB', 'internet', 45000.00, 2, 10, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 45000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"internet\": 45000.00, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 1, 0, NULL, NULL, 0, 1, 45000.00, 0.00, 53550.00, 0.00),
+(2, 'INT30', 'Internet 30MB', 'internet', 65000.00, 5, 30, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 65000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"internet\": 65000.00, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 2, 0, NULL, NULL, 0, 1, 65000.00, 0.00, 77350.00, 0.00),
+(3, 'INT50', 'Internet 50MB', 'internet', 85000.00, 10, 50, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 85000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"internet\": 85000.00, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 3, 0, NULL, NULL, 0, 1, 85000.00, 0.00, 101150.00, 0.00),
+(4, 'TV_BAS', 'TV Básica', 'television', 35000.00, NULL, NULL, 80, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 0.00, 35000.00, 42016.00, 1, 'residencial', 'HFC (Cable)', 0, 0.00, '{\"television\": 25000.00, \"instalacion\": 42016, \"tipo_principal\": \"television\"}', 4, 0, NULL, NULL, 1, 1, 0.00, 29411.76, 0.00, 35000.00),
+(5, 'TV_PREM', 'TV Premium', 'television', 45000.00, NULL, NULL, 100, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 0.00, 45000.00, 42016.00, 1, 'residencial', 'HFC (Cable)', 0, 0.00, '{\"television\": 45000.00, \"instalacion\": 42016, \"tipo_principal\": \"television\"}', 5, 0, NULL, NULL, 1, 1, 0.00, 37815.13, 0.00, 45000.00),
+(6, 'COMBO1', 'Combo Internet 30MB + TV', 'combo', 75000.00, 5, 30, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 48750.00, 26250.00, 42016.00, 1, 'residencial', 'Fibra Óptica + HFC', 0, 15.00, '{\"internet\": 48750.00, \"television\": 26250.00, \"instalacion\": 42016, \"descuento_combo\": 15.00, \"tipo_principal\": \"combo\"}', 6, 0, NULL, NULL, 0, 1, 48750.00, 22058.82, 58012.50, 26250.00),
+(8, 'INT20', 'Internet 20MB Residencial', 'internet', 55000.00, 3, 20, NULL, 'Plan internet residencial 20MB ideal para navegación y streaming básico', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 55000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 12, 0.00, '{\"internet\": 55000, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 7, 0, NULL, NULL, 0, 1, 55000.00, 0.00, 65450.00, 0.00),
+(9, 'INT100', 'Internet 100MB Residencial', 'internet', 95000.00, 15, 100, NULL, 'Plan internet residencial 100MB para familias con alto consumo', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 95000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 12, 0.00, '{\"internet\": 95000, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 8, 0, NULL, NULL, 0, 1, 95000.00, 0.00, 113050.00, 0.00),
+(10, 'EMP50', 'Internet 50MB Empresarial', 'internet', 120000.00, 20, 50, NULL, 'Plan internet empresarial con soporte prioritario y IP fija', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 120000.00, 0.00, 60000.00, 1, 'empresarial', 'Fibra Óptica', 24, 0.00, '{\"internet\": 120000, \"instalacion\": 60000, \"tipo_principal\": \"internet\", \"ip_fija\": true}', 9, 0, NULL, NULL, 0, 1, 120000.00, 0.00, 142800.00, 0.00),
+(11, 'TV_DIG', 'TV Digital HD', 'television', 35000.00, NULL, NULL, 120, 'Televisión digital HD con canales nacionales e internacionales', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 0.00, 35000.00, 42016.00, 1, 'residencial', 'Satelital', 12, 0.00, '{\"television\": 35000, \"instalacion\": 42016, \"tipo_principal\": \"television\"}', 10, 0, NULL, NULL, 1, 1, 0.00, 29411.76, 0.00, 35000.00),
+(12, 'COMBO_30TV', 'Combo Internet 30MB + TV Básica', 'combo', 85000.00, 5, 30, 80, 'Combo económico ideal para familias: Internet 30MB + TV Básica', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 55250.00, 29750.00, 42016.00, 1, 'residencial', 'Fibra Óptica + HFC', 12, 15.00, '{\"internet\": 55250, \"television\": 29750, \"instalacion\": 42016, \"descuento_combo\": 15.00, \"tipo_principal\": \"combo\"}', 11, 0, NULL, NULL, 0, 1, 55250.00, 25000.00, 65747.50, 29750.00),
+(13, 'COMBO_50PR', 'Combo Internet 50MB + TV Premium', 'combo', 115000.00, 10, 50, 100, 'Combo premium: Internet 50MB + TV Premium con canales HD', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 74750.00, 40250.00, 42016.00, 1, 'residencial', 'Fibra Óptica + HFC', 12, 15.00, '{\"internet\": 74750, \"television\": 40250, \"instalacion\": 42016, \"descuento_combo\": 15.00, \"tipo_principal\": \"combo\"}', 12, 0, NULL, NULL, 0, 1, 74750.00, 33823.53, 88952.50, 40250.00),
+(14, 'COMBO3', 'i', 'combo', 45000.00, 3, 2, 80, '', 1, 1, '2025-07-09 16:56:44', '2025-07-09 19:04:56', 29250.00, 15750.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"tipo_principal\":\"combo\",\"instalacion\":\"42016\",\"internet\":29250,\"television\":15750}', 0, 0, '0000-00-00', '0000-00-00', 0, 1, 29250.00, 13235.29, 34807.50, 15750.00);
 
 -- --------------------------------------------------------
 
@@ -1147,7 +1242,7 @@ CREATE TABLE `sistema_usuarios` (
 --
 
 INSERT INTO `sistema_usuarios` (`id`, `email`, `password`, `nombre`, `telefono`, `rol`, `activo`, `ultimo_acceso`, `created_at`, `updated_at`) VALUES
-(1, 'admin@empresa.com', '$2b$12$8pOnup7urwhWUA7.e8VpEuDYuUiZ/gVTIf35HbnKQSWBMQeb7QXAa', 'Mateo salazar ortiz', '3007015239', 'administrador', 1, '2025-07-08 15:00:54', '2025-05-23 13:44:46', '2025-07-08 15:00:54'),
+(1, 'admin@empresa.com', '$2b$12$8pOnup7urwhWUA7.e8VpEuDYuUiZ/gVTIf35HbnKQSWBMQeb7QXAa', 'Mateo salazar ortiz', '3007015239', 'administrador', 1, '2025-07-09 15:58:53', '2025-05-23 13:44:46', '2025-07-09 15:58:53'),
 (2, 'super@empresa.com', '$2b$12$f1Vvth/hYSUD7VHtfmZKmOuNXrHowf0Fy2T7MtxdhRAZdIOQR8MCa', 'mateo salazar ortiz', '3007015239', 'supervisor', 1, '2025-06-03 16:18:19', '2025-05-30 14:32:41', '2025-06-11 13:07:30'),
 (3, 'instalador@empresa.com', '$2b$12$FCgmtglWlgNJPwNmNbX3fOp8eRnvpeaSgKdteS0mKYtKHq1/qq6Ri', 'mateo salazar ortiz', '3007015239', 'instalador', 1, '2025-06-04 16:44:35', '2025-05-30 15:00:25', '2025-06-04 16:44:35');
 
@@ -1305,6 +1400,63 @@ CREATE TABLE `vista_metricas_disponibilidad` (
 -- --------------------------------------------------------
 
 --
+-- Estructura Stand-in para la vista `vista_planes_completos`
+-- (Véase abajo para la vista actual)
+--
+CREATE TABLE `vista_planes_completos` (
+`id` int(11)
+,`codigo` varchar(10)
+,`nombre` varchar(255)
+,`tipo` enum('internet','television','combo')
+,`precio` decimal(10,2)
+,`precio_internet` decimal(10,2)
+,`precio_television` decimal(10,2)
+,`velocidad_subida` int(11)
+,`velocidad_bajada` int(11)
+,`canales_tv` int(11)
+,`descripcion` text
+,`precio_instalacion` decimal(10,2)
+,`requiere_instalacion` tinyint(1)
+,`segmento` enum('residencial','empresarial')
+,`tecnologia` varchar(50)
+,`permanencia_meses` int(11)
+,`descuento_combo` decimal(5,2)
+,`orden_visualizacion` int(11)
+,`promocional` tinyint(1)
+,`aplica_iva` tinyint(1)
+,`activo` tinyint(1)
+,`created_at` timestamp
+,`updated_at` timestamp
+,`tipo_servicio_detallado` varchar(13)
+,`precio_con_iva` decimal(13,4)
+,`velocidad_total` bigint(12)
+,`clientes_activos` bigint(21)
+);
+
+-- --------------------------------------------------------
+
+--
+-- Estructura Stand-in para la vista `vista_precios_con_iva`
+-- (Véase abajo para la vista actual)
+--
+CREATE TABLE `vista_precios_con_iva` (
+`id` int(11)
+,`codigo` varchar(10)
+,`nombre` varchar(255)
+,`tipo` enum('internet','television','combo')
+,`precio_base` decimal(10,2)
+,`precio_internet` decimal(10,2)
+,`precio_television` decimal(10,2)
+,`precio_internet_sin_iva` decimal(10,2)
+,`precio_internet_con_iva` decimal(12,2)
+,`precio_television_sin_iva` decimal(13,2)
+,`precio_television_con_iva` decimal(10,2)
+,`activo` tinyint(1)
+);
+
+-- --------------------------------------------------------
+
+--
 -- Estructura Stand-in para la vista `vista_reportes_crc`
 -- (Véase abajo para la vista actual)
 --
@@ -1392,6 +1544,24 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 DROP TABLE IF EXISTS `vista_metricas_disponibilidad`;
 
 CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vista_metricas_disponibilidad`  AS SELECT `metricas_qos`.`anno` AS `anno`, `metricas_qos`.`semestre` AS `semestre`, `metricas_qos`.`mes` AS `mes`, avg(`metricas_qos`.`disponibilidad_porcentaje`) AS `disponibilidad_promedio`, sum(`metricas_qos`.`tiempo_inactividad_minutos`) AS `total_inactividad_minutos`, sum(`metricas_qos`.`incidencias_total`) AS `total_incidencias`, count(0) AS `meses_reportados` FROM `metricas_qos` GROUP BY `metricas_qos`.`anno`, `metricas_qos`.`semestre` ORDER BY `metricas_qos`.`anno` DESC, `metricas_qos`.`semestre` DESC ;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura para la vista `vista_planes_completos`
+--
+DROP TABLE IF EXISTS `vista_planes_completos`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vista_planes_completos`  AS SELECT `p`.`id` AS `id`, `p`.`codigo` AS `codigo`, `p`.`nombre` AS `nombre`, `p`.`tipo` AS `tipo`, `p`.`precio` AS `precio`, `p`.`precio_internet` AS `precio_internet`, `p`.`precio_television` AS `precio_television`, `p`.`velocidad_subida` AS `velocidad_subida`, `p`.`velocidad_bajada` AS `velocidad_bajada`, `p`.`canales_tv` AS `canales_tv`, `p`.`descripcion` AS `descripcion`, `p`.`precio_instalacion` AS `precio_instalacion`, `p`.`requiere_instalacion` AS `requiere_instalacion`, `p`.`segmento` AS `segmento`, `p`.`tecnologia` AS `tecnologia`, `p`.`permanencia_meses` AS `permanencia_meses`, `p`.`descuento_combo` AS `descuento_combo`, `p`.`orden_visualizacion` AS `orden_visualizacion`, `p`.`promocional` AS `promocional`, `p`.`aplica_iva` AS `aplica_iva`, `p`.`activo` AS `activo`, `p`.`created_at` AS `created_at`, `p`.`updated_at` AS `updated_at`, CASE WHEN `p`.`precio_internet` > 0 AND `p`.`precio_television` > 0 THEN 'Combo' WHEN `p`.`precio_internet` > 0 THEN 'Solo Internet' WHEN `p`.`precio_television` > 0 THEN 'Solo TV' ELSE 'Otro' END AS `tipo_servicio_detallado`, CASE WHEN `p`.`aplica_iva` = 1 THEN `p`.`precio`* 1.19 ELSE `p`.`precio` END AS `precio_con_iva`, coalesce(`p`.`velocidad_subida`,0) + coalesce(`p`.`velocidad_bajada`,0) AS `velocidad_total`, (select count(0) from `servicios_cliente` `sc` where `sc`.`plan_id` = `p`.`id` and `sc`.`estado` = 'activo') AS `clientes_activos` FROM `planes_servicio` AS `p` WHERE `p`.`activo` = 1 ORDER BY `p`.`orden_visualizacion` ASC, `p`.`precio` ASC ;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura para la vista `vista_precios_con_iva`
+--
+DROP TABLE IF EXISTS `vista_precios_con_iva`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vista_precios_con_iva`  AS SELECT `p`.`id` AS `id`, `p`.`codigo` AS `codigo`, `p`.`nombre` AS `nombre`, `p`.`tipo` AS `tipo`, `p`.`precio` AS `precio_base`, `p`.`precio_internet` AS `precio_internet`, `p`.`precio_television` AS `precio_television`, CASE WHEN `p`.`tipo` = 'internet' THEN `p`.`precio` WHEN `p`.`tipo` = 'combo' THEN `p`.`precio_internet` ELSE 0 END AS `precio_internet_sin_iva`, CASE WHEN `p`.`tipo` = 'internet' THEN round(`p`.`precio` * 1.19,2) WHEN `p`.`tipo` = 'combo' THEN round(`p`.`precio_internet` * 1.19,2) ELSE 0 END AS `precio_internet_con_iva`, CASE WHEN `p`.`tipo` = 'television' THEN round(`p`.`precio` / 1.19,2) WHEN `p`.`tipo` = 'combo' THEN round(`p`.`precio_television` / 1.19,2) ELSE 0 END AS `precio_television_sin_iva`, CASE WHEN `p`.`tipo` = 'television' THEN `p`.`precio` WHEN `p`.`tipo` = 'combo' THEN `p`.`precio_television` ELSE 0 END AS `precio_television_con_iva`, `p`.`activo` AS `activo` FROM `planes_servicio` AS `p` WHERE `p`.`activo` = 1 ;
 
 -- --------------------------------------------------------
 
@@ -1490,6 +1660,12 @@ ALTER TABLE `configuracion_empresa`
 ALTER TABLE `configuracion_facturacion`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `unique_parametro` (`parametro`);
+
+--
+-- Indices de la tabla `configuracion_iva`
+--
+ALTER TABLE `configuracion_iva`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indices de la tabla `cortes_servicio`
@@ -1648,7 +1824,13 @@ ALTER TABLE `planes_servicio`
   ADD KEY `idx_codigo` (`codigo`),
   ADD KEY `idx_tipo` (`tipo`),
   ADD KEY `idx_activo` (`activo`),
-  ADD KEY `idx_precio` (`precio`);
+  ADD KEY `idx_precio` (`precio`),
+  ADD KEY `idx_segmento` (`segmento`),
+  ADD KEY `idx_tecnologia` (`tecnologia`),
+  ADD KEY `idx_orden_visualizacion` (`orden_visualizacion`),
+  ADD KEY `idx_promocional` (`promocional`),
+  ADD KEY `idx_precio_internet` (`precio_internet`),
+  ADD KEY `idx_precio_television` (`precio_television`);
 
 --
 -- Indices de la tabla `plantillas_correo`
@@ -1764,6 +1946,12 @@ ALTER TABLE `configuracion_facturacion`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=134;
 
 --
+-- AUTO_INCREMENT de la tabla `configuracion_iva`
+--
+ALTER TABLE `configuracion_iva`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
 -- AUTO_INCREMENT de la tabla `cortes_servicio`
 --
 ALTER TABLE `cortes_servicio`
@@ -1839,7 +2027,7 @@ ALTER TABLE `pagos`
 -- AUTO_INCREMENT de la tabla `planes_servicio`
 --
 ALTER TABLE `planes_servicio`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT de la tabla `plantillas_correo`
