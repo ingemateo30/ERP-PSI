@@ -306,17 +306,14 @@ export const paymentsService = {
 };
 
 export const servicesService = {
-  getPlans: () => apiService.get('/services/plans'),
-  getPlanById: (id) => apiService.get(`/services/plans/${id}`),
-  createPlan: (data) => apiService.post('/services/plans', data),
-  updatePlan: (id, data) => apiService.put(`/services/plans/${id}`, data),
-  deletePlan: (id) => apiService.delete(`/services/plans/${id}`),
-  
-  getClientServices: (clientId) => apiService.get(`/clients/${clientId}/services`),
-  activateService: (clientId, data) => apiService.post(`/clients/${clientId}/services`, data),
-  updateService: (serviceId, data) => apiService.put(`/services/${serviceId}`, data),
-  suspendService: (serviceId, reason) => apiService.patch(`/services/${serviceId}/suspend`, { reason }),
-  reactivateService: (serviceId) => apiService.patch(`/services/${serviceId}/reactivate`),
+   getServicePlans: (params) => apiService.get('/config/service-plans', params),
+  getServicePlanStats: () => apiService.get('/config/service-plans/stats'),
+  getServicePlanById: (id) => apiService.get(`/config/service-plans/${id}`),
+  createServicePlan: (data) => apiService.post('/config/service-plans', data),
+  updateServicePlan: (id, data) => apiService.put(`/config/service-plans/${id}`, data),
+  deleteServicePlan: (id) => apiService.delete(`/config/service-plans/${id}`),
+  toggleServicePlanStatus: (id, activo) => apiService.patch(`/config/service-plans/${id}/toggle-status`, { activo }),
+  getServicePlansForClientForm: () => apiService.get('/config/service-plans', { activo: 1, orden: 'orden_visualizacion' }),
 };
 
 export const reportsService = {

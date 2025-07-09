@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 24-06-2025 a las 16:55:51
+-- Tiempo de generación: 09-07-2025 a las 17:25:57
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.1.25
 
@@ -104,6 +104,24 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `CalcularDisponibilidadMensual` (IN 
         
 END$$
 
+CREATE DEFINER=`root`@`localhost` PROCEDURE `CalcularEstadisticasFacturacion` (IN `fecha_inicio` DATE, IN `fecha_fin` DATE)   BEGIN
+    SELECT 
+        COUNT(*) as total_facturas,
+        COUNT(CASE WHEN estado = 'pendiente' THEN 1 END) as pendientes,
+        COUNT(CASE WHEN estado = 'pagada' THEN 1 END) as pagadas,
+        COUNT(CASE WHEN estado = 'anulada' THEN 1 END) as anuladas,
+        COUNT(CASE WHEN estado = 'vencida' THEN 1 END) as vencidas,
+        SUM(CASE WHEN estado = 'pendiente' THEN total ELSE 0 END) as valor_pendiente,
+        SUM(CASE WHEN estado = 'pagada' THEN total ELSE 0 END) as valor_pagado,
+        SUM(total) as valor_total_facturado,
+        AVG(total) as promedio_factura,
+        SUM(s_iva) as total_iva_facturado,
+        COUNT(DISTINCT cliente_id) as clientes_facturados
+    FROM facturas 
+    WHERE fecha_emision BETWEEN fecha_inicio AND fecha_fin
+    AND activo = '1';
+END$$
+
 CREATE DEFINER=`root`@`localhost` PROCEDURE `DevolverEquipo` (IN `p_equipo_id` INT, IN `p_ubicacion_devolucion` VARCHAR(255), IN `p_notas` TEXT, IN `p_devuelto_por` INT)   BEGIN
   DECLARE v_instalador_actual INT;
   
@@ -129,6 +147,76 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `DevolverEquipo` (IN `p_equipo_id` I
     p_equipo_id, v_instalador_actual, 'devuelto', p_ubicacion_devolucion, p_notas, p_devuelto_por
   );
   
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `GenerarNumeroFactura` (OUT `nuevo_numero` VARCHAR(20))   BEGIN
+    DECLARE prefijo VARCHAR(10);
+    DECLARE consecutivo INT;
+    
+    -- Obtener configuración
+    SELECT 
+        COALESCE(prefijo_factura, 'FAC') as pref,
+        COALESCE(consecutivo_factura, 1) as cons
+    INTO prefijo, consecutivo
+    FROM configuracion_empresa 
+    WHERE id = 1;
+    
+    -- Actualizar consecutivo
+    UPDATE configuracion_empresa 
+    SET consecutivo_factura = consecutivo_factura + 1 
+    WHERE id = 1;
+    
+    -- Generar número con formato
+    SET nuevo_numero = CONCAT(prefijo, LPAD(consecutivo + 1, 6, '0'));
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `ObtenerClientesConMora` (IN `dias_mora_minima` INT)   BEGIN
+    SELECT 
+        c.id,
+        c.identificacion,
+        c.nombre,
+        c.telefono,
+        c.email,
+        s.nombre as sector,
+        COUNT(f.id) as facturas_vencidas,
+        SUM(f.total) as total_deuda,
+        MIN(f.fecha_vencimiento) as primera_factura_vencida,
+        MAX(DATEDIFF(CURDATE(), f.fecha_vencimiento)) as dias_mora_maxima,
+        GROUP_CONCAT(f.numero_factura ORDER BY f.fecha_vencimiento SEPARATOR ', ') as facturas_numeros
+    FROM clientes c
+    JOIN facturas f ON c.id = f.cliente_id
+    LEFT JOIN sectores s ON c.sector_id = s.id
+    WHERE f.estado IN ('pendiente', 'vencida')
+    AND DATEDIFF(CURDATE(), f.fecha_vencimiento) >= dias_mora_minima
+    AND f.activo = '1'
+    AND c.activo = 1
+    GROUP BY c.id
+    HAVING total_deuda > 0
+    ORDER BY dias_mora_maxima DESC, total_deuda DESC;
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `ObtenerClientesParaFacturar` (IN `fecha_referencia` DATE)   BEGIN
+    SELECT DISTINCT 
+        c.id,
+        c.identificacion,
+        c.nombre,
+        c.estrato,
+        MAX(f.fecha_hasta) as ultima_fecha_facturada,
+        sc.fecha_activacion,
+        COUNT(sc.id) as servicios_activos,
+        GROUP_CONCAT(ps.nombre SEPARATOR ', ') as planes_servicios
+    FROM clientes c
+    JOIN servicios_cliente sc ON c.id = sc.cliente_id 
+        AND sc.activo = 1 
+        AND sc.estado = 'activo'
+    JOIN planes_servicio ps ON sc.plan_id = ps.id
+    LEFT JOIN facturas f ON c.id = f.cliente_id AND f.activo = '1'
+    WHERE c.activo = 1
+    GROUP BY c.id
+    HAVING 
+        (ultima_fecha_facturada IS NULL) OR 
+        (ultima_fecha_facturada < DATE_SUB(fecha_referencia, INTERVAL 30 DAY))
+    ORDER BY ultima_fecha_facturada ASC, c.id ASC;
 END$$
 
 DELIMITER ;
@@ -231,17 +319,22 @@ CREATE TABLE `clientes` (
 --
 
 INSERT INTO `clientes` (`id`, `identificacion`, `tipo_documento`, `nombre`, `direccion`, `sector_id`, `estrato`, `barrio`, `ciudad_id`, `telefono`, `telefono_2`, `correo`, `fecha_registro`, `fecha_hasta`, `estado`, `mac_address`, `ip_asignada`, `tap`, `poste`, `contrato`, `ruta`, `requiere_reconexion`, `codigo_usuario`, `observaciones`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, '12345678', 'cedula', 'Juan Carlos Rodríguez Méndez', 'Calle 15 # 23-45, Barrio Centro', 1, '1', 'Centro', 5, '3001234567', '6012345678', 'juan.rodriguez@email.com', '2024-01-15', '2025-01-15', 'suspendido', 'AA:BB:CC:DD:EE:01', '192.168.1.101', 'TAP001', 'P-001', 'CT-00001', 'R001', 0, 'USR00001', 'Cliente preferencial, pago puntual', 1, '2025-06-06 14:46:55', '2025-06-11 22:03:12'),
+(1, '123456789', 'cedula', 'Juan Carlos Rodríguez Méndez', 'Calle 15 # 23-45, Barrio Centro', 1, '1', 'Centro', 5, '3001234567', '6012345678', 'juan.rodriguez@email.com', '2024-01-14', '2025-01-15', 'activo', 'AA:BB:CC:DD:EE:01', '192.168.1.101', 'TAP001', 'P-001', 'CT-00001', 'R001', 0, 'USR00001', 'Cliente preferencial, pago puntual', 1, '2025-06-06 14:46:55', '2025-07-04 20:13:03'),
 (2, '87654321', 'cedula', 'María Isabel García López', 'Carrera 10 # 45-67, Barrio Los Pinos', 1, '4', 'Los Pinos', 5, '3109876543', NULL, 'maria.garcia@gmail.com', '2024-02-01', '2025-02-01', 'activo', 'AA:BB:CC:DD:EE:02', '192.168.1.102', 'TAP002', 'P-002', 'CT-00002', 'R001', 0, 'USR00002', 'Servicio de internet y TV', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
-(3, '23456789', 'cedula', 'Carlos Alberto Ruiz Vargas', 'Calle 8 # 12-34, Barrio San José', 1, '2', 'San José', 5, '3201234567', '6078901234', 'carlos.ruiz@hotmail.com', '2024-01-20', '2025-01-20', 'suspendido', 'AA:BB:CC:DD:EE:03', '192.168.1.103', 'TAP003', 'P-003', 'CT-00003', 'R002', 1, 'USR00003', 'Suspendido por mora - Requiere reconexión', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
+(3, '23456789', 'cedula', 'Carlos Alberto Ruiz Vargas', 'Calle 8 # 12-34, Barrio San José', 1, '2', 'San José', 5, '3201234567', '6078901234', 'carlos.ruiz@hotmail.com', '2024-01-19', '2025-01-20', 'activo', 'AA:BB:CC:DD:EE:03', '192.168.1.103', 'TAP003', 'P-003', 'CT-00003', 'R002', 1, 'USR00003', 'Suspendido por mora - Requiere reconexión', 1, '2025-06-06 14:46:55', '2025-07-04 21:59:40'),
 (4, '34567890', 'cedula', 'Ana Patricia Morales Castellanos', 'Transversal 5 # 78-90, Barrio Villa Nueva', 1, '3', 'Villa Nueva', 5, '3156789012', NULL, 'ana.morales@empresa.com', '2024-03-01', '2025-03-01', 'activo', 'AA:BB:CC:DD:EE:04', '192.168.1.104', 'TAP004', 'P-004', 'CT-00004', 'R001', 0, 'USR00004', 'Cliente empresarial', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
 (5, '45678901', 'cedula', 'Luis Fernando Torres Jiménez', 'Avenida Principal # 100-25, Barrio El Progreso', 1, '5', 'El Progreso', 5, '3012345678', '6075432109', 'luis.torres@correo.co', '2024-02-15', '2025-02-15', 'activo', 'AA:BB:CC:DD:EE:05', '192.168.1.105', 'TAP005', 'P-005', 'CT-00005', 'R002', 0, 'USR00005', 'Plan premium, servicio completo', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
 (6, '56789012', 'cedula', 'Sandra Milena Castro Romero', 'Calle 25 # 15-80, Barrio La Esperanza', 1, '2', 'La Esperanza', 5, '3178901234', NULL, 'sandra.castro@yahoo.com', '2024-03-10', '2025-03-10', 'activo', 'AA:BB:CC:DD:EE:06', '192.168.1.106', 'TAP006', 'P-006', 'CT-00006', 'R001', 0, 'USR00006', 'Solo servicio de internet', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
-(7, '67890123', 'cedula', 'Roberto Andrés Silva Peña', 'Carrera 20 # 30-45, Barrio Las Flores', 1, '3', 'Las Flores', 5, '3023456789', '6012987654', 'roberto.silva@outlook.com', '2023-12-01', '2024-12-01', 'cortado', 'AA:BB:CC:DD:EE:07', '192.168.1.107', 'TAP007', 'P-007', 'CT-00007', 'R002', 1, 'USR00007', 'Cortado por mora prolongada', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
+(7, '67890123', 'cedula', 'Roberto Andrés Silva Peña', 'Carrera 20 # 30-45, Barrio Las Flores', 1, '3', 'Las Flores', 5, '3023456789', '6012987654', 'roberto.silva@outlook.com', '2023-11-30', '2024-12-01', 'activo', 'AA:BB:CC:DD:EE:07', '192.168.1.107', 'TAP007', 'P-007', 'CT-00007', 'R002', 1, 'USR00007', 'Cortado por mora prolongada', 1, '2025-06-06 14:46:55', '2025-07-04 21:59:34'),
 (8, '78901234', 'cedula', 'Claudia Elena Vargas Muñoz', 'Diagonal 12 # 56-78, Barrio Nuevo Horizonte', 1, '4', 'Nuevo Horizonte', 5, '3134567890', NULL, 'claudia.vargas@gmail.com', '2024-01-30', '2025-01-30', 'activo', 'AA:BB:CC:DD:EE:08', '192.168.1.108', 'TAP008', 'P-008', 'CT-00008', 'R001', 0, 'USR00008', 'Excelente historial de pagos', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
 (9, '900123456', 'nit', 'Empresa XYZ Servicios Ltda', 'Calle 50 # 100-200, Zona Industrial', 1, '6', 'Zona Industrial', 5, '6017654321', '3001111111', 'info@empresaxyz.com', '2024-02-20', '2025-02-20', 'activo', 'AA:BB:CC:DD:EE:09', '192.168.1.109', 'TAP009', 'P-009', 'CT-00009', 'R003', 0, 'USR00009', 'Cliente corporativo - Plan empresarial', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
 (10, '89012345', 'cedula', 'Pedro José Hernández Rueda', 'Calle 35 # 67-89, Barrio El Recuerdo', 1, '3', 'El Recuerdo', 5, '3187654321', '6013456789', 'pedro.hernandez@correo.com', '2024-03-05', '2025-03-05', 'activo', 'AA:BB:CC:DD:EE:10', '192.168.1.110', 'TAP010', 'P-010', 'CT-00010', 'R002', 0, 'USR00010', 'Cliente nuevo - Plan básico', 1, '2025-06-06 14:46:55', '2025-06-06 14:46:55'),
-(11, '1005450340', 'cedula', 'mateo salazar ortiz', 'calle 32e 11 13', 1, '2', 'buenos aires', 5, '3007015239', NULL, 'mateo.s3009@gmail.com', '2025-06-11', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, 'dsfdsfdsf', 1, '2025-06-11 21:29:32', '2025-06-11 22:02:40');
+(16, '1005450340', 'cedula', 'mateo salazar ortiz', 'calle 32e 11 13', 3, '1', 'san luis', 6, '3011780208', '3024773516', NULL, '2025-07-03', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, 'nuevo cliente', NULL, '2025-07-04 20:16:38', '2025-07-04 20:17:27'),
+(20, '79882886', 'cedula', 'prueba prueba prueba', 'CR 1 7 53', 3, '2', 'industrial', 6, '3007015239', NULL, 'sistemas@jelcom.com.co', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 14:59:21', '2025-07-08 14:59:21'),
+(23, '52487047', 'cedula', 'Lina Maria Ortiz Pereira', 'CR 1 7 53', 3, '2', 'industrial', 6, '3007015239', NULL, 'sistemas@jelcom.com.co', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 15:16:25', '2025-07-08 15:16:25'),
+(25, '52487048', 'cedula', 'prueba prueba', 'calle 32e 11 13', 3, '1', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 19:36:14', '2025-07-08 19:36:14'),
+(26, '52487049', 'cedula', 'prueba prueba', 'calle 32e 11 13', 3, '1', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 21:27:30', '2025-07-08 21:27:30'),
+(27, '52487050', 'cedula', 'prueba2', 'calle 32e 11 13', NULL, '1', 'san luis', 6, '3024773516', '3024773516', 'MSALAZAR5@UDI.EDU.CO', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 21:49:13', '2025-07-08 21:49:13');
 
 -- --------------------------------------------------------
 
@@ -264,13 +357,6 @@ CREATE TABLE `clientes_inactivos` (
   `motivo_inactivacion` text DEFAULT NULL,
   `cliente_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `clientes_inactivos`
---
-
-INSERT INTO `clientes_inactivos` (`id`, `identificacion`, `nombre`, `direccion`, `descripcion`, `fecha_inactivacion`, `barrio`, `sector_codigo`, `telefono`, `poste`, `estrato`, `motivo_inactivacion`, `cliente_id`) VALUES
-(1, 'SFDDG54454', 'PRUEBA', 'CALLE 32E 11 13', 'Cliente eliminado del sistema', '2025-06-11', 'CALLE 32E 11 13', '001', '3004545545', NULL, '1', 'ELIMINADO POR USUARIO', NULL);
 
 -- --------------------------------------------------------
 
@@ -384,13 +470,51 @@ CREATE TABLE `conceptos_facturacion` (
 --
 
 INSERT INTO `conceptos_facturacion` (`id`, `codigo`, `nombre`, `valor_base`, `aplica_iva`, `porcentaje_iva`, `descripcion`, `tipo`, `activo`, `created_at`, `updated_at`) VALUES
-(1, 'INT', 'Servicio Internet', 0.00, 1, 0.00, NULL, 'internet', 1, '2025-05-23 13:44:46', '2025-06-03 13:58:34'),
-(2, 'TV', 'Servicio Televisión basico', 0.00, 1, 0.00, NULL, 'television', 1, '2025-05-23 13:44:46', '2025-06-03 13:58:50'),
-(3, 'REC', 'Reconexión', 0.00, 1, 0.00, NULL, 'reconexion', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
-(4, 'INT_M', 'Intereses por Mora', 0.00, 0, 0.00, NULL, 'interes', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
-(5, 'DESC', 'Descuento', 0.00, 0, 0.00, NULL, 'descuento', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
-(6, 'VAR', 'Varios', 0.00, 1, 0.00, NULL, 'varios', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
-(7, 'PUB', 'Publicidad', 0.00, 1, 0.00, NULL, 'publicidad', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46');
+(80, '80', 'INTERNET', 59900.00, 0, 0.00, 'INTERNET 50 MEGAS HOGAR SOLO INTERNET', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(81, '81', 'INTERNET', 64900.00, 0, 0.00, 'INTERNET 100 MEGAS HOGAR SOLO INTERNET', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(82, '82', 'INTERNET', 59900.00, 0, 0.00, 'INTERNET 50 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(83, '83', 'INTERNET', 64900.00, 0, 0.00, 'INTERNET 100 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(84, '84', 'INTERNET', 74900.00, 0, 0.00, 'INTERNET 200 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(85, '85', 'INTERNET', 84900.00, 0, 0.00, 'INTERNET 400 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(86, '86', 'INTERNET', 39900.00, 0, 0.00, 'INTERNET 5 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(87, '87', 'INTERNET', 49900.00, 0, 0.00, 'INTERNET 10 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(88, '88', 'INTERNET', 69900.00, 0, 0.00, 'INTERNET 500 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(89, '89', 'INTERNET', 79900.00, 0, 0.00, 'INTERNET 900 MEGAS HOGAR', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(90, '90', 'FIBRA COMERCIAL', 74900.00, 0, 0.00, 'INTERNET COMERCIAL 100 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(91, '91', 'FIBRA COMERCIAL', 71344.00, 1, 19.00, 'INTERNET COMERCIAL 200 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(92, '92', 'FIBRA COMERCIAL', 79747.00, 1, 19.00, 'INTERNET COMERCIAL 400 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(99, '99', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 200 MG RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(100, '100', 'TELEVISIÓN', 26807.00, 1, 19.00, 'Basico', 'television', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(105, '105', 'INTERNET', 64900.00, 0, 0.00, 'FIBRA 200 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(106, '106', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 200 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(116, '116', 'INTERNET', 67142.00, 1, 19.00, 'FIBRA 200 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(129, '129', 'INTERNET', 59900.00, 0, 0.00, 'FIBRA 100 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(130, '130', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 300 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(131, '131', 'INTERNET', 83949.00, 1, 19.00, 'FIBRA 300 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(132, '132', 'INTERNET', 75546.00, 1, 19.00, 'FIBRA 200 MEGAS COMERCIAL+ IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(140, '140', 'INTERNET', 64900.00, 0, 0.00, 'FIBRA 100 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(141, '141', 'INTERNET', 69900.00, 0, 0.00, 'FIBRA 150 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(145, '145', 'INTERNET', 79900.00, 0, 0.00, 'FIBRA 300 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(147, '147', 'INTERNET', 67142.00, 1, 19.00, 'INTERNET FIBRA 200 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(148, '148', 'INTERNET', 75546.00, 1, 19.00, 'INTERNET FIBRA 300 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(149, '149', 'INTERNET', 79900.00, 0, 0.00, 'FIBRA 400 MG RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(150, '150', 'INTERNET', 243697.00, 1, 19.00, 'INTERNET 10 MEGAS DEDICADO', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(152, '152', 'INTERNET', 67143.00, 1, 19.00, '500 MEGAS FIBRA INTERNET COMERCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(153, '153', 'INTERNET', 75546.00, 1, 19.00, '900 MEGAS FIBRA INTERNET COMERCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(154, '154', 'INTERNET', 58740.00, 1, 19.00, 'INTERNET FIBRA 50 MEGAS COMERCIAL + IVA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(200, '200', 'INTERNET', 49900.00, 0, 0.00, 'FIBRA', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(300, '300', 'INTERNET', 38000.00, 0, 0.00, '30 MEGAS', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(302, '302', 'INTERNET', 0.00, 0, 0.00, '', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(514, '514', 'INTERNET', 149900.00, 0, 0.00, 'INTERNET 200 MEGAS RURAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(515, '515', 'INTERNET', 1672269.00, 1, 19.00, 'INTERNET 320 MEGAS DEDICADO', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(516, '516', 'INTERNET', 1252100.00, 1, 19.00, 'INTERNET 200 MEGAS DEDICADO', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(526, '526', 'TELEVISION', 176471.00, 1, 19.00, 'TELEVISION 21 PUNTOS', 'television', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(528, '528', 'TELEVISION', 8403.00, 1, 19.00, 'TELEVISION DUO', 'television', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(529, '529', 'TELEVISION', 38572.00, 1, 19.00, 'TELEVISION', 'television', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(530, '530', 'TELEVISION', 37731.00, 1, 19.00, 'TELEVISION ESTRATO 1,2 Y 3', 'television', 1, '2025-07-04 13:46:55', '2025-07-04 15:34:08'),
+(751, '751', 'INTERNET', 59900.00, 0, 0.00, 'FIBRA 200 MEGAS RESIDENCIAL', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(910, '910', 'INTERNET', 1252100.00, 1, 19.00, '200 MEGAS DEDICADO + 10 PUNTOS DE TV', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55'),
+(911, '911', 'INTERNET', 1252100.00, 1, 19.00, '200 MEGAS + 10 PUNTOS DE TV', 'internet', 1, '2025-07-04 13:46:55', '2025-07-04 13:46:55');
 
 -- --------------------------------------------------------
 
@@ -431,7 +555,43 @@ CREATE TABLE `configuracion_empresa` (
 --
 
 INSERT INTO `configuracion_empresa` (`id`, `licencia`, `empresa_nombre`, `empresa_nit`, `empresa_direccion`, `empresa_ciudad`, `empresa_departamento`, `empresa_telefono`, `empresa_email`, `resolucion_facturacion`, `licencia_internet`, `vigilado`, `vigilado_internet`, `comentario`, `prefijo_factura`, `codigo_gs1`, `fecha_actualizacion`, `consecutivo_factura`, `consecutivo_contrato`, `consecutivo_recibo`, `valor_reconexion`, `dias_mora_corte`, `porcentaje_iva`, `porcentaje_interes`, `updated_at`) VALUES
-(1, 'PRINCIPAL1', 'PROVEEDOR DE TELECOMUNICACIONES SAS.', '901582657-3', 'Carrera 9 No. 9-94', 'San Gil', 'SANTANDER', '3184550936', 'facturacion@psi.net.co', 'pendiente', 'pendiente', 'Registro unico de tic No. 96006732', 'pendiente', '', 'FAC', 'GS1', '2025-06-11', 6, 1, 1, 11900.00, 5, 19.00, 15.00, '2025-06-11 13:25:18');
+(1, 'PRINCIPAL1', 'PROVEEDOR DE TELECOMUNICACIONES SAS.', '901582657-3', 'Carrera 9 No. 9-94', 'San Gil', 'SANTANDER', '3184550936', 'facturacion@psi.net.co', 'pendiente', 'pendiente', 'Registro unico de tic No. 96006732', 'pendiente', 'hola', 'FAC', 'GS1', '2025-06-11', 18, 1, 1, 10000.00, 15, 19.00, 15.00, '2025-07-08 22:05:48');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `configuracion_facturacion`
+--
+
+CREATE TABLE `configuracion_facturacion` (
+  `id` int(11) NOT NULL,
+  `parametro` varchar(100) NOT NULL,
+  `valor` text NOT NULL,
+  `tipo` enum('STRING','NUMBER','BOOLEAN','JSON','DATE') DEFAULT 'STRING',
+  `descripcion` text DEFAULT NULL,
+  `categoria` varchar(50) DEFAULT 'GENERAL',
+  `activo` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `configuracion_facturacion`
+--
+
+INSERT INTO `configuracion_facturacion` (`id`, `parametro`, `valor`, `tipo`, `descripcion`, `categoria`, `activo`, `created_at`, `updated_at`) VALUES
+(1, 'FACTURACION_AUTOMATICA_ACTIVA', 'true', 'BOOLEAN', 'Activar/desactivar facturación automática mensual', 'AUTOMATIZACION', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(2, 'DIAS_VENCIMIENTO_FACTURA', '15', 'NUMBER', 'Días para vencimiento de facturas desde fecha de emisión', 'FACTURACION', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(3, 'PORCENTAJE_INTERES_MORA', '2.5', 'NUMBER', 'Porcentaje de interés mensual por mora', 'MORA', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(4, 'DIAS_CORTE_SERVICIO', '30', 'NUMBER', 'Días de mora antes del corte automático de servicio', 'CORTE', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(5, 'VALOR_INSTALACION_DEFAULT', '42016', 'NUMBER', 'Valor por defecto para instalaciones nuevas', 'SERVICIOS', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(6, 'GENERAR_PDF_AUTOMATICO', 'true', 'BOOLEAN', 'Generar PDF automáticamente al crear facturas', 'PDF', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(7, 'ENVIAR_EMAIL_FACTURA', 'false', 'BOOLEAN', 'Enviar factura por email automáticamente', 'EMAIL', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(8, 'HORARIO_FACTURACION_MENSUAL', '06:00', 'STRING', 'Hora para ejecutar facturación mensual (HH:MM)', 'AUTOMATIZACION', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(9, 'INCLUIR_MOROSOS_FACTURACION', 'true', 'BOOLEAN', 'Incluir clientes con mora en facturación mensual', 'MORA', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(10, 'REDONDEAR_CENTAVOS', 'true', 'BOOLEAN', 'Redondear valores a centavos más cercanos', 'CALCULO', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(11, 'PERMITIR_FACTURAS_CERO', 'false', 'BOOLEAN', 'Permitir crear facturas con valor $0', 'VALIDACION', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33'),
+(12, 'BACKUP_ANTES_FACTURACION', 'true', 'BOOLEAN', 'Crear backup antes de facturación masiva', 'SEGURIDAD', 1, '2025-07-04 21:22:33', '2025-07-04 21:22:33');
 
 -- --------------------------------------------------------
 
@@ -500,6 +660,30 @@ CREATE TABLE `detalle_facturas` (
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `facturacion_historial`
+--
+
+CREATE TABLE `facturacion_historial` (
+  `id` int(11) NOT NULL,
+  `tipo_proceso` enum('MENSUAL','INDIVIDUAL','MANUAL','CORRECCION') NOT NULL,
+  `fecha_proceso` date NOT NULL,
+  `clientes_procesados` int(11) DEFAULT 0,
+  `facturas_generadas` int(11) DEFAULT 0,
+  `facturas_fallidas` int(11) DEFAULT 0,
+  `valor_total_facturado` decimal(15,2) DEFAULT 0.00,
+  `errores_json` longtext DEFAULT NULL CHECK (json_valid(`errores_json`)),
+  `parametros_json` longtext DEFAULT NULL CHECK (json_valid(`parametros_json`)),
+  `tiempo_procesamiento_segundos` int(11) DEFAULT NULL,
+  `estado` enum('INICIADO','COMPLETADO','FALLIDO','CANCELADO') DEFAULT 'INICIADO',
+  `observaciones` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Estructura de tabla para la tabla `facturas`
 --
 
@@ -553,11 +737,17 @@ CREATE TABLE `facturas` (
 --
 
 INSERT INTO `facturas` (`id`, `numero_factura`, `cliente_id`, `identificacion_cliente`, `nombre_cliente`, `periodo_facturacion`, `fecha_emision`, `fecha_vencimiento`, `fecha_desde`, `fecha_hasta`, `fecha_pago`, `internet`, `television`, `saldo_anterior`, `interes`, `reconexion`, `descuento`, `varios`, `publicidad`, `s_internet`, `s_television`, `s_interes`, `s_reconexion`, `s_descuento`, `s_varios`, `s_publicidad`, `s_iva`, `subtotal`, `iva`, `total`, `estado`, `metodo_pago`, `referencia_pago`, `banco_id`, `ruta`, `resolucion`, `consignacion`, `activo`, `observaciones`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'FAC000001', 1, '1005450340', 'MATEO SALAZAR ORTIZ', '2025-06', '2025-06-01', '2025-06-16', '2025-06-01', '2025-06-30', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 59900.00, 'pendiente', NULL, NULL, NULL, 'R01', 'Facturación desde 10.001 hasta 37600 prefijo 10 del 26-SEP-2022', NULL, '1', 'Factura de internet mensual', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
+(1, 'FAC000001', 1, '1005450340', 'MATEO SALAZAR ORTIZ', '2025-06', '2025-06-01', '2025-06-16', '2025-06-01', '2025-06-30', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 59900.00, 'vencida', NULL, NULL, NULL, 'R01', 'Facturación desde 10.001 hasta 37600 prefijo 10 del 26-SEP-2022', NULL, '1', 'Factura de internet mensual', 1, '2025-06-09 13:29:14', '2025-07-04 21:22:33'),
 (2, 'FAC000002', 2, '1234567890', 'JUAN PÉREZ LÓPEZ', '2025-06', '2025-06-01', '2025-06-16', '2025-06-01', '2025-06-30', '2025-06-10', 45000.00, 25000.00, 10000.00, 1500.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 25000.00, 1500.00, 0.00, 0.00, 0.00, 0.00, 0.00, 81500.00, 0.00, 81500.00, 'pagada', 'efectivo', NULL, NULL, 'R02', NULL, NULL, '1', 'Internet + TV + saldo anterior + intereses', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
-(3, 'FAC000003', 3, '9876543210', 'MARÍA GARCÍA RUIZ', '2025-05', '2025-05-01', '2025-05-16', '2025-05-01', '2025-05-31', NULL, 39900.00, 15000.00, 0.00, 0.00, 11900.00, 0.00, 0.00, 0.00, 39900.00, 15000.00, 0.00, 11900.00, 0.00, 0.00, 0.00, 0.00, 66800.00, 0.00, 66800.00, 'pendiente', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Internet + TV + reconexión', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
+(3, 'FAC000003', 3, '9876543210', 'MARÍA GARCÍA RUIZ', '2025-05', '2025-05-01', '2025-05-16', '2025-05-01', '2025-05-31', NULL, 39900.00, 15000.00, 0.00, 0.00, 11900.00, 0.00, 0.00, 0.00, 39900.00, 15000.00, 0.00, 11900.00, 0.00, 0.00, 0.00, 0.00, 66800.00, 0.00, 66800.00, 'vencida', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Internet + TV + reconexión', 1, '2025-06-09 13:29:14', '2025-07-04 21:22:33'),
 (4, 'FAC000004', 1, '1005450340', 'MATEO SALAZAR ORTIZ', '2025-05', '2025-05-01', '2025-05-16', '2025-05-01', '2025-05-31', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 10000.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 10000.00, 0.00, 0.00, 0.00, 49900.00, 0.00, 49900.00, 'pagada', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Internet con descuento promocional', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
-(5, 'FAC000005', 2, '1234567890', 'JUAN PÉREZ LÓPEZ', '2025-04', '2025-04-01', '2025-04-16', '2025-04-01', '2025-04-30', NULL, 45000.00, 25000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 25000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 70000.00, 0.00, 70000.00, 'anulada', NULL, NULL, NULL, 'R02', NULL, NULL, '1', 'Factura anulada por error en facturación', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14');
+(5, 'FAC000005', 2, '1234567890', 'JUAN PÉREZ LÓPEZ', '2025-04', '2025-04-01', '2025-04-16', '2025-04-01', '2025-04-30', NULL, 45000.00, 25000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 25000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 70000.00, 0.00, 70000.00, 'anulada', NULL, NULL, NULL, 'R02', NULL, NULL, '1', 'Factura anulada por error en facturación', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
+(6, 'FAC000006', 1, '12345678', 'Juan Carlos Rodríguez Méndez', '2025-06', '2025-06-26', '2025-06-16', '2025-06-01', '2025-06-30', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 59900.00, 'vencida', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Duplicada de factura FAC000001', 1, '2025-06-26 14:21:49', '2025-07-04 21:22:33'),
+(7, 'FAC000007', 2, '87654321', 'María Isabel García López', '2025-07', '2025-07-04', '2025-08-15', '2025-07-01', '2025-07-31', NULL, 49900.00, 50000.00, 10000.00, 0.00, 0.00, 0.00, 2000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 10000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', NULL, 1, '2025-07-04 20:43:37', '2025-07-04 20:43:37'),
+(16, '202500000002', 23, '52487047', 'Lina Maria Ortiz Pereira', '2025-07', '2025-07-08', '2025-08-07', '2025-07-08', NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 85000.00, 0.00, 85000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', 'Primera factura automática', 1, '2025-07-08 15:16:25', '2025-07-08 15:19:56'),
+(17, 'FAC000015', 25, '', '', '', '2025-07-08', '2025-08-07', NULL, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 0.00, 45000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', 'Primera factura automática', NULL, '2025-07-08 19:36:14', '2025-07-08 19:36:14'),
+(18, 'FAC000016', 26, '', '', '', '2025-07-08', '2025-08-07', NULL, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 65000.00, 0.00, 65000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', 'Primera factura automática', NULL, '2025-07-08 21:27:30', '2025-07-08 21:27:30'),
+(19, 'FAC000017', 27, '', '', '', '2025-07-08', '2025-08-07', NULL, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 0.00, 45000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', 'Primera factura automática', NULL, '2025-07-08 21:49:13', '2025-07-08 21:49:13');
 
 -- --------------------------------------------------------
 
@@ -606,6 +796,11 @@ CREATE TABLE `instalaciones` (
   `hora_inicio` time DEFAULT NULL,
   `hora_fin` time DEFAULT NULL,
   `estado` enum('programada','en_proceso','completada','cancelada','reagendada') DEFAULT 'programada',
+  `direccion_instalacion` varchar(255) DEFAULT NULL,
+  `barrio` varchar(100) DEFAULT NULL,
+  `telefono_contacto` varchar(30) DEFAULT NULL,
+  `persona_recibe` varchar(255) DEFAULT NULL,
+  `tipo_instalacion` enum('nueva','migracion','upgrade','reparacion') DEFAULT 'nueva',
   `observaciones` text DEFAULT NULL,
   `equipos_instalados` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`equipos_instalados`)),
   `fotos_instalacion` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`fotos_instalacion`)),
@@ -615,6 +810,15 @@ CREATE TABLE `instalaciones` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `instalaciones`
+--
+
+INSERT INTO `instalaciones` (`id`, `cliente_id`, `servicio_cliente_id`, `instalador_id`, `fecha_programada`, `hora_programada`, `fecha_realizada`, `hora_inicio`, `hora_fin`, `estado`, `direccion_instalacion`, `barrio`, `telefono_contacto`, `persona_recibe`, `tipo_instalacion`, `observaciones`, `equipos_instalados`, `fotos_instalacion`, `coordenadas_lat`, `coordenadas_lng`, `costo_instalacion`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 1, '2025-06-20', '09:00:00', '2025-06-20', '09:15:00', '11:30:00', 'completada', 'Calle 15 # 23-45, Barrio Centro', 'Centro', '3001234567', 'Juan Carlos Rodríguez', 'nueva', 'Instalación exitosa. Cliente muy colaborador. Señal excelente.', '[\r\n        {\r\n            \"equipo_id\": 1,\r\n            \"equipo_codigo\": \"RTR001\",\r\n            \"equipo_nombre\": \"Router WiFi AC1200\",\r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"TPL2024001\",\r\n            \"observaciones\": \"Router principal instalado en sala\"\r\n        },\r\n        {\r\n            \"equipo_id\": 3,\r\n            \"equipo_codigo\": \"CBL001\", \r\n            \"equipo_nombre\": \"Cable UTP Cat6\",\r\n            \"cantidad\": 15,\r\n            \"numero_serie\": \"CAB-001-001\",\r\n            \"observaciones\": \"15 metros utilizados para conexión desde tap hasta router\"\r\n        }\r\n    ]', '[\r\n        {\r\n            \"url\": \"/uploads/instalaciones/1/foto1.jpg\",\r\n            \"descripcion\": \"Router instalado en sala principal\",\r\n            \"fecha\": \"2025-06-20 10:30:00\"\r\n        },\r\n        {\r\n            \"url\": \"/uploads/instalaciones/1/foto2.jpg\", \r\n            \"descripcion\": \"Conexión externa desde tap\",\r\n            \"fecha\": \"2025-06-20 11:00:00\"\r\n        }\r\n    ]', 6.26377500, -73.13758900, 25000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30'),
+(2, 2, 2, 2, '2025-06-25', '14:00:00', NULL, '14:10:00', NULL, 'en_proceso', 'Carrera 10 # 45-67, Barrio Los Pinos', 'Los Pinos', '3109876543', 'María Isabel García', 'nueva', 'Instalación en progreso. Requiere conexión de fibra adicional.', '[\r\n        {\r\n            \"equipo_id\": 2,\r\n            \"equipo_codigo\": \"RTR002\",\r\n            \"equipo_nombre\": \"Router WiFi AX1800\", \r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"ASU2024001\",\r\n            \"observaciones\": \"Router de alta velocidad para plan 50MB\"\r\n        }\r\n    ]', NULL, 6.26412000, -73.13824500, 35000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30'),
+(3, 3, 3, 3, '2025-06-26', '08:30:00', NULL, NULL, NULL, 'programada', 'Calle 8 # 12-34, Barrio San José', 'San José', '3201234567', 'Carlos Alberto Ruiz', 'nueva', 'Instalación combo internet + TV. Cliente requiere configuración especial para TV en 2 habitaciones.', '[\r\n        {\r\n            \"equipo_id\": 1,\r\n            \"equipo_codigo\": \"RTR001\",\r\n            \"equipo_nombre\": \"Router WiFi AC1200\",\r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"Pendiente asignación de router específico\"\r\n        },\r\n        {\r\n            \"equipo_id\": 8,\r\n            \"equipo_codigo\": \"DEC001\", \r\n            \"equipo_nombre\": \"Decodificador TDT HD\",\r\n            \"cantidad\": 2,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"2 decodificadores para habitaciones\"\r\n        },\r\n        {\r\n            \"equipo_id\": 4,\r\n            \"equipo_codigo\": \"CBL002\",\r\n            \"equipo_nombre\": \"Cable Coaxial RG6\",\r\n            \"cantidad\": 25,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"Cable para distribución de señal TV\"\r\n        }\r\n    ]', NULL, 6.26289000, -73.13542300, 45000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30');
 
 -- --------------------------------------------------------
 
@@ -807,7 +1011,7 @@ CREATE TABLE `plantillas_correo` (
 
 INSERT INTO `plantillas_correo` (`id`, `titulo`, `asunto`, `contenido`, `tipo`, `activo`, `created_at`, `updated_at`) VALUES
 (1, 'Bienvenida', 'Bienvenido a nuestros servicios', 'Estimado cliente, le damos la bienvenida...', 'bienvenida', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
-(2, 'Facturación', 'Su factura está disponible', 'Su factura del mes está lista para descargar...', 'facturacion', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
+(2, 'Facturación', 'Su factura está disponible', 'Su factura del mes está lista para descargar...', 'facturacion', 0, '2025-05-23 13:44:46', '2025-07-07 22:02:26'),
 (3, 'Aviso de Corte', 'Aviso de suspensión de servicio', 'Le informamos que su servicio será suspendido...', 'corte', 1, '2025-05-23 13:44:46', '2025-05-23 13:44:46'),
 (4, 'Factura Vencida', 'Su factura {{numero_factura}} está vencida', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <h2 style=\"color: #0e6493;\">{{empresa_nombre}}</h2>\r\n    \r\n    <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n    \r\n    <p>Le informamos que su factura número <strong>{{numero_factura}}</strong> con fecha de vencimiento <strong>{{fecha_vencimiento}}</strong> por valor de <strong>{{valor_factura}}</strong> se encuentra vencida.</p>\r\n    \r\n    <div style=\"background-color: #f8f9fa; padding: 15px; border-left: 4px solid #0e6493; margin: 20px 0;\">\r\n        <h3 style=\"margin: 0; color: #0e6493;\">Información de Pago</h3>\r\n        <p style=\"margin: 10px 0 0 0;\">Para realizar su pago, comuníquese con nosotros al <strong>{{telefono_soporte}}</strong> o visite nuestras oficinas.</p>\r\n    </div>\r\n    \r\n    <p>Evite la suspensión de su servicio realizando el pago a la mayor brevedad posible.</p>\r\n    \r\n    <p style=\"margin-top: 30px;\">\r\n        Atentamente,<br>\r\n        <strong>{{empresa_nombre}}</strong><br>\r\n        Fecha: {{fecha_actual}}\r\n    </p>\r\n</div>', 'facturacion', 1, '2025-06-04 13:36:32', '2025-06-12 19:42:47'),
 (5, 'Aviso Corte por Mora', 'URGENTE: Suspensión de servicio programada', '<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\r\n    <div style=\"background-color: #dc3545; color: white; padding: 15px; text-align: center; margin-bottom: 20px;\">\r\n        <h2 style=\"margin: 0;\">⚠️ AVISO URGENTE ⚠️</h2>\r\n    </div>\r\n    \r\n    <p>Estimado/a <strong>{{nombre_cliente}}</strong>,</p>\r\n    \r\n    <p>Le informamos que debido a mora en el pago de sus servicios, <strong>su servicio será suspendido en las próximas 24 horas</strong>.</p>\r\n    \r\n    <div style=\"background-color: #fff3cd; padding: 15px; border: 1px solid #ffeaa7; border-radius: 5px; margin: 20px 0;\">\r\n        <h3 style=\"margin: 0 0 10px 0; color: #856404;\">Para evitar la suspensión:</h3>\r\n        <ul style=\"margin: 0; padding-left: 20px;\">\r\n            <li>Realice su pago inmediatamente</li>\r\n            <li>Comuníquese con nosotros al <strong>{{telefono_soporte}}</strong></li>\r\n            <li>Presente comprobante de pago</li>\r\n        </ul>\r\n    </div>\r\n    \r\n    <p><strong>Factura pendiente:</strong> {{numero_factura}}<br>\r\n    <strong>Valor:</strong> {{valor_factura}}<br>\r\n    <strong>Vencimiento:</strong> {{fecha_vencimiento}}</p>\r\n    \r\n    <p style=\"margin-top: 30px;\">\r\n        {{empresa_nombre}}<br>\r\n        {{fecha_actual}}\r\n    </p>\r\n</div>', 'corte', 1, '2025-06-04 13:36:32', '2025-06-04 13:54:32'),
@@ -905,6 +1109,20 @@ CREATE TABLE `servicios_cliente` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Volcado de datos para la tabla `servicios_cliente`
+--
+
+INSERT INTO `servicios_cliente` (`id`, `cliente_id`, `plan_id`, `fecha_activacion`, `fecha_suspension`, `estado`, `precio_personalizado`, `observaciones`, `instalador_id`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, '2025-06-20', NULL, 'activo', NULL, NULL, 1, '2025-06-25 13:23:57', '2025-06-25 13:23:57'),
+(2, 2, 3, '2025-06-22', NULL, 'activo', NULL, NULL, 2, '2025-06-25 13:23:57', '2025-06-25 13:23:57'),
+(3, 3, 6, '2025-06-25', NULL, 'activo', NULL, NULL, 3, '2025-06-25 13:23:57', '2025-06-25 13:23:57'),
+(6, 20, 1, '2025-07-08', NULL, 'activo', NULL, NULL, NULL, '2025-07-08 14:59:21', '2025-07-08 14:59:21'),
+(9, 23, 3, '2025-07-08', NULL, 'activo', NULL, NULL, NULL, '2025-07-08 15:16:25', '2025-07-08 15:16:25'),
+(10, 25, 1, '2025-07-08', NULL, 'activo', NULL, NULL, NULL, '2025-07-08 19:36:14', '2025-07-08 19:36:14'),
+(11, 26, 2, '2025-07-08', NULL, 'activo', NULL, NULL, NULL, '2025-07-08 21:27:30', '2025-07-08 21:27:30'),
+(12, 27, 1, '2025-07-08', NULL, 'activo', NULL, NULL, NULL, '2025-07-08 21:49:13', '2025-07-08 21:49:13');
+
 -- --------------------------------------------------------
 
 --
@@ -929,9 +1147,30 @@ CREATE TABLE `sistema_usuarios` (
 --
 
 INSERT INTO `sistema_usuarios` (`id`, `email`, `password`, `nombre`, `telefono`, `rol`, `activo`, `ultimo_acceso`, `created_at`, `updated_at`) VALUES
-(1, 'admin@empresa.com', '$2b$10$G79aY18UGoMa8iEa65GvieeQi74v7DkXCmQs4sVxuuhNCdWUBjcGO', 'Mateo salazar ortiz', '3007015239', 'administrador', 1, '2025-06-24 14:06:52', '2025-05-23 13:44:46', '2025-06-24 14:06:52'),
+(1, 'admin@empresa.com', '$2b$12$8pOnup7urwhWUA7.e8VpEuDYuUiZ/gVTIf35HbnKQSWBMQeb7QXAa', 'Mateo salazar ortiz', '3007015239', 'administrador', 1, '2025-07-08 15:00:54', '2025-05-23 13:44:46', '2025-07-08 15:00:54'),
 (2, 'super@empresa.com', '$2b$12$f1Vvth/hYSUD7VHtfmZKmOuNXrHowf0Fy2T7MtxdhRAZdIOQR8MCa', 'mateo salazar ortiz', '3007015239', 'supervisor', 1, '2025-06-03 16:18:19', '2025-05-30 14:32:41', '2025-06-11 13:07:30'),
 (3, 'instalador@empresa.com', '$2b$12$FCgmtglWlgNJPwNmNbX3fOp8eRnvpeaSgKdteS0mKYtKHq1/qq6Ri', 'mateo salazar ortiz', '3007015239', 'instalador', 1, '2025-06-04 16:44:35', '2025-05-30 15:00:25', '2025-06-04 16:44:35');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura Stand-in para la vista `vista_cartera_actual`
+-- (Véase abajo para la vista actual)
+--
+CREATE TABLE `vista_cartera_actual` (
+`cliente_id` int(11)
+,`identificacion` varchar(20)
+,`cliente_nombre` varchar(255)
+,`telefono` varchar(30)
+,`correo` varchar(100)
+,`sector` varchar(100)
+,`sector_codigo` varchar(3)
+,`facturas_pendientes` bigint(21)
+,`saldo_total` decimal(32,2)
+,`fecha_primera_mora` date
+,`dias_mora_maxima` bigint(7)
+,`categoria_mora` varchar(13)
+);
 
 -- --------------------------------------------------------
 
@@ -1010,6 +1249,26 @@ CREATE TABLE `vista_equipos_instaladores` (
 -- --------------------------------------------------------
 
 --
+-- Estructura Stand-in para la vista `vista_estadisticas_mensuales`
+-- (Véase abajo para la vista actual)
+--
+CREATE TABLE `vista_estadisticas_mensuales` (
+`periodo` varchar(7)
+,`total_facturas` bigint(21)
+,`pendientes` bigint(21)
+,`pagadas` bigint(21)
+,`anuladas` bigint(21)
+,`vencidas` bigint(21)
+,`valor_total_facturado` decimal(32,2)
+,`valor_recaudado` decimal(32,2)
+,`valor_pendiente_cobro` decimal(32,2)
+,`promedio_factura` decimal(14,6)
+,`clientes_facturados` bigint(21)
+);
+
+-- --------------------------------------------------------
+
+--
 -- Estructura Stand-in para la vista `vista_estadisticas_pqr`
 -- (Véase abajo para la vista actual)
 --
@@ -1074,6 +1333,15 @@ CREATE TABLE `vista_suscriptores_tecnologia` (
 -- --------------------------------------------------------
 
 --
+-- Estructura para la vista `vista_cartera_actual`
+--
+DROP TABLE IF EXISTS `vista_cartera_actual`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vista_cartera_actual`  AS SELECT `c`.`id` AS `cliente_id`, `c`.`identificacion` AS `identificacion`, `c`.`nombre` AS `cliente_nombre`, `c`.`telefono` AS `telefono`, `c`.`correo` AS `correo`, `s`.`nombre` AS `sector`, `s`.`codigo` AS `sector_codigo`, count(`f`.`id`) AS `facturas_pendientes`, sum(`f`.`total`) AS `saldo_total`, min(`f`.`fecha_vencimiento`) AS `fecha_primera_mora`, max(to_days(curdate()) - to_days(`f`.`fecha_vencimiento`)) AS `dias_mora_maxima`, CASE WHEN max(to_days(curdate()) - to_days(`f`.`fecha_vencimiento`)) <= 30 THEN 'MORA_TEMPRANA' WHEN max(to_days(curdate()) - to_days(`f`.`fecha_vencimiento`)) <= 60 THEN 'MORA_MEDIA' WHEN max(to_days(curdate()) - to_days(`f`.`fecha_vencimiento`)) <= 90 THEN 'MORA_ALTA' ELSE 'MORA_CRITICA' END AS `categoria_mora` FROM ((`clientes` `c` join `facturas` `f` on(`c`.`id` = `f`.`cliente_id`)) left join `sectores` `s` on(`c`.`sector_id` = `s`.`id`)) WHERE `f`.`estado` in ('pendiente','vencida') AND `f`.`activo` = '1' AND `c`.`estado` = 'activo' GROUP BY `c`.`id` HAVING `saldo_total` > 0 ;
+
+-- --------------------------------------------------------
+
+--
 -- Estructura para la vista `vista_cartera_vencida`
 --
 DROP TABLE IF EXISTS `vista_cartera_vencida`;
@@ -1097,6 +1365,15 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 DROP TABLE IF EXISTS `vista_equipos_instaladores`;
 
 CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vista_equipos_instaladores`  AS SELECT `e`.`id` AS `id`, `e`.`codigo` AS `codigo`, `e`.`nombre` AS `nombre`, `e`.`tipo` AS `tipo`, `e`.`marca` AS `marca`, `e`.`modelo` AS `modelo`, `e`.`numero_serie` AS `numero_serie`, `e`.`estado` AS `estado`, `e`.`precio_compra` AS `precio_compra`, `e`.`fecha_compra` AS `fecha_compra`, `e`.`proveedor` AS `proveedor`, `e`.`ubicacion` AS `ubicacion`, `e`.`ubicacion_actual` AS `ubicacion_actual`, `e`.`coordenadas_lat` AS `coordenadas_lat`, `e`.`coordenadas_lng` AS `coordenadas_lng`, `e`.`observaciones` AS `observaciones`, `e`.`notas_instalador` AS `notas_instalador`, `e`.`instalador_id` AS `instalador_id`, `e`.`fecha_asignacion` AS `fecha_asignacion`, `e`.`fecha_devolucion` AS `fecha_devolucion`, `u`.`nombre` AS `instalador_nombre`, `u`.`telefono` AS `instalador_telefono`, `u`.`email` AS `instalador_email`, `e`.`created_at` AS `created_at`, `e`.`updated_at` AS `updated_at`, CASE WHEN `e`.`fecha_asignacion` is not null AND `e`.`fecha_devolucion` is null THEN to_days(current_timestamp()) - to_days(`e`.`fecha_asignacion`) WHEN `e`.`fecha_asignacion` is not null AND `e`.`fecha_devolucion` is not null THEN to_days(`e`.`fecha_devolucion`) - to_days(`e`.`fecha_asignacion`) ELSE NULL END AS `dias_asignado`, CASE WHEN `e`.`estado` = 'asignado' AND `e`.`instalador_id` is not null THEN concat('Asignado a ',`u`.`nombre`) WHEN `e`.`estado` = 'instalado' AND `e`.`instalador_id` is not null THEN concat('Instalado por ',`u`.`nombre`) ELSE `e`.`estado` END AS `estado_descriptivo` FROM (`inventario_equipos` `e` left join `sistema_usuarios` `u` on(`e`.`instalador_id` = `u`.`id` and `u`.`rol` = 'instalador')) ;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura para la vista `vista_estadisticas_mensuales`
+--
+DROP TABLE IF EXISTS `vista_estadisticas_mensuales`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vista_estadisticas_mensuales`  AS SELECT date_format(`facturas`.`fecha_emision`,'%Y-%m') AS `periodo`, count(0) AS `total_facturas`, count(case when `facturas`.`estado` = 'pendiente' then 1 end) AS `pendientes`, count(case when `facturas`.`estado` = 'pagada' then 1 end) AS `pagadas`, count(case when `facturas`.`estado` = 'anulada' then 1 end) AS `anuladas`, count(case when `facturas`.`estado` = 'vencida' then 1 end) AS `vencidas`, sum(`facturas`.`total`) AS `valor_total_facturado`, sum(case when `facturas`.`estado` = 'pagada' then `facturas`.`total` else 0 end) AS `valor_recaudado`, sum(case when `facturas`.`estado` in ('pendiente','vencida') then `facturas`.`total` else 0 end) AS `valor_pendiente_cobro`, avg(`facturas`.`total`) AS `promedio_factura`, count(distinct `facturas`.`cliente_id`) AS `clientes_facturados` FROM `facturas` WHERE `facturas`.`activo` = '1' GROUP BY date_format(`facturas`.`fecha_emision`,'%Y-%m') ORDER BY date_format(`facturas`.`fecha_emision`,'%Y-%m') DESC ;
 
 -- --------------------------------------------------------
 
@@ -1208,6 +1485,13 @@ ALTER TABLE `configuracion_empresa`
   ADD KEY `idx_licencia` (`licencia`);
 
 --
+-- Indices de la tabla `configuracion_facturacion`
+--
+ALTER TABLE `configuracion_facturacion`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_parametro` (`parametro`);
+
+--
 -- Indices de la tabla `cortes_servicio`
 --
 ALTER TABLE `cortes_servicio`
@@ -1236,6 +1520,15 @@ ALTER TABLE `detalle_facturas`
   ADD KEY `servicio_cliente_id` (`servicio_cliente_id`);
 
 --
+-- Indices de la tabla `facturacion_historial`
+--
+ALTER TABLE `facturacion_historial`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_fecha_proceso` (`fecha_proceso`),
+  ADD KEY `idx_tipo_proceso` (`tipo_proceso`),
+  ADD KEY `idx_estado` (`estado`);
+
+--
 -- Indices de la tabla `facturas`
 --
 ALTER TABLE `facturas`
@@ -1250,7 +1543,16 @@ ALTER TABLE `facturas`
   ADD KEY `idx_periodo` (`periodo_facturacion`),
   ADD KEY `idx_ruta` (`ruta`),
   ADD KEY `banco_id` (`banco_id`),
-  ADD KEY `created_by` (`created_by`);
+  ADD KEY `created_by` (`created_by`),
+  ADD KEY `idx_estado_fecha` (`estado`,`fecha_emision`),
+  ADD KEY `idx_cliente_estado` (`cliente_id`,`estado`),
+  ADD KEY `idx_periodo_estado` (`periodo_facturacion`,`estado`),
+  ADD KEY `idx_fecha_vencimientoo` (`fecha_vencimiento`),
+  ADD KEY `idx_numero_facturaa` (`numero_factura`),
+  ADD KEY `idx_identificacion_cliente` (`identificacion_cliente`),
+  ADD KEY `idx_nombre_cliente` (`nombre_cliente`),
+  ADD KEY `idx_activo_estado` (`activo`,`estado`),
+  ADD KEY `idx_ruta_estado` (`ruta`,`estado`);
 
 --
 -- Indices de la tabla `incidencias_servicio`
@@ -1429,13 +1731,13 @@ ALTER TABLE `ciudades`
 -- AUTO_INCREMENT de la tabla `clientes`
 --
 ALTER TABLE `clientes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
 
 --
 -- AUTO_INCREMENT de la tabla `clientes_inactivos`
 --
 ALTER TABLE `clientes_inactivos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT de la tabla `codigos_regulatorios`
@@ -1447,13 +1749,19 @@ ALTER TABLE `codigos_regulatorios`
 -- AUTO_INCREMENT de la tabla `conceptos_facturacion`
 --
 ALTER TABLE `conceptos_facturacion`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=912;
 
 --
 -- AUTO_INCREMENT de la tabla `configuracion_empresa`
 --
 ALTER TABLE `configuracion_empresa`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT de la tabla `configuracion_facturacion`
+--
+ALTER TABLE `configuracion_facturacion`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=134;
 
 --
 -- AUTO_INCREMENT de la tabla `cortes_servicio`
@@ -1474,10 +1782,16 @@ ALTER TABLE `detalle_facturas`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT de la tabla `facturacion_historial`
+--
+ALTER TABLE `facturacion_historial`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT de la tabla `facturas`
 --
 ALTER TABLE `facturas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT de la tabla `incidencias_servicio`
@@ -1489,7 +1803,7 @@ ALTER TABLE `incidencias_servicio`
 -- AUTO_INCREMENT de la tabla `instalaciones`
 --
 ALTER TABLE `instalaciones`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT de la tabla `inventario_equipos`
@@ -1555,7 +1869,7 @@ ALTER TABLE `sectores`
 -- AUTO_INCREMENT de la tabla `servicios_cliente`
 --
 ALTER TABLE `servicios_cliente`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT de la tabla `sistema_usuarios`

@@ -296,62 +296,186 @@ class ConfigService {
     return this.makeRequest(`${this.baseURL}/banks/stats`);
   }
 
-  // ==========================================
-  // PLANES DE SERVICIO
-  // ==========================================
-
-  async getServicePlans(tipo = null, activo = null) {
-    let url = `${this.baseURL}/service-plans`;
-    const params = new URLSearchParams();
-    
-    if (tipo) params.append('tipo', tipo);
-    if (activo !== null) params.append('activo', activo);
-    
-    if (params.toString()) {
-      url += `?${params.toString()}`;
+   async getServicePlans(params = {}) {
+    try {
+      const queryParams = new URLSearchParams(params).toString();
+      const url = queryParams ? 
+        `${this.baseURL}/service-plans?${queryParams}` : 
+        `${this.baseURL}/service-plans`;
+        
+      console.log('🔄 ConfigService: Solicitando planes desde:', url);
+      
+      const response = await this.makeRequest(url);
+      console.log('📡 ConfigService: Respuesta recibida:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('❌ ConfigService: Error obteniendo planes:', error);
+      throw error;
     }
-    
-    return this.makeRequest(url);
-  }
-
-  async getServicePlanById(id) {
-    return this.makeRequest(`${this.baseURL}/service-plans/${id}`);
-  }
-
-  async createServicePlan(plan) {
-    return this.makeRequest(`${this.baseURL}/service-plans`, {
-      method: 'POST',
-      body: JSON.stringify(plan),
-    });
-  }
-
-  async updateServicePlan(id, plan) {
-    return this.makeRequest(`${this.baseURL}/service-plans/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(plan),
-    });
-  }
-
-  async toggleServicePlan(id) {
-    return this.makeRequest(`${this.baseURL}/service-plans/${id}/toggle`, {
-      method: 'POST',
-    });
-  }
-
-  async deleteServicePlan(id) {
-    return this.makeRequest(`${this.baseURL}/service-plans/${id}`, {
-      method: 'DELETE',
-    });
   }
 
   async getServicePlanStats() {
-    return this.makeRequest(`${this.baseURL}/service-plans/stats`);
+    try {
+      return await this.makeRequest(`${this.baseURL}/service-plans/stats`);
+    } catch (error) {
+      console.error('❌ ConfigService: Error obteniendo estadísticas:', error);
+      throw error;
+    }
   }
 
-  async getServicePlansByType() {
-    return this.makeRequest(`${this.baseURL}/service-plans/by-type`);
+  async getServicePlanById(id) {
+    try {
+      return await this.makeRequest(`${this.baseURL}/service-plans/${id}`);
+    } catch (error) {
+      console.error('❌ ConfigService: Error obteniendo plan:', error);
+      throw error;
+    }
   }
 
+  async createServicePlan(planData) {
+    try {
+      return await this.makeRequest(`${this.baseURL}/service-plans`, {
+        method: 'POST',
+        body: JSON.stringify(planData),
+      });
+    } catch (error) {
+      console.error('❌ ConfigService: Error creando plan:', error);
+      throw error;
+    }
+  }
+
+  async updateServicePlan(id, planData) {
+    try {
+      return await this.makeRequest(`${this.baseURL}/service-plans/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(planData),
+      });
+    } catch (error) {
+      console.error('❌ ConfigService: Error actualizando plan:', error);
+      throw error;
+    }
+  }
+
+  async deleteServicePlan(id) {
+    try {
+      return await this.makeRequest(`${this.baseURL}/service-plans/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      console.error('❌ ConfigService: Error eliminando plan:', error);
+      throw error;
+    }
+  }
+
+  async toggleServicePlanStatus(id, activo) {
+    try {
+      return await this.makeRequest(`${this.baseURL}/service-plans/${id}/toggle-status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ activo }),
+      });
+    } catch (error) {
+      console.error('❌ ConfigService: Error cambiando estado:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================
+  // MÉTODOS DE UTILIDAD PARA PLANES
+  // ==========================================
+
+  async getServicePlansForClientForm() {
+    try {
+      const response = await this.getServicePlans({ 
+        activo: 1, 
+        orden: 'orden_visualizacion' 
+      });
+      
+      // Agrupar planes por segmento y tipo
+      const planesAgrupados = {
+        residencial: { internet: [], television: [], combo: [] },
+        empresarial: { internet: [], television: [], combo: [] }
+      };
+
+      if (response.success && response.data) {
+        response.data.forEach(plan => {
+          const segmento = plan.segmento || 'residencial';
+          const tipo = plan.tipo;
+          
+          if (planesAgrupados[segmento] && planesAgrupados[segmento][tipo]) {
+            planesAgrupados[segmento][tipo].push({
+              id: plan.id,
+              codigo: plan.codigo,
+              nombre: plan.nombre,
+              precio: plan.precio,
+              precio_con_iva: plan.precio_con_iva,
+              velocidad_bajada: plan.velocidad_bajada,
+              canales_tv: plan.canales_tv,
+              permanencia_meses: plan.permanencia_meses,
+              precio_instalacion: plan.precio_instalacion,
+              especificaciones: this.getEspecificacionesDisplay(plan)
+            });
+          }
+        });
+      }
+
+      return {
+        success: true,
+        data: {
+          planes_agrupados: planesAgrupados,
+          planes_simples: response.data || []
+        }
+      };
+    } catch (error) {
+      console.error('❌ ConfigService: Error obteniendo planes para formulario:', error);
+      throw error;
+    }
+  }
+
+  getEspecificacionesDisplay(plan) {
+    switch (plan.tipo) {
+      case 'internet':
+        return plan.velocidad_bajada ? `${plan.velocidad_bajada} Mbps` : 'Internet';
+      case 'television':
+        return plan.canales_tv ? `${plan.canales_tv} canales` : 'TV';
+      case 'combo':
+        const internet = plan.velocidad_bajada ? `${plan.velocidad_bajada} Mbps` : '';
+        const tv = plan.canales_tv ? `${plan.canales_tv} canales` : '';
+        return internet && tv ? `${internet} + ${tv}` : 'Combo';
+      default:
+        return 'N/A';
+    }
+  }
+
+// ================================================================
+// TAMBIÉN ACTUALIZAR EL apiService.js EXISTENTE
+// ================================================================
+
+/*
+En frontend/src/services/apiService.js, BUSCAR la sección de configService 
+y REEMPLAZAR por:
+
+export const configService = {
+  getCompany: () => apiService.get('/config/company'),
+  updateCompany: (data) => apiService.put('/config/company', data),
+  getEmailTemplates: () => apiService.get('/config/email-templates'),
+  updateEmailTemplate: (id, data) => apiService.put(`/config/email-templates/${id}`, data),
+  getBanks: () => apiService.get('/config/banks'),
+  getSectors: () => apiService.get('/config/sectors'),
+  getCities: () => apiService.get('/config/cities'),
+  getDepartments: () => apiService.get('/config/departments'),
+  
+  // ✅ PLANES DE SERVICIO MEJORADOS
+  getServicePlans: (params) => apiService.get('/config/service-plans', params),
+  getServicePlanStats: () => apiService.get('/config/service-plans/stats'),
+  getServicePlanById: (id) => apiService.get(`/config/service-plans/${id}`),
+  createServicePlan: (data) => apiService.post('/config/service-plans', data),
+  updateServicePlan: (id, data) => apiService.put(`/config/service-plans/${id}`, data),
+  deleteServicePlan: (id) => apiService.delete(`/config/service-plans/${id}`),
+  toggleServicePlanStatus: (id, activo) => apiService.patch(`/config/service-plans/${id}/toggle-status`, { activo }),
+  getServicePlansForClientForm: () => apiService.get('/config/service-plans', { activo: 1, orden: 'orden_visualizacion' }),
+};
+*/
   // ==========================================
   // MÉTODOS DE CONVENIENCIA Y UTILIDADES
   // ==========================================
