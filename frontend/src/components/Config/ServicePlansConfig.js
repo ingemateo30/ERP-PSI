@@ -18,6 +18,7 @@ const ServicePlansConfig = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [estadisticas, setEstadisticas] = useState({});
 
   // Estados del formulario - SIN CAMPOS OBSOLETOS
@@ -359,12 +360,12 @@ const ServicePlansConfig = () => {
 
   const filteredPlanes = planes.filter(plan => {
     const matchesSearch = plan.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      plan.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      plan.descripcion?.toLowerCase().includes(searchTerm.toLowerCase());
-
+      plan.codigo.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'all' || plan.tipo === filterType;
-
-    return matchesSearch && matchesFilter;
+    const matchesStatus = filterStatus === 'all' ||
+      (filterStatus === 'active' && plan.activo) ||
+      (filterStatus === 'inactive' && !plan.activo); // ✅ AGREGAR ESTA LÍNEA
+    return matchesSearch && matchesFilter && matchesStatus; // ✅ AGREGAR && matchesStatus
   });
 
   const openEditModal = (plan) => {
@@ -492,6 +493,17 @@ const ServicePlansConfig = () => {
               <option value="television">Televisión</option>
               <option value="combo">Combo</option>
             </select>
+            <div>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">Todos los estados</option>
+                <option value="active">Solo activos</option>
+                <option value="inactive">Solo inactivos</option>
+              </select>
+            </div>
           </div>
 
           <button
@@ -528,8 +540,8 @@ const ServicePlansConfig = () => {
                   <button
                     onClick={() => handleToggleStatus(plan)}
                     className={`p-1 rounded transition-colors ${plan.activo
-                        ? 'text-green-600 hover:bg-green-50'
-                        : 'text-gray-400 hover:bg-gray-50'
+                      ? 'text-green-600 hover:bg-green-50'
+                      : 'text-gray-400 hover:bg-gray-50'
                       }`}
                     title={plan.activo ? 'Desactivar' : 'Activar'}
                   >
