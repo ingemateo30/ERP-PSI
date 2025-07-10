@@ -1,5 +1,5 @@
 // backend/controllers/servicePlansController.js
-// VERSIÓN CORREGIDA basada en la estructura REAL de la base de datos
+// VERSIÓN OPTIMIZADA - Sin campos obsoletos: precio_instalacion, permanencia_meses, conceptos_incluidos
 
 const { Database } = require('../models/Database');
 const { validationResult } = require('express-validator');
@@ -7,96 +7,65 @@ const { validationResult } = require('express-validator');
 class ServicePlansController {
 
   /**
-   * OBTENER TODOS LOS PLANES CON FILTROS AVANZADOS
+   * OBTENER TODOS LOS PLANES CON PAGINACIÓN Y FILTROS
    */
   static async getPlans(req, res) {
     try {
-      console.log('🔍 Obteniendo planes de servicio con filtros:', req.query);
-
-      const {
-        tipo,
-        segmento,
-        activo,
-        promocional,
-        incluir_promocionales = true,
-        orden = 'orden_visualizacion',
-        limite,
-        offset,
-        search,
-        tecnologia
+      const { 
+        page = 1, 
+        limit = 50, 
+        search = '', 
+        tipo = '', 
+        activo = '', 
+        segmento = '',
+        orden = 'orden_visualizacion'
       } = req.query;
 
-      // Construir consulta con los campos REALES de la BD
+      console.log('📊 Obteniendo planes con filtros:', { page, limit, search, tipo, activo, segmento });
+
       let query = `
         SELECT 
           p.*,
           CASE WHEN p.aplica_iva = 1 THEN p.precio * 1.19 ELSE p.precio END as precio_con_iva,
-          COALESCE(p.velocidad_subida, 0) + COALESCE(p.velocidad_bajada, 0) as velocidad_total,
-          (SELECT COUNT(*) FROM servicios_cliente sc WHERE sc.plan_id = p.id AND sc.estado = 'activo') as clientes_activos,
-          CASE 
-            WHEN p.precio_internet > 0 AND p.precio_television > 0 THEN 'Combo'
-            WHEN p.precio_internet > 0 THEN 'Solo Internet'
-            WHEN p.precio_television > 0 THEN 'Solo TV'
-            ELSE 'Otro'
-          END as tipo_servicio_detallado
-        FROM planes_servicio p
+          (SELECT COUNT(*) FROM servicios_cliente sc WHERE sc.plan_id = p.id AND sc.estado = 'activo') as clientes_activos
+        FROM planes_servicio p 
         WHERE 1=1
       `;
 
       const params = [];
 
-      // Aplicar filtros
+      // Filtros dinámicos
+      if (search) {
+        query += ` AND (p.nombre LIKE ? OR p.codigo LIKE ? OR p.descripcion LIKE ?)`;
+        const searchTerm = `%${search}%`;
+        params.push(searchTerm, searchTerm, searchTerm);
+      }
+
       if (tipo) {
-        query += ' AND p.tipo = ?';
+        query += ` AND p.tipo = ?`;
         params.push(tipo);
       }
 
+      if (activo !== '') {
+        query += ` AND p.activo = ?`;
+        params.push(activo === 'true' ? 1 : 0);
+      }
+
       if (segmento) {
-        query += ' AND p.segmento = ?';
+        query += ` AND p.segmento = ?`;
         params.push(segmento);
       }
 
-      if (activo !== undefined && activo !== '') {
-        query += ' AND p.activo = ?';
-        params.push(parseInt(activo));
-      }
-
-      if (promocional !== undefined) {
-        query += ' AND p.promocional = ?';
-        params.push(promocional === 'true' ? 1 : 0);
-      }
-
-      if (tecnologia) {
-        query += ' AND p.tecnologia = ?';
-        params.push(tecnologia);
-      }
-
-      // Búsqueda por texto
-      if (search) {
-        query += ' AND (p.nombre LIKE ? OR p.codigo LIKE ? OR p.descripcion LIKE ?)';
-        const searchParam = `%${search}%`;
-        params.push(searchParam, searchParam, searchParam);
-      }
-
-      // Filtro de promocionales vigentes
-      if (incluir_promocionales === 'false') {
-        query += ' AND (p.promocional = 0 OR (p.promocional = 1 AND (p.fecha_fin_promocion IS NULL OR p.fecha_fin_promocion >= CURDATE())))';
-      }
-
       // Ordenamiento
-      const ordenamientosValidos = [
-        'orden_visualizacion', 'nombre', 'precio', 'created_at', 'updated_at', 
-        'tipo', 'segmento', 'clientes_activos'
-      ];
-      
-      if (ordenamientosValidos.includes(orden)) {
-        query += ` ORDER BY ${orden === 'clientes_activos' ? 'clientes_activos' : 'p.' + orden}`;
-      } else {
-        query += ' ORDER BY p.orden_visualizacion, p.nombre';
-      }
+      const ordenesValidos = ['orden_visualizacion', 'nombre', 'precio', 'created_at', 'tipo'];
+      const ordenFinal = ordenesValidos.includes(orden) ? orden : 'orden_visualizacion';
+      query += ` ORDER BY p.${ordenFinal} ASC, p.nombre ASC`;
 
       // Paginación
-      if (limite) {
+      if (limit && limit !== 'all') {
+        const limite = parseInt(limit);
+        const offset = (parseInt(page) - 1) * limite;
+        
         query += ' LIMIT ?';
         params.push(parseInt(limite));
         
@@ -111,14 +80,9 @@ class ServicePlansController {
 
       const planes = await Database.query(query, params);
 
-      // Procesar conceptos incluidos (JSON)
+      // ✅ PROCESAR DATOS SIN CAMPOS OBSOLETOS
       const planesFormateados = planes.map(plan => ({
         ...plan,
-        conceptos_incluidos: plan.conceptos_incluidos ? 
-          (typeof plan.conceptos_incluidos === 'string' ? 
-            JSON.parse(plan.conceptos_incluidos) : 
-            plan.conceptos_incluidos
-          ) : null,
         // Convertir valores numéricos a números
         precio: parseFloat(plan.precio) || 0,
         precio_internet: parseFloat(plan.precio_internet) || 0,
@@ -126,19 +90,19 @@ class ServicePlansController {
         velocidad_bajada: parseInt(plan.velocidad_bajada) || 0,
         velocidad_subida: parseInt(plan.velocidad_subida) || 0,
         canales_tv: parseInt(plan.canales_tv) || 0,
-        permanencia_meses: parseInt(plan.permanencia_meses) || 0,
         descuento_combo: parseFloat(plan.descuento_combo) || 0,
-        precio_instalacion: parseFloat(plan.precio_instalacion) || 0,
         orden_visualizacion: parseInt(plan.orden_visualizacion) || 0,
         
-        // CAMPOS NUEVOS REALES DE LA BD
+        // ✅ CAMPOS OPTIMIZADOS DE INSTALACIÓN
+        costo_instalacion_permanencia: parseFloat(plan.costo_instalacion_permanencia) || 0,
+        costo_instalacion_sin_permanencia: parseFloat(plan.costo_instalacion_sin_permanencia) || 0,
+        permanencia_minima_meses: parseInt(plan.permanencia_minima_meses) || 0,
+        
+        // Precios con IVA específicos
         precio_internet_sin_iva: parseFloat(plan.precio_internet_sin_iva) || 0,
         precio_television_sin_iva: parseFloat(plan.precio_television_sin_iva) || 0,
         precio_internet_con_iva: parseFloat(plan.precio_internet_con_iva) || 0,
         precio_television_con_iva: parseFloat(plan.precio_television_con_iva) || 0,
-        costo_instalacion_permanencia: parseFloat(plan.costo_instalacion_permanencia) || 0,
-        costo_instalacion_sin_permanencia: parseFloat(plan.costo_instalacion_sin_permanencia) || 0,
-        permanencia_minima_meses: parseInt(plan.permanencia_minima_meses) || 0,
         
         // Convertir valores booleanos
         activo: Boolean(plan.activo),
@@ -192,10 +156,15 @@ class ServicePlansController {
         });
       }
 
+      // ✅ SIN PROCESAMIENTO DE CAMPOS OBSOLETOS
       const plan = {
         ...planes[0],
-        conceptos_incluidos: planes[0].conceptos_incluidos ? 
-          JSON.parse(planes[0].conceptos_incluidos) : null
+        // Convertir tipos de datos correctamente
+        activo: Boolean(planes[0].activo),
+        aplica_iva: Boolean(planes[0].aplica_iva),
+        requiere_instalacion: Boolean(planes[0].requiere_instalacion),
+        promocional: Boolean(planes[0].promocional),
+        aplica_permanencia: Boolean(planes[0].aplica_permanencia)
       };
 
       res.json({
@@ -215,7 +184,7 @@ class ServicePlansController {
   }
 
   /**
-   * CREAR NUEVO PLAN CON TODOS LOS CAMPOS REALES
+   * ✅ CREAR NUEVO PLAN SIN CAMPOS OBSOLETOS
    */
   static async createPlan(req, res) {
     try {
@@ -245,17 +214,14 @@ class ServicePlansController {
         // Campos de precios específicos
         precio_internet,
         precio_television,
-        precio_instalacion = 42016,
         requiere_instalacion = true,
         
         // Campos de segmentación
         segmento = 'residencial',
         tecnologia = 'Fibra Óptica',
-        permanencia_meses = 0,
         descuento_combo = 0,
         
-        // Campos JSON y configuración avanzada
-        conceptos_incluidos,
+        // Campos de configuración
         orden_visualizacion = 0,
         
         // Campos promocionales
@@ -263,7 +229,7 @@ class ServicePlansController {
         fecha_inicio_promocion,
         fecha_fin_promocion,
         
-        // CAMPOS NUEVOS REALES DE LA BD
+        // ✅ CAMPOS OPTIMIZADOS DE INSTALACIÓN Y PERMANENCIA
         aplica_iva_estrato_123 = false,
         aplica_iva_estrato_456 = true,
         precio_internet_sin_iva,
@@ -280,7 +246,7 @@ class ServicePlansController {
 
       // Verificar código único
       const codigoExistente = await Database.query(
-        'SELECT id FROM planes_servicio WHERE codigo = ?', 
+        'SELECT id FROM planes_servicio WHERE codigo = ?',
         [codigo]
       );
 
@@ -291,89 +257,42 @@ class ServicePlansController {
         });
       }
 
-      // Validar precios según tipo
-      let precioInternetFinal = precio_internet || 0;
-      let precioTelevisionFinal = precio_television || 0;
+      // ✅ CALCULAR PRECIOS SIN IVA/CON IVA AUTOMÁTICAMENTE
+      const precioInternetFinal = parseFloat(precio_internet) || 0;
+      const precioTelevisionFinal = parseFloat(precio_television) || 0;
 
-      if (tipo === 'internet') {
-        precioInternetFinal = precio;
-        precioTelevisionFinal = 0;
-      } else if (tipo === 'television') {
-        precioInternetFinal = 0;
-        precioTelevisionFinal = precio;
-      } else if (tipo === 'combo') {
-        if (!precio_internet && !precio_television) {
-          precioInternetFinal = Math.round(precio * 0.65);
-          precioTelevisionFinal = Math.round(precio * 0.35);
-        }
-      }
+      const precioInternetSinIVA = precio_internet_sin_iva ? 
+        parseFloat(precio_internet_sin_iva) : precioInternetFinal;
+      const precioTVSinIVA = precio_television_sin_iva ? 
+        parseFloat(precio_television_sin_iva) : precioTelevisionFinal;
 
-      // Auto-calcular precios con y sin IVA si no se proporcionan
-      let precioInternetSinIVA = precio_internet_sin_iva || precioInternetFinal;
-      let precioInternetConIVA = precio_internet_con_iva || Math.round(precioInternetFinal * 1.19);
-      let precioTVSinIVA = precio_television_sin_iva || Math.round(precioTelevisionFinal / 1.19);
-      let precioTVConIVA = precio_television_con_iva || precioTelevisionFinal;
+      const ivaRate = 0.19; // 19%
+      const precioInternetConIVA = precio_internet_con_iva ? 
+        parseFloat(precio_internet_con_iva) : (precioInternetSinIVA * (1 + ivaRate));
+      const precioTVConIVA = precio_television_con_iva ? 
+        parseFloat(precio_television_con_iva) : (precioTVSinIVA * (1 + ivaRate));
 
-      // Crear conceptos incluidos
-      let conceptosIncluidos = {};
-      if (conceptos_incluidos) {
-        try {
-          conceptosIncluidos = typeof conceptos_incluidos === 'string' 
-            ? JSON.parse(conceptos_incluidos) 
-            : conceptos_incluidos;
-        } catch (e) {
-          conceptosIncluidos = {};
-        }
-      }
-
-      // Auto-generar conceptos básicos si está vacío
-      if (Object.keys(conceptosIncluidos).length === 0) {
-        conceptosIncluidos = {
-          tipo_principal: tipo,
-          instalacion: precio_instalacion
-        };
-
-        if (precioInternetFinal > 0) {
-          conceptosIncluidos.internet = {
-            precio: precioInternetFinal,
-            velocidad_bajada: velocidad_bajada,
-            velocidad_subida: velocidad_subida
-          };
-        }
-
-        if (precioTelevisionFinal > 0) {
-          conceptosIncluidos.television = {
-            precio: precioTelevisionFinal,
-            canales: canales_tv
-          };
-        }
-
-        if (tipo === 'combo' && descuento_combo > 0) {
-          conceptosIncluidos.descuento_combo = descuento_combo;
-        }
-      }
-
-      // Insertar en base de datos con TODOS los campos reales
+      // ✅ INSERTAR CON CAMPOS OPTIMIZADOS
       const result = await Database.query(`
         INSERT INTO planes_servicio (
           codigo, nombre, tipo, precio, velocidad_subida, velocidad_bajada, 
           canales_tv, descripcion, aplica_iva, activo, precio_internet, precio_television,
-          precio_instalacion, requiere_instalacion, segmento, tecnologia,
-          permanencia_meses, descuento_combo, conceptos_incluidos, orden_visualizacion,
+          requiere_instalacion, segmento, tecnologia,
+          descuento_combo, orden_visualizacion,
           promocional, fecha_inicio_promocion, fecha_fin_promocion,
           aplica_iva_estrato_123, aplica_iva_estrato_456,
           precio_internet_sin_iva, precio_television_sin_iva,
           precio_internet_con_iva, precio_television_con_iva,
           costo_instalacion_permanencia, costo_instalacion_sin_permanencia,
           permanencia_minima_meses, aplica_permanencia
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         codigo, nombre, tipo, precio, 
         velocidad_subida || null, velocidad_bajada || null, canales_tv || null, descripcion,
         aplica_iva ? 1 : 0, activo ? 1 : 0, 
         precioInternetFinal, precioTelevisionFinal,
-        precio_instalacion, requiere_instalacion ? 1 : 0, segmento, tecnologia,
-        permanencia_meses, descuento_combo, JSON.stringify(conceptosIncluidos), orden_visualizacion,
+        requiere_instalacion ? 1 : 0, segmento, tecnologia,
+        descuento_combo, orden_visualizacion,
         promocional ? 1 : 0, fecha_inicio_promocion || null, fecha_fin_promocion || null,
         aplica_iva_estrato_123 ? 1 : 0, aplica_iva_estrato_456 ? 1 : 0,
         precioInternetSinIVA, precioTVSinIVA, precioInternetConIVA, precioTVConIVA,
@@ -405,7 +324,7 @@ class ServicePlansController {
   }
 
   /**
-   * ACTUALIZAR PLAN EXISTENTE CON TODOS LOS CAMPOS REALES
+   * ✅ ACTUALIZAR PLAN SIN CAMPOS OBSOLETOS
    */
   static async updatePlan(req, res) {
     try {
@@ -417,7 +336,7 @@ class ServicePlansController {
 
       // Verificar que el plan existe
       const planExistente = await Database.query(
-        'SELECT * FROM planes_servicio WHERE id = ?', 
+        'SELECT * FROM planes_servicio WHERE id = ?',
         [id]
       );
 
@@ -428,18 +347,16 @@ class ServicePlansController {
         });
       }
 
-      const plan = planExistente[0];
-
-      // Campos que se pueden actualizar - BASADOS EN LA ESTRUCTURA REAL
+      // ✅ CAMPOS PERMITIDOS SIN OBSOLETOS
       const camposPermitidos = [
         // Campos básicos
         'nombre', 'precio', 'velocidad_subida', 'velocidad_bajada', 'canales_tv', 'descripcion',
         'aplica_iva', 'activo', 'precio_internet', 'precio_television',
-        'precio_instalacion', 'requiere_instalacion', 'segmento', 'tecnologia',
-        'permanencia_meses', 'descuento_combo', 'conceptos_incluidos', 'orden_visualizacion',
+        'requiere_instalacion', 'segmento', 'tecnologia',
+        'descuento_combo', 'orden_visualizacion',
         'promocional', 'fecha_inicio_promocion', 'fecha_fin_promocion',
         
-        // CAMPOS NUEVOS REALES
+        // ✅ CAMPOS OPTIMIZADOS
         'aplica_iva_estrato_123', 'aplica_iva_estrato_456',
         'precio_internet_sin_iva', 'precio_television_sin_iva',
         'precio_internet_con_iva', 'precio_television_con_iva',
@@ -475,23 +392,6 @@ class ServicePlansController {
             actualizaciones[campo] = '?';
             const valor = datosActualizacion[campo];
             valores.push(valor === '' ? null : valor);
-          }
-          // Campos JSON
-          else if (campo === 'conceptos_incluidos') {
-            actualizaciones[campo] = '?';
-            let valor = datosActualizacion[campo];
-            if (typeof valor === 'string') {
-              try {
-                JSON.parse(valor); // Validar que es JSON válido
-                valores.push(valor);
-              } catch (e) {
-                valores.push('{}');
-              }
-            } else if (typeof valor === 'object') {
-              valores.push(JSON.stringify(valor));
-            } else {
-              valores.push('{}');
-            }
           }
           // Campos normales
           else {
@@ -711,26 +611,27 @@ class ServicePlansController {
       delete planDuplicado.created_at;
       delete planDuplicado.updated_at;
 
-      // Insertar el nuevo plan
+      // ✅ INSERTAR PLAN DUPLICADO SIN CAMPOS OBSOLETOS
       const result = await Database.query(`
         INSERT INTO planes_servicio (
           codigo, nombre, tipo, precio, velocidad_subida, velocidad_bajada, 
           canales_tv, descripcion, aplica_iva, activo, precio_internet, precio_television,
-          precio_instalacion, requiere_instalacion, segmento, tecnologia,
-          permanencia_meses, descuento_combo, conceptos_incluidos, orden_visualizacion,
+          requiere_instalacion, segmento, tecnologia,
+          descuento_combo, orden_visualizacion,
           promocional, fecha_inicio_promocion, fecha_fin_promocion,
           aplica_iva_estrato_123, aplica_iva_estrato_456,
           precio_internet_sin_iva, precio_television_sin_iva,
           precio_internet_con_iva, precio_television_con_iva,
           costo_instalacion_permanencia, costo_instalacion_sin_permanencia,
           permanencia_minima_meses, aplica_permanencia
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        planDuplicado.codigo, planDuplicado.nombre, planDuplicado.tipo, planDuplicado.precio,
-        planDuplicado.velocidad_subida, planDuplicado.velocidad_bajada, planDuplicado.canales_tv, planDuplicado.descripcion,
-        planDuplicado.aplica_iva, planDuplicado.activo, planDuplicado.precio_internet, planDuplicado.precio_television,
-        planDuplicado.precio_instalacion, planDuplicado.requiere_instalacion, planDuplicado.segmento, planDuplicado.tecnologia,
-        planDuplicado.permanencia_meses, planDuplicado.descuento_combo, planDuplicado.conceptos_incluidos, planDuplicado.orden_visualizacion,
+        planDuplicado.codigo, planDuplicado.nombre, planDuplicado.tipo, planDuplicado.precio, 
+        planDuplicado.velocidad_subida, planDuplicado.velocidad_bajada, planDuplicado.canales_tv, 
+        planDuplicado.descripcion, planDuplicado.aplica_iva, planDuplicado.activo, 
+        planDuplicado.precio_internet, planDuplicado.precio_television,
+        planDuplicado.requiere_instalacion, planDuplicado.segmento, planDuplicado.tecnologia,
+        planDuplicado.descuento_combo, planDuplicado.orden_visualizacion,
         planDuplicado.promocional, planDuplicado.fecha_inicio_promocion, planDuplicado.fecha_fin_promocion,
         planDuplicado.aplica_iva_estrato_123, planDuplicado.aplica_iva_estrato_456,
         planDuplicado.precio_internet_sin_iva, planDuplicado.precio_television_sin_iva,
@@ -753,7 +654,7 @@ class ServicePlansController {
       console.error('❌ Error duplicando plan:', error);
       res.status(500).json({
         success: false,
-        message: 'Error duplicando plan',
+        message: 'Error duplicando plan de servicio',
         error: error.message
       });
     }

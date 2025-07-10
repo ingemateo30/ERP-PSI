@@ -79,26 +79,26 @@ router.use(authenticateToken);
 // ==========================================
 
 // Obtener todos los clientes con filtros y paginación
-router.get('/', 
-  rateLimiter.clientes, 
+router.get('/',
+  rateLimiter.clientes,
   ClienteController.obtenerTodos
 );
 
 // NUEVA: Ruta para exportar clientes
-router.get('/export', 
+router.get('/export',
   rateLimiter.clientes,
   ClienteController.exportarClientes
 );
 
 // Obtener estadísticas de clientes
-router.get('/stats', 
-  rateLimiter.clientes, 
+router.get('/stats',
+  rateLimiter.clientes,
   ClienteController.obtenerEstadisticas
 );
 
 // Buscar clientes
-router.get('/search', 
-  rateLimiter.busquedas, 
+router.get('/search',
+  rateLimiter.busquedas,
   ClienteController.buscar
 );
 
@@ -177,15 +177,15 @@ router.get('/inactivos',
 );
 
 // Obtener cliente por identificación
-router.get('/identification/:identificacion', 
-  rateLimiter.clientes, 
+router.get('/identification/:identificacion',
+  rateLimiter.clientes,
   ClienteController.obtenerPorIdentificacion
 );
 
 // ⭐ CRÍTICO: ESTA RUTA DEBE IR AL FINAL
 // Obtener cliente por ID (debe ir al final para evitar conflictos)
-router.get('/:id', 
-  rateLimiter.clientes, 
+router.get('/:id',
+  rateLimiter.clientes,
   ClienteController.obtenerPorId
 );
 
@@ -194,7 +194,7 @@ router.get('/:id',
 // ==========================================
 
 // Crear nuevo cliente
-router.post('/', 
+router.post('/',
   rateLimiter.clientes,
   ...validarCreacionCliente,
   ClienteController.crear
@@ -219,7 +219,7 @@ router.put('/:id/inactivar',
 
       const pool = require('../config/database');
       const connection = await pool.getConnection();
-      
+
       try {
         await connection.beginTransaction();
 
@@ -239,10 +239,10 @@ router.put('/:id/inactivar',
 
         // 2. ⭐ CANCELAR SERVICIOS ACTIVOS - QUERY CORREGIDO
         await connection.execute(`
-          UPDATE servicios_cliente 
-          SET estado = 'cancelado', updated_at = NOW()
-          WHERE cliente_id = ? AND estado IN ('activo', 'suspendido')
-        `, [id]);
+  UPDATE servicios_cliente 
+  SET estado = 'activo', fecha_suspension = NULL, updated_at = NOW()
+  WHERE cliente_id = ? AND estado IN ('suspendido', 'cortado', 'cancelado')
+`, [id]);
 
         // 3. Insertar en clientes_inactivos
         await connection.execute(`
@@ -318,7 +318,7 @@ router.put('/:id/reactivar',
 
       const pool = require('../config/database');
       const connection = await pool.getConnection();
-      
+
       try {
         await connection.beginTransaction();
 
@@ -373,14 +373,14 @@ router.put('/:id/reactivar',
 );
 
 // Actualizar cliente (debe ir después de las rutas específicas)
-router.put('/:id', 
+router.put('/:id',
   rateLimiter.clientes,
   ...validarActualizacionCliente,
   ClienteController.actualizar
 );
 
 // Eliminar cliente
-router.delete('/:id', 
+router.delete('/:id',
   rateLimiter.criticas,
   ClienteController.eliminar
 );
@@ -396,7 +396,7 @@ router.use('*', (req, res) => {
 // Manejo de errores generales
 router.use((error, req, res, next) => {
   console.error('❌ Error en rutas de clientes:', error);
-  
+
   res.status(error.status || 500).json({
     success: false,
     message: error.message || 'Error interno del servidor',

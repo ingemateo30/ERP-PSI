@@ -379,6 +379,28 @@ class ConfigService {
       throw error;
     }
   }
+  async getServicePlansStats() {
+    try {
+      return await this.makeRequest(`${this.baseURL}/service-plans/stats`);
+    } catch (error) {
+      console.error('❌ ConfigService: Error obteniendo estadísticas de planes:', error);
+      throw error;
+    }
+  }
+
+  // ✅ FUNCIÓN AGREGADA: Duplicar plan
+  async duplicateServicePlan(id, duplicateData) {
+    try {
+      return await this.makeRequest(`${this.baseURL}/service-plans/${id}/duplicate`, {
+        method: 'POST',
+        body: JSON.stringify(duplicateData),
+      });
+    } catch (error) {
+      console.error('❌ ConfigService: Error duplicando plan:', error);
+      throw error;
+    }
+  }
+
 
   // ==========================================
   // MÉTODOS DE UTILIDAD PARA PLANES

@@ -1148,10 +1148,10 @@ class ClienteCompletoService {
       // Si es reactivado, reactivar servicios
       if (nuevoEstado === 'activo') {
         await conexion.execute(`
-          UPDATE servicios_cliente 
-          SET estado = 'activo', fecha_suspension = NULL
-          WHERE cliente_id = ? AND estado IN ('suspendido', 'cortado')
-        `, [clienteId]);
+    UPDATE servicios_cliente 
+    SET estado = 'activo', fecha_suspension = NULL
+    WHERE cliente_id = ? AND estado IN ('suspendido', 'cortado', 'cancelado')
+  `, [clienteId]);
       }
 
       // Registrar en historial si existe tabla
