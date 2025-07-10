@@ -73,6 +73,20 @@ securityHeaders(app);
 const corsOptions = require('./config/cors');
 app.use(cors(corsOptions));
 
+app.use((req, res, next) => {
+  // Permitir PATCH específicamente
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-API-Key');
+  
+  // Manejar preflight OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
+  next();
+});
+
 // Parsers con límites ajustados
 app.use(express.json({
   limit: '10mb',
