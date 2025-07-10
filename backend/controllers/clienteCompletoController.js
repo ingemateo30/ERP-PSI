@@ -59,7 +59,12 @@ class ClienteCompletoController {
       };
 
       // Ejecutar creación completa
-      const resultado = await ClienteCompletoService.crearClienteCompleto(datosCompletos);
+      const createdBy = req.user?.id || req.user?.userId || req.userId || 1;
+      const resultado = await ClienteCompletoService.crearClienteCompleto({
+        cliente,
+        servicio,
+        opciones: opciones || {}
+      }, createdBy);
 
       res.status(201).json({
         success: true,
@@ -69,7 +74,7 @@ class ClienteCompletoController {
 
     } catch (error) {
       console.error('❌ Error creando cliente completo:', error);
-      
+
       // Manejo de errores específicos
       if (error.code === 'ER_DUP_ENTRY') {
         return res.status(409).json({
@@ -493,7 +498,7 @@ class ClienteCompletoController {
       }
 
       const disponible = await ClienteCompletoService.verificarDisponibilidadIdentificacion(
-        identificacion, 
+        identificacion,
         tipo_documento || 'cedula'
       );
 
