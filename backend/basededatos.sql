@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 09-07-2025 a las 22:12:39
+-- Tiempo de generación: 10-07-2025 a las 02:08:04
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.1.25
 
@@ -149,6 +149,27 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `DevolverEquipo` (IN `p_equipo_id` I
   
 END$$
 
+CREATE DEFINER=`root`@`localhost` PROCEDURE `GenerarNumeroContrato` (OUT `nuevo_numero` VARCHAR(20))   BEGIN
+    DECLARE prefijo VARCHAR(10);
+    DECLARE consecutivo INT;
+    
+    -- Obtener configuración
+    SELECT 
+        COALESCE(prefijo_contrato, 'CON') as pref,
+        COALESCE(consecutivo_contrato, 1) as cons
+    INTO prefijo, consecutivo
+    FROM configuracion_empresa 
+    WHERE id = 1;
+    
+    -- Actualizar consecutivo
+    UPDATE configuracion_empresa 
+    SET consecutivo_contrato = consecutivo_contrato + 1 
+    WHERE id = 1;
+    
+    -- Generar número con formato
+    SET nuevo_numero = CONCAT(prefijo, LPAD(consecutivo + 1, 6, '0'));
+END$$
+
 CREATE DEFINER=`root`@`localhost` PROCEDURE `GenerarNumeroFactura` (OUT `nuevo_numero` VARCHAR(20))   BEGIN
     DECLARE prefijo VARCHAR(10);
     DECLARE consecutivo INT;
@@ -164,6 +185,27 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `GenerarNumeroFactura` (OUT `nuevo_n
     -- Actualizar consecutivo
     UPDATE configuracion_empresa 
     SET consecutivo_factura = consecutivo_factura + 1 
+    WHERE id = 1;
+    
+    -- Generar número con formato
+    SET nuevo_numero = CONCAT(prefijo, LPAD(consecutivo + 1, 6, '0'));
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `GenerarNumeroOrden` (OUT `nuevo_numero` VARCHAR(20))   BEGIN
+    DECLARE prefijo VARCHAR(10);
+    DECLARE consecutivo INT;
+    
+    -- Obtener configuración
+    SELECT 
+        COALESCE(prefijo_orden, 'ORD') as pref,
+        COALESCE(consecutivo_orden, 1) as cons
+    INTO prefijo, consecutivo
+    FROM configuracion_empresa 
+    WHERE id = 1;
+    
+    -- Actualizar consecutivo
+    UPDATE configuracion_empresa 
+    SET consecutivo_orden = consecutivo_orden + 1 
     WHERE id = 1;
     
     -- Generar número con formato
@@ -369,7 +411,8 @@ INSERT INTO `clientes` (`id`, `identificacion`, `tipo_documento`, `nombre`, `dir
 (23, '52487047', 'cedula', 'Lina Maria Ortiz Pereira', 'CR 1 7 53', 3, '2', 'industrial', 6, '3007015239', NULL, 'sistemas@jelcom.com.co', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 15:16:25', '2025-07-08 15:16:25'),
 (25, '52487048', 'cedula', 'prueba prueba', 'calle 32e 11 13', 3, '1', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 19:36:14', '2025-07-08 19:36:14'),
 (26, '52487049', 'cedula', 'prueba prueba', 'calle 32e 11 13', 3, '1', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 21:27:30', '2025-07-08 21:27:30'),
-(27, '52487050', 'cedula', 'prueba2', 'calle 32e 11 13', NULL, '1', 'san luis', 6, '3024773516', '3024773516', 'MSALAZAR5@UDI.EDU.CO', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 21:49:13', '2025-07-08 21:49:13');
+(27, '52487050', 'cedula', 'prueba2', 'calle 32e 11 13', NULL, '1', 'san luis', 6, '3024773516', '3024773516', 'MSALAZAR5@UDI.EDU.CO', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 21:49:13', '2025-07-08 21:49:13'),
+(28, '52487090', 'cedula', 'prueba prueba', 'calle 32e 11 13', 2, '3', 'san luis', 1, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-09', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-10 00:03:23', '2025-07-10 00:03:23');
 
 -- --------------------------------------------------------
 
@@ -583,15 +626,18 @@ CREATE TABLE `configuracion_empresa` (
   `dias_mora_corte` int(11) DEFAULT 30,
   `porcentaje_iva` decimal(5,2) DEFAULT 19.00,
   `porcentaje_interes` decimal(5,2) DEFAULT 0.00,
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `prefijo_contrato` varchar(10) DEFAULT 'CON' COMMENT 'Prefijo para contratos',
+  `consecutivo_orden` int(11) DEFAULT 1 COMMENT 'Consecutivo para órdenes',
+  `prefijo_orden` varchar(10) DEFAULT 'ORD' COMMENT 'Prefijo para órdenes'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `configuracion_empresa`
 --
 
-INSERT INTO `configuracion_empresa` (`id`, `licencia`, `empresa_nombre`, `empresa_nit`, `empresa_direccion`, `empresa_ciudad`, `empresa_departamento`, `empresa_telefono`, `empresa_email`, `resolucion_facturacion`, `licencia_internet`, `vigilado`, `vigilado_internet`, `comentario`, `prefijo_factura`, `codigo_gs1`, `fecha_actualizacion`, `consecutivo_factura`, `consecutivo_contrato`, `consecutivo_recibo`, `valor_reconexion`, `dias_mora_corte`, `porcentaje_iva`, `porcentaje_interes`, `updated_at`) VALUES
-(1, 'PRINCIPAL1', 'PROVEEDOR DE TELECOMUNICACIONES SAS.', '901582657-3', 'Carrera 9 No. 9-94', 'San Gil', 'SANTANDER', '3184550936', 'facturacion@psi.net.co', 'pendiente', 'pendiente', 'Registro unico de tic No. 96006732', 'pendiente', 'hola', 'FAC', 'GS1', '2025-06-11', 18, 1, 1, 10000.00, 15, 19.00, 15.00, '2025-07-08 22:05:48');
+INSERT INTO `configuracion_empresa` (`id`, `licencia`, `empresa_nombre`, `empresa_nit`, `empresa_direccion`, `empresa_ciudad`, `empresa_departamento`, `empresa_telefono`, `empresa_email`, `resolucion_facturacion`, `licencia_internet`, `vigilado`, `vigilado_internet`, `comentario`, `prefijo_factura`, `codigo_gs1`, `fecha_actualizacion`, `consecutivo_factura`, `consecutivo_contrato`, `consecutivo_recibo`, `valor_reconexion`, `dias_mora_corte`, `porcentaje_iva`, `porcentaje_interes`, `updated_at`, `prefijo_contrato`, `consecutivo_orden`, `prefijo_orden`) VALUES
+(1, 'PRINCIPAL1', 'PROVEEDOR DE TELECOMUNICACIONES SAS.', '901582657-3', 'Carrera 9 No. 9-94', 'San Gil', 'SANTANDER', '3184550936', 'facturacion@psi.net.co', 'pendiente', 'pendiente', 'Registro unico de tic No. 96006732', 'pendiente', 'hola', 'FAC', 'GS1', '2025-06-11', 19, 1, 1, 10000.00, 15, 19.00, 2.00, '2025-07-10 00:03:24', 'CON', 1, 'ORD');
 
 -- --------------------------------------------------------
 
@@ -665,6 +711,45 @@ INSERT INTO `configuracion_iva` (`id`, `tipo_servicio`, `estrato_desde`, `estrat
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `contratos`
+--
+
+CREATE TABLE `contratos` (
+  `id` int(11) NOT NULL,
+  `numero_contrato` varchar(20) NOT NULL,
+  `cliente_id` int(11) NOT NULL,
+  `servicio_id` int(11) DEFAULT NULL,
+  `tipo_contrato` enum('servicio','permanencia','comercial') DEFAULT 'servicio',
+  `tipo_permanencia` enum('con_permanencia','sin_permanencia') DEFAULT 'sin_permanencia',
+  `permanencia_meses` int(11) DEFAULT 0,
+  `costo_instalacion` decimal(10,2) DEFAULT 150000.00,
+  `fecha_generacion` date NOT NULL,
+  `fecha_inicio` date NOT NULL,
+  `fecha_fin` date DEFAULT NULL,
+  `fecha_vencimiento_permanencia` date DEFAULT NULL,
+  `estado` enum('activo','vencido','terminado','anulado') DEFAULT 'activo',
+  `clausulas_especiales` text DEFAULT NULL,
+  `penalizacion_terminacion` decimal(10,2) DEFAULT 0.00,
+  `documento_pdf_path` varchar(500) DEFAULT NULL,
+  `firmado_cliente` tinyint(1) DEFAULT 0,
+  `fecha_firma` date DEFAULT NULL,
+  `generado_automaticamente` tinyint(1) DEFAULT 0,
+  `observaciones` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `contratos`
+--
+
+INSERT INTO `contratos` (`id`, `numero_contrato`, `cliente_id`, `servicio_id`, `tipo_contrato`, `tipo_permanencia`, `permanencia_meses`, `costo_instalacion`, `fecha_generacion`, `fecha_inicio`, `fecha_fin`, `fecha_vencimiento_permanencia`, `estado`, `clausulas_especiales`, `penalizacion_terminacion`, `documento_pdf_path`, `firmado_cliente`, `fecha_firma`, `generado_automaticamente`, `observaciones`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 'CONT-2025-000001', 28, 13, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-09', '0000-00-00', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, NULL, '2025-07-10 00:03:24', '2025-07-10 00:03:24');
+
+-- --------------------------------------------------------
+
+--
 -- Estructura de tabla para la tabla `cortes_servicio`
 --
 
@@ -724,6 +809,22 @@ CREATE TABLE `detalle_facturas` (
   `iva` decimal(10,2) DEFAULT 0.00,
   `total` decimal(10,2) NOT NULL,
   `servicio_cliente_id` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `equipos_perdidos`
+--
+
+CREATE TABLE `equipos_perdidos` (
+  `id` int(11) NOT NULL,
+  `cliente_id` int(11) NOT NULL,
+  `nombre` varchar(255) NOT NULL,
+  `precio_reposicion` decimal(10,2) NOT NULL,
+  `cantidad` int(11) DEFAULT 1,
+  `facturado` tinyint(1) DEFAULT 0,
+  `activo` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -798,25 +899,24 @@ CREATE TABLE `facturas` (
   `observaciones` text DEFAULT NULL,
   `created_by` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `referencia_pago_sugerida` varchar(50) DEFAULT NULL COMMENT 'Referencia de pago sugerida (cédula)',
+  `contrato_id` int(11) DEFAULT NULL COMMENT 'ID del contrato relacionado'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `facturas`
 --
 
-INSERT INTO `facturas` (`id`, `numero_factura`, `cliente_id`, `identificacion_cliente`, `nombre_cliente`, `periodo_facturacion`, `fecha_emision`, `fecha_vencimiento`, `fecha_desde`, `fecha_hasta`, `fecha_pago`, `internet`, `television`, `saldo_anterior`, `interes`, `reconexion`, `descuento`, `varios`, `publicidad`, `s_internet`, `s_television`, `s_interes`, `s_reconexion`, `s_descuento`, `s_varios`, `s_publicidad`, `s_iva`, `subtotal`, `iva`, `total`, `estado`, `metodo_pago`, `referencia_pago`, `banco_id`, `ruta`, `resolucion`, `consignacion`, `activo`, `observaciones`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'FAC000001', 1, '1005450340', 'MATEO SALAZAR ORTIZ', '2025-06', '2025-06-01', '2025-06-16', '2025-06-01', '2025-06-30', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 59900.00, 'vencida', NULL, NULL, NULL, 'R01', 'Facturación desde 10.001 hasta 37600 prefijo 10 del 26-SEP-2022', NULL, '1', 'Factura de internet mensual', 1, '2025-06-09 13:29:14', '2025-07-04 21:22:33'),
-(2, 'FAC000002', 2, '1234567890', 'JUAN PÉREZ LÓPEZ', '2025-06', '2025-06-01', '2025-06-16', '2025-06-01', '2025-06-30', '2025-06-10', 45000.00, 25000.00, 10000.00, 1500.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 25000.00, 1500.00, 0.00, 0.00, 0.00, 0.00, 0.00, 81500.00, 0.00, 81500.00, 'pagada', 'efectivo', NULL, NULL, 'R02', NULL, NULL, '1', 'Internet + TV + saldo anterior + intereses', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
-(3, 'FAC000003', 3, '9876543210', 'MARÍA GARCÍA RUIZ', '2025-05', '2025-05-01', '2025-05-16', '2025-05-01', '2025-05-31', NULL, 39900.00, 15000.00, 0.00, 0.00, 11900.00, 0.00, 0.00, 0.00, 39900.00, 15000.00, 0.00, 11900.00, 0.00, 0.00, 0.00, 0.00, 66800.00, 0.00, 66800.00, 'vencida', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Internet + TV + reconexión', 1, '2025-06-09 13:29:14', '2025-07-04 21:22:33'),
-(4, 'FAC000004', 1, '1005450340', 'MATEO SALAZAR ORTIZ', '2025-05', '2025-05-01', '2025-05-16', '2025-05-01', '2025-05-31', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 10000.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 10000.00, 0.00, 0.00, 0.00, 49900.00, 0.00, 49900.00, 'pagada', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Internet con descuento promocional', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
-(5, 'FAC000005', 2, '1234567890', 'JUAN PÉREZ LÓPEZ', '2025-04', '2025-04-01', '2025-04-16', '2025-04-01', '2025-04-30', NULL, 45000.00, 25000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 25000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 70000.00, 0.00, 70000.00, 'anulada', NULL, NULL, NULL, 'R02', NULL, NULL, '1', 'Factura anulada por error en facturación', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14'),
-(6, 'FAC000006', 1, '12345678', 'Juan Carlos Rodríguez Méndez', '2025-06', '2025-06-26', '2025-06-16', '2025-06-01', '2025-06-30', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 59900.00, 'vencida', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Duplicada de factura FAC000001', 1, '2025-06-26 14:21:49', '2025-07-04 21:22:33'),
-(7, 'FAC000007', 2, '87654321', 'María Isabel García López', '2025-07', '2025-07-04', '2025-08-15', '2025-07-01', '2025-07-31', NULL, 49900.00, 50000.00, 10000.00, 0.00, 0.00, 0.00, 2000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 10000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', NULL, 1, '2025-07-04 20:43:37', '2025-07-04 20:43:37'),
-(16, '202500000002', 23, '52487047', 'Lina Maria Ortiz Pereira', '2025-07', '2025-07-08', '2025-08-07', '2025-07-08', NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 85000.00, 0.00, 85000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', 'Primera factura automática', 1, '2025-07-08 15:16:25', '2025-07-08 15:19:56'),
-(17, 'FAC000015', 25, '', '', '', '2025-07-08', '2025-08-07', NULL, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 0.00, 45000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', 'Primera factura automática', NULL, '2025-07-08 19:36:14', '2025-07-08 19:36:14'),
-(18, 'FAC000016', 26, '', '', '', '2025-07-08', '2025-08-07', NULL, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 65000.00, 0.00, 65000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', 'Primera factura automática', NULL, '2025-07-08 21:27:30', '2025-07-08 21:27:30'),
-(19, 'FAC000017', 27, '', '', '', '2025-07-08', '2025-08-07', NULL, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 0.00, 45000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', 'Primera factura automática', NULL, '2025-07-08 21:49:13', '2025-07-08 21:49:13');
+INSERT INTO `facturas` (`id`, `numero_factura`, `cliente_id`, `identificacion_cliente`, `nombre_cliente`, `periodo_facturacion`, `fecha_emision`, `fecha_vencimiento`, `fecha_desde`, `fecha_hasta`, `fecha_pago`, `internet`, `television`, `saldo_anterior`, `interes`, `reconexion`, `descuento`, `varios`, `publicidad`, `s_internet`, `s_television`, `s_interes`, `s_reconexion`, `s_descuento`, `s_varios`, `s_publicidad`, `s_iva`, `subtotal`, `iva`, `total`, `estado`, `metodo_pago`, `referencia_pago`, `banco_id`, `ruta`, `resolucion`, `consignacion`, `activo`, `observaciones`, `created_by`, `created_at`, `updated_at`, `referencia_pago_sugerida`, `contrato_id`) VALUES
+(1, 'FAC000001', 1, '1005450340', 'MATEO SALAZAR ORTIZ', '2025-06', '2025-06-01', '2025-06-16', '2025-06-01', '2025-06-30', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 59900.00, 'vencida', NULL, NULL, NULL, 'R01', 'Facturación desde 10.001 hasta 37600 prefijo 10 del 26-SEP-2022', NULL, '1', 'Factura de internet mensual', 1, '2025-06-09 13:29:14', '2025-07-04 21:22:33', NULL, NULL),
+(2, 'FAC000002', 2, '1234567890', 'JUAN PÉREZ LÓPEZ', '2025-06', '2025-06-01', '2025-06-16', '2025-06-01', '2025-06-30', '2025-06-10', 45000.00, 25000.00, 10000.00, 1500.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 25000.00, 1500.00, 0.00, 0.00, 0.00, 0.00, 0.00, 81500.00, 0.00, 81500.00, 'pagada', 'efectivo', NULL, NULL, 'R02', NULL, NULL, '1', 'Internet + TV + saldo anterior + intereses', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14', NULL, NULL),
+(3, 'FAC000003', 3, '9876543210', 'MARÍA GARCÍA RUIZ', '2025-05', '2025-05-01', '2025-05-16', '2025-05-01', '2025-05-31', NULL, 39900.00, 15000.00, 0.00, 0.00, 11900.00, 0.00, 0.00, 0.00, 39900.00, 15000.00, 0.00, 11900.00, 0.00, 0.00, 0.00, 0.00, 66800.00, 0.00, 66800.00, 'vencida', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Internet + TV + reconexión', 1, '2025-06-09 13:29:14', '2025-07-04 21:22:33', NULL, NULL),
+(4, 'FAC000004', 1, '1005450340', 'MATEO SALAZAR ORTIZ', '2025-05', '2025-05-01', '2025-05-16', '2025-05-01', '2025-05-31', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 10000.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 10000.00, 0.00, 0.00, 0.00, 49900.00, 0.00, 49900.00, 'pagada', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Internet con descuento promocional', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14', NULL, NULL),
+(5, 'FAC000005', 2, '1234567890', 'JUAN PÉREZ LÓPEZ', '2025-04', '2025-04-01', '2025-04-16', '2025-04-01', '2025-04-30', NULL, 45000.00, 25000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 25000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 70000.00, 0.00, 70000.00, 'anulada', NULL, NULL, NULL, 'R02', NULL, NULL, '1', 'Factura anulada por error en facturación', 1, '2025-06-09 13:29:14', '2025-06-09 13:29:14', NULL, NULL),
+(6, 'FAC000006', 1, '12345678', 'Juan Carlos Rodríguez Méndez', '2025-06', '2025-06-26', '2025-06-16', '2025-06-01', '2025-06-30', NULL, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 59900.00, 0.00, 59900.00, 'vencida', NULL, NULL, NULL, 'R01', NULL, NULL, '1', 'Duplicada de factura FAC000001', 1, '2025-06-26 14:21:49', '2025-07-04 21:22:33', NULL, NULL),
+(7, 'FAC000007', 2, '87654321', 'María Isabel García López', '2025-07', '2025-07-04', '2025-08-15', '2025-07-01', '2025-07-31', NULL, 49900.00, 50000.00, 10000.00, 0.00, 0.00, 0.00, 2000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 10000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', NULL, 1, '2025-07-04 20:43:37', '2025-07-04 20:43:37', NULL, NULL),
+(20, 'FAC000018', 28, '', '', '', '2025-07-09', '2025-08-09', NULL, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 115000.00, 0.00, 115000.00, 'pendiente', NULL, NULL, NULL, NULL, NULL, NULL, '1', 'Primera factura automática', NULL, '2025-07-10 00:03:24', '2025-07-10 00:03:24', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -877,17 +977,19 @@ CREATE TABLE `instalaciones` (
   `coordenadas_lng` decimal(11,8) DEFAULT NULL,
   `costo_instalacion` decimal(10,2) DEFAULT 0.00,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `contrato_id` int(11) DEFAULT NULL COMMENT 'ID del contrato relacionado',
+  `tipo_orden` enum('instalacion','cambio_plan','traslado','reconexion','retiro','mantenimiento') DEFAULT 'instalacion'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `instalaciones`
 --
 
-INSERT INTO `instalaciones` (`id`, `cliente_id`, `servicio_cliente_id`, `instalador_id`, `fecha_programada`, `hora_programada`, `fecha_realizada`, `hora_inicio`, `hora_fin`, `estado`, `direccion_instalacion`, `barrio`, `telefono_contacto`, `persona_recibe`, `tipo_instalacion`, `observaciones`, `equipos_instalados`, `fotos_instalacion`, `coordenadas_lat`, `coordenadas_lng`, `costo_instalacion`, `created_at`, `updated_at`) VALUES
-(1, 1, 1, 1, '2025-06-20', '09:00:00', '2025-06-20', '09:15:00', '11:30:00', 'completada', 'Calle 15 # 23-45, Barrio Centro', 'Centro', '3001234567', 'Juan Carlos Rodríguez', 'nueva', 'Instalación exitosa. Cliente muy colaborador. Señal excelente.', '[\r\n        {\r\n            \"equipo_id\": 1,\r\n            \"equipo_codigo\": \"RTR001\",\r\n            \"equipo_nombre\": \"Router WiFi AC1200\",\r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"TPL2024001\",\r\n            \"observaciones\": \"Router principal instalado en sala\"\r\n        },\r\n        {\r\n            \"equipo_id\": 3,\r\n            \"equipo_codigo\": \"CBL001\", \r\n            \"equipo_nombre\": \"Cable UTP Cat6\",\r\n            \"cantidad\": 15,\r\n            \"numero_serie\": \"CAB-001-001\",\r\n            \"observaciones\": \"15 metros utilizados para conexión desde tap hasta router\"\r\n        }\r\n    ]', '[\r\n        {\r\n            \"url\": \"/uploads/instalaciones/1/foto1.jpg\",\r\n            \"descripcion\": \"Router instalado en sala principal\",\r\n            \"fecha\": \"2025-06-20 10:30:00\"\r\n        },\r\n        {\r\n            \"url\": \"/uploads/instalaciones/1/foto2.jpg\", \r\n            \"descripcion\": \"Conexión externa desde tap\",\r\n            \"fecha\": \"2025-06-20 11:00:00\"\r\n        }\r\n    ]', 6.26377500, -73.13758900, 25000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30'),
-(2, 2, 2, 2, '2025-06-25', '14:00:00', NULL, '14:10:00', NULL, 'en_proceso', 'Carrera 10 # 45-67, Barrio Los Pinos', 'Los Pinos', '3109876543', 'María Isabel García', 'nueva', 'Instalación en progreso. Requiere conexión de fibra adicional.', '[\r\n        {\r\n            \"equipo_id\": 2,\r\n            \"equipo_codigo\": \"RTR002\",\r\n            \"equipo_nombre\": \"Router WiFi AX1800\", \r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"ASU2024001\",\r\n            \"observaciones\": \"Router de alta velocidad para plan 50MB\"\r\n        }\r\n    ]', NULL, 6.26412000, -73.13824500, 35000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30'),
-(3, 3, 3, 3, '2025-06-26', '08:30:00', NULL, NULL, NULL, 'programada', 'Calle 8 # 12-34, Barrio San José', 'San José', '3201234567', 'Carlos Alberto Ruiz', 'nueva', 'Instalación combo internet + TV. Cliente requiere configuración especial para TV en 2 habitaciones.', '[\r\n        {\r\n            \"equipo_id\": 1,\r\n            \"equipo_codigo\": \"RTR001\",\r\n            \"equipo_nombre\": \"Router WiFi AC1200\",\r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"Pendiente asignación de router específico\"\r\n        },\r\n        {\r\n            \"equipo_id\": 8,\r\n            \"equipo_codigo\": \"DEC001\", \r\n            \"equipo_nombre\": \"Decodificador TDT HD\",\r\n            \"cantidad\": 2,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"2 decodificadores para habitaciones\"\r\n        },\r\n        {\r\n            \"equipo_id\": 4,\r\n            \"equipo_codigo\": \"CBL002\",\r\n            \"equipo_nombre\": \"Cable Coaxial RG6\",\r\n            \"cantidad\": 25,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"Cable para distribución de señal TV\"\r\n        }\r\n    ]', NULL, 6.26289000, -73.13542300, 45000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30');
+INSERT INTO `instalaciones` (`id`, `cliente_id`, `servicio_cliente_id`, `instalador_id`, `fecha_programada`, `hora_programada`, `fecha_realizada`, `hora_inicio`, `hora_fin`, `estado`, `direccion_instalacion`, `barrio`, `telefono_contacto`, `persona_recibe`, `tipo_instalacion`, `observaciones`, `equipos_instalados`, `fotos_instalacion`, `coordenadas_lat`, `coordenadas_lng`, `costo_instalacion`, `created_at`, `updated_at`, `contrato_id`, `tipo_orden`) VALUES
+(1, 1, 1, 1, '2025-06-20', '09:00:00', '2025-06-20', '09:15:00', '11:30:00', 'completada', 'Calle 15 # 23-45, Barrio Centro', 'Centro', '3001234567', 'Juan Carlos Rodríguez', 'nueva', 'Instalación exitosa. Cliente muy colaborador. Señal excelente.', '[\r\n        {\r\n            \"equipo_id\": 1,\r\n            \"equipo_codigo\": \"RTR001\",\r\n            \"equipo_nombre\": \"Router WiFi AC1200\",\r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"TPL2024001\",\r\n            \"observaciones\": \"Router principal instalado en sala\"\r\n        },\r\n        {\r\n            \"equipo_id\": 3,\r\n            \"equipo_codigo\": \"CBL001\", \r\n            \"equipo_nombre\": \"Cable UTP Cat6\",\r\n            \"cantidad\": 15,\r\n            \"numero_serie\": \"CAB-001-001\",\r\n            \"observaciones\": \"15 metros utilizados para conexión desde tap hasta router\"\r\n        }\r\n    ]', '[\r\n        {\r\n            \"url\": \"/uploads/instalaciones/1/foto1.jpg\",\r\n            \"descripcion\": \"Router instalado en sala principal\",\r\n            \"fecha\": \"2025-06-20 10:30:00\"\r\n        },\r\n        {\r\n            \"url\": \"/uploads/instalaciones/1/foto2.jpg\", \r\n            \"descripcion\": \"Conexión externa desde tap\",\r\n            \"fecha\": \"2025-06-20 11:00:00\"\r\n        }\r\n    ]', 6.26377500, -73.13758900, 25000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30', NULL, 'instalacion'),
+(2, 2, 2, 2, '2025-06-25', '14:00:00', NULL, '14:10:00', NULL, 'en_proceso', 'Carrera 10 # 45-67, Barrio Los Pinos', 'Los Pinos', '3109876543', 'María Isabel García', 'nueva', 'Instalación en progreso. Requiere conexión de fibra adicional.', '[\r\n        {\r\n            \"equipo_id\": 2,\r\n            \"equipo_codigo\": \"RTR002\",\r\n            \"equipo_nombre\": \"Router WiFi AX1800\", \r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"ASU2024001\",\r\n            \"observaciones\": \"Router de alta velocidad para plan 50MB\"\r\n        }\r\n    ]', NULL, 6.26412000, -73.13824500, 35000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30', NULL, 'instalacion'),
+(3, 3, 3, 3, '2025-06-26', '08:30:00', NULL, NULL, NULL, 'programada', 'Calle 8 # 12-34, Barrio San José', 'San José', '3201234567', 'Carlos Alberto Ruiz', 'nueva', 'Instalación combo internet + TV. Cliente requiere configuración especial para TV en 2 habitaciones.', '[\r\n        {\r\n            \"equipo_id\": 1,\r\n            \"equipo_codigo\": \"RTR001\",\r\n            \"equipo_nombre\": \"Router WiFi AC1200\",\r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"Pendiente asignación de router específico\"\r\n        },\r\n        {\r\n            \"equipo_id\": 8,\r\n            \"equipo_codigo\": \"DEC001\", \r\n            \"equipo_nombre\": \"Decodificador TDT HD\",\r\n            \"cantidad\": 2,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"2 decodificadores para habitaciones\"\r\n        },\r\n        {\r\n            \"equipo_id\": 4,\r\n            \"equipo_codigo\": \"CBL002\",\r\n            \"equipo_nombre\": \"Cable Coaxial RG6\",\r\n            \"cantidad\": 25,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"Cable para distribución de señal TV\"\r\n        }\r\n    ]', NULL, 6.26289000, -73.13542300, 45000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30', NULL, 'instalacion');
 
 -- --------------------------------------------------------
 
@@ -1061,27 +1163,31 @@ CREATE TABLE `planes_servicio` (
   `precio_internet_sin_iva` decimal(10,2) DEFAULT 0.00 COMMENT 'Precio internet sin IVA',
   `precio_television_sin_iva` decimal(10,2) DEFAULT 0.00 COMMENT 'Precio TV sin IVA',
   `precio_internet_con_iva` decimal(10,2) DEFAULT 0.00 COMMENT 'Precio internet con IVA',
-  `precio_television_con_iva` decimal(10,2) DEFAULT 0.00 COMMENT 'Precio TV con IVA'
+  `precio_television_con_iva` decimal(10,2) DEFAULT 0.00 COMMENT 'Precio TV con IVA',
+  `costo_instalacion_permanencia` decimal(10,2) DEFAULT 50000.00 COMMENT 'Costo instalación con permanencia',
+  `costo_instalacion_sin_permanencia` decimal(10,2) DEFAULT 150000.00 COMMENT 'Costo instalación sin permanencia',
+  `permanencia_minima_meses` int(11) DEFAULT 6 COMMENT 'Meses mínimos de permanencia',
+  `aplica_permanencia` tinyint(1) DEFAULT 1 COMMENT 'Si el plan permite permanencia'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `planes_servicio`
 --
 
-INSERT INTO `planes_servicio` (`id`, `codigo`, `nombre`, `tipo`, `precio`, `velocidad_subida`, `velocidad_bajada`, `canales_tv`, `descripcion`, `aplica_iva`, `activo`, `created_at`, `updated_at`, `precio_internet`, `precio_television`, `precio_instalacion`, `requiere_instalacion`, `segmento`, `tecnologia`, `permanencia_meses`, `descuento_combo`, `conceptos_incluidos`, `orden_visualizacion`, `promocional`, `fecha_inicio_promocion`, `fecha_fin_promocion`, `aplica_iva_estrato_123`, `aplica_iva_estrato_456`, `precio_internet_sin_iva`, `precio_television_sin_iva`, `precio_internet_con_iva`, `precio_television_con_iva`) VALUES
-(1, 'INT10', 'Internet 10MB', 'internet', 45000.00, 2, 10, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 45000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"internet\": 45000.00, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 1, 0, NULL, NULL, 0, 1, 45000.00, 0.00, 53550.00, 0.00),
-(2, 'INT30', 'Internet 30MB', 'internet', 65000.00, 5, 30, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 65000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"internet\": 65000.00, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 2, 0, NULL, NULL, 0, 1, 65000.00, 0.00, 77350.00, 0.00),
-(3, 'INT50', 'Internet 50MB', 'internet', 85000.00, 10, 50, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 85000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"internet\": 85000.00, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 3, 0, NULL, NULL, 0, 1, 85000.00, 0.00, 101150.00, 0.00),
-(4, 'TV_BAS', 'TV Básica', 'television', 35000.00, NULL, NULL, 80, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 0.00, 35000.00, 42016.00, 1, 'residencial', 'HFC (Cable)', 0, 0.00, '{\"television\": 25000.00, \"instalacion\": 42016, \"tipo_principal\": \"television\"}', 4, 0, NULL, NULL, 1, 1, 0.00, 29411.76, 0.00, 35000.00),
-(5, 'TV_PREM', 'TV Premium', 'television', 45000.00, NULL, NULL, 100, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 0.00, 45000.00, 42016.00, 1, 'residencial', 'HFC (Cable)', 0, 0.00, '{\"television\": 45000.00, \"instalacion\": 42016, \"tipo_principal\": \"television\"}', 5, 0, NULL, NULL, 1, 1, 0.00, 37815.13, 0.00, 45000.00),
-(6, 'COMBO1', 'Combo Internet 30MB + TV', 'combo', 75000.00, 5, 30, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 48750.00, 26250.00, 42016.00, 1, 'residencial', 'Fibra Óptica + HFC', 0, 15.00, '{\"internet\": 48750.00, \"television\": 26250.00, \"instalacion\": 42016, \"descuento_combo\": 15.00, \"tipo_principal\": \"combo\"}', 6, 0, NULL, NULL, 0, 1, 48750.00, 22058.82, 58012.50, 26250.00),
-(8, 'INT20', 'Internet 20MB Residencial', 'internet', 55000.00, 3, 20, NULL, 'Plan internet residencial 20MB ideal para navegación y streaming básico', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 55000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 12, 0.00, '{\"internet\": 55000, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 7, 0, NULL, NULL, 0, 1, 55000.00, 0.00, 65450.00, 0.00),
-(9, 'INT100', 'Internet 100MB Residencial', 'internet', 95000.00, 15, 100, NULL, 'Plan internet residencial 100MB para familias con alto consumo', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 95000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 12, 0.00, '{\"internet\": 95000, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 8, 0, NULL, NULL, 0, 1, 95000.00, 0.00, 113050.00, 0.00),
-(10, 'EMP50', 'Internet 50MB Empresarial', 'internet', 120000.00, 20, 50, NULL, 'Plan internet empresarial con soporte prioritario y IP fija', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 120000.00, 0.00, 60000.00, 1, 'empresarial', 'Fibra Óptica', 24, 0.00, '{\"internet\": 120000, \"instalacion\": 60000, \"tipo_principal\": \"internet\", \"ip_fija\": true}', 9, 0, NULL, NULL, 0, 1, 120000.00, 0.00, 142800.00, 0.00),
-(11, 'TV_DIG', 'TV Digital HD', 'television', 35000.00, NULL, NULL, 120, 'Televisión digital HD con canales nacionales e internacionales', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 0.00, 35000.00, 42016.00, 1, 'residencial', 'Satelital', 12, 0.00, '{\"television\": 35000, \"instalacion\": 42016, \"tipo_principal\": \"television\"}', 10, 0, NULL, NULL, 1, 1, 0.00, 29411.76, 0.00, 35000.00),
-(12, 'COMBO_30TV', 'Combo Internet 30MB + TV Básica', 'combo', 85000.00, 5, 30, 80, 'Combo económico ideal para familias: Internet 30MB + TV Básica', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 55250.00, 29750.00, 42016.00, 1, 'residencial', 'Fibra Óptica + HFC', 12, 15.00, '{\"internet\": 55250, \"television\": 29750, \"instalacion\": 42016, \"descuento_combo\": 15.00, \"tipo_principal\": \"combo\"}', 11, 0, NULL, NULL, 0, 1, 55250.00, 25000.00, 65747.50, 29750.00),
-(13, 'COMBO_50PR', 'Combo Internet 50MB + TV Premium', 'combo', 115000.00, 10, 50, 100, 'Combo premium: Internet 50MB + TV Premium con canales HD', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 74750.00, 40250.00, 42016.00, 1, 'residencial', 'Fibra Óptica + HFC', 12, 15.00, '{\"internet\": 74750, \"television\": 40250, \"instalacion\": 42016, \"descuento_combo\": 15.00, \"tipo_principal\": \"combo\"}', 12, 0, NULL, NULL, 0, 1, 74750.00, 33823.53, 88952.50, 40250.00),
-(14, 'COMBO3', 'i', 'combo', 45000.00, 3, 2, 80, '', 1, 1, '2025-07-09 16:56:44', '2025-07-09 19:04:56', 29250.00, 15750.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"tipo_principal\":\"combo\",\"instalacion\":\"42016\",\"internet\":29250,\"television\":15750}', 0, 0, '0000-00-00', '0000-00-00', 0, 1, 29250.00, 13235.29, 34807.50, 15750.00);
+INSERT INTO `planes_servicio` (`id`, `codigo`, `nombre`, `tipo`, `precio`, `velocidad_subida`, `velocidad_bajada`, `canales_tv`, `descripcion`, `aplica_iva`, `activo`, `created_at`, `updated_at`, `precio_internet`, `precio_television`, `precio_instalacion`, `requiere_instalacion`, `segmento`, `tecnologia`, `permanencia_meses`, `descuento_combo`, `conceptos_incluidos`, `orden_visualizacion`, `promocional`, `fecha_inicio_promocion`, `fecha_fin_promocion`, `aplica_iva_estrato_123`, `aplica_iva_estrato_456`, `precio_internet_sin_iva`, `precio_television_sin_iva`, `precio_internet_con_iva`, `precio_television_con_iva`, `costo_instalacion_permanencia`, `costo_instalacion_sin_permanencia`, `permanencia_minima_meses`, `aplica_permanencia`) VALUES
+(1, 'INT10', 'Internet 10MB', 'internet', 45000.00, 2, 10, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 45000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"internet\": 45000.00, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 1, 0, NULL, NULL, 0, 1, 45000.00, 0.00, 53550.00, 0.00, 50000.00, 150000.00, 6, 1),
+(2, 'INT30', 'Internet 30MB', 'internet', 65000.00, 5, 30, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 65000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"internet\": 65000.00, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 2, 0, NULL, NULL, 0, 1, 65000.00, 0.00, 77350.00, 0.00, 50000.00, 150000.00, 6, 1),
+(3, 'INT50', 'Internet 50MB', 'internet', 85000.00, 10, 50, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 85000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"internet\": 85000.00, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 3, 0, NULL, NULL, 0, 1, 85000.00, 0.00, 101150.00, 0.00, 50000.00, 150000.00, 6, 1),
+(4, 'TV_BAS', 'TV Básica', 'television', 35000.00, NULL, NULL, 80, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 0.00, 35000.00, 42016.00, 1, 'residencial', 'HFC (Cable)', 0, 0.00, '{\"television\": 25000.00, \"instalacion\": 42016, \"tipo_principal\": \"television\"}', 4, 0, NULL, NULL, 1, 1, 0.00, 29411.76, 0.00, 35000.00, 50000.00, 150000.00, 6, 1),
+(5, 'TV_PREM', 'TV Premium', 'television', 45000.00, NULL, NULL, 100, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 0.00, 45000.00, 42016.00, 1, 'residencial', 'HFC (Cable)', 0, 0.00, '{\"television\": 45000.00, \"instalacion\": 42016, \"tipo_principal\": \"television\"}', 5, 0, NULL, NULL, 1, 1, 0.00, 37815.13, 0.00, 45000.00, 50000.00, 150000.00, 6, 1),
+(6, 'COMBO1', 'Combo Internet 30MB + TV', 'combo', 75000.00, 5, 30, NULL, NULL, 1, 1, '2025-05-23 13:44:46', '2025-07-09 19:04:56', 48750.00, 26250.00, 42016.00, 1, 'residencial', 'Fibra Óptica + HFC', 0, 15.00, '{\"internet\": 48750.00, \"television\": 26250.00, \"instalacion\": 42016, \"descuento_combo\": 15.00, \"tipo_principal\": \"combo\"}', 6, 0, NULL, NULL, 0, 1, 48750.00, 22058.82, 58012.50, 26250.00, 50000.00, 150000.00, 6, 1),
+(8, 'INT20', 'Internet 20MB Residencial', 'internet', 55000.00, 3, 20, NULL, 'Plan internet residencial 20MB ideal para navegación y streaming básico', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 55000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 12, 0.00, '{\"internet\": 55000, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 7, 0, NULL, NULL, 0, 1, 55000.00, 0.00, 65450.00, 0.00, 50000.00, 150000.00, 6, 1),
+(9, 'INT100', 'Internet 100MB Residencial', 'internet', 95000.00, 15, 100, NULL, 'Plan internet residencial 100MB para familias con alto consumo', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 95000.00, 0.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 12, 0.00, '{\"internet\": 95000, \"instalacion\": 42016, \"tipo_principal\": \"internet\"}', 8, 0, NULL, NULL, 0, 1, 95000.00, 0.00, 113050.00, 0.00, 50000.00, 150000.00, 6, 1),
+(10, 'EMP50', 'Internet 50MB Empresarial', 'internet', 120000.00, 20, 50, NULL, 'Plan internet empresarial con soporte prioritario y IP fija', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 120000.00, 0.00, 60000.00, 1, 'empresarial', 'Fibra Óptica', 24, 0.00, '{\"internet\": 120000, \"instalacion\": 60000, \"tipo_principal\": \"internet\", \"ip_fija\": true}', 9, 0, NULL, NULL, 0, 1, 120000.00, 0.00, 142800.00, 0.00, 50000.00, 150000.00, 6, 1),
+(11, 'TV_DIG', 'TV Digital HD', 'television', 35000.00, NULL, NULL, 120, 'Televisión digital HD con canales nacionales e internacionales', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 0.00, 35000.00, 42016.00, 1, 'residencial', 'Satelital', 12, 0.00, '{\"television\": 35000, \"instalacion\": 42016, \"tipo_principal\": \"television\"}', 10, 0, NULL, NULL, 1, 1, 0.00, 29411.76, 0.00, 35000.00, 50000.00, 150000.00, 6, 1),
+(12, 'COMBO_30TV', 'Combo Internet 30MB + TV Básica', 'combo', 85000.00, 5, 30, 80, 'Combo económico ideal para familias: Internet 30MB + TV Básica', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 55250.00, 29750.00, 42016.00, 1, 'residencial', 'Fibra Óptica + HFC', 12, 15.00, '{\"internet\": 55250, \"television\": 29750, \"instalacion\": 42016, \"descuento_combo\": 15.00, \"tipo_principal\": \"combo\"}', 11, 0, NULL, NULL, 0, 1, 55250.00, 25000.00, 65747.50, 29750.00, 50000.00, 150000.00, 6, 1),
+(13, 'COMBO_50PR', 'Combo Internet 50MB + TV Premium', 'combo', 115000.00, 10, 50, 100, 'Combo premium: Internet 50MB + TV Premium con canales HD', 1, 1, '2025-07-09 15:42:59', '2025-07-09 19:04:56', 74750.00, 40250.00, 42016.00, 1, 'residencial', 'Fibra Óptica + HFC', 12, 15.00, '{\"internet\": 74750, \"television\": 40250, \"instalacion\": 42016, \"descuento_combo\": 15.00, \"tipo_principal\": \"combo\"}', 12, 0, NULL, NULL, 0, 1, 74750.00, 33823.53, 88952.50, 40250.00, 50000.00, 150000.00, 6, 1),
+(14, 'COMBO3', 'Combo15', 'combo', 45000.00, 3, 2, 80, '', 1, 1, '2025-07-09 16:56:44', '2025-07-09 21:44:18', 29250.00, 15750.00, 42016.00, 1, 'residencial', 'Fibra Óptica', 0, 0.00, '{\"tipo_principal\":\"combo\",\"instalacion\":\"42016\",\"internet\":\"29250\",\"television\":\"15750\",\"descuento_combo\":\"0\"}', 0, 0, '0000-00-00', '0000-00-00', 0, 1, 29250.00, 13235.29, 34807.50, 15750.00, 50000.00, 150000.00, 6, 1);
 
 -- --------------------------------------------------------
 
@@ -1182,7 +1288,8 @@ CREATE TABLE `sectores` (
 INSERT INTO `sectores` (`id`, `codigo`, `nombre`, `ciudad_id`, `activo`) VALUES
 (1, '001', 'CENTRO', 5, 1),
 (2, '111', 'Engativa', 1, 1),
-(3, '684', 'zona central', 6, 1);
+(3, '684', 'zona central', 6, 1),
+(4, '112', 'bolivia oriental', 1, 1);
 
 -- --------------------------------------------------------
 
@@ -1216,7 +1323,8 @@ INSERT INTO `servicios_cliente` (`id`, `cliente_id`, `plan_id`, `fecha_activacio
 (9, 23, 3, '2025-07-08', NULL, 'activo', NULL, NULL, NULL, '2025-07-08 15:16:25', '2025-07-08 15:16:25'),
 (10, 25, 1, '2025-07-08', NULL, 'activo', NULL, NULL, NULL, '2025-07-08 19:36:14', '2025-07-08 19:36:14'),
 (11, 26, 2, '2025-07-08', NULL, 'activo', NULL, NULL, NULL, '2025-07-08 21:27:30', '2025-07-08 21:27:30'),
-(12, 27, 1, '2025-07-08', NULL, 'activo', NULL, NULL, NULL, '2025-07-08 21:49:13', '2025-07-08 21:49:13');
+(12, 27, 1, '2025-07-08', NULL, 'activo', NULL, NULL, NULL, '2025-07-08 21:49:13', '2025-07-08 21:49:13'),
+(13, 28, 13, '2025-07-10', NULL, 'activo', NULL, NULL, NULL, '2025-07-10 00:03:24', '2025-07-10 00:03:24');
 
 -- --------------------------------------------------------
 
@@ -1245,6 +1353,42 @@ INSERT INTO `sistema_usuarios` (`id`, `email`, `password`, `nombre`, `telefono`,
 (1, 'admin@empresa.com', '$2b$12$8pOnup7urwhWUA7.e8VpEuDYuUiZ/gVTIf35HbnKQSWBMQeb7QXAa', 'Mateo salazar ortiz', '3007015239', 'administrador', 1, '2025-07-09 15:58:53', '2025-05-23 13:44:46', '2025-07-09 15:58:53'),
 (2, 'super@empresa.com', '$2b$12$f1Vvth/hYSUD7VHtfmZKmOuNXrHowf0Fy2T7MtxdhRAZdIOQR8MCa', 'mateo salazar ortiz', '3007015239', 'supervisor', 1, '2025-06-03 16:18:19', '2025-05-30 14:32:41', '2025-06-11 13:07:30'),
 (3, 'instalador@empresa.com', '$2b$12$FCgmtglWlgNJPwNmNbX3fOp8eRnvpeaSgKdteS0mKYtKHq1/qq6Ri', 'mateo salazar ortiz', '3007015239', 'instalador', 1, '2025-06-04 16:44:35', '2025-05-30 15:00:25', '2025-06-04 16:44:35');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `traslados_servicio`
+--
+
+CREATE TABLE `traslados_servicio` (
+  `id` int(11) NOT NULL,
+  `cliente_id` int(11) NOT NULL,
+  `fecha_traslado` date NOT NULL,
+  `costo` decimal(10,2) DEFAULT 15000.00,
+  `motivo` varchar(255) DEFAULT NULL,
+  `facturado` tinyint(1) DEFAULT 0,
+  `activo` tinyint(1) DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `varios_pendientes`
+--
+
+CREATE TABLE `varios_pendientes` (
+  `id` int(11) NOT NULL,
+  `cliente_id` int(11) NOT NULL,
+  `concepto` varchar(255) NOT NULL,
+  `cantidad` int(11) DEFAULT 1,
+  `valor_unitario` decimal(10,2) NOT NULL,
+  `valor_total` decimal(10,2) NOT NULL,
+  `aplica_iva` tinyint(1) DEFAULT 1,
+  `porcentaje_iva` decimal(5,2) DEFAULT 19.00,
+  `fecha_aplicacion` date NOT NULL,
+  `facturado` tinyint(1) DEFAULT 0,
+  `activo` tinyint(1) DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -1303,6 +1447,30 @@ CREATE TABLE `vista_clientes_activos` (
 ,`estado_servicio` enum('activo','suspendido','cortado','cancelado')
 ,`plan_nombre` varchar(255)
 ,`precio_plan` decimal(10,2)
+);
+
+-- --------------------------------------------------------
+
+--
+-- Estructura Stand-in para la vista `vista_contratos_activos`
+-- (Véase abajo para la vista actual)
+--
+CREATE TABLE `vista_contratos_activos` (
+`id` int(11)
+,`numero_contrato` varchar(20)
+,`tipo_permanencia` enum('con_permanencia','sin_permanencia')
+,`permanencia_meses` int(11)
+,`costo_instalacion` decimal(10,2)
+,`fecha_inicio` date
+,`fecha_vencimiento_permanencia` date
+,`estado` enum('activo','vencido','terminado','anulado')
+,`cliente_identificacion` varchar(20)
+,`cliente_nombre` varchar(255)
+,`cliente_telefono` varchar(30)
+,`plan_nombre` varchar(255)
+,`plan_precio` decimal(10,2)
+,`dias_restantes_permanencia` int(7)
+,`estado_permanencia` varchar(15)
 );
 
 -- --------------------------------------------------------
@@ -1512,6 +1680,15 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 -- --------------------------------------------------------
 
 --
+-- Estructura para la vista `vista_contratos_activos`
+--
+DROP TABLE IF EXISTS `vista_contratos_activos`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vista_contratos_activos`  AS SELECT `c`.`id` AS `id`, `c`.`numero_contrato` AS `numero_contrato`, `c`.`tipo_permanencia` AS `tipo_permanencia`, `c`.`permanencia_meses` AS `permanencia_meses`, `c`.`costo_instalacion` AS `costo_instalacion`, `c`.`fecha_inicio` AS `fecha_inicio`, `c`.`fecha_vencimiento_permanencia` AS `fecha_vencimiento_permanencia`, `c`.`estado` AS `estado`, `cl`.`identificacion` AS `cliente_identificacion`, `cl`.`nombre` AS `cliente_nombre`, `cl`.`telefono` AS `cliente_telefono`, `ps`.`nombre` AS `plan_nombre`, `ps`.`precio` AS `plan_precio`, CASE WHEN `c`.`tipo_permanencia` = 'con_permanencia' AND `c`.`fecha_vencimiento_permanencia` > curdate() THEN to_days(`c`.`fecha_vencimiento_permanencia`) - to_days(curdate()) ELSE 0 END AS `dias_restantes_permanencia`, CASE WHEN `c`.`tipo_permanencia` = 'con_permanencia' AND `c`.`fecha_vencimiento_permanencia` <= curdate() THEN 'Vencida' WHEN `c`.`tipo_permanencia` = 'con_permanencia' THEN 'Vigente' ELSE 'Sin permanencia' END AS `estado_permanencia` FROM (((`contratos` `c` left join `clientes` `cl` on(`c`.`cliente_id` = `cl`.`id`)) left join `servicios_cliente` `sc` on(`c`.`servicio_id` = `sc`.`id`)) left join `planes_servicio` `ps` on(`sc`.`plan_id` = `ps`.`id`)) WHERE `c`.`estado` = 'activo' ;
+
+-- --------------------------------------------------------
+
+--
 -- Estructura para la vista `vista_equipos_instaladores`
 --
 DROP TABLE IF EXISTS `vista_equipos_instaladores`;
@@ -1668,6 +1845,17 @@ ALTER TABLE `configuracion_iva`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indices de la tabla `contratos`
+--
+ALTER TABLE `contratos`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `numero_contrato` (`numero_contrato`),
+  ADD KEY `idx_cliente_contrato` (`cliente_id`),
+  ADD KEY `idx_numero_contrato` (`numero_contrato`),
+  ADD KEY `idx_servicio_contrato` (`servicio_id`),
+  ADD KEY `fk_contratos_usuario` (`created_by`);
+
+--
 -- Indices de la tabla `cortes_servicio`
 --
 ALTER TABLE `cortes_servicio`
@@ -1694,6 +1882,13 @@ ALTER TABLE `detalle_facturas`
   ADD KEY `idx_factura` (`factura_id`),
   ADD KEY `idx_concepto` (`concepto_id`),
   ADD KEY `servicio_cliente_id` (`servicio_cliente_id`);
+
+--
+-- Indices de la tabla `equipos_perdidos`
+--
+ALTER TABLE `equipos_perdidos`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `cliente_id` (`cliente_id`);
 
 --
 -- Indices de la tabla `facturacion_historial`
@@ -1728,7 +1923,8 @@ ALTER TABLE `facturas`
   ADD KEY `idx_identificacion_cliente` (`identificacion_cliente`),
   ADD KEY `idx_nombre_cliente` (`nombre_cliente`),
   ADD KEY `idx_activo_estado` (`activo`,`estado`),
-  ADD KEY `idx_ruta_estado` (`ruta`,`estado`);
+  ADD KEY `idx_ruta_estado` (`ruta`,`estado`),
+  ADD KEY `fk_facturas_contrato` (`contrato_id`);
 
 --
 -- Indices de la tabla `incidencias_servicio`
@@ -1752,7 +1948,8 @@ ALTER TABLE `instalaciones`
   ADD KEY `idx_instalador` (`instalador_id`),
   ADD KEY `idx_fecha_programada` (`fecha_programada`),
   ADD KEY `idx_estado` (`estado`),
-  ADD KEY `servicio_cliente_id` (`servicio_cliente_id`);
+  ADD KEY `servicio_cliente_id` (`servicio_cliente_id`),
+  ADD KEY `fk_instalaciones_contrato` (`contrato_id`);
 
 --
 -- Indices de la tabla `inventario_equipos`
@@ -1894,6 +2091,20 @@ ALTER TABLE `sistema_usuarios`
   ADD KEY `idx_activo` (`activo`);
 
 --
+-- Indices de la tabla `traslados_servicio`
+--
+ALTER TABLE `traslados_servicio`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `cliente_id` (`cliente_id`);
+
+--
+-- Indices de la tabla `varios_pendientes`
+--
+ALTER TABLE `varios_pendientes`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `cliente_id` (`cliente_id`);
+
+--
 -- AUTO_INCREMENT de las tablas volcadas
 --
 
@@ -1913,7 +2124,7 @@ ALTER TABLE `ciudades`
 -- AUTO_INCREMENT de la tabla `clientes`
 --
 ALTER TABLE `clientes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
 -- AUTO_INCREMENT de la tabla `clientes_inactivos`
@@ -1952,6 +2163,12 @@ ALTER TABLE `configuracion_iva`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
+-- AUTO_INCREMENT de la tabla `contratos`
+--
+ALTER TABLE `contratos`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
 -- AUTO_INCREMENT de la tabla `cortes_servicio`
 --
 ALTER TABLE `cortes_servicio`
@@ -1970,6 +2187,12 @@ ALTER TABLE `detalle_facturas`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT de la tabla `equipos_perdidos`
+--
+ALTER TABLE `equipos_perdidos`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT de la tabla `facturacion_historial`
 --
 ALTER TABLE `facturacion_historial`
@@ -1979,7 +2202,7 @@ ALTER TABLE `facturacion_historial`
 -- AUTO_INCREMENT de la tabla `facturas`
 --
 ALTER TABLE `facturas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- AUTO_INCREMENT de la tabla `incidencias_servicio`
@@ -2051,19 +2274,31 @@ ALTER TABLE `rutas_cobranza`
 -- AUTO_INCREMENT de la tabla `sectores`
 --
 ALTER TABLE `sectores`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT de la tabla `servicios_cliente`
 --
 ALTER TABLE `servicios_cliente`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT de la tabla `sistema_usuarios`
 --
 ALTER TABLE `sistema_usuarios`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT de la tabla `traslados_servicio`
+--
+ALTER TABLE `traslados_servicio`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de la tabla `varios_pendientes`
+--
+ALTER TABLE `varios_pendientes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- Restricciones para tablas volcadas
@@ -2090,6 +2325,14 @@ ALTER TABLE `clientes_inactivos`
   ADD CONSTRAINT `clientes_inactivos_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE SET NULL;
 
 --
+-- Filtros para la tabla `contratos`
+--
+ALTER TABLE `contratos`
+  ADD CONSTRAINT `fk_contratos_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_contratos_servicio` FOREIGN KEY (`servicio_id`) REFERENCES `servicios_cliente` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_contratos_usuario` FOREIGN KEY (`created_by`) REFERENCES `sistema_usuarios` (`id`) ON DELETE SET NULL;
+
+--
 -- Filtros para la tabla `cortes_servicio`
 --
 ALTER TABLE `cortes_servicio`
@@ -2106,12 +2349,19 @@ ALTER TABLE `detalle_facturas`
   ADD CONSTRAINT `detalle_facturas_ibfk_3` FOREIGN KEY (`servicio_cliente_id`) REFERENCES `servicios_cliente` (`id`) ON DELETE SET NULL;
 
 --
+-- Filtros para la tabla `equipos_perdidos`
+--
+ALTER TABLE `equipos_perdidos`
+  ADD CONSTRAINT `equipos_perdidos_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`);
+
+--
 -- Filtros para la tabla `facturas`
 --
 ALTER TABLE `facturas`
   ADD CONSTRAINT `facturas_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`),
   ADD CONSTRAINT `facturas_ibfk_2` FOREIGN KEY (`banco_id`) REFERENCES `bancos` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `facturas_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `sistema_usuarios` (`id`) ON DELETE SET NULL;
+  ADD CONSTRAINT `facturas_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `sistema_usuarios` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_facturas_contrato` FOREIGN KEY (`contrato_id`) REFERENCES `contratos` (`id`) ON DELETE SET NULL;
 
 --
 -- Filtros para la tabla `incidencias_servicio`
@@ -2124,6 +2374,7 @@ ALTER TABLE `incidencias_servicio`
 -- Filtros para la tabla `instalaciones`
 --
 ALTER TABLE `instalaciones`
+  ADD CONSTRAINT `fk_instalaciones_contrato` FOREIGN KEY (`contrato_id`) REFERENCES `contratos` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `instalaciones_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `instalaciones_ibfk_2` FOREIGN KEY (`servicio_cliente_id`) REFERENCES `servicios_cliente` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `instalaciones_ibfk_3` FOREIGN KEY (`instalador_id`) REFERENCES `sistema_usuarios` (`id`) ON DELETE SET NULL;
@@ -2185,6 +2436,18 @@ ALTER TABLE `servicios_cliente`
   ADD CONSTRAINT `servicios_cliente_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `servicios_cliente_ibfk_2` FOREIGN KEY (`plan_id`) REFERENCES `planes_servicio` (`id`),
   ADD CONSTRAINT `servicios_cliente_ibfk_3` FOREIGN KEY (`instalador_id`) REFERENCES `sistema_usuarios` (`id`) ON DELETE SET NULL;
+
+--
+-- Filtros para la tabla `traslados_servicio`
+--
+ALTER TABLE `traslados_servicio`
+  ADD CONSTRAINT `traslados_servicio_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`);
+
+--
+-- Filtros para la tabla `varios_pendientes`
+--
+ALTER TABLE `varios_pendientes`
+  ADD CONSTRAINT `varios_pendientes_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
