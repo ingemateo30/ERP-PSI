@@ -11,12 +11,12 @@ class ServicePlansController {
    */
   static async getPlans(req, res) {
     try {
-      const { 
-        page = 1, 
-        limit = 50, 
-        search = '', 
-        tipo = '', 
-        activo = '', 
+      const {
+        page = 1,
+        limit = 50,
+        search = '',
+        tipo = '',
+        activo = '',
         segmento = '',
         orden = 'orden_visualizacion'
       } = req.query;
@@ -46,7 +46,7 @@ class ServicePlansController {
         params.push(tipo);
       }
 
-      if (activo !== '') {
+      if (activo !== '' && activo !== undefined) {
         query += ` AND p.activo = ?`;
         params.push(activo === 'true' ? 1 : 0);
       }
@@ -65,10 +65,10 @@ class ServicePlansController {
       if (limit && limit !== 'all') {
         const limite = parseInt(limit);
         const offset = (parseInt(page) - 1) * limite;
-        
+
         query += ' LIMIT ?';
         params.push(parseInt(limite));
-        
+
         if (offset) {
           query += ' OFFSET ?';
           params.push(parseInt(offset));
@@ -92,18 +92,18 @@ class ServicePlansController {
         canales_tv: parseInt(plan.canales_tv) || 0,
         descuento_combo: parseFloat(plan.descuento_combo) || 0,
         orden_visualizacion: parseInt(plan.orden_visualizacion) || 0,
-        
+
         // ✅ CAMPOS OPTIMIZADOS DE INSTALACIÓN
         costo_instalacion_permanencia: parseFloat(plan.costo_instalacion_permanencia) || 0,
         costo_instalacion_sin_permanencia: parseFloat(plan.costo_instalacion_sin_permanencia) || 0,
         permanencia_minima_meses: parseInt(plan.permanencia_minima_meses) || 0,
-        
+
         // Precios con IVA específicos
         precio_internet_sin_iva: parseFloat(plan.precio_internet_sin_iva) || 0,
         precio_television_sin_iva: parseFloat(plan.precio_television_sin_iva) || 0,
         precio_internet_con_iva: parseFloat(plan.precio_internet_con_iva) || 0,
         precio_television_con_iva: parseFloat(plan.precio_television_con_iva) || 0,
-        
+
         // Convertir valores booleanos
         activo: Boolean(plan.activo),
         aplica_iva: Boolean(plan.aplica_iva),
@@ -210,25 +210,25 @@ class ServicePlansController {
         descripcion,
         aplica_iva = true,
         activo = true,
-        
+
         // Campos de precios específicos
         precio_internet,
         precio_television,
         requiere_instalacion = true,
-        
+
         // Campos de segmentación
         segmento = 'residencial',
         tecnologia = 'Fibra Óptica',
         descuento_combo = 0,
-        
+
         // Campos de configuración
         orden_visualizacion = 0,
-        
+
         // Campos promocionales
         promocional = false,
         fecha_inicio_promocion,
         fecha_fin_promocion,
-        
+
         // ✅ CAMPOS OPTIMIZADOS DE INSTALACIÓN Y PERMANENCIA
         aplica_iva_estrato_123 = false,
         aplica_iva_estrato_456 = true,
@@ -261,15 +261,15 @@ class ServicePlansController {
       const precioInternetFinal = parseFloat(precio_internet) || 0;
       const precioTelevisionFinal = parseFloat(precio_television) || 0;
 
-      const precioInternetSinIVA = precio_internet_sin_iva ? 
+      const precioInternetSinIVA = precio_internet_sin_iva ?
         parseFloat(precio_internet_sin_iva) : precioInternetFinal;
-      const precioTVSinIVA = precio_television_sin_iva ? 
+      const precioTVSinIVA = precio_television_sin_iva ?
         parseFloat(precio_television_sin_iva) : precioTelevisionFinal;
 
       const ivaRate = 0.19; // 19%
-      const precioInternetConIVA = precio_internet_con_iva ? 
+      const precioInternetConIVA = precio_internet_con_iva ?
         parseFloat(precio_internet_con_iva) : (precioInternetSinIVA * (1 + ivaRate));
-      const precioTVConIVA = precio_television_con_iva ? 
+      const precioTVConIVA = precio_television_con_iva ?
         parseFloat(precio_television_con_iva) : (precioTVSinIVA * (1 + ivaRate));
 
       // ✅ INSERTAR CON CAMPOS OPTIMIZADOS
@@ -287,9 +287,9 @@ class ServicePlansController {
           permanencia_minima_meses, aplica_permanencia
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        codigo, nombre, tipo, precio, 
+        codigo, nombre, tipo, precio,
         velocidad_subida || null, velocidad_bajada || null, canales_tv || null, descripcion,
-        aplica_iva ? 1 : 0, activo ? 1 : 0, 
+        aplica_iva ? 1 : 0, activo ? 1 : 0,
         precioInternetFinal, precioTelevisionFinal,
         requiere_instalacion ? 1 : 0, segmento, tecnologia,
         descuento_combo, orden_visualizacion,
@@ -355,7 +355,7 @@ class ServicePlansController {
         'requiere_instalacion', 'segmento', 'tecnologia',
         'descuento_combo', 'orden_visualizacion',
         'promocional', 'fecha_inicio_promocion', 'fecha_fin_promocion',
-        
+
         // ✅ CAMPOS OPTIMIZADOS
         'aplica_iva_estrato_123', 'aplica_iva_estrato_456',
         'precio_internet_sin_iva', 'precio_television_sin_iva',
@@ -366,12 +366,12 @@ class ServicePlansController {
 
       const actualizaciones = {};
       const valores = [];
-      
+
       camposPermitidos.forEach(campo => {
         if (datosActualizacion.hasOwnProperty(campo)) {
           // Conversiones especiales para campos booleanos
-          if (['aplica_iva', 'activo', 'requiere_instalacion', 'promocional', 
-               'aplica_iva_estrato_123', 'aplica_iva_estrato_456', 'aplica_permanencia'].includes(campo)) {
+          if (['aplica_iva', 'activo', 'requiere_instalacion', 'promocional',
+            'aplica_iva_estrato_123', 'aplica_iva_estrato_456', 'aplica_permanencia'].includes(campo)) {
             actualizaciones[campo] = '?';
             valores.push(datosActualizacion[campo] ? 1 : 0);
           }
@@ -412,7 +412,7 @@ class ServicePlansController {
       actualizaciones.updated_at = 'NOW()';
       valores.push(id);
 
-      const setClauses = Object.keys(actualizaciones).map(key => 
+      const setClauses = Object.keys(actualizaciones).map(key =>
         `${key} = ${actualizaciones[key]}`
       ).join(', ');
 
@@ -626,9 +626,9 @@ class ServicePlansController {
           permanencia_minima_meses, aplica_permanencia
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        planDuplicado.codigo, planDuplicado.nombre, planDuplicado.tipo, planDuplicado.precio, 
-        planDuplicado.velocidad_subida, planDuplicado.velocidad_bajada, planDuplicado.canales_tv, 
-        planDuplicado.descripcion, planDuplicado.aplica_iva, planDuplicado.activo, 
+        planDuplicado.codigo, planDuplicado.nombre, planDuplicado.tipo, planDuplicado.precio,
+        planDuplicado.velocidad_subida, planDuplicado.velocidad_bajada, planDuplicado.canales_tv,
+        planDuplicado.descripcion, planDuplicado.aplica_iva, planDuplicado.activo,
         planDuplicado.precio_internet, planDuplicado.precio_television,
         planDuplicado.requiere_instalacion, planDuplicado.segmento, planDuplicado.tecnologia,
         planDuplicado.descuento_combo, planDuplicado.orden_visualizacion,

@@ -522,7 +522,13 @@ const ServicePlansConfig = () => {
       {/* Lista de planes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredPlanes.map((plan) => (
-          <div key={plan.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div
+            key={plan.id}
+            className={`rounded-lg shadow-sm border overflow-hidden transition-all duration-200 ${plan.activo
+                ? 'bg-white border-gray-200'
+                : 'bg-gray-50 border-gray-300 opacity-75'
+              }`}
+          >
             {/* Header del plan */}
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-start justify-between mb-4">

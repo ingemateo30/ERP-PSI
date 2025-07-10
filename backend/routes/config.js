@@ -1386,7 +1386,7 @@ router.get('/service-plans', async (req, res) => {
     
     const planes = await Database.query(`
       SELECT * FROM planes_servicio 
-      WHERE activo = 1 
+      WHERE 1 = 1 
       ORDER BY codigo
     `);
 
