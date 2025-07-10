@@ -1,5 +1,5 @@
 // =============================================
-// FRONTEND: frontend/src/components/Clients/ClientEditForm.js - VERSIÓN FINAL
+// FRONTEND: frontend/src/components/Clients/ClientEditForm.js - SOLUCIÓN CORREGIDA
 // =============================================
 
 import React, { useState, useEffect } from 'react';
@@ -54,12 +54,19 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
         clientService.getSectores()
       ]);
 
-      setCiudades(ciudadesResponse.data || []);
-      setSectores(sectoresResponse.data || []);
+      if (ciudadesResponse.success) {
+        setCiudades(ciudadesResponse.data);
+      }
+
+      if (sectoresResponse.success) {
+        setSectores(sectoresResponse.data);
+      }
 
     } catch (error) {
-      console.error('Error cargando datos iniciales:', error);
-      setErrors({ general: 'Error cargando datos del formulario' });
+      console.error('❌ Error cargando datos iniciales:', error);
+      setErrors({
+        general: 'Error cargando datos. Refresque la página.'
+      });
     } finally {
       setLoading(false);
     }
@@ -68,34 +75,27 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
   const cargarSectoresPorCiudad = async (ciudadId) => {
     try {
       const response = await clientService.getSectoresPorCiudad(ciudadId);
-      setSectores(response.data || []);
-      
-      // Limpiar sector si no pertenece a la nueva ciudad
-      if (formData.sector_id) {
-        const sectorExiste = response.data?.find(s => s.id === parseInt(formData.sector_id));
-        if (!sectorExiste) {
-          handleInputChange('sector_id', '');
-        }
+      if (response.success) {
+        setSectores(response.data);
       }
     } catch (error) {
-      console.error('Error cargando sectores por ciudad:', error);
-      setSectores([]);
+      console.error('❌ Error cargando sectores:', error);
     }
   };
 
   const cargarDatosCliente = () => {
-    console.log('📋 Cargando datos del cliente:', client);
-    
+    if (!client) return;
+
     setFormData({
       nombre: client.nombre || '',
       direccion: client.direccion || '',
       telefono: client.telefono || '',
-      telefono_fijo: client.telefono_fijo || '',
+      telefono_fijo: client.telefono_2 || '',
       correo: client.correo || '',
       barrio: client.barrio || '',
       estrato: client.estrato || '3',
-      ciudad_id: client.ciudad_id?.toString() || '',
-      sector_id: client.sector_id?.toString() || '',
+      ciudad_id: client.ciudad_id || '',
+      sector_id: client.sector_id || '',
       observaciones: client.observaciones || ''
     });
   };
@@ -157,9 +157,11 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
 
       console.log('📝 Actualizando cliente:', client.id, formData);
 
-      // Preparar datos para envío
+      // SOLUCIÓN: Incluir la identificación del cliente en los datos de actualización
+      // porque el backend la requiere para validación
       const datosActualizacion = {
         ...formData,
+        identificacion: client.identificacion, // ⭐ ESTA ES LA LÍNEA QUE SOLUCIONA EL ERROR
         ciudad_id: formData.ciudad_id ? parseInt(formData.ciudad_id) : null,
         sector_id: formData.sector_id ? parseInt(formData.sector_id) : null
       };
@@ -273,41 +275,31 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     placeholder="Nombre completo del cliente"
                   />
                   {errors.nombre && (
-                    <p className="text-red-600 text-sm mt-1">{errors.nombre}</p>
+                    <p className="mt-1 text-sm text-red-600">{errors.nombre}</p>
                   )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estrato
+                    Correo Electrónico
                   </label>
-                  <select
-                    value={formData.estrato}
-                    onChange={(e) => handleInputChange('estrato', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="1">Estrato 1</option>
-                    <option value="2">Estrato 2</option>
-                    <option value="3">Estrato 3</option>
-                    <option value="4">Estrato 4</option>
-                    <option value="5">Estrato 5</option>
-                    <option value="6">Estrato 6</option>
-                  </select>
+                  <input
+                    type="email"
+                    value={formData.correo}
+                    onChange={(e) => handleInputChange('correo', e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.correo ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="correo@example.com"
+                  />
+                  {errors.correo && (
+                    <p className="mt-1 text-sm text-red-600">{errors.correo}</p>
+                  )}
                 </div>
-              </div>
-            </div>
 
-            {/* Información de Contacto */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <Phone className="w-5 h-5" />
-                Información de Contacto
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Teléfono Móvil *
+                    Teléfono Celular *
                   </label>
                   <input
                     type="tel"
@@ -319,7 +311,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     placeholder="3001234567"
                   />
                   {errors.telefono && (
-                    <p className="text-red-600 text-sm mt-1">{errors.telefono}</p>
+                    <p className="mt-1 text-sm text-red-600">{errors.telefono}</p>
                   )}
                 </div>
 
@@ -334,34 +326,16 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       errors.telefono_fijo ? 'border-red-300' : 'border-gray-300'
                     }`}
-                    placeholder="6015551234"
+                    placeholder="6012345678"
                   />
                   {errors.telefono_fijo && (
-                    <p className="text-red-600 text-sm mt-1">{errors.telefono_fijo}</p>
-                  )}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Correo Electrónico
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.correo}
-                    onChange={(e) => handleInputChange('correo', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.correo ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="cliente@email.com"
-                  />
-                  {errors.correo && (
-                    <p className="text-red-600 text-sm mt-1">{errors.correo}</p>
+                    <p className="mt-1 text-sm text-red-600">{errors.telefono_fijo}</p>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Ubicación */}
+            {/* Información de Ubicación */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
                 <MapPin className="w-5 h-5" />
@@ -380,10 +354,10 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       errors.direccion ? 'border-red-300' : 'border-gray-300'
                     }`}
-                    placeholder="Dirección completa"
+                    placeholder="Dirección completa del cliente"
                   />
                   {errors.direccion && (
-                    <p className="text-red-600 text-sm mt-1">{errors.direccion}</p>
+                    <p className="mt-1 text-sm text-red-600">{errors.direccion}</p>
                   )}
                 </div>
 
@@ -398,6 +372,24 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Nombre del barrio"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Estrato
+                  </label>
+                  <select
+                    value={formData.estrato}
+                    onChange={(e) => handleInputChange('estrato', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="1">Estrato 1</option>
+                    <option value="2">Estrato 2</option>
+                    <option value="3">Estrato 3</option>
+                    <option value="4">Estrato 4</option>
+                    <option value="5">Estrato 5</option>
+                    <option value="6">Estrato 6</option>
+                  </select>
                 </div>
 
                 <div>
@@ -418,7 +410,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                   </select>
                 </div>
 
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Sector
                   </label>
@@ -426,11 +418,12 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     value={formData.sector_id}
                     onChange={(e) => handleInputChange('sector_id', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={!formData.ciudad_id}
                   >
                     <option value="">Seleccionar sector</option>
                     {sectores.map(sector => (
                       <option key={sector.id} value={sector.id}>
-                        {sector.codigo} - {sector.nombre}
+                        {sector.nombre}
                       </option>
                     ))}
                   </select>
