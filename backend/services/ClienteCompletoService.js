@@ -363,59 +363,99 @@ class ClienteCompletoService {
    * Generar orden de instalación interna COMPLETA
    */
   static async generarOrdenInstalacionInterno(conexion, clienteId, servicioId, createdBy = null) {
-    console.log('📋 Generando orden de instalación COMPLETA...');
+  console.log('📋 Generando orden de instalación COMPLETA...');
 
-    // INSERTAR EN TABLA INSTALACIONES con campos que SÍ existen ✓ CORREGIDO
-    const query = `
+  // Obtener datos del plan para el costo de instalación
+  const [planes] = await conexion.execute(`
+    SELECT costo_instalacion_sin_permanencia, costo_instalacion_permanencia 
+    FROM planes_servicio ps
+    JOIN servicios_cliente sc ON ps.id = sc.plan_id
+    WHERE sc.id = ?
+  `, [servicioId]);
+
+  const costoInstalacion = planes[0]?.costo_instalacion_sin_permanencia || 150000.00;
+
+  // Obtener contrato_id si existe
+  const [contratos] = await conexion.execute(`
+    SELECT id FROM contratos WHERE servicio_id = ? ORDER BY created_at DESC LIMIT 1
+  `, [servicioId]);
+
+  const contratoId = contratos[0]?.id || null;
+
+  const query = `
     INSERT INTO instalaciones (
-      cliente_id, servicio_cliente_id, fecha_programada, 
-      estado, tipo_instalacion, observaciones, created_at
-    ) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 2 DAY), 'programada', 'nueva', 'Orden generada automáticamente', NOW())
+      cliente_id, servicio_cliente_id, contrato_id, fecha_programada, 
+      estado, tipo_instalacion, costo_instalacion, observaciones, created_at
+    ) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 2 DAY), 'programada', 'nueva', ?, 'Orden generada automáticamente', NOW())
   `;
 
-    await conexion.execute(query, [clienteId, servicioId]);
+  await conexion.execute(query, [clienteId, servicioId, contratoId, costoInstalacion]);
 
-    console.log('✅ Orden de instalación creada en tabla instalaciones');
+  console.log('✅ Orden de instalación creada con contrato_id y costo correcto');
 
-    // Como no hay numero_orden en la tabla, generar uno ficticio para el return
-    const numeroOrdenFicticio = `ORD-${Date.now()}-${clienteId}`;
-
-    return {
-      numero: numeroOrdenFicticio,
-      estado: 'programada',
-      fecha_programada: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    };
-  }
+  return {
+    numero: `ORD-${Date.now()}-${clienteId}`,
+    estado: 'programada',
+    contrato_id: contratoId,
+    costo_instalacion: costoInstalacion
+  };
+}
 
 
   /**
    * Generar contrato interno
    */
   static async generarContratoInterno(conexion, clienteId, servicioId, createdBy = null) {
-    console.log('📄 Generando contrato...');
+  console.log('📄 Generando contrato...');
 
-    const numeroContrato = await this.generarNumeroContrato(conexion);
+  const numeroContrato = await this.generarNumeroContrato(conexion);
 
-    const query = `
-      INSERT INTO contratos (
-        numero_contrato, cliente_id, servicio_id, tipo_contrato,
-        tipo_permanencia, costo_instalacion, fecha_generacion,
-        estado, generado_automaticamente, created_by, created_at
-      ) VALUES (?, ?, ?, 'servicio', 'sin_permanencia', 150000.00, CURDATE(), 'activo', 1, ?, NOW())
-    `;
+  // Obtener datos del plan para calcular permanencia y costo
+  const [planes] = await conexion.execute(`
+    SELECT permanencia_minima_meses, costo_instalacion_permanencia, costo_instalacion_sin_permanencia
+    FROM planes_servicio ps
+    JOIN servicios_cliente sc ON ps.id = sc.plan_id
+    WHERE sc.id = ?
+  `, [servicioId]);
 
-    await conexion.execute(query, [
-      numeroContrato,
-      clienteId,
-      servicioId,
-      createdBy ? parseInt(createdBy) : null
-    ]);
+  const planData = planes[0] || {};
+  const tipoPermanencia = 'sin_permanencia'; // o tomar de datosServicio si lo pasas
+  const permanenciaMeses = tipoPermanencia === 'con_permanencia' ? (planData.permanencia_minima_meses || 6) : 0;
+  const costoInstalacion = tipoPermanencia === 'con_permanencia' 
+    ? planData.costo_instalacion_permanencia 
+    : planData.costo_instalacion_sin_permanencia;
 
-    return {
-      numero: numeroContrato,
-      estado: 'activo'
-    };
+  const fechaInicio = new Date().toISOString().split('T')[0];
+  let fechaVencimiento = null;
+  if (permanenciaMeses > 0) {
+    const fecha = new Date();
+    fecha.setMonth(fecha.getMonth() + permanenciaMeses);
+    fechaVencimiento = fecha.toISOString().split('T')[0];
   }
+
+  const query = `
+    INSERT INTO contratos (
+      numero_contrato, cliente_id, servicio_id, tipo_contrato,
+      tipo_permanencia, permanencia_meses, costo_instalacion, 
+      fecha_generacion, fecha_inicio, fecha_vencimiento_permanencia,
+      estado, generado_automaticamente, created_by, created_at
+    ) VALUES (?, ?, ?, 'servicio', ?, ?, ?, CURDATE(), ?, ?, 'activo', 1, ?, NOW())
+  `;
+
+  await conexion.execute(query, [
+    numeroContrato, clienteId, servicioId, tipoPermanencia, 
+    permanenciaMeses, costoInstalacion, fechaInicio, fechaVencimiento, createdBy || 1
+  ]);
+
+  console.log(`✅ Contrato generado: ${numeroContrato} con permanencia y costos correctos`);
+
+  return {
+    numero: numeroContrato,
+    estado: 'activo',
+    permanencia_meses: permanenciaMeses,
+    costo_instalacion: costoInstalacion
+  };
+}
 
   /**
    * Generar número de factura usando procedimiento almacenado
