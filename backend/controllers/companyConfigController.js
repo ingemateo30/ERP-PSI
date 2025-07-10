@@ -23,11 +23,11 @@ class CompanyConfigController {
 
       // Verificar si la configuración está completa
       const empresaConfigurada = empresaConfig && empresaConfig.empresa_nombre && empresaConfig.empresa_nit;
-      
-      const configCompleta = empresaConfigurada && 
-                            contadores.bancos_activos > 0 && 
-                            contadores.sectores_activos > 0 && 
-                            contadores.planes_activos > 0;
+
+      const configCompleta = empresaConfigurada &&
+        contadores.bancos_activos > 0 &&
+        contadores.sectores_activos > 0 &&
+        contadores.planes_activos > 0;
 
       const porcentajeCompletado = CompanyConfigController.calcularPorcentajeCompletado(contadores, empresaConfigurada);
 
@@ -82,7 +82,41 @@ class CompanyConfigController {
   static async updateCompanyConfig(req, res) {
     try {
       const configData = req.body;
-      
+      const validaciones = [];
+
+      if (configData.porcentaje_iva && (configData.porcentaje_iva < 0 || configData.porcentaje_iva > 100)) {
+        validaciones.push('El porcentaje de IVA debe estar entre 0 y 100');
+      }
+
+      if (configData.dias_mora_corte && configData.dias_mora_corte < 1) {
+        validaciones.push('Los días de mora deben ser mayor a 0');
+      }
+
+      if (configData.prefijo_factura && configData.prefijo_factura.length > 10) {
+        validaciones.push('El prefijo de factura no puede exceder 10 caracteres');
+      }
+
+      if (validaciones.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Errores de validación',
+          errors: validaciones
+        });
+      }
+
+      // Limpiar y procesar datos
+      Object.keys(configData).forEach(key => {
+        if (typeof configData[key] === 'string') {
+          configData[key] = configData[key].trim();
+        }
+        // Convertir números si es necesario
+        if (['dias_mora_corte', 'consecutivo_factura', 'consecutivo_contrato', 'consecutivo_recibo', 'consecutivo_orden'].includes(key)) {
+          configData[key] = parseInt(configData[key]) || 0;
+        }
+        if (['valor_reconexion', 'porcentaje_iva', 'porcentaje_interes'].includes(key)) {
+          configData[key] = parseFloat(configData[key]) || 0;
+        }
+      });
       // Verificar si existe configuración
       const [existingConfig] = await Database.query(
         'SELECT id FROM configuracion_empresa LIMIT 1'
@@ -198,14 +232,14 @@ class CompanyConfigController {
         FROM ciudades c
         LEFT JOIN departamentos d ON c.departamento_id = d.id
       `;
-      
+
       const params = [];
-      
+
       if (departamento_id) {
         query += ' WHERE c.departamento_id = ?';
         params.push(departamento_id);
       }
-      
+
       query += ' ORDER BY c.nombre ASC';
 
       const ciudades = await Database.query(query, params);
@@ -252,19 +286,19 @@ class CompanyConfigController {
         LEFT JOIN departamentos d ON c.departamento_id = d.id
         WHERE 1=1
       `;
-      
+
       const params = [];
-      
+
       if (ciudad_id) {
         query += ' AND s.ciudad_id = ?';
         params.push(ciudad_id);
       }
-      
+
       if (activo !== undefined) {
         query += ' AND s.activo = ?';
         params.push(activo === 'true' ? 1 : 0);
       }
-      
+
       query += ' ORDER BY s.codigo ASC';
 
       const sectores = await Database.query(query, params);
@@ -307,12 +341,12 @@ class CompanyConfigController {
 
       let query = 'SELECT * FROM bancos';
       const params = [];
-      
+
       if (activo !== undefined) {
         query += ' WHERE activo = ?';
         params.push(activo === 'true' ? 1 : 0);
       }
-      
+
       query += ' ORDER BY nombre ASC';
 
       const bancos = await Database.query(query, params);
@@ -344,17 +378,17 @@ class CompanyConfigController {
 
       let query = 'SELECT * FROM planes_servicio WHERE 1=1';
       const params = [];
-      
+
       if (tipo) {
         query += ' AND tipo = ?';
         params.push(tipo);
       }
-      
+
       if (activo !== undefined) {
         query += ' AND activo = ?';
         params.push(activo === 'true' ? 1 : 0);
       }
-      
+
       query += ' ORDER BY tipo ASC, precio ASC';
 
       const planes = await Database.query(query, params);
@@ -457,21 +491,21 @@ class CompanyConfigController {
       );
 
       const empresaConfigurada = empresaConfig && empresaConfig.empresa_nombre && empresaConfig.empresa_nit;
-      
+
       const problemas = [];
-      
+
       if (!empresaConfigurada) {
         problemas.push('Configuración de empresa incompleta');
       }
-      
+
       if (contadores.bancos_activos === 0) {
         problemas.push('No hay bancos configurados');
       }
-      
+
       if (contadores.sectores_activos === 0) {
         problemas.push('No hay sectores configurados');
       }
-      
+
       if (contadores.planes_activos === 0) {
         problemas.push('No hay planes de servicio configurados');
       }
@@ -505,29 +539,29 @@ class CompanyConfigController {
   static async getGeographyHierarchy(req, res) {
     try {
       const departamentos = await Database.query('SELECT * FROM departamentos ORDER BY nombre ASC');
-      
+
       const hierarchy = [];
-      
+
       for (let dept of departamentos) {
         const ciudades = await Database.query(
           'SELECT * FROM ciudades WHERE departamento_id = ? ORDER BY nombre ASC',
           [dept.id]
         );
-        
+
         const ciudadesWithSectors = [];
-        
+
         for (let ciudad of ciudades) {
           const sectores = await Database.query(
             'SELECT * FROM sectores WHERE ciudad_id = ? AND activo = 1 ORDER BY codigo ASC',
             [ciudad.id]
           );
-          
+
           ciudadesWithSectors.push({
             ...ciudad,
             sectores
           });
         }
-        
+
         hierarchy.push({
           ...dept,
           ciudades: ciudadesWithSectors

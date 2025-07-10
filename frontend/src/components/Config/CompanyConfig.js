@@ -1,15 +1,13 @@
 // frontend/src/components/Config/CompanyConfig.js
+// ARCHIVO COMPLETO CORREGIDO - Configuración de Empresa con todos los campos
 
 import React, { useState, useEffect } from 'react';
-import {
-  Building2, Save, RefreshCw, AlertCircle, CheckCircle,
-  Loader2, ArrowLeft, Eye, EyeOff
-} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { ArrowLeft, Save, Loader2, Building2, FileText, Settings, Shield } from 'lucide-react';
 import configService from '../../services/configService';
 
 const CompanyConfig = () => {
+  const navigate = useNavigate();
   const [config, setConfig] = useState({
     licencia: '',
     empresa_nombre: '',
@@ -29,28 +27,20 @@ const CompanyConfig = () => {
     valor_reconexion: 15000,
     dias_mora_corte: 30,
     porcentaje_iva: 19,
-    porcentaje_interes: 0
+    porcentaje_interes: 0,
+    prefijo_contrato: 'CONT',
+    consecutivo_contrato: 1,
+    consecutivo_orden: 1,
+    prefijo_orden: 'ORD',
   });
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isDirty, setIsDirty] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const navigate = useNavigate();
-  const { hasPermission } = useAuth();
-
-  // Verificar permisos
-  useEffect(() => {
-    if (!hasPermission('administrador')) {
-      navigate('/dashboard');
-      return;
-    }
-  }, [hasPermission, navigate]);
-
-  // Cargar configuración inicial
   useEffect(() => {
     loadConfig();
   }, []);
@@ -58,15 +48,20 @@ const CompanyConfig = () => {
   const loadConfig = async () => {
     try {
       setLoading(true);
-      setError(null);
-      
       const response = await configService.getCompanyConfig();
-      if (response.data && response.data.config) {
-        setConfig(response.data.config);
+      
+      if (response.data?.config) {
+        // Fusionar configuración existente con valores por defecto
+        setConfig(prevConfig => ({
+          ...prevConfig,
+          ...response.data.config
+        }));
       }
-    } catch (err) {
-      console.error('Error cargando configuración:', err);
-      setError(err.message);
+      
+      setError('');
+    } catch (error) {
+      console.error('Error cargando configuración:', error);
+      setError('Error al cargar la configuración de la empresa');
     } finally {
       setLoading(false);
     }
@@ -78,43 +73,76 @@ const CompanyConfig = () => {
       [field]: value
     }));
     setIsDirty(true);
-    if (error) setError(null);
-    if (success) setSuccess(false);
+    setError('');
+    setSuccess('');
+  };
+
+  const validateForm = () => {
+    const errors = [];
+
+    if (!config.empresa_nombre?.trim()) {
+      errors.push('El nombre de la empresa es requerido');
+    }
+
+    if (!config.empresa_nit?.trim()) {
+      errors.push('El NIT de la empresa es requerido');
+    }
+
+    if (config.porcentaje_iva < 0 || config.porcentaje_iva > 100) {
+      errors.push('El porcentaje de IVA debe estar entre 0 y 100');
+    }
+
+    if (config.dias_mora_corte < 1) {
+      errors.push('Los días de mora deben ser mayor a 0');
+    }
+
+    if (config.valor_reconexion < 0) {
+      errors.push('El valor de reconexión no puede ser negativo');
+    }
+
+    return errors;
   };
 
   const handleSave = async () => {
     try {
+      const errors = validateForm();
+      if (errors.length > 0) {
+        setError(errors.join(', '));
+        return;
+      }
+
       setSaving(true);
-      setError(null);
+      setError('');
+
+      // Limpiar datos antes de enviar
+      const cleanConfig = { ...config };
+      Object.keys(cleanConfig).forEach(key => {
+        if (typeof cleanConfig[key] === 'string') {
+          cleanConfig[key] = cleanConfig[key].trim();
+        }
+      });
+
+      await configService.updateCompanyConfig(cleanConfig);
       
-      await configService.updateCompanyConfig(config);
-      
-      setSuccess(true);
+      setSuccess('Configuración guardada exitosamente');
       setIsDirty(false);
       
-      // Ocultar mensaje de éxito después de 3 segundos
-      setTimeout(() => setSuccess(false), 3000);
+      // Limpiar mensaje de éxito después de 3 segundos
+      setTimeout(() => setSuccess(''), 3000);
       
-    } catch (err) {
-      console.error('Error guardando configuración:', err);
-      setError(err.message);
+    } catch (error) {
+      console.error('Error guardando configuración:', error);
+      setError(error.response?.data?.message || 'Error al guardar la configuración');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleReset = () => {
-    loadConfig();
-    setIsDirty(false);
-    setError(null);
-    setSuccess(false);
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="mx-auto h-12 w-12 animate-spin text-[#0e6493] mb-4" />
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#0e6493]" />
           <p className="text-gray-600">Cargando configuración...</p>
         </div>
       </div>
@@ -122,371 +150,415 @@ const CompanyConfig = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate('/config')}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <ArrowLeft size={20} />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Configuración de Empresa
-                </h1>
-                <p className="text-gray-600">
-                  Configura los datos básicos de tu empresa
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              {isDirty && (
-                <button
-                  onClick={handleReset}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-                >
-                  <RefreshCw size={16} className="mr-2 inline" />
-                  Descartar
-                </button>
-              )}
-              <button
-                onClick={handleSave}
-                disabled={saving || !isDirty}
-                className="flex items-center px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? (
-                  <Loader2 size={16} className="mr-2 animate-spin" />
-                ) : (
-                  <Save size={16} className="mr-2" />
-                )}
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
+        <div className="mb-8">
+          <button
+            onClick={() => navigate('/config')}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          >
+            <ArrowLeft size={20} className="mr-2" />
+            Volver a Configuración
+          </button>
+          
+          <div className="flex items-center">
+            <Building2 className="w-8 h-8 text-[#0e6493] mr-3" />
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Configuración de Empresa
+              </h1>
+              <p className="text-gray-600 mt-1">
+                Configura los datos básicos de tu empresa y parámetros del sistema
+              </p>
             </div>
           </div>
         </div>
 
         {/* Mensajes */}
-        {success && (
-          <div className="mb-6 p-4 bg-green-100 border border-green-300 text-green-800 rounded-lg flex items-center">
-            <CheckCircle size={20} className="mr-2" />
-            <span>Configuración guardada exitosamente</span>
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-700 text-sm">{error}</p>
           </div>
         )}
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-300 text-red-800 rounded-lg flex items-center">
-            <AlertCircle size={20} className="mr-2" />
-            <div>
-              <p className="font-medium">Error guardando configuración</p>
-              <p className="text-sm">{error}</p>
-            </div>
+        {success && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+            <p className="text-green-700 text-sm">{success}</p>
           </div>
         )}
 
         {/* Formulario */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Información Básica */}
-            <div className="md:col-span-2">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Building2 size={20} className="mr-2 text-[#0e6493]" />
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-6">
+            
+            {/* Información Básica de la Empresa */}
+            <div className="flex items-center mb-6">
+              <Building2 className="w-5 h-5 text-[#0e6493] mr-2" />
+              <h2 className="text-xl font-semibold text-gray-900">
                 Información Básica
-              </h3>
+              </h2>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Licencia *
-              </label>
-              <input
-                type="text"
-                value={config.licencia}
-                onChange={(e) => handleChange('licencia', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                placeholder="Número de licencia"
-                required
-              />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nombre de la Empresa *
+                </label>
+                <input
+                  type="text"
+                  value={config.empresa_nombre}
+                  onChange={(e) => handleChange('empresa_nombre', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="Nombre completo de la empresa"
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nombre de la Empresa *
-              </label>
-              <input
-                type="text"
-                value={config.empresa_nombre}
-                onChange={(e) => handleChange('empresa_nombre', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                placeholder="Nombre de la empresa"
-                required
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  NIT/RUT *
+                </label>
+                <input
+                  type="text"
+                  value={config.empresa_nit}
+                  onChange={(e) => handleChange('empresa_nit', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="123456789-0"
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                NIT *
-              </label>
-              <input
-                type="text"
-                value={config.empresa_nit}
-                onChange={(e) => handleChange('empresa_nit', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                placeholder="123456789-1"
-                required
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Teléfono
+                </label>
+                <input
+                  type="tel"
+                  value={config.empresa_telefono}
+                  onChange={(e) => handleChange('empresa_telefono', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="+57 300 123 4567"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Teléfono
-              </label>
-              <input
-                type="tel"
-                value={config.empresa_telefono}
-                onChange={(e) => handleChange('empresa_telefono', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                placeholder="+57 123 456 7890"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={config.empresa_email}
+                  onChange={(e) => handleChange('empresa_email', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="contacto@empresa.com"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={config.empresa_email}
-                onChange={(e) => handleChange('empresa_email', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                placeholder="contacto@empresa.com"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ciudad
+                </label>
+                <input
+                  type="text"
+                  value={config.empresa_ciudad}
+                  onChange={(e) => handleChange('empresa_ciudad', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="Bogotá"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ciudad
-              </label>
-              <input
-                type="text"
-                value={config.empresa_ciudad}
-                onChange={(e) => handleChange('empresa_ciudad', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                placeholder="Bogotá"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Departamento
+                </label>
+                <input
+                  type="text"
+                  value={config.empresa_departamento}
+                  onChange={(e) => handleChange('empresa_departamento', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="Santander"
+                />
+              </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Dirección
-              </label>
-              <textarea
-                value={config.empresa_direccion}
-                onChange={(e) => handleChange('empresa_direccion', e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                placeholder="Dirección completa de la empresa"
-              />
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Dirección
+                </label>
+                <textarea
+                  value={config.empresa_direccion}
+                  onChange={(e) => handleChange('empresa_direccion', e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="Dirección completa de la empresa"
+                />
+              </div>
             </div>
 
             {/* Configuración de Facturación */}
-            <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <div className="flex items-center mb-6">
+              <FileText className="w-5 h-5 text-[#0e6493] mr-2" />
+              <h2 className="text-xl font-semibold text-gray-900">
                 Configuración de Facturación
-              </h3>
+              </h2>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Prefijo de Factura
-              </label>
-              <input
-                type="text"
-                value={config.prefijo_factura}
-                onChange={(e) => handleChange('prefijo_factura', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                placeholder="FAC"
-                maxLength={10}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Prefijo de Factura
+                </label>
+                <input
+                  type="text"
+                  value={config.prefijo_factura}
+                  onChange={(e) => handleChange('prefijo_factura', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="FAC"
+                  maxLength={10}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Valor Reconexión ($)
+                </label>
+                <input
+                  type="number"
+                  value={config.valor_reconexion}
+                  onChange={(e) => handleChange('valor_reconexion', parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="15000"
+                  min="0"
+                  step="1000"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Días Mora para Corte
+                </label>
+                <input
+                  type="number"
+                  value={config.dias_mora_corte}
+                  onChange={(e) => handleChange('dias_mora_corte', parseInt(e.target.value) || 30)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="30"
+                  min="1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Porcentaje IVA (%)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={config.porcentaje_iva}
+                  onChange={(e) => handleChange('porcentaje_iva', parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="19.00"
+                  min="0"
+                  max="100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Porcentaje Interés Mora (%)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={config.porcentaje_interes}
+                  onChange={(e) => handleChange('porcentaje_interes', parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="0.00"
+                  min="0"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Valor Reconexión ($)
-              </label>
-              <input
-                type="number"
-                value={config.valor_reconexion}
-                onChange={(e) => handleChange('valor_reconexion', parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                placeholder="15000"
-                min="0"
-                step="1000"
-              />
+            {/* Configuración de Contratos y Órdenes */}
+            <div className="flex items-center mb-6">
+              <Settings className="w-5 h-5 text-[#0e6493] mr-2" />
+              <h2 className="text-xl font-semibold text-gray-900">
+                Contratos y Órdenes
+              </h2>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Días Mora para Corte
-              </label>
-              <input
-                type="number"
-                value={config.dias_mora_corte}
-                onChange={(e) => handleChange('dias_mora_corte', parseInt(e.target.value) || 30)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                placeholder="30"
-                min="1"
-                max="90"
-              />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Prefijo Contratos
+                </label>
+                <input
+                  type="text"
+                  value={config.prefijo_contrato}
+                  onChange={(e) => handleChange('prefijo_contrato', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="CONT"
+                  maxLength={10}
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Porcentaje IVA (%)
-              </label>
-              <input
-                type="number"
-                value={config.porcentaje_iva}
-                onChange={(e) => handleChange('porcentaje_iva', parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                placeholder="19"
-                min="0"
-                max="100"
-                step="0.1"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Prefijo Órdenes
+                </label>
+                <input
+                  type="text"
+                  value={config.prefijo_orden}
+                  onChange={(e) => handleChange('prefijo_orden', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="ORD"
+                  maxLength={10}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Consecutivo Contratos
+                </label>
+                <input
+                  type="number"
+                  value={config.consecutivo_contrato}
+                  onChange={(e) => handleChange('consecutivo_contrato', parseInt(e.target.value) || 1)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="1"
+                  min="1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Consecutivo Órdenes
+                </label>
+                <input
+                  type="number"
+                  value={config.consecutivo_orden}
+                  onChange={(e) => handleChange('consecutivo_orden', parseInt(e.target.value) || 1)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="1"
+                  min="1"
+                />
+              </div>
             </div>
 
             {/* Configuración Avanzada */}
-            <div className="md:col-span-2 mt-6">
+            <div className="border-t border-gray-200 pt-6">
               <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center text-[#0e6493] hover:text-[#0e6493]/80 transition-colors"
+                className="flex items-center text-[#0e6493] hover:text-[#0e6493]/80 mb-6"
               >
-                {showAdvanced ? <EyeOff size={16} /> : <Eye size={16} />}
-                <span className="ml-2">
-                  {showAdvanced ? 'Ocultar' : 'Mostrar'} configuración avanzada
+                <Shield className="w-5 h-5 mr-2" />
+                <span className="font-medium">
+                  {showAdvanced ? 'Ocultar' : 'Mostrar'} Configuración Regulatoria
                 </span>
               </button>
+
+              {showAdvanced && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Licencia
+                    </label>
+                    <input
+                      type="text"
+                      value={config.licencia}
+                      onChange={(e) => handleChange('licencia', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                      placeholder="DEMO2025"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Código GS1
+                    </label>
+                    <input
+                      type="text"
+                      value={config.codigo_gs1}
+                      onChange={(e) => handleChange('codigo_gs1', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                      placeholder="Código GS1"
+                      maxLength={20}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Resolución Facturación
+                    </label>
+                    <input
+                      type="text"
+                      value={config.resolucion_facturacion}
+                      onChange={(e) => handleChange('resolucion_facturacion', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                      placeholder="Pendiente"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Licencia Internet
+                    </label>
+                    <input
+                      type="text"
+                      value={config.licencia_internet}
+                      onChange={(e) => handleChange('licencia_internet', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                      placeholder="Pendiente"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Vigilado Por
+                    </label>
+                    <textarea
+                      value={config.vigilado}
+                      onChange={(e) => handleChange('vigilado', e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                      placeholder="Entidad que vigila la empresa"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Vigilado Internet
+                    </label>
+                    <textarea
+                      value={config.vigilado_internet}
+                      onChange={(e) => handleChange('vigilado_internet', e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                      placeholder="Entidad que vigila los servicios de internet"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Comentarios Adicionales
+                    </label>
+                    <textarea
+                      value={config.comentario}
+                      onChange={(e) => handleChange('comentario', e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                      placeholder="Comentarios o notas adicionales"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
-            {showAdvanced && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Departamento
-                  </label>
-                  <input
-                    type="text"
-                    value={config.empresa_departamento}
-                    onChange={(e) => handleChange('empresa_departamento', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                    placeholder="Cundinamarca"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Código GS1
-                  </label>
-                  <input
-                    type="text"
-                    value={config.codigo_gs1}
-                    onChange={(e) => handleChange('codigo_gs1', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                    placeholder="Código GS1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Resolución de Facturación
-                  </label>
-                  <input
-                    type="text"
-                    value={config.resolucion_facturacion}
-                    onChange={(e) => handleChange('resolucion_facturacion', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                    placeholder="Resolución DIAN"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Licencia Internet
-                  </label>
-                  <input
-                    type="text"
-                    value={config.licencia_internet}
-                    onChange={(e) => handleChange('licencia_internet', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                    placeholder="Licencia para servicios de internet"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Vigilado por
-                  </label>
-                  <input
-                    type="text"
-                    value={config.vigilado}
-                    onChange={(e) => handleChange('vigilado', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                    placeholder="Superintendencia..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Vigilado Internet
-                  </label>
-                  <input
-                    type="text"
-                    value={config.vigilado_internet}
-                    onChange={(e) => handleChange('vigilado_internet', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                    placeholder="Vigilado servicios de internet"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Porcentaje Interés Mora (%)
-                  </label>
-                  <input
-                    type="number"
-                    value={config.porcentaje_interes}
-                    onChange={(e) => handleChange('porcentaje_interes', parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                    placeholder="0"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Comentarios Adicionales
-                  </label>
-                  <textarea
-                    value={config.comentario}
-                    onChange={(e) => handleChange('comentario', e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                    placeholder="Comentarios o notas adicionales"
-                  />
-                </div>
-              </>
-            )}
           </div>
 
           {/* Footer del formulario */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
             <div className="flex items-center justify-between">
               <p className="text-sm text-gray-500">
                 * Campos obligatorios
