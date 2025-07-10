@@ -200,7 +200,6 @@ router.post('/',
   ClienteController.crear
 );
 
-// ⭐ AGREGAR RUTAS DE INACTIVAR/REACTIVAR ANTES DE PUT /:id
 router.put('/:id/inactivar',
   rateLimiter.clientes,
   requireRole('supervisor', 'administrador'),
@@ -238,10 +237,10 @@ router.put('/:id/inactivar',
 
         const cliente = clienteData[0];
 
-        // 2. Cancelar servicios activos
+        // 2. ⭐ CANCELAR SERVICIOS ACTIVOS - QUERY CORREGIDO
         await connection.execute(`
           UPDATE servicios_cliente 
-          SET estado = 'cancelado', fecha_cancelacion = NOW()
+          SET estado = 'cancelado', updated_at = NOW()
           WHERE cliente_id = ? AND estado IN ('activo', 'suspendido')
         `, [id]);
 
