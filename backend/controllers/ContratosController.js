@@ -4,92 +4,103 @@ const { Database } = require('../models/Database');
 class ContratosController {
   
   static async obtenerTodos(req, res) {
-    try {
-      console.log('📋 GET /contratos - Obteniendo contratos');
-      
-      const { 
-        page = 1, 
-        limit = 10, 
-        cliente_id, 
-        estado = '',
-        tipo_contrato = '',
-        search = ''
-      } = req.query;
+  try {
+    console.log('📋 GET /contratos - Obteniendo contratos');
+    
+    const { 
+      page = 1, 
+      limit = 10, 
+      cliente_id, 
+      estado = '',
+      tipo_contrato = '',
+      search = ''
+    } = req.query;
 
-      const offset = (page - 1) * limit;
-      
-      // ✅ CONSULTA CORREGIDA SEGÚN TU ESTRUCTURA DE BD
-      let query = `
-        SELECT 
-          c.*,
-          cl.nombre as cliente_nombre,
-          cl.identificacion as cliente_identificacion,
-          cl.telefono as cliente_telefono,
-          cl.correo as cliente_email
-        FROM contratos c
-        LEFT JOIN clientes cl ON c.cliente_id = cl.id
-        WHERE 1=1
-      `;
+    const offset = (page - 1) * limit;
+    
+    // ✅ CONSULTA MEJORADA CON JOINS PARA TRAER LOS DATOS DEL PLAN
+    let query = `
+      SELECT 
+        c.*,
+        cl.nombre as cliente_nombre,
+        cl.identificacion as cliente_identificacion,
+        cl.telefono as cliente_telefono,
+        cl.correo as cliente_email,
+        cl.direccion as cliente_direccion,
+        cl.estrato as cliente_estrato,
+        ps.nombre as plan_nombre,
+        ps.precio as plan_precio,
+        ps.tipo as plan_tipo,
+        ps.velocidad_bajada,
+        ps.velocidad_subida,
+        ps.canales_tv,
+        ps.descripcion as plan_descripcion
+      FROM contratos c
+      LEFT JOIN clientes cl ON c.cliente_id = cl.id
+      LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
+      LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+      WHERE 1=1
+    `;
 
-      const params = [];
+    const params = [];
 
-      // Filtros
-      if (cliente_id) {
-        query += ' AND c.cliente_id = ?';
-        params.push(cliente_id);
-      }
-
-      if (estado) {
-        query += ' AND c.estado = ?';
-        params.push(estado);
-      }
-
-      if (tipo_contrato) {
-        query += ' AND c.tipo_contrato = ?';
-        params.push(tipo_contrato);
-      }
-
-      if (search) {
-        query += ' AND (c.numero_contrato LIKE ? OR cl.nombre LIKE ? OR cl.identificacion LIKE ?)';
-        const searchTerm = `%${search}%`;
-        params.push(searchTerm, searchTerm, searchTerm);
-      }
-
-      // Contar total
-      const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
-      const [countResult] = await Database.query(countQuery, params);
-      const total = countResult[0]?.total || 0;
-
-      // Agregar paginación
-      query += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
-      params.push(parseInt(limit), parseInt(offset));
-
-      const contratos = await Database.query(query, params);
-
-      console.log(`✅ Encontrados ${contratos.length} contratos`);
-
-      res.json({
-        success: true,
-        data: {
-          contratos,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            totalPages: Math.ceil(total / limit)
-          }
-        }
-      });
-
-    } catch (error) {
-      console.error('❌ Error obteniendo contratos:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error interno del servidor',
-        error: error.message
-      });
+    // Aplicar filtros...
+    if (cliente_id) {
+      query += ' AND c.cliente_id = ?';
+      params.push(cliente_id);
     }
+
+    if (estado) {
+      query += ' AND c.estado = ?';
+      params.push(estado);
+    }
+
+    if (tipo_contrato) {
+      query += ' AND c.tipo_contrato = ?';
+      params.push(tipo_contrato);
+    }
+
+    if (search) {
+      query += ' AND (c.numero_contrato LIKE ? OR cl.nombre LIKE ? OR cl.identificacion LIKE ?)';
+      const searchTerm = `%${search}%`;
+      params.push(searchTerm, searchTerm, searchTerm);
+    }
+
+    // Contar total
+    const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
+    const [countResult] = await Database.query(countQuery, params);
+    const total = countResult[0]?.total || 0;
+
+    // Agregar paginación
+    query += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), parseInt(offset));
+
+    const contratos = await Database.query(query, params);
+
+    console.log(`✅ Encontrados ${contratos.length} contratos con datos de planes`);
+
+    res.json({
+      success: true,
+      data: {
+        contratos,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo contratos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
   }
+}
 
   static async obtenerPorId(req, res) {
     try {
@@ -133,27 +144,40 @@ class ContratosController {
     }
   }
 
-  static async generarPDF(req, res) {
-    try {
-      const { id } = req.params;
-      
-      // Por ahora retornar mensaje temporal
-      res.json({
-        success: true,
-        message: 'Función de PDF en desarrollo',
-        data: { id }
-      });
+ static async generarPDF(req, res) {
+  try {
+    const { id } = req.params;
+    console.log(`📄 Generando PDF para contrato ID: ${id}`);
 
-    } catch (error) {
-      console.error('❌ Error generando PDF:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error interno del servidor',
-        error: error.message
-      });
-    }
+    // Por ahora, crear un PDF simple de prueba
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument();
+    
+    // Configurar headers para PDF
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="contrato_${id}.pdf"`);
+    
+    // Pipe el documento al response
+    doc.pipe(res);
+    
+    // Contenido básico del PDF
+    doc.fontSize(16).text('CONTRATO DE SERVICIOS PSI', 100, 100);
+    doc.fontSize(12).text(`Contrato ID: ${id}`, 100, 150);
+    doc.text('Este es un PDF de prueba.', 100, 180);
+    doc.text('Función completa en desarrollo.', 100, 200);
+    
+    // Finalizar el documento
+    doc.end();
+    
+  } catch (error) {
+    console.error('❌ Error generando PDF:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error generando PDF',
+      error: error.message
+    });
   }
-
+}
   static async actualizarEstado(req, res) {
     try {
       const { id } = req.params;
