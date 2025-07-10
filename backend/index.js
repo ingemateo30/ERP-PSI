@@ -77,13 +77,13 @@ app.use((req, res, next) => {
   // Permitir PATCH específicamente
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-API-Key');
-  
+
   // Manejar preflight OPTIONS requests
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
-  
+
   next();
 });
 
@@ -245,7 +245,7 @@ try {
   app.use('/api/v1/config/plantillas-correo', plantillasCorreoRoutes);
   console.log('✅ Rutas de plantillas de correo cargadas: /api/v1/config/plantillas-correo');
 
-  
+
   console.log('💰 Cargando rutas de facturas...');
   const facturasRoutes = require('./routes/factura');
   app.use('/api/v1/facturas', facturasRoutes);
@@ -283,8 +283,11 @@ try {
 
   console.log('🕐 Configurando sistema de facturación automática...');
 
+  console.log('📋 Cargando rutas de contratos...');
+  const contratosRoutes = require('./routes/contratos');
+  app.use('/api/v1/contratos', contratosRoutes);
+  console.log('✅ Rutas de contratos cargadas: /api/v1/contratos');
 
-  
   console.log('🧾 Cargando rutas de cliente completo...');
   const Clientecompleto = require('./routes/clienteCompleto');
   app.use('/api/v1/clientes-completo', Clientecompleto);

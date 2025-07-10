@@ -82,16 +82,22 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
     },
     {
-      icon:  <Activity size={22} />,
+      icon: <Activity size={22} />,
       label: 'Facturación Automática',
       path: '/facturacion-automatica',
       permission: 'administrador' // o 'administrador' según tus necesidades
     },
-     {
-      icon:  <TrendingUp size={22} />,
+    {
+      icon: <TrendingUp size={22} />,
       label: 'Facturas',
       path: '/facturas',
       permission: 'administrador' // o 'administrador' según tus necesidades
+    },
+    {
+      icon: <FileText size={22} />,
+      label: 'Contratos',
+      path: '/contratos',
+      permission: 'supervisor'
     },
     {
       icon: <Wifi size={22} />,

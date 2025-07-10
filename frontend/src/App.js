@@ -34,6 +34,7 @@ const IncidenciasManagement = lazy(() => import('./components/Incidencias/Incide
 const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
 const InstalacionesManagement = lazy(() => import('./components/Instalaciones/InstalacionesManagement'));
 const FacturacionAutomatica = lazy(() => import('./components/Facturas/FacturacionAutomatica'));
+const ContratosList = lazy(() => import('./components/Contratos/ContratosList'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -335,6 +336,16 @@ function App() {
                       <FacturacionAutomatica />
                     </MainLayout>
                   </ ProtectedRoute>
+                }
+              />
+              <Route
+                path="/contratos"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Contratos" subtitle="Gestión de contratos de servicio">
+                      <ContratosList />
+                    </MainLayout>
+                  </ProtectedRoute>
                 }
               />
 
