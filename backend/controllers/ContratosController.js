@@ -155,204 +155,89 @@ class ContratosController {
             const { id } = req.params;
             console.log(`📄 Generando PDF para contrato ID: ${id}`);
 
-            // Consulta FINAL con TODOS los campos correctos
+            if (!id || isNaN(id)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID de contrato inválido'
+                });
+            }
+
+            // Obtener datos del contrato
             const query = `
-      SELECT 
-        -- Datos del contrato
-        c.id,
-        c.numero_contrato,
-        c.cliente_id,
-        c.servicio_id,
-        c.tipo_contrato,
-        c.tipo_permanencia,
-        c.permanencia_meses,
-        c.costo_instalacion,
-        c.fecha_generacion,
-        c.fecha_inicio,
-        c.fecha_fin,
-        c.fecha_vencimiento_permanencia,
-        c.estado,
-        c.observaciones,
-        c.firmado_cliente,
-        c.fecha_firma,
-        
-        -- Datos del cliente (SOLO CAMPOS QUE EXISTEN)
-        cl.identificacion,
-        cl.tipo_documento,
-        cl.nombre as cliente_nombre,
-        cl.direccion as cliente_direccion,
-        cl.estrato as cliente_estrato,
-        cl.barrio,
-        cl.telefono as cliente_telefono,
-        cl.telefono_2,
-        cl.correo as cliente_email,
-        cl.fecha_registro,
-        cl.fecha_hasta,
-        cl.estado as cliente_estado,
-        cl.mac_address,
-        cl.ip_asignada,
-        cl.tap,
-        cl.poste,
-        cl.contrato as cliente_contrato,
-        cl.ruta,
-        cl.requiere_reconexion,
-        cl.codigo_usuario,
-        cl.observaciones as cliente_observaciones,
-        
-        -- Datos geográficos
-        ci.nombre as ciudad_nombre,
-        d.nombre as departamento_nombre,
-        
-        -- Datos del sector
-        s.nombre as sector_nombre,
-        s.codigo as sector_codigo,
-        
-        -- Datos del servicio del cliente
-        sc.plan_id,
-        sc.fecha_activacion,
-        sc.fecha_suspension,
-        sc.estado as servicio_estado,
-        sc.precio_personalizado,
-        sc.observaciones as servicio_observaciones,
-        
-             ps.codigo as plan_codigo,
-ps.nombre as plan_nombre,
-ps.tipo as plan_tipo,
-ps.precio as plan_precio,
-ps.velocidad_subida,
-ps.velocidad_bajada,
-ps.canales_tv,
-ps.descripcion as plan_descripcion,
-ps.aplica_iva,
-ps.activo as plan_activo,
-ps.created_at as plan_created_at,
-ps.updated_at as plan_updated_at,
-        
-        -- Configuración de empresa
-        ce.empresa_nombre,
-        ce.empresa_nit,
-        ce.empresa_direccion,
-        ce.empresa_ciudad,
-        ce.empresa_departamento,
-        ce.empresa_telefono,
-        ce.empresa_email,
-        ce.vigilado,
-        ce.vigilado_internet,
-        ce.porcentaje_iva,
-        ce.valor_reconexion,
-        ce.dias_mora_corte
-        
-      FROM contratos c
-      INNER JOIN clientes cl ON c.cliente_id = cl.id
-      LEFT JOIN ciudades ci ON cl.ciudad_id = ci.id
-      LEFT JOIN departamentos d ON ci.departamento_id = d.id
-      LEFT JOIN sectores s ON cl.sector_id = s.id
-      LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
-      LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-      CROSS JOIN configuracion_empresa ce
-      WHERE c.id = ? AND cl.estado = 'activo'
-    `;
+        SELECT 
+          c.*,
+          cl.identificacion,
+          cl.tipo_documento,
+          cl.nombre as cliente_nombre,
+          cl.direccion as cliente_direccion,
+          cl.estrato as cliente_estrato,
+          cl.barrio,
+          cl.telefono as cliente_telefono,
+          cl.telefono_2,
+          cl.correo as cliente_email,
+          cl.mac_address,
+          cl.ip_asignada,
+          cl.tap,
+          cl.poste,
+          cl.ruta,
+          ci.nombre as ciudad_nombre,
+          d.nombre as departamento_nombre,
+          s.nombre as sector_nombre,
+          s.codigo as sector_codigo,
+          sc.plan_id,
+          sc.fecha_activacion,
+          sc.fecha_suspension,
+          sc.estado as servicio_estado,
+          p.nombre as plan_nombre,
+          p.descripcion as plan_descripcion,
+          p.velocidad_bajada,
+          p.velocidad_subida,
+          p.precio as plan_precio,
+          p.canales_tv
+        FROM contratos c
+        LEFT JOIN clientes cl ON c.cliente_id = cl.id
+        LEFT JOIN ciudades ci ON cl.ciudad_id = ci.id
+        LEFT JOIN departamentos d ON ci.departamento_id = d.id
+        LEFT JOIN sectores s ON cl.sector_id = s.id
+        LEFT JOIN servicios_cliente sc ON cl.id = sc.cliente_id
+        LEFT JOIN planes_servicio p ON sc.plan_id = p.id
+        WHERE c.id = ?
+      `;
 
             const contratos = await Database.query(query, [id]);
 
             if (contratos.length === 0) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Contrato no encontrado o cliente inactivo'
+                    message: 'Contrato no encontrado'
                 });
             }
 
-            const row = contratos[0];
+            const contratoData = contratos[0];
+            console.log(`📋 Contrato encontrado: ${contratoData.numero_contrato}`);
 
-            console.log('📋 Datos obtenidos de la BD:', {
-                contrato: row.numero_contrato,
-                cliente: row.cliente_nombre,
-                plan: row.plan_nombre,
-                identificacion: row.identificacion
-            });
+            // Obtener configuración de empresa
+            const empresaQuery = 'SELECT * FROM configuracion_empresa LIMIT 1';
+            const empresaResult = await Database.query(empresaQuery);
 
-            // Estructurar datos para el ContratoPDFGenerator existente
-            const contratoData = {
-                id: row.id,
-                numero_contrato: row.numero_contrato,
-                cliente_id: row.cliente_id,
-                servicio_id: row.servicio_id,
-                tipo_contrato: row.tipo_contrato,
-                tipo_permanencia: row.tipo_permanencia,
-                permanencia_meses: row.permanencia_meses,
-                costo_instalacion: row.costo_instalacion,
-                fecha_generacion: row.fecha_generacion,
-                fecha_inicio: row.fecha_inicio,
-                fecha_fin: row.fecha_fin,
-                fecha_vencimiento_permanencia: row.fecha_vencimiento_permanencia,
-                estado: row.estado,
-                observaciones: row.observaciones,
-                firmado_cliente: row.firmado_cliente,
-                fecha_firma: row.fecha_firma,
-
-                // Datos del cliente adaptados para el PDF
-                cliente_nombre: row.cliente_nombre,
-                cliente_identificacion: `${row.tipo_documento || 'CC'} ${row.identificacion}`,
-                cliente_email: row.cliente_email || '',
-                cliente_telefono: row.cliente_telefono || '',
-                cliente_direccion: row.cliente_direccion,
-                cliente_estrato: row.cliente_estrato || '',
-
-                // Ubicación
-                ciudad_nombre: row.ciudad_nombre || 'San Gil',
-                departamento_nombre: row.departamento_nombre || 'Santander',
-
-                // Sector
-                sector_nombre: row.sector_nombre,
-                sector_codigo: row.sector_codigo,
-
-                // Servicio
-                servicio_estado: row.servicio_estado,
-                precio_personalizado: row.precio_personalizado,
-
-                // Plan/Servicio - usar precio personalizado si existe, sino el del plan
-                plan_codigo: row.plan_codigo,
-                plan_nombre: row.plan_nombre || 'Plan de Servicio',
-                plan_tipo: row.plan_tipo || 'internet',
-                plan_precio: row.precio_personalizado || row.plan_precio || 0,
-                precio_internet: row.precio_internet,
-                precio_television: row.precio_television,
-                plan_precio_instalacion: row.precio_instalacion || row.costo_instalacion,
-                velocidad_subida: row.velocidad_subida,
-                velocidad_bajada: row.velocidad_bajada,
-                canales_tv: row.canales_tv,
-                plan_descripcion: row.plan_descripcion,
-                plan_permanencia: row.plan_permanencia,
-                tecnologia: row.tecnologia,
-                plan_segmento: row.plan_segmento,
-                aplica_iva: row.aplica_iva,
-                requiere_instalacion: row.requiere_instalacion,
-                descuento_combo: row.descuento_combo
-            };
-
-            const empresaData = {
-                empresa_nombre: row.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.',
-                empresa_nit: row.empresa_nit || '901.582.657-3',
-                empresa_direccion: row.empresa_direccion || 'Carrera 9 No. 9-94',
-                empresa_ciudad: row.empresa_ciudad || 'San Gil',
-                empresa_departamento: row.empresa_departamento || 'SANTANDER',
-                empresa_telefono: row.empresa_telefono || '3184550936',
-                empresa_email: row.empresa_email || 'facturacion@psi.net.co',
-                vigilado: row.vigilado || 'Registro único de TIC No.',
-                vigilado_internet: row.vigilado_internet || 'Registro único de TIC No.',
-                porcentaje_iva: row.porcentaje_iva || 19.00,
-                valor_reconexion: row.valor_reconexion,
-                dias_mora_corte: row.dias_mora_corte
+            const empresaData = empresaResult.length > 0 ? empresaResult[0] : {
+                empresa_nombre: 'PROVEEDOR DE TELECOMUNICACIONES SAS.',
+                empresa_nit: '901.582.657-3',
+                empresa_direccion: 'VIA 40 #36-135',
+                empresa_ciudad: 'San Gil',
+                empresa_departamento: 'SANTANDER',
+                empresa_telefono: '3184550936',
+                empresa_email: 'facturacion@psi.net.co'
             };
 
             console.log('📄 Generando HTML del contrato...');
 
-            // Generar HTML usando tu ContratoPDFGenerator existente
+            // Generar HTML usando ContratoPDFGenerator
             const htmlContent = ContratoPDFGenerator.generarHTML(contratoData, empresaData);
 
             console.log('🖨️ Iniciando conversión a PDF...');
 
-            // Configurar Puppeteer para generar PDF
+            // Configurar Puppeteer
             const browser = await puppeteer.launch({
                 headless: true,
                 args: [
@@ -372,7 +257,7 @@ ps.updated_at as plan_updated_at,
                 timeout: 30000
             });
 
-            // Generar PDF con configuración específica
+            // Generar PDF
             const pdfBuffer = await page.pdf({
                 format: 'Letter',
                 printBackground: true,
@@ -390,18 +275,21 @@ ps.updated_at as plan_updated_at,
 
             console.log(`✅ PDF generado exitosamente (${pdfBuffer.length} bytes)`);
 
-            // Configurar headers para descarga del PDF
+            // CORREGIDO: Headers específicos para PDF
+            const filename = `contrato_${contratoData.numero_contrato || id}.pdf`;
+
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename="contrato_${contratoData.numero_contrato}.pdf"`);
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
             res.setHeader('Content-Length', pdfBuffer.length);
+            res.setHeader('Accept-Ranges', 'bytes');
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
 
-            // Enviar el PDF
-            res.send(pdfBuffer);
+            // IMPORTANTE: Enviar directamente el buffer sin conversiones
+            res.end(pdfBuffer, 'binary');
 
-            console.log(`📎 PDF del contrato ${contratoData.numero_contrato} enviado al cliente`);
+            console.log(`📎 PDF del contrato enviado: ${filename}`);
 
         } catch (error) {
             console.error('❌ Error generando PDF del contrato:', error);
@@ -409,11 +297,7 @@ ps.updated_at as plan_updated_at,
             res.status(500).json({
                 success: false,
                 message: 'Error generando PDF del contrato',
-                error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno del servidor',
-                details: process.env.NODE_ENV === 'development' ? {
-                    stack: error.stack,
-                    sql_error: error.sqlMessage || 'No SQL error'
-                } : undefined
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     }
