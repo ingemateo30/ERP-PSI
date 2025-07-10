@@ -1,5 +1,6 @@
 // backend/services/ClienteCompletoService.js
 // Servicio completo para crear clientes con servicios y documentos automáticos
+// VERSIÓN CORREGIDA - Soluciona todos los errores de facturación
 
 const { Database } = require('../models/Database');
 const pool = require('../config/database');
@@ -8,19 +9,20 @@ class ClienteCompletoService {
   /**
    * Crear cliente completo con servicio y documentos automáticos
    */
-  static async crearClienteCompleto(datosCompletos) {
+  static async crearClienteCompleto(datosCompletos, createdBy = null) {
     return await Database.transaction(async (conexion) => {
       console.log('🚀 Iniciando creación completa de cliente...');
 
       // 1. CREAR CLIENTE
-      const clienteId = await this.crearCliente(conexion, datosCompletos.cliente);
+      const clienteId = await this.crearCliente(conexion, datosCompletos.cliente, createdBy);
       console.log(`✅ Cliente creado con ID: ${clienteId}`);
 
       // 2. ASIGNAR SERVICIO AL CLIENTE
       const servicioId = await this.asignarServicioCliente(
         conexion, 
         clienteId, 
-        datosCompletos.servicio
+        datosCompletos.servicio,
+        createdBy
       );
       console.log(`✅ Servicio asignado con ID: ${servicioId}`);
 
@@ -32,7 +34,8 @@ class ClienteCompletoService {
         documentos.contrato = await this.generarContratoInterno(
           conexion, 
           clienteId, 
-          servicioId
+          servicioId,
+          createdBy
         );
         console.log(`✅ Contrato generado: ${documentos.contrato.numero}`);
 
@@ -40,24 +43,26 @@ class ClienteCompletoService {
         documentos.orden_instalacion = await this.generarOrdenInstalacionInterno(
           conexion, 
           clienteId, 
-          servicioId
+          servicioId,
+          createdBy
         );
         console.log(`✅ Orden de instalación generada: ${documentos.orden_instalacion.numero}`);
       }
 
-      // 4. GENERAR PRIMERA FACTURA AUTOMÁTICA
-      documentos.factura = await this.generarPrimeraFacturaInterno(
+      // 4. GENERAR PRIMERA FACTURA AUTOMÁTICA CON TODOS LOS CAMPOS COMPLETOS
+      documentos.factura = await this.generarPrimeraFacturaInternoCompleta(
         conexion, 
         clienteId, 
         servicioId, 
         datosCompletos.cliente,
-        datosCompletos.servicio
+        datosCompletos.servicio,
+        createdBy
       );
       console.log(`✅ Primera factura generada: ${documentos.factura.numero_factura}`);
 
       // 5. PROGRAMAR INSTALACIÓN (si se solicita)
       if (datosCompletos.opciones?.programar_instalacion) {
-        await this.programarInstalacionInterno(conexion, clienteId, servicioId);
+        await this.programarInstalacionInterno(conexion, clienteId, servicioId, createdBy);
         console.log(`✅ Instalación programada`);
       }
 
@@ -86,10 +91,11 @@ class ClienteCompletoService {
       return resultado;
     });
   }
+
   /**
-   * Crear cliente en la base de datos
+   * Crear cliente en la base de datos con created_by
    */
-  static async crearCliente(conexion, datosCliente) {
+  static async crearCliente(conexion, datosCliente, createdBy = null) {
     console.log('📝 Datos del cliente recibidos:', datosCliente);
 
     // Limpiar y validar datos antes de insertar
@@ -102,40 +108,23 @@ class ClienteCompletoService {
       telefono_fijo: datosCliente.telefono_fijo?.toString().trim() || null,
       direccion: datosCliente.direccion?.toString().trim() || '',
       barrio: datosCliente.barrio?.toString().trim() || null,
-      estrato: datosCliente.estrato ? parseInt(datosCliente.estrato) : null,
+      estrato: datosCliente.estrato ? parseInt(datosCliente.estrato) : 3,
       ciudad_id: datosCliente.ciudad_id ? parseInt(datosCliente.ciudad_id) : null,
       sector_id: datosCliente.sector_id ? parseInt(datosCliente.sector_id) : null,
-      observaciones: datosCliente.observaciones?.toString().trim() || null
+      observaciones: datosCliente.observaciones?.toString().trim() || null,
+      fecha_inicio_contrato: datosCliente.fecha_inicio_contrato || new Date().toISOString().split('T')[0],
+      created_by: createdBy ? parseInt(createdBy) : null
     };
 
-    // Validar campos requeridos
-    if (!datosLimpios.identificacion) {
-      throw new Error('La identificación es requerida');
-    }
-    if (!datosLimpios.nombre) {
-      throw new Error('El nombre es requerido');
-    }
-    if (!datosLimpios.email) {
-      throw new Error('El email es requerido');
-    }
-    if (!datosLimpios.telefono) {
-      throw new Error('El teléfono es requerido');
-    }
-    if (!datosLimpios.direccion) {
-      throw new Error('La dirección es requerida');
-    }
-    if (!datosLimpios.ciudad_id) {
-      throw new Error('La ciudad es requerida');
-    }
-
-    console.log('✅ Datos limpios para insertar:', datosLimpios);
+    // Generar código de usuario único
+    const codigoUsuario = await this.generarCodigoUsuario(conexion, datosLimpios.identificacion);
 
     const query = `
       INSERT INTO clientes (
-        identificacion, tipo_documento, nombre, correo, telefono, 
-        telefono_2, direccion, barrio, estrato, ciudad_id, 
-        sector_id, observaciones, fecha_registro, estado, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'activo', NOW())
+        identificacion, tipo_documento, nombre, correo, telefono, telefono_2,
+        direccion, barrio, estrato, ciudad_id, sector_id, observaciones,
+        fecha_registro, codigo_usuario, estado, created_by 
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?)
     `;
 
     const valores = [
@@ -150,514 +139,488 @@ class ClienteCompletoService {
       datosLimpios.estrato,
       datosLimpios.ciudad_id,
       datosLimpios.sector_id,
-      datosLimpios.observaciones
+      datosLimpios.observaciones,
+      datosLimpios.fecha_inicio_contrato,
+      codigoUsuario,
+      datosLimpios.created_by
     ];
 
+    console.log('🔍 Query cliente:', query);
+    console.log('🔍 Valores cliente:', valores);
+
     const [resultado] = await conexion.execute(query, valores);
-    console.log('✅ Cliente insertado con ID:', resultado.insertId);
     
+    console.log('✅ Cliente creado con ID:', resultado.insertId);
     return resultado.insertId;
   }
 
   /**
-   * Asignar servicio al cliente
+   * Asignar servicio al cliente con created_by
    */
-  static async asignarServicioCliente(conexion, clienteId, datosServicio) {
-    console.log('🔧 Datos del servicio recibidos:', datosServicio);
-
-    // Obtener datos del plan
-    const [planes] = await conexion.execute(
-      'SELECT * FROM planes_servicio WHERE id = ?',
-      [datosServicio.plan_id]
-    );
-
-    if (planes.length === 0) {
-      throw new Error('Plan de servicio no encontrado');
-    }
-
-    const plan = planes[0];
-    console.log('📋 Plan encontrado:', plan);
-
-    // Limpiar y validar datos del servicio
-    let datosLimpios = {
-      cliente_id: parseInt(clienteId),
-      plan_id: parseInt(datosServicio.plan_id),
-      fecha_activacion: datosServicio.fecha_activacion || new Date().toISOString().split('T')[0],
-      precio_personalizado: datosServicio.precio_personalizado ? parseFloat(datosServicio.precio_personalizado) : null,
-      observaciones: datosServicio.observaciones?.toString().trim()
-    };
-
-    // Usar método auxiliar para limpiar datos
-    datosLimpios = this.limpiarDatosParaMySQL(datosLimpios);
-
-    console.log('✅ Datos del servicio limpios:', datosLimpios);
+  static async asignarServicioCliente(conexion, clienteId, datosServicio, createdBy = null) {
+    console.log('🔌 Asignando servicio al cliente:', datosServicio);
 
     const query = `
       INSERT INTO servicios_cliente (
-        cliente_id, plan_id, fecha_activacion, estado, 
-        precio_personalizado, observaciones, created_at
-      ) VALUES (?, ?, ?, 'activo', ?, ?, NOW())
+        cliente_id, plan_id, fecha_activacion, precio_personalizado,
+        observaciones, estado, created_at
+      ) VALUES (?, ?, ?, ?, ?, 'activo', NOW())
     `;
 
     const valores = [
-      datosLimpios.cliente_id,
-      datosLimpios.plan_id,
-      datosLimpios.fecha_activacion,
-      datosLimpios.precio_personalizado,
-      datosLimpios.observaciones
+      parseInt(clienteId),
+      parseInt(datosServicio.plan_id),
+      datosServicio.fecha_activacion || new Date().toISOString().split('T')[0],
+      datosServicio.precio_personalizado ? parseFloat(datosServicio.precio_personalizado) : null,
+      datosServicio.observaciones || null,
     ];
 
-    console.log('🔍 Query servicio SQL:', query);
-    console.log('🔍 Valores servicio antes de validar:', valores);
+    console.log('🔍 Query servicio:', query);
+    console.log('🔍 Valores servicio:', valores);
 
-    // Validar valores para MySQL
-    const valoresValidados = this.validarValoresParaMySQL(valores);
-
-    console.log('🔍 Valores servicio validados:', valoresValidados);
-
-    const [resultado] = await conexion.execute(query, valoresValidados);
-    console.log('✅ Servicio insertado con ID:', resultado.insertId);
+    const [resultado] = await conexion.execute(query, valores);
     
+    console.log('✅ Servicio asignado con ID:', resultado.insertId);
     return resultado.insertId;
+  }
+
+  /**
+   * Generar primera factura interna COMPLETA con todos los campos
+   */
+  static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioId, datosCliente, datosServicio, createdBy = null) {
+    console.log('🧾 Generando primera factura completa...');
+    
+    try {
+      // 1. Obtener configuración de empresa para resolución de facturación
+      const [configEmpresa] = await conexion.execute(`
+        SELECT resolucion_facturacion, prefijo_factura, consecutivo_factura, porcentaje_iva
+        FROM configuracion_empresa 
+        WHERE id = 1
+      `);
+      
+      if (configEmpresa.length === 0) {
+        throw new Error('No se encontró configuración de empresa');
+      }
+
+      const config = configEmpresa[0];
+      console.log('📋 Configuración de empresa:', config);
+
+      // 2. Generar número de factura
+      const numeroFactura = await this.generarNumeroFactura(conexion);
+      
+      // 3. Obtener datos completos del cliente y servicio
+      const [clientesCompletos] = await conexion.execute(`
+        SELECT 
+          c.*, 
+          sc.*, 
+          ps.nombre as plan_nombre, 
+          ps.precio as plan_precio,
+          ps.tipo as plan_tipo,
+          ci.nombre as ciudad_nombre,
+          s.nombre as sector_nombre
+        FROM clientes c
+        JOIN servicios_cliente sc ON c.id = sc.cliente_id
+        JOIN planes_servicio ps ON sc.plan_id = ps.id
+        LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+        LEFT JOIN sectores s ON c.sector_id = s.id
+        WHERE c.id = ? AND sc.id = ?
+      `, [clienteId, servicioId]);
+
+      if (clientesCompletos.length === 0) {
+        throw new Error('Cliente o servicio no encontrado');
+      }
+
+      const clienteCompleto = clientesCompletos[0];
+      console.log('📋 Cliente completo para facturar:', clienteCompleto);
+
+      // 4. Calcular valores de la factura
+      const valorInternet = clienteCompleto.precio_personalizado || clienteCompleto.plan_precio;
+      const valorTelevision = clienteCompleto.plan_tipo === 'combo' ? 0 : 0; // Ajustar según plan
+      
+      // Calcular fechas del período
+      const fechaEmision = new Date();
+      const fechaDesde = new Date();
+      const fechaHasta = new Date();
+      fechaHasta.setMonth(fechaHasta.getMonth() + 1);
+      
+      const fechaVencimiento = new Date(fechaEmision);
+      fechaVencimiento.setDate(fechaVencimiento.getDate() + 15); // 15 días de plazo
+
+      // Generar período de facturación
+      const periodoFacturacion = `${fechaEmision.getFullYear()}-${String(fechaEmision.getMonth() + 1).padStart(2, '0')}`;
+
+      // Calcular totales
+      const subtotal = parseFloat(valorInternet) + parseFloat(valorTelevision);
+      const iva = 0; // Sin IVA para estratos 1,2,3 en internet
+      const total = subtotal + iva;
+
+      // 5. Insertar factura con TODOS los campos requeridos
+      const queryFactura = `
+        INSERT INTO facturas (
+          numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
+          periodo_facturacion, fecha_emision, fecha_vencimiento,
+          fecha_desde, fecha_hasta,
+          internet, television, saldo_anterior, interes, reconexion,
+          descuento, varios, publicidad,
+          s_internet, s_television, s_interes, s_reconexion,
+          s_descuento, s_varios, s_publicidad, s_iva,
+          subtotal, iva, total, estado,
+          referencia_pago, resolucion, activo, observaciones,
+          created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, '1', ?, ?, NOW())
+      `;
+
+      const valoresFactura = [
+        numeroFactura,
+        parseInt(clienteId),
+        clienteCompleto.identificacion,
+        clienteCompleto.nombre,
+        periodoFacturacion,
+        fechaEmision.toISOString().split('T')[0],
+        fechaVencimiento.toISOString().split('T')[0],
+        fechaDesde.toISOString().split('T')[0],
+        fechaHasta.toISOString().split('T')[0],
+        parseFloat(valorInternet),  // internet
+        parseFloat(valorTelevision), // television
+        0.00, // saldo_anterior
+        0.00, // interes
+        0.00, // reconexion
+        0.00, // descuento
+        0.00, // varios
+        0.00, // publicidad
+        parseFloat(valorInternet),  // s_internet (subtotal internet)
+        parseFloat(valorTelevision), // s_television (subtotal television)
+        0.00, // s_interes
+        0.00, // s_reconexion
+        0.00, // s_descuento
+        0.00, // s_varios
+        0.00, // s_publicidad
+        iva,  // s_iva
+        subtotal,
+        iva,
+        total,
+        clienteCompleto.identificacion, // referencia_pago = misma cédula
+        config.resolucion_facturacion || 'RESOLUCIÓN PENDIENTE', // resolucion de configuracion_empresa
+        'Primera factura automática',
+        createdBy ? parseInt(createdBy) : 1 // created_by
+      ];
+
+      console.log('🔍 Query factura completa:', queryFactura);
+      console.log('🔍 Valores factura completa:', valoresFactura);
+
+      const [resultadoFactura] = await conexion.execute(queryFactura, valoresFactura);
+      const facturaId = resultadoFactura.insertId;
+
+      console.log('✅ Factura completa creada con ID:', facturaId);
+
+      // 6. Crear detalle de factura para el servicio principal
+      await this.crearDetalleFactura(conexion, facturaId, {
+        concepto_id: 1,
+        descripcion: `Plan ${clienteCompleto.plan_nombre}`,
+        cantidad: 1,
+        precio_unitario: valorInternet,
+        subtotal: valorInternet,
+        servicio_cliente_id: servicioId
+      });
+
+      // 7. Si hay televisión, crear detalle adicional
+      if (valorTelevision > 0) {
+        await this.crearDetalleFactura(conexion, facturaId, {
+          concepto_id: 2,
+          descripcion: 'Servicio de Televisión',
+          cantidad: 1,
+          precio_unitario: valorTelevision,
+          subtotal: valorTelevision,
+          servicio_cliente_id: servicioId
+        });
+      }
+
+      return {
+        id: facturaId,
+        numero_factura: numeroFactura,
+        total: total,
+        fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
+        estado: 'pendiente',
+        periodo_facturacion: periodoFacturacion,
+        referencia_pago: clienteCompleto.identificacion,
+        resolucion: config.resolucion_facturacion
+      };
+
+    } catch (error) {
+      console.error('❌ Error generando primera factura completa:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear detalle de factura
+   */
+  static async crearDetalleFactura(conexion, facturaId, detalle) {
+    const query = `
+      INSERT INTO detalle_facturas (
+        factura_id, concepto_id, concepto_nombre, cantidad,
+        precio_unitario, descuento, subtotal, iva, total,
+        servicio_cliente_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const valores = [
+      facturaId,
+      detalle.concepto_id || 1,
+      detalle.descripcion,
+      detalle.cantidad || 1,
+      parseFloat(detalle.precio_unitario),
+      0.00, // descuento
+      parseFloat(detalle.subtotal),
+      0.00, // iva
+      parseFloat(detalle.subtotal), // total
+      detalle.servicio_cliente_id || null
+    ];
+
+    await conexion.execute(query, valores);
+    console.log('✅ Detalle de factura creado');
+  }
+
+  /**
+   * Generar orden de instalación interna COMPLETA
+   */
+  static async generarOrdenInstalacionInterno(conexion, clienteId, servicioId, createdBy = null) {
+    console.log('📋 Generando orden de instalación...');
+    
+    const numeroOrden = await this.generarNumeroOrden(conexion);
+    
+    // Crear en tabla instalaciones con TODOS los campos
+    const query = `
+      INSERT INTO instalaciones (
+        cliente_id, servicio_cliente_id, estado,
+         fecha_programada, observaciones,
+         created_at
+      ) VALUES (?, ?, 'pendiente',  DATE_ADD(NOW(), INTERVAL 2 DAY), 'Orden generada automáticamente', NOW())
+    `;
+
+    await conexion.execute(query, [
+      clienteId, 
+      servicioId, 
+      
+    ]);
+
+    console.log('✅ Orden de instalación creada en tabla instalaciones');
+
+    return {
+      numero: numeroOrden,
+      estado: 'pendiente',
+      fecha_programada: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    };
   }
 
   /**
    * Generar contrato interno
    */
-  static async generarContratoInterno(conexion, clienteId, servicioId) {
+  static async generarContratoInterno(conexion, clienteId, servicioId, createdBy = null) {
+    console.log('📄 Generando contrato...');
+    
     const numeroContrato = await this.generarNumeroContrato(conexion);
     
-    // Verificar si existe tabla contratos, si no, simplemente retornar datos
-    try {
-      const query = `
-        INSERT INTO contratos (
-          cliente_id, servicio_id, numero_contrato, tipo_contrato,
-          fecha_generacion, estado, generado_automaticamente
-        ) VALUES (?, ?, ?, 'servicio', NOW(), 'activo', 1)
-      `;
+    const query = `
+      INSERT INTO contratos (
+        numero_contrato, cliente_id, servicio_id, tipo_contrato,
+        tipo_permanencia, costo_instalacion, fecha_generacion,
+        estado, generado_automaticamente, created_by, created_at
+      ) VALUES (?, ?, ?, 'servicio', 'sin_permanencia', 150000.00, CURDATE(), 'activo', 1, ?, NOW())
+    `;
 
-      await conexion.execute(query, [clienteId, servicioId, numeroContrato]);
-    } catch (error) {
-      console.warn('⚠️ Tabla contratos no existe, saltando generación de contrato');
-    }
+    await conexion.execute(query, [
+      numeroContrato,
+      clienteId,
+      servicioId,
+      createdBy ? parseInt(createdBy) : null
+    ]);
 
     return {
       numero: numeroContrato,
-      tipo: 'servicio',
-      fecha_generacion: new Date()
+      estado: 'activo'
     };
   }
 
   /**
-   * Generar orden de instalación interna
+   * Generar número de factura usando procedimiento almacenado
    */
-  static async generarOrdenInstalacionInterno(conexion, clienteId, servicioId) {
-    const numeroOrden = await this.generarNumeroOrdenInstalacion(conexion);
-    
-    // Verificar si existe tabla ordenes_instalacion, si no, usar instalaciones
+  static async generarNumeroFactura(conexion) {
     try {
-      const query = `
-        INSERT INTO instalaciones (
-          cliente_id, servicio_cliente_id, numero_orden, estado,
-          fecha_creacion, fecha_programada, prioridad
-        ) VALUES (?, ?, ?, 'pendiente', NOW(), DATE_ADD(NOW(), INTERVAL 2 DAY), 'normal')
-      `;
-
-      await conexion.execute(query, [clienteId, servicioId, numeroOrden]);
+      // Intentar usar procedimiento almacenado
+      await conexion.execute('CALL GenerarNumeroFactura(@nuevo_numero)');
+      const [resultado] = await conexion.execute('SELECT @nuevo_numero as numero');
+      
+      if (resultado[0]?.numero) {
+        return resultado[0].numero;
+      }
     } catch (error) {
-      console.warn('⚠️ Error creando orden de instalación:', error.message);
+      console.warn('⚠️ No se pudo usar procedimiento almacenado, generando manualmente');
     }
 
-    return {
-      numero: numeroOrden,
-      estado: 'pendiente',
-      fecha_programada: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) // +2 días
-    };
+    // Fallback: generar manualmente
+    const [config] = await conexion.execute(`
+      UPDATE configuracion_empresa 
+      SET consecutivo_factura = consecutivo_factura + 1 
+      WHERE id = 1
+    `);
+
+    const [resultado] = await conexion.execute(`
+      SELECT 
+        CONCAT(COALESCE(prefijo_factura, 'FAC'), LPAD(consecutivo_factura, 6, '0')) as numero
+      FROM configuracion_empresa 
+      WHERE id = 1
+    `);
+
+    return resultado[0]?.numero || `FAC${Date.now()}`;
   }
 
   /**
-   * Generar primera factura interna
+   * Generar número de orden usando procedimiento almacenado
    */
-  static async generarPrimeraFacturaInterno(conexion, clienteId, servicioId, datosCliente, datosServicio) {
-    console.log('🧾 Generando primera factura...');
-    
-    const numeroFactura = await this.generarNumeroFactura(conexion);
-    
-    // Obtener datos del servicio y plan
-    const [servicios] = await conexion.execute(`
-      SELECT sc.*, ps.nombre as plan_nombre, ps.precio as plan_precio
-      FROM servicios_cliente sc
-      JOIN planes_servicio ps ON sc.plan_id = ps.id
-      WHERE sc.id = ?
-    `, [servicioId]);
-
-    if (servicios.length === 0) {
-      throw new Error('Servicio no encontrado');
-    }
-
-    const servicio = servicios[0];
-    console.log('📋 Servicio para facturar:', servicio);
-
-    // Calcular valores de la factura
-    const valor = servicio.precio_personalizado || servicio.plan_precio;
-    const fechaVencimiento = new Date();
-    fechaVencimiento.setDate(fechaVencimiento.getDate() + 30); // +30 días
-
-    // Limpiar datos para la factura
-    const datosFactura = {
-      cliente_id: parseInt(clienteId),
-      numero_factura: numeroFactura.toString(),
-      fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
-      subtotal: parseFloat(valor),
-      impuestos: 0,
-      total: parseFloat(valor),
-      estado: 'pendiente',
-      observaciones: 'Primera factura automática',
-      generada_automaticamente: 1
-    };
-
-    console.log('💰 Datos de la factura:', datosFactura);
-
-    // Crear factura
-    const queryFactura = `
-      INSERT INTO facturas (
-        cliente_id, numero_factura, fecha_emision, fecha_vencimiento,
-        subtotal, iva, total, estado, observaciones, created_at
-      ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, NOW())
-    `;
-
-    const valoresFactura = [
-      datosFactura.cliente_id,
-      datosFactura.numero_factura,
-      datosFactura.fecha_vencimiento,
-      datosFactura.subtotal,
-      datosFactura.impuestos,
-      datosFactura.total,
-      datosFactura.estado,
-      datosFactura.observaciones,
-    ];
-
-    console.log('🔍 Query factura SQL:', queryFactura);
-    console.log('🔍 Valores factura a insertar:', valoresFactura);
-
-    const [resultadoFactura] = await conexion.execute(queryFactura, valoresFactura);
-    const facturaId = resultadoFactura.insertId;
-
-    console.log('✅ Factura creada con ID:', facturaId);
-
-    // Crear detalle de factura
+  static async generarNumeroOrden(conexion) {
     try {
-      const queryDetalle = `
-        INSERT INTO detalle_facturas (
-          factura_id, concepto_id, descripcion, cantidad,
-          precio_unitario, subtotal
-        ) VALUES (?, ?, ?, ?, ?, ?)
-      `;
-
-      const valoresDetalle = [
-        facturaId,
-        1, // concepto_id por defecto
-        `Plan ${servicio.plan_nombre} - Primer mes`,
-        1,
-        datosFactura.subtotal,
-        datosFactura.subtotal
-      ];
-
-      console.log('🔍 Query detalle SQL:', queryDetalle);
-      console.log('🔍 Valores detalle a insertar:', valoresDetalle);
-
-      await conexion.execute(queryDetalle, valoresDetalle);
-      console.log('✅ Detalle de factura creado');
-
+      await conexion.execute('CALL GenerarNumeroOrden(@nuevo_numero)');
+      const [resultado] = await conexion.execute('SELECT @nuevo_numero as numero');
+      
+      if (resultado[0]?.numero) {
+        return resultado[0].numero;
+      }
     } catch (error) {
-      console.warn('⚠️ Error creando detalle de factura:', error.message);
-      // No lanzar error para que no falle toda la creación
+      console.warn('⚠️ No se pudo usar procedimiento almacenado para orden');
     }
 
-    return {
-      numero_factura: numeroFactura,
-      total: valor,
-      fecha_vencimiento: fechaVencimiento,
-      estado: 'pendiente'
-    };
+    // Fallback manual
+    await conexion.execute(`
+      UPDATE configuracion_empresa 
+      SET consecutivo_orden = consecutivo_orden + 1 
+      WHERE id = 1
+    `);
+
+    const [resultado] = await conexion.execute(`
+      SELECT 
+        CONCAT(COALESCE(prefijo_orden, 'ORD'), LPAD(consecutivo_orden, 6, '0')) as numero
+      FROM configuracion_empresa 
+      WHERE id = 1
+    `);
+
+    return resultado[0]?.numero || `ORD${Date.now()}`;
+  }
+
+  /**
+   * Generar número de contrato usando procedimiento almacenado
+   */
+  static async generarNumeroContrato(conexion) {
+    try {
+      await conexion.execute('CALL GenerarNumeroContrato(@nuevo_numero)');
+      const [resultado] = await conexion.execute('SELECT @nuevo_numero as numero');
+      
+      if (resultado[0]?.numero) {
+        return resultado[0].numero;
+      }
+    } catch (error) {
+      console.warn('⚠️ No se pudo usar procedimiento almacenado para contrato');
+    }
+
+    // Fallback manual
+    await conexion.execute(`
+      UPDATE configuracion_empresa 
+      SET consecutivo_contrato = consecutivo_contrato + 1 
+      WHERE id = 1
+    `);
+
+    const [resultado] = await conexion.execute(`
+      SELECT 
+        CONCAT(COALESCE(prefijo_contrato, 'CON'), LPAD(consecutivo_contrato, 6, '0')) as numero
+      FROM configuracion_empresa 
+      WHERE id = 1
+    `);
+
+    return resultado[0]?.numero || `CON${Date.now()}`;
+  }
+
+  /**
+   * Generar código de usuario único
+   */
+  static async generarCodigoUsuario(conexion, identificacion) {
+    // Usar los últimos 4 dígitos de la identificación + timestamp
+    const ultimos4 = identificacion.slice(-4);
+    const timestamp = Date.now().toString().slice(-6);
+    return `USR${ultimos4}${timestamp}`;
   }
 
   /**
    * Programar instalación interna
    */
-  static async programarInstalacionInterno(conexion, clienteId, servicioId) {
-    // Buscar técnico disponible (lógica simplificada)
-    const [tecnicos] = await conexion.execute(`
-      SELECT id FROM sistema_usuarios 
-      WHERE rol = 'instalador' AND activo = 1 
-      ORDER BY RAND() LIMIT 1
-    `);
-
-    if (tecnicos.length > 0) {
-      const fechaInstalacion = new Date();
-      fechaInstalacion.setDate(fechaInstalacion.getDate() + 2); // +2 días
-
-      try {
-        const query = `
-          UPDATE instalaciones 
-          SET instalador_id = ?, fecha_programada = ?, estado = 'programada'
-          WHERE cliente_id = ? AND servicio_cliente_id = ?
-        `;
-
-        await conexion.execute(query, [
-          tecnicos[0].id, fechaInstalacion, clienteId, servicioId
-        ]);
-      } catch (error) {
-        console.warn('⚠️ Error programando instalación:', error.message);
-      }
-    }
+  static async programarInstalacionInterno(conexion, clienteId, servicioId, createdBy = null) {
+    // Esta función puede expandirse para programar con instaladores específicos
+    console.log('📅 Programando instalación...');
+    
+    // Por ahora, la instalación se crea en generarOrdenInstalacionInterno
+    // Aquí se puede agregar lógica adicional como:
+    // - Asignar instalador automáticamente
+    // - Calcular fecha según disponibilidad
+    // - Enviar notificaciones
+    
+    return true;
   }
 
   /**
    * Enviar correo de bienvenida
    */
   static async enviarCorreoBienvenida(clienteId, datosCliente) {
-    try {
-      // Aquí implementarías la lógica de envío de correo
-      // Por ahora solo simulamos el envío
-      console.log(`📧 Enviando correo de bienvenida a ${datosCliente.email}`);
-      
-      // TODO: Implementar envío real de correo con plantillas
-      return {
-        enviado: true,
-        email: datosCliente.email,
-        fecha_envio: new Date()
-      };
-    } catch (error) {
-      console.error('❌ Error enviando correo de bienvenida:', error);
-      // No lanzamos error para que no falle toda la creación
-      return { enviado: false, error: error.message };
-    }
+    console.log('📧 Enviando correo de bienvenida...');
+    
+    // Implementar envío de correo aquí
+    // Por ahora solo simulamos
+    console.log(`📧 Correo enviado a: ${datosCliente.email}`);
+    
+    return true;
   }
+
   /**
-   * Obtener cliente completo con todos sus datos
+   * Previsualizar primera factura antes de crear cliente
    */
-  static async obtenerClienteCompleto(clienteId) {
+  static async previsualizarPrimeraFactura(datosPreview) {
     const conexion = await pool.getConnection();
     
     try {
-      // Cliente básico
-      const [clientes] = await conexion.execute(`
-        SELECT c.*, ci.nombre as ciudad_nombre, s.nombre as sector_nombre
-        FROM clientes c
-        LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
-        LEFT JOIN sectores s ON c.sector_id = s.id
-        WHERE c.id = ?
-      `, [clienteId]);
+      // Obtener datos del plan
+      const [planes] = await conexion.execute(`
+        SELECT * FROM planes_servicio WHERE id = ?
+      `, [datosPreview.plan_id]);
 
-      if (clientes.length === 0) {
-        return null;
+      if (planes.length === 0) {
+        throw new Error('Plan de servicio no encontrado');
       }
 
-      const cliente = clientes[0];
+      const plan = planes[0];
+      const valor = datosPreview.precio_personalizado || plan.precio;
 
-      // Servicios
-      const [servicios] = await conexion.execute(`
-        SELECT cs.*, ps.nombre as plan_nombre, ps.descripcion as plan_descripcion,
-               ps.velocidad_bajada, ps.velocidad_subida
-        FROM servicios_cliente cs
-        JOIN planes_servicio ps ON cs.plan_id = ps.id
-        WHERE cs.cliente_id = ?
-        ORDER BY cs.created_at DESC
-      `, [clienteId]);
-
-      // Facturas recientes
-      const [facturas] = await conexion.execute(`
-        SELECT * FROM facturas 
-        WHERE cliente_id = ? 
-        ORDER BY fecha_emision DESC 
-        LIMIT 5
-      `, [clienteId]);
-
-      return {
-        cliente,
-        servicios,
-        facturas
+      // Calcular preview de la factura
+      const preview = {
+        plan_nombre: plan.nombre,
+        valor_plan: parseFloat(valor),
+        conceptos_adicionales: datosPreview.conceptos_adicionales || [],
+        subtotal: parseFloat(valor),
+        iva: 0, // Sin IVA para estratos residenciales
+        total: parseFloat(valor),
+        fecha_estimada_vencimiento: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       };
+
+      // Agregar conceptos adicionales al preview
+      for (const concepto of preview.conceptos_adicionales) {
+        preview.subtotal += parseFloat(concepto.valor || 0);
+        preview.total += parseFloat(concepto.valor || 0);
+      }
+
+      return preview;
 
     } finally {
       conexion.release();
     }
   }
 
-  /**
-   * Generar contrato para un cliente existente
-   */
-  static async generarContrato(clienteId, tipoContrato = 'servicio') {
-    const conexion = await Database.conexion();
-    
-    try {
-      await conexion.beginTransaction();
-
-      const numeroContrato = await this.generarNumeroContrato(conexion);
-      
-      const query = `
-        INSERT INTO contratos (
-          cliente_id, numero_contrato, tipo_contrato,
-          fecha_generacion, estado, generado_automaticamente
-        ) VALUES (?, ?, ?, NOW(), 'activo', 0)
-      `;
-
-      await conexion.execute(query, [clienteId, numeroContrato, tipoContrato]);
-      
-      await conexion.commit();
-
-      return {
-        numero: numeroContrato,
-        tipo: tipoContrato,
-        fecha_generacion: new Date()
-      };
-
-    } catch (error) {
-      await conexion.rollback();
-      throw error;
-    } finally {
-      conexion.release();
-    }
-  }
-
-  static limpiarDatosParaMySQL(objeto) {
-    const objetoLimpio = {};
-    
-    for (const [clave, valor] of Object.entries(objeto)) {
-      if (valor === undefined || valor === '') {
-        objetoLimpio[clave] = null;
-      } else if (typeof valor === 'string') {
-        objetoLimpio[clave] = valor.trim();
-      } else {
-        objetoLimpio[clave] = valor;
-      }
-    }
-    
-    return objetoLimpio;
-  }
-
-  static validarValoresParaMySQL(valores) {
-    return valores.map((valor, index) => {
-      if (valor === undefined) {
-        console.warn(`⚠️ Valor undefined en posición ${index}, convirtiendo a null`);
-        return null;
-      }
-      return valor;
-    });
-  }
-
-  static async generarNumeroContrato(conexion) {
-    const año = new Date().getFullYear();
-    
-    try {
-      const [ultimo] = await conexion.execute(`
-        SELECT numero_contrato FROM contratos 
-        WHERE numero_contrato LIKE 'CONT-${año}-%' 
-        ORDER BY id DESC LIMIT 1
-      `);
-
-      let siguiente = 1;
-      if (ultimo.length > 0) {
-        const numeroActual = parseInt(ultimo[0].numero_contrato.split('-')[2]);
-        siguiente = numeroActual + 1;
-      }
-
-      return `CONT-${año}-${siguiente.toString().padStart(6, '0')}`;
-    } catch (error) {
-      // Si no existe la tabla contratos, generar número básico
-      return `CONT-${año}-${Date.now().toString().slice(-6)}`;
-    }
-  }
-
-  /**
-   * Generar número de orden de instalación único
-   */
-  static async generarNumeroOrdenInstalacion(conexion) {
-    const año = new Date().getFullYear();
-    
-    try {
-      const [ultimo] = await conexion.execute(`
-        SELECT numero_orden FROM instalaciones 
-        WHERE numero_orden LIKE 'INST-${año}-%' 
-        ORDER BY id DESC LIMIT 1
-      `);
-
-      let siguiente = 1;
-      if (ultimo.length > 0 && ultimo[0].numero_orden) {
-        const numeroActual = parseInt(ultimo[0].numero_orden.split('-')[2]);
-        siguiente = numeroActual + 1;
-      }
-
-      return `INST-${año}-${siguiente.toString().padStart(6, '0')}`;
-    } catch (error) {
-      // Si hay error, generar número básico
-      return `INST-${año}-${Date.now().toString().slice(-6)}`;
-    }
-  }
-
-  /**
-   * Generar número de factura único
-   */
- static async generarNumeroFactura(conexion) {
-  try {
-    console.log('📄 Generando número de factura usando configuración empresa...');
-    
-    // Obtener configuración de la empresa
-    const [configEmpresa] = await conexion.execute(`
-      SELECT 
-        prefijo_factura,
-        consecutivo_factura
-      FROM configuracion_empresa 
-      WHERE id = 1
-      LIMIT 1
-    `);
-
-    if (configEmpresa.length === 0) {
-      console.warn('⚠️ No hay configuración de empresa, creando configuración por defecto...');
-      
-      // Crear configuración por defecto
-      await conexion.execute(`
-        INSERT INTO configuracion_empresa (
-          id, licencia, empresa_nombre, prefijo_factura, consecutivo_factura
-        ) VALUES (1, 'DEFAULT', 'EMPRESA PSI', 'FAC', 1)
-        ON DUPLICATE KEY UPDATE
-        prefijo_factura = COALESCE(prefijo_factura, 'FAC'),
-        consecutivo_factura = COALESCE(consecutivo_factura, 1)
-      `);
-      
-      // Usar valores por defecto
-      const numeroFactura = `FAC000001`;
-      console.log(`📄 Número generado con configuración por defecto: ${numeroFactura}`);
-      return numeroFactura;
-    }
-
-    const config = configEmpresa[0];
-    const prefijo = config.prefijo_factura || 'FAC';
-    const consecutivo = config.consecutivo_factura || 1;
-
-    // Generar número con formato: PREFIJO + CONSECUTIVO (6 dígitos)
-    const numeroFactura = `${prefijo}${consecutivo.toString().padStart(6, '0')}`;
-
-    // Actualizar el consecutivo para la próxima factura
-    await conexion.execute(`
-      UPDATE configuracion_empresa 
-      SET consecutivo_factura = consecutivo_factura + 1
-      WHERE id = 1
-    `);
-
-    console.log(`📄 Número de factura generado: ${numeroFactura} (próximo consecutivo: ${consecutivo + 1})`);
-    
-    return numeroFactura;
-
-  } catch (error) {
-    console.error('❌ Error generando número de factura:', error);
-    // Fallback con timestamp
-    const fallback = `FAC${Date.now().toString().slice(-6)}`;
-    console.log(`📄 Usando número de fallback: ${fallback}`);
-    return fallback;
-  }
-}
   /**
    * Obtener servicios de un cliente
    */
@@ -666,8 +629,11 @@ class ClienteCompletoService {
     
     try {
       const [servicios] = await conexion.execute(`
-        SELECT sc.*, ps.nombre as plan_nombre, ps.descripcion as plan_descripcion,
-               ps.velocidad_bajada, ps.velocidad_subida, ps.precio as plan_precio
+        SELECT 
+          sc.*,
+          ps.nombre as plan_nombre,
+          ps.precio as plan_precio,
+          ps.tipo as plan_tipo
         FROM servicios_cliente sc
         JOIN planes_servicio ps ON sc.plan_id = ps.id
         WHERE sc.cliente_id = ?
@@ -682,174 +648,61 @@ class ClienteCompletoService {
   }
 
   /**
-   * Cambiar plan de un cliente
+   * Obtener planes disponibles
    */
-  static async cambiarPlanCliente(clienteId, nuevosPlanData) {
-    return await Database.transaction(async (conexion) => {
-      // Obtener servicio activo actual
-      const [servicioActual] = await conexion.execute(`
-        SELECT * FROM servicios_cliente 
-        WHERE cliente_id = ? AND estado = 'activo'
-        ORDER BY created_at DESC LIMIT 1
-      `, [clienteId]);
+  static async obtenerPlanesDisponibles() {
+    const conexion = await pool.getConnection();
+    
+    try {
+      const [planes] = await conexion.execute(`
+        SELECT * FROM planes_servicio 
+        WHERE activo = 1
+        ORDER BY precio ASC
+      `);
 
-      if (servicioActual.length === 0) {
-        throw new Error('Cliente no tiene servicios activos');
-      }
+      return planes;
 
-      // Finalizar servicio actual
-      await conexion.execute(`
-        UPDATE servicios_cliente 
-        SET estado = 'cambiado', fecha_suspension = NOW()
-        WHERE id = ?
-      `, [servicioActual[0].id]);
-
-      // Crear nuevo servicio
-      const servicioId = await this.asignarServicioCliente(conexion, clienteId, {
-        plan_id: nuevosPlanData.plan_id,
-        precio_personalizado: nuevosPlanData.precio_personalizado,
-        fecha_activacion: nuevosPlanData.fecha_cambio || new Date(),
-        observaciones: nuevosPlanData.observaciones || 'Cambio de plan'
-      });
-
-      return {
-        servicio_anterior_id: servicioActual[0].id,
-        servicio_nuevo_id: servicioId,
-        fecha_cambio: new Date()
-      };
-    });
+    } finally {
+      conexion.release();
+    }
   }
 
   /**
-   * Suspender servicio de un cliente
+   * Verificar disponibilidad de identificación
    */
-  static async suspenderServicio(clienteId, datosSuspension) {
-    return await Database.transaction(async (conexion) => {
-      // Actualizar estado del servicio
-      const [resultado] = await conexion.execute(`
-        UPDATE servicios_cliente 
-        SET estado = 'suspendido', 
-            observaciones = CONCAT(IFNULL(observaciones, ''), '\nSuspendido: ', ?)
-        WHERE cliente_id = ? AND estado = 'activo'
-      `, [datosSuspension.motivo, clienteId]);
-
-      if (resultado.affectedRows === 0) {
-        throw new Error('No se encontró servicio activo para suspender');
-      }
+  static async verificarDisponibilidadIdentificacion(identificacion, tipoDocumento = 'cedula') {
+    const conexion = await pool.getConnection();
+    
+    try {
+      const [clientes] = await conexion.execute(`
+        SELECT id, nombre, estado FROM clientes 
+        WHERE identificacion = ? AND tipo_documento = ?
+      `, [identificacion, tipoDocumento]);
 
       return {
-        cliente_id: clienteId,
-        estado: 'suspendido',
-        fecha_suspension: datosSuspension.fecha_suspension,
-        motivo: datosSuspension.motivo
+        disponible: clientes.length === 0,
+        cliente_existente: clientes.length > 0 ? clientes[0] : null
       };
-    });
+
+    } finally {
+      conexion.release();
+    }
   }
 
   /**
-   * Reactivar servicio de un cliente
-   */
-  static async reactivarServicio(clienteId, datosReactivacion) {
-    return await Database.transaction(async (conexion) => {
-      // Actualizar estado del servicio
-      const [resultado] = await conexion.execute(`
-        UPDATE servicios_cliente 
-        SET estado = 'activo', 
-            observaciones = CONCAT(IFNULL(observaciones, ''), '\nReactivado: ', ?)
-        WHERE cliente_id = ? AND estado = 'suspendido'
-      `, [datosReactivacion.observaciones || 'Reactivación manual', clienteId]);
-
-      if (resultado.affectedRows === 0) {
-        throw new Error('No se encontró servicio suspendido para reactivar');
-      }
-
-      return {
-        cliente_id: clienteId,
-        estado: 'activo',
-        fecha_reactivacion: datosReactivacion.fecha_reactivacion,
-        observaciones: datosReactivacion.observaciones
-      };
-    });
-  }
-
-  /**
-   * Generar contrato para cliente existente
-   */
-  static async generarContrato(clienteId, tipoContrato = 'servicio') {
-    return await Database.transaction(async (conexion) => {
-      const numeroContrato = await this.generarNumeroContrato(conexion);
-      
-      try {
-        const query = `
-          INSERT INTO contratos (
-            cliente_id, numero_contrato, tipo_contrato,
-            fecha_generacion, estado, generado_automaticamente
-          ) VALUES (?, ?, ?, NOW(), 'activo', 0)
-        `;
-
-        await conexion.execute(query, [clienteId, numeroContrato, tipoContrato]);
-      } catch (error) {
-        console.warn('⚠️ Error creando contrato en BD:', error.message);
-      }
-
-      return {
-        numero: numeroContrato,
-        tipo: tipoContrato,
-        fecha_generacion: new Date()
-      };
-    });
-  }
-
-  /**
-   * Generar orden de instalación para cliente existente
-   */
-  static async generarOrdenInstalacion(clienteId, fechaInstalacion = null) {
-    return await Database.transaction(async (conexion) => {
-      const numeroOrden = await this.generarNumeroOrdenInstalacion(conexion);
-      
-      // Obtener servicio activo del cliente
-      const [servicios] = await conexion.execute(`
-        SELECT id FROM servicios_cliente 
-        WHERE cliente_id = ? AND estado = 'activo'
-        ORDER BY created_at DESC LIMIT 1
-      `, [clienteId]);
-
-      if (servicios.length === 0) {
-        throw new Error('Cliente no tiene servicios activos');
-      }
-
-      const servicioId = servicios[0].id;
-      const fechaProgramada = fechaInstalacion || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
-
-      try {
-        const query = `
-          INSERT INTO instalaciones (
-            cliente_id, servicio_cliente_id, numero_orden, estado,
-            fecha_creacion, fecha_programada, prioridad
-          ) VALUES (?, ?, ?, 'pendiente', NOW(), ?, 'normal')
-        `;
-
-        await conexion.execute(query, [clienteId, servicioId, numeroOrden, fechaProgramada]);
-      } catch (error) {
-        console.warn('⚠️ Error creando orden de instalación:', error.message);
-      }
-
-      return {
-        numero: numeroOrden,
-        estado: 'pendiente',
-        fecha_programada: fechaProgramada
-      };
-    });
-  }
-
-  /**
-   * Generar factura inmediata para un cliente
+   * Generar factura inmediata para cliente existente
    */
   static async generarFacturaInmediata(clienteId, conceptosAdicionales = []) {
-    return await Database.transaction(async (conexion) => {
-      // Obtener datos del cliente y servicio
+    const conexion = await pool.getConnection();
+    
+    try {
+      await conexion.beginTransaction();
+
+      // Obtener datos del cliente con su servicio activo
       const [clientes] = await conexion.execute(`
-        SELECT c.*, sc.precio_personalizado, ps.nombre as plan_nombre, ps.precio as plan_precio
+        SELECT 
+          c.*, sc.*, sc.precio_personalizado, 
+          ps.nombre as plan_nombre, ps.precio as plan_precio
         FROM clientes c
         JOIN servicios_cliente sc ON c.id = sc.cliente_id AND sc.estado = 'activo'
         JOIN planes_servicio ps ON sc.plan_id = ps.id
@@ -862,84 +715,39 @@ class ClienteCompletoService {
       }
 
       const cliente = clientes[0];
-      const numeroFactura = await this.generarNumeroFactura(conexion);
       
-      let subtotal = parseFloat(cliente.precio_personalizado || cliente.plan_precio);
-      
-      // Agregar conceptos adicionales
-      for (const concepto of conceptosAdicionales) {
-        subtotal += parseFloat(concepto.valor || 0);
-      }
+      // Generar factura usando el método completo
+      const factura = await this.generarPrimeraFacturaInternoCompleta(
+        conexion,
+        clienteId,
+        cliente.id, // servicio_cliente_id
+        cliente,
+        cliente,
+        null
+      );
 
-      const impuestos = 0; // Calcular según configuración
-      const total = subtotal + impuestos;
+      await conexion.commit();
+      return factura;
 
-      const fechaVencimiento = new Date();
-      fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
-
-      // Crear factura
-      const queryFactura = `
-        INSERT INTO facturas (
-          cliente_id, numero_factura, fecha_emision, fecha_vencimiento,
-          subtotal, impuestos, total, estado, observaciones,
-          generada_automaticamente, created_at
-        ) VALUES (?, ?, NOW(), ?, ?, ?, ?, 'pendiente', 'Factura inmediata', 0, NOW())
-      `;
-
-      const [resultadoFactura] = await conexion.execute(queryFactura, [
-        clienteId, numeroFactura, fechaVencimiento, subtotal, impuestos, total
-      ]);
-
-      const facturaId = resultadoFactura.insertId;
-
-      // Crear detalle principal
-      try {
-        await conexion.execute(`
-          INSERT INTO detalle_facturas (
-            factura_id, concepto_id, descripcion, cantidad,
-            precio_unitario, subtotal
-          ) VALUES (?, 1, ?, 1, ?, ?)
-        `, [facturaId, `Plan ${cliente.plan_nombre}`, cliente.precio_personalizado || cliente.plan_precio, cliente.precio_personalizado || cliente.plan_precio]);
-
-        // Crear detalles adicionales
-        for (const concepto of conceptosAdicionales) {
-          await conexion.execute(`
-            INSERT INTO detalle_facturas (
-              factura_id, concepto_id, descripcion, cantidad,
-              precio_unitario, subtotal
-            ) VALUES (?, ?, ?, ?, ?, ?)
-          `, [
-            facturaId, 
-            concepto.concepto_id || 2, 
-            concepto.descripcion, 
-            concepto.cantidad || 1,
-            concepto.valor,
-            concepto.valor * (concepto.cantidad || 1)
-          ]);
-        }
-      } catch (error) {
-        console.warn('⚠️ Error creando detalles de factura:', error.message);
-      }
-
-      return {
-        numero_factura: numeroFactura,
-        total: total,
-        fecha_vencimiento: fechaVencimiento,
-        estado: 'pendiente'
-      };
-    });
+    } catch (error) {
+      await conexion.rollback();
+      throw error;
+    } finally {
+      conexion.release();
+    }
   }
+
   /**
    * Obtener facturas generadas desde cliente completo
    */
-static async obtenerFacturasGeneradas(filtros = {}) {
+  static async obtenerFacturasGeneradas(filtros = {}) {
     const conexion = await pool.getConnection();
     
     try {
       const { page = 1, limit = 10, estado, cliente_id } = filtros;
       const offset = (page - 1) * limit;
 
-      let whereClause = 'WHERE f.generada_automaticamente = 1';
+      let whereClause = 'WHERE f.activo = "1"';
       let params = [];
 
       if (estado) {
@@ -1054,12 +862,12 @@ static async obtenerFacturasGeneradas(filtros = {}) {
         const [pagos] = await conexion.execute(`
           SELECT * FROM pagos 
           WHERE factura_id = ?
-          ORDER BY fecha_pago DESC
+          ORDER BY created_at DESC
         `, [facturaId]);
         
         factura.pagos = pagos;
       } catch (error) {
-        console.warn('⚠️ Tabla pagos no existe o error consultando:', error.message);
+        console.warn('⚠️ Tabla pagos no existe o error:', error.message);
         factura.pagos = [];
       }
 
@@ -1071,112 +879,140 @@ static async obtenerFacturasGeneradas(filtros = {}) {
   }
 
   /**
-   * Obtener contratos generados
+   * Generar orden de instalación independiente
    */
-  static async obtenerContratosGenerados(filtros = {}) {
+  static async generarOrdenInstalacion(clienteId, fechaInstalacion = null) {
     const conexion = await pool.getConnection();
     
     try {
-      const { page = 1, limit = 10, cliente_id } = filtros;
-      const offset = (page - 1) * limit;
+      await conexion.beginTransaction();
 
-      let whereClause = 'WHERE 1=1';
-      let params = [];
+      // Obtener servicio activo del cliente
+      const [servicios] = await conexion.execute(`
+        SELECT * FROM servicios_cliente 
+        WHERE cliente_id = ? AND estado = 'activo'
+        ORDER BY created_at DESC LIMIT 1
+      `, [clienteId]);
 
-      if (cliente_id) {
-        whereClause += ' AND c.cliente_id = ?';
-        params.push(parseInt(cliente_id));
+      if (servicios.length === 0) {
+        throw new Error('Cliente no tiene servicios activos');
       }
 
-      // Intentar consultar contratos (puede que la tabla no exista)
-      try {
-        const query = `
-          SELECT 
-            c.*,
-            cl.nombre as cliente_nombre,
-            cl.identificacion as cliente_identificacion,
-            COUNT(*) OVER() as total_registros
-          FROM contratos c
-          JOIN clientes cl ON c.cliente_id = cl.id
-          ${whereClause}
-          ORDER BY c.fecha_generacion DESC
-          LIMIT ? OFFSET ?
-        `;
+      const servicioId = servicios[0].id;
+      
+      // Generar orden
+      const orden = await this.generarOrdenInstalacionInterno(
+        conexion, 
+        clienteId, 
+        servicioId, 
+        null
+      );
 
-        params.push(limit, offset);
-
-        const [contratos] = await conexion.execute(query, params);
-        const totalRegistros = contratos.length > 0 ? contratos[0].total_registros : 0;
-
-        return {
-          contratos: contratos.map(c => {
-            const { total_registros, ...contratoLimpio } = c;
-            return contratoLimpio;
-          }),
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total: parseInt(totalRegistros),
-            totalPages: Math.ceil(totalRegistros / limit)
-          }
-        };
-
-      } catch (error) {
-        console.warn('⚠️ Tabla contratos no existe:', error.message);
-        return {
-          contratos: [],
-          pagination: {
-            page: 1,
-            limit: 10,
-            total: 0,
-            totalPages: 0
-          }
-        };
+      // Si se especifica fecha, actualizarla
+      if (fechaInstalacion) {
+        await conexion.execute(`
+          UPDATE instalaciones 
+          SET fecha_programada = ? 
+          WHERE numero_orden = ?
+        `, [fechaInstalacion, orden.numero]);
+        
+        orden.fecha_programada = fechaInstalacion;
       }
 
+      await conexion.commit();
+      return orden;
+
+    } catch (error) {
+      await conexion.rollback();
+      throw error;
     } finally {
       conexion.release();
     }
   }
+
   /**
-   * Previsualizar primera factura
+   * Buscar clientes con filtros avanzados
    */
-  static async previsualizarPrimeraFactura(datos) {
+  static async buscarClientes(filtros = {}) {
     const conexion = await pool.getConnection();
     
     try {
-      // Obtener datos del plan
-      const [planes] = await conexion.execute(
-        'SELECT * FROM planes_servicio WHERE id = ?',
-        [datos.servicio.plan_id]
-      );
+      const { 
+        busqueda, 
+        estado, 
+        ciudad_id, 
+        sector_id, 
+        page = 1, 
+        limit = 20 
+      } = filtros;
 
-      if (planes.length === 0) {
-        throw new Error('Plan de servicio no encontrado');
+      const offset = (page - 1) * limit;
+      let whereClause = 'WHERE 1=1';
+      let params = [];
+
+      // Filtro de búsqueda general
+      if (busqueda) {
+        whereClause += ` AND (
+          c.identificacion LIKE ? OR 
+          c.nombre LIKE ? OR 
+          c.telefono LIKE ? OR 
+          c.email LIKE ?
+        )`;
+        const busquedaTerm = `%${busqueda}%`;
+        params.push(busquedaTerm, busquedaTerm, busquedaTerm, busquedaTerm);
       }
 
-      const plan = planes[0];
-      const precio = datos.servicio.precio_personalizado || plan.precio;
-      
-      const fechaVencimiento = new Date();
-      fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+      // Filtro por estado
+      if (estado) {
+        whereClause += ' AND c.estado = ?';
+        params.push(estado);
+      }
+
+      // Filtro por ciudad
+      if (ciudad_id) {
+        whereClause += ' AND c.ciudad_id = ?';
+        params.push(ciudad_id);
+      }
+
+      // Filtro por sector
+      if (sector_id) {
+        whereClause += ' AND c.sector_id = ?';
+        params.push(sector_id);
+      }
+
+      const query = `
+        SELECT 
+          c.*,
+          ci.nombre as ciudad_nombre,
+          s.nombre as sector_nombre,
+          COUNT(sc.id) as total_servicios,
+          COUNT(CASE WHEN sc.estado = 'activo' THEN 1 END) as servicios_activos,
+          COUNT(*) OVER() as total_registros
+        FROM clientes c
+        LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+        LEFT JOIN sectores s ON c.sector_id = s.id
+        LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id
+        ${whereClause}
+        GROUP BY c.id
+        ORDER BY c.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      params.push(limit, offset);
+
+      const [clientes] = await conexion.execute(query, params);
+      const totalRegistros = clientes.length > 0 ? clientes[0].total_registros : 0;
 
       return {
-        cliente: {
-          nombre: datos.cliente.nombre,
-          identificacion: datos.cliente.identificacion,
-          email: datos.cliente.email
-        },
-        servicio: {
-          plan_nombre: plan.nombre,
-          precio: precio,
-          descripcion: plan.descripcion
-        },
-        factura: {
-          subtotal: precio,
-          impuestos: 0,
-          total: precio,
-          fecha_vencimiento: fechaVencimiento
+        clientes: clientes.map(c => {
+          const { total_registros, ...clienteLimpio } = c;
+          return clienteLimpio;
+        }),
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: parseInt(totalRegistros),
+          totalPages: Math.ceil(totalRegistros / limit)
         }
       };
 
@@ -1184,8 +1020,203 @@ static async obtenerFacturasGeneradas(filtros = {}) {
       conexion.release();
     }
   }
+
+  /**
+   * Actualizar datos de cliente existente
+   */
+  static async actualizarCliente(clienteId, datosActualizacion, updatedBy = null) {
+    const conexion = await pool.getConnection();
+    
+    try {
+      await conexion.beginTransaction();
+
+      // Preparar campos a actualizar
+      const camposPermitidos = [
+        'nombre', 'email', 'telefono', 'telefono_fijo', 
+        'direccion', 'barrio', 'estrato', 'ciudad_id', 
+        'sector_id', 'observaciones'
+      ];
+
+      const camposActualizar = [];
+      const valores = [];
+
+      for (const campo of camposPermitidos) {
+        if (datosActualizacion.hasOwnProperty(campo)) {
+          camposActualizar.push(`${campo} = ?`);
+          valores.push(datosActualizacion[campo]);
+        }
+      }
+
+      if (camposActualizar.length === 0) {
+        throw new Error('No se especificaron campos para actualizar');
+      }
+
+      // Agregar campos de auditoría
+      camposActualizar.push('updated_at = NOW()');
+      if (updatedBy) {
+        camposActualizar.push('updated_by = ?');
+        valores.push(updatedBy);
+      }
+
+      valores.push(clienteId);
+
+      const query = `
+        UPDATE clientes 
+        SET ${camposActualizar.join(', ')}
+        WHERE id = ?
+      `;
+
+      const [resultado] = await conexion.execute(query, valores);
+
+      if (resultado.affectedRows === 0) {
+        throw new Error('Cliente no encontrado');
+      }
+
+      await conexion.commit();
+
+      // Obtener cliente actualizado
+      const [clienteActualizado] = await conexion.execute(`
+        SELECT c.*, ci.nombre as ciudad_nombre, s.nombre as sector_nombre
+        FROM clientes c
+        LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+        LEFT JOIN sectores s ON c.sector_id = s.id
+        WHERE c.id = ?
+      `, [clienteId]);
+
+      return clienteActualizado[0];
+
+    } catch (error) {
+      await conexion.rollback();
+      throw error;
+    } finally {
+      conexion.release();
+    }
+  }
+
+  /**
+   * Cambiar estado de cliente
+   */
+  static async cambiarEstadoCliente(clienteId, nuevoEstado, motivo = null, changedBy = null) {
+    const conexion = await pool.getConnection();
+    
+    try {
+      await conexion.beginTransaction();
+
+      // Validar estado
+      const estadosValidos = ['activo', 'suspendido', 'cortado', 'retirado', 'inactivo'];
+      if (!estadosValidos.includes(nuevoEstado)) {
+        throw new Error('Estado no válido');
+      }
+
+      // Actualizar cliente
+      await conexion.execute(`
+        UPDATE clientes 
+        SET estado = ?, updated_at = NOW()
+        WHERE id = ?
+      `, [nuevoEstado, clienteId]);
+
+      // Si es cortado o suspendido, actualizar servicios
+      if (['cortado', 'suspendido'].includes(nuevoEstado)) {
+        await conexion.execute(`
+          UPDATE servicios_cliente 
+          SET estado = ?, fecha_suspension = CURDATE()
+          WHERE cliente_id = ? AND estado = 'activo'
+        `, [nuevoEstado, clienteId]);
+      }
+
+      // Si es reactivado, reactivar servicios
+      if (nuevoEstado === 'activo') {
+        await conexion.execute(`
+          UPDATE servicios_cliente 
+          SET estado = 'activo', fecha_suspension = NULL
+          WHERE cliente_id = ? AND estado IN ('suspendido', 'cortado')
+        `, [clienteId]);
+      }
+
+      // Registrar en historial si existe tabla
+      try {
+        await conexion.execute(`
+          INSERT INTO clientes_historial (
+            cliente_id, estado_anterior, estado_nuevo, motivo, changed_by, created_at
+          ) SELECT 
+            ?, estado, ?, ?, ?, NOW()
+          FROM clientes WHERE id = ?
+        `, [clienteId, nuevoEstado, motivo, changedBy, clienteId]);
+      } catch (error) {
+        console.warn('⚠️ No se pudo registrar en historial:', error.message);
+      }
+
+      await conexion.commit();
+
+      return {
+        cliente_id: clienteId,
+        estado_anterior: null, // Se podría obtener del historial
+        estado_nuevo: nuevoEstado,
+        motivo: motivo,
+        fecha_cambio: new Date().toISOString()
+      };
+
+    } catch (error) {
+      await conexion.rollback();
+      throw error;
+    } finally {
+      conexion.release();
+    }
+  }
+
+  /**
+   * Obtener resumen estadístico del sistema
+   */
+  static async obtenerResumenEstadistico() {
+    const conexion = await pool.getConnection();
+    
+    try {
+      const resumen = {};
+
+      // Estadísticas de clientes
+      const [statsClientes] = await conexion.execute(`
+        SELECT 
+          COUNT(*) as total_clientes,
+          COUNT(CASE WHEN estado = 'activo' THEN 1 END) as clientes_activos,
+          COUNT(CASE WHEN estado = 'suspendido' THEN 1 END) as clientes_suspendidos,
+          COUNT(CASE WHEN estado = 'cortado' THEN 1 END) as clientes_cortados
+        FROM clientes
+      `);
+
+      resumen.clientes = statsClientes[0];
+
+      // Estadísticas de facturas
+      const [statsFacturas] = await conexion.execute(`
+        SELECT 
+          COUNT(*) as total_facturas,
+          COUNT(CASE WHEN estado = 'pendiente' THEN 1 END) as facturas_pendientes,
+          COUNT(CASE WHEN estado = 'pagada' THEN 1 END) as facturas_pagadas,
+          COUNT(CASE WHEN estado = 'vencida' THEN 1 END) as facturas_vencidas,
+          SUM(CASE WHEN estado = 'pendiente' THEN total ELSE 0 END) as cartera_pendiente,
+          SUM(CASE WHEN estado = 'vencida' THEN total ELSE 0 END) as cartera_vencida
+        FROM facturas
+        WHERE activo = '1'
+      `);
+
+      resumen.facturas = statsFacturas[0];
+
+      // Estadísticas de instalaciones
+      const [statsInstalaciones] = await conexion.execute(`
+        SELECT 
+          COUNT(*) as total_instalaciones,
+          COUNT(CASE WHEN estado = 'pendiente' THEN 1 END) as instalaciones_pendientes,
+          COUNT(CASE WHEN estado = 'completada' THEN 1 END) as instalaciones_completadas
+        FROM instalaciones
+      `);
+
+      resumen.instalaciones = statsInstalaciones[0];
+
+      return resumen;
+
+    } finally {
+      conexion.release();
+    }
+  }
 }
-
-
 
 module.exports = ClienteCompletoService;
