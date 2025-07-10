@@ -113,6 +113,240 @@ router.get('/:id',
   rateLimiter.clientes, 
   ClienteController.obtenerPorId
 );
+/**
+ * @route PUT /api/v1/clients/:id/inactivar
+ * @desc Inactivar cliente y moverlo a tabla clientes_inactivos
+ * @access Private (Supervisor+)
+ */
+router.put('/:id/inactivar',
+  authenticateToken,
+  requireRole('supervisor', 'administrador'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { motivo_inactivacion, observaciones_inactivacion } = req.body;
+
+      console.log('🔄 Inactivando cliente:', id);
+
+      const connection = await pool.getConnection();
+      
+      try {
+        await connection.beginTransaction();
+
+        // 1. Obtener datos completos del cliente
+        const [clienteData] = await connection.execute(`
+          SELECT c.*, s.nombre as sector_nombre, s.codigo as sector_codigo
+          FROM clientes c
+          LEFT JOIN sectores s ON c.sector_id = s.id
+          WHERE c.id = ?
+        `, [id]);
+
+        if (clienteData.length === 0) {
+          throw new Error('Cliente no encontrado');
+        }
+
+        const cliente = clienteData[0];
+
+        // 2. Cancelar todos los servicios activos
+        await connection.execute(`
+          UPDATE servicios_cliente 
+          SET estado = 'cancelado', fecha_cancelacion = NOW()
+          WHERE cliente_id = ? AND estado IN ('activo', 'suspendido')
+        `, [id]);
+
+        // 3. Insertar en tabla clientes_inactivos
+        await connection.execute(`
+          INSERT INTO clientes_inactivos (
+            identificacion, nombre, direccion, descripcion, 
+            fecha_inactivacion, barrio, sector_codigo, telefono, 
+            poste, estrato, motivo_inactivacion, cliente_id
+          ) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          cliente.identificacion,
+          cliente.nombre,
+          cliente.direccion,
+          `${cliente.nombre} - ${cliente.direccion}`,
+          cliente.barrio,
+          cliente.sector_codigo || null,
+          cliente.telefono,
+          cliente.poste,
+          cliente.estrato,
+          motivo_inactivacion || 'Inactivación manual',
+          id
+        ]);
+
+        // 4. Cambiar estado del cliente a inactivo
+        await connection.execute(`
+          UPDATE clientes 
+          SET estado = 'inactivo', updated_at = NOW()
+          WHERE id = ?
+        `, [id]);
+
+        await connection.commit();
+
+        console.log('✅ Cliente inactivado exitosamente');
+
+        res.json({
+          success: true,
+          message: 'Cliente inactivado exitosamente',
+          data: {
+            id: id,
+            estado: 'inactivo'
+          }
+        });
+
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+
+    } catch (error) {
+      console.error('❌ Error inactivando cliente:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error al inactivar cliente'
+      });
+    }
+  }
+);
+
+/**
+ * @route GET /api/v1/clients/inactivos
+ * @desc Obtener lista de clientes inactivos
+ * @access Private (Supervisor+)
+ */
+router.get('/inactivos',
+  authenticateToken,
+  requireRole('supervisor', 'administrador'),
+  async (req, res) => {
+    try {
+      const { page = 1, limit = 10, search = '' } = req.query;
+      const offset = (page - 1) * limit;
+
+      let whereClause = '';
+      let params = [];
+
+      if (search) {
+        whereClause = 'WHERE ci.nombre LIKE ? OR ci.identificacion LIKE ?';
+        params = [`%${search}%`, `%${search}%`];
+      }
+
+      // Obtener clientes inactivos
+      const query = `
+        SELECT 
+          ci.*,
+          DATEDIFF(NOW(), ci.fecha_inactivacion) as dias_inactivo
+        FROM clientes_inactivos ci
+        ${whereClause}
+        ORDER BY ci.fecha_inactivacion DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM clientes_inactivos ci
+        ${whereClause}
+      `;
+
+      const [clientes] = await pool.execute(query, [...params, parseInt(limit), offset]);
+      const [countResult] = await pool.execute(countQuery, params);
+
+      const total = countResult[0].total;
+      const totalPages = Math.ceil(total / limit);
+
+      res.json({
+        success: true,
+        data: {
+          clientes,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            totalPages
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo clientes inactivos:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error obteniendo clientes inactivos'
+      });
+    }
+  }
+);
+
+/**
+ * @route PUT /api/v1/clients/:id/reactivar
+ * @desc Reactivar cliente inactivo
+ * @access Private (Admin)
+ */
+router.put('/:id/reactivar',
+  authenticateToken,
+  requireRole('administrador'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const connection = await pool.getConnection();
+      
+      try {
+        await connection.beginTransaction();
+
+        // 1. Verificar que el cliente existe
+        const [clienteData] = await connection.execute(`
+          SELECT * FROM clientes WHERE id = ?
+        `, [id]);
+
+        if (clienteData.length === 0) {
+          throw new Error('Cliente no encontrado');
+        }
+
+        // 2. Cambiar estado del cliente a activo
+        await connection.execute(`
+          UPDATE clientes 
+          SET estado = 'activo', updated_at = NOW()
+          WHERE id = ?
+        `, [id]);
+
+        // 3. Eliminar de clientes_inactivos
+        await connection.execute(`
+          DELETE FROM clientes_inactivos 
+          WHERE cliente_id = ?
+        `, [id]);
+
+        await connection.commit();
+
+        console.log('✅ Cliente reactivado exitosamente');
+
+        res.json({
+          success: true,
+          message: 'Cliente reactivado exitosamente',
+          data: {
+            id: id,
+            estado: 'activo'
+          }
+        });
+
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+
+    } catch (error) {
+      console.error('❌ Error reactivando cliente:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error al reactivar cliente'
+      });
+    }
+  }
+);
 
 // ==========================================
 // RUTAS DE MODIFICACIÓN

@@ -1,59 +1,115 @@
+// =============================================
+// FRONTEND: frontend/src/components/Clients/ClientsList.js - CORREGIDO
+// =============================================
+
 import React from 'react';
-import { Eye, Edit, Phone, Mail, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
-import { CLIENT_STATE_LABELS, CLIENT_STATE_COLORS, PAGINATION_CONFIG } from '../../constants/clientConstants';
+import { 
+  Eye, Edit, Trash2, UserX, Phone, Mail, MapPin, 
+  Calendar, ChevronLeft, ChevronRight, AlertCircle,
+  RefreshCw, User
+} from 'lucide-react';
 
-
-const ClientsList = ({
-  clients,
-  pagination,
-  loading,
+const ClientsList = ({ 
+  clients = [], 
+  pagination = {}, 
+  loading = false,
   onClientSelect,
   onEditClient,
+  onDeleteClient,
+  onInactivarCliente, // ⭐ NUEVA PROP PARA INACTIVAR
   onPageChange,
   onLimitChange,
-  permissions
+  permissions = {}
 }) => {
-  // Función para obtener el color del estado
-  const getStateColor = (state) => {
-    const colorClass = CLIENT_STATE_COLORS[state] || 'gray';
-    return {
-      'green': 'bg-green-100 text-green-800',
-      'yellow': 'bg-yellow-100 text-yellow-800',
-      'red': 'bg-red-100 text-red-800',
-      'gray': 'bg-gray-100 text-gray-800',
-      'slate': 'bg-slate-100 text-slate-800'
-    }[colorClass];
-  };
-
-  // Formatear teléfono
-  const formatPhone = (phone) => {
-    if (!phone) return '';
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 10 && cleaned.startsWith('3')) {
-      return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6)}`;
-    }
-    return phone;
-  };
 
   // Formatear fecha
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('es-CO');
+  const formatearFecha = (fecha) => {
+    if (!fecha) return '-';
+    return new Date(fecha).toLocaleDateString('es-ES');
   };
+
+  // Obtener color del estado
+  const getEstadoColor = (estado) => {
+    const colores = {
+      'activo': 'bg-green-100 text-green-800',
+      'suspendido': 'bg-yellow-100 text-yellow-800', 
+      'cortado': 'bg-red-100 text-red-800',
+      'retirado': 'bg-gray-100 text-gray-800',
+      'inactivo': 'bg-gray-100 text-gray-800'
+    };
+    return colores[estado] || 'bg-gray-100 text-gray-800';
+  };
+
+  // Renderizar acciones
+  const renderActions = (client) => (
+    <div className="flex items-center gap-2">
+      {/* Ver detalles */}
+      {permissions.canRead && onClientSelect && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClientSelect(client);
+          }}
+          className="text-blue-600 hover:text-blue-800 p-1 rounded transition-colors"
+          title="Ver detalles"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* Editar */}
+      {permissions.canUpdate && onEditClient && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onEditClient(client);
+          }}
+          className="text-green-600 hover:text-green-800 p-1 rounded transition-colors"
+          title="Editar cliente"
+        >
+          <Edit className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* ⭐ NUEVO: Botón inactivar - Solo para clientes activos */}
+      {permissions.canDelete && onInactivarCliente && client.estado === 'activo' && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onInactivarCliente(client);
+          }}
+          className="text-orange-600 hover:text-orange-800 p-1 rounded transition-colors"
+          title="Inactivar cliente"
+        >
+          <UserX className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* Eliminar */}
+      {permissions.canDelete && onDeleteClient && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (window.confirm(`¿Está seguro de eliminar al cliente ${client.nombre}?`)) {
+              onDeleteClient(client.id);
+            }
+          }}
+          className="text-red-600 hover:text-red-800 p-1 rounded transition-colors"
+          title="Eliminar cliente"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6">
-          <div className="animate-pulse space-y-4">
-            {[...Array(5)].map((_, index) => (
-              <div key={index} className="flex items-center space-x-4">
-                <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/5"></div>
-              </div>
-            ))}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="flex items-center justify-center py-12">
+          <div className="flex items-center gap-3">
+            <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+            <span className="text-gray-600">Cargando clientes...</span>
           </div>
         </div>
       </div>
@@ -62,18 +118,14 @@ const ClientsList = ({
 
   if (!clients || clients.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="text-center py-8">
-          <div className="text-gray-400 mb-4">
-            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-          </div>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="flex flex-col items-center justify-center py-12">
+          <User className="w-12 h-12 text-gray-300 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No hay clientes
+            No hay clientes registrados
           </h3>
-          <p className="text-gray-500">
-            No se encontraron clientes con los filtros aplicados.
+          <p className="text-gray-500 text-center">
+            Comience agregando el primer cliente al sistema
           </p>
         </div>
       </div>
@@ -81,37 +133,10 @@ const ClientsList = ({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      {/* Header de la tabla */}
-      <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-900">
-            Clientes ({pagination.totalItems?.toLocaleString() || 0})
-          </h3>
-          
-          {/* Selector de elementos por página */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-700">Mostrar:</label>
-            <select
-              value={pagination.itemsPerPage}
-              onChange={(e) => onLimitChange(parseInt(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
-            >
-              {PAGINATION_CONFIG.LIMIT_OPTIONS.map(option => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <span className="text-sm text-gray-700">por página</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabla */}
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Cliente
@@ -138,8 +163,9 @@ const ClientsList = ({
               <tr
                 key={client.id}
                 className="hover:bg-gray-50 transition-colors cursor-pointer"
-                onClick={() => onClientSelect(client)}
+                onClick={() => onClientSelect && onClientSelect(client)}
               >
+                {/* Datos del cliente */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div>
                     <div className="text-sm font-medium text-gray-900">
@@ -150,79 +176,60 @@ const ClientsList = ({
                     </div>
                   </div>
                 </td>
-                
+
+                {/* Contacto */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="space-y-1">
                     {client.telefono && (
-                      <div className="flex items-center text-sm text-gray-900">
-                        <Phone className="w-3 h-3 mr-1 text-gray-400" />
-                        {formatPhone(client.telefono)}
+                      <div className="flex items-center gap-1 text-sm text-gray-900">
+                        <Phone className="w-3 h-3 text-gray-400" />
+                        {client.telefono}
                       </div>
                     )}
                     {client.correo && (
-                      <div className="flex items-center text-sm text-gray-500">
-                        <Mail className="w-3 h-3 mr-1 text-gray-400" />
+                      <div className="flex items-center gap-1 text-sm text-gray-500">
+                        <Mail className="w-3 h-3 text-gray-400" />
                         {client.correo}
                       </div>
                     )}
                   </div>
                 </td>
-                
-                <td className="px-6 py-4 whitespace-nowrap">
+
+                {/* Ubicación */}
+                <td className="px-6 py-4">
                   <div className="space-y-1">
-                    <div className="flex items-center text-sm text-gray-900">
-                      <MapPin className="w-3 h-3 mr-1 text-gray-400" />
-                      <span className="truncate max-w-32">
+                    <div className="flex items-center gap-1 text-sm text-gray-900">
+                      <MapPin className="w-3 h-3 text-gray-400" />
+                      <span className="truncate max-w-xs">
                         {client.direccion}
                       </span>
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {client.sector_nombre && (
-                        <span>{client.sector_nombre}</span>
-                      )}
-                      {client.ciudad_nombre && (
-                        <span>{client.sector_nombre ? ', ' : ''}{client.ciudad_nombre}</span>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStateColor(client.estado)}`}>
-                    {CLIENT_STATE_LABELS[client.estado] || client.estado}
-                  </span>
-                </td>
-                
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatDate(client.fecha_registro || client.created_at)}
-                </td>
-                
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center justify-end space-x-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onClientSelect(client);
-                      }}
-                      className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                      title="Ver detalles"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    
-                    {permissions.canEdit && onEditClient && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEditClient(client);
-                        }}
-                        className="text-indigo-600 hover:text-indigo-900 p-1 rounded"
-                        title="Editar"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
+                    {(client.barrio || client.sector_nombre) && (
+                      <div className="text-xs text-gray-500">
+                        {[client.barrio, client.sector_nombre].filter(Boolean).join(' - ')}
+                      </div>
                     )}
                   </div>
+                </td>
+
+                {/* Estado */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(client.estado)}`}>
+                    {client.estado}
+                  </span>
+                </td>
+
+                {/* Fecha de registro */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <Calendar className="w-3 h-3 text-gray-400" />
+                    {formatearFecha(client.fecha_registro)}
+                  </div>
+                </td>
+
+                {/* Acciones */}
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  {renderActions(client)}
                 </td>
               </tr>
             ))}
@@ -250,26 +257,46 @@ const ClientsList = ({
               resultados
             </div>
             
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => onPageChange(pagination.currentPage - 1)}
-                disabled={pagination.currentPage <= 1}
-                className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              
-              <span className="px-3 py-1 text-sm text-gray-700">
-                Página {pagination.currentPage} de {pagination.totalPages}
-              </span>
-              
-              <button
-                onClick={() => onPageChange(pagination.currentPage + 1)}
-                disabled={pagination.currentPage >= pagination.totalPages}
-                className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+            <div className="flex items-center gap-2">
+              {/* Selector de elementos por página */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">Mostrar:</span>
+                <select
+                  value={pagination.itemsPerPage || 10}
+                  onChange={(e) => onLimitChange && onLimitChange(parseInt(e.target.value))}
+                  className="text-sm border border-gray-300 rounded px-2 py-1"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              {/* Controles de paginación */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => onPageChange && onPageChange(pagination.currentPage - 1)}
+                  disabled={pagination.currentPage <= 1}
+                  className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                  title="Página anterior"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                
+                <span className="px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded">
+                  Página {pagination.currentPage} de {pagination.totalPages}
+                </span>
+                
+                <button
+                  onClick={() => onPageChange && onPageChange(pagination.currentPage + 1)}
+                  disabled={pagination.currentPage >= pagination.totalPages}
+                  className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                  title="Página siguiente"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

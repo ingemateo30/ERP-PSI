@@ -1,16 +1,16 @@
 // =============================================
-// FRONTEND: frontend/src/components/Clients/ClientsManagement.js - VERSIÓN FINAL
+// FRONTEND: frontend/src/components/Clients/ClientsManagement.js - ACTUALIZADO
 // =============================================
 
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Download, RefreshCw, UserX, Users,X, AlertCircle,Loader2 } from 'lucide-react';
+import { Plus, Search, Filter, Download, RefreshCw, UserX, Users, X, AlertCircle, Loader2 } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROLE_PERMISSIONS } from '../../constants/clientConstants';
 import { clientService } from '../../services/clientService';
 import ClientsList from './ClientsList';
 import ClientForm from './ClientForm';
-import ClientEditForm from './ClientEditForm'; // NUEVO: Formulario específico para editar
+import ClientEditForm from './ClientEditForm';
 import ClientFilters from './ClientFilters';
 import ClientStats from './ClientStats';
 import ClientModal from './ClientModal';
@@ -32,7 +32,7 @@ const ClientsManagement = () => {
   } = useClients();
 
   const [showForm, setShowForm] = useState(false);
-  const [showEditForm, setShowEditForm] = useState(false); // NUEVO: Estado para formulario de edición
+  const [showEditForm, setShowEditForm] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showInactivos, setShowInactivos] = useState(false); // NUEVO: Vista de clientes inactivos
   const [selectedClient, setSelectedClient] = useState(null);
@@ -43,7 +43,7 @@ const ClientsManagement = () => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // Estados para confirmaciones
+  // Estados para confirmaciones - NUEVO: Modal de inactivar
   const [showInactivarModal, setShowInactivarModal] = useState(false);
   const [inactivandoCliente, setInactivandoCliente] = useState(false);
 
@@ -67,10 +67,10 @@ const ClientsManagement = () => {
     setShowClientModal(true);
   };
 
-  // MODIFICADO: Manejar edición de cliente - usar formulario específico
+  // Manejar edición de cliente
   const handleEditClient = (client) => {
     setSelectedClient(client);
-    setShowEditForm(true); // Usar formulario de edición específico
+    setShowEditForm(true);
   };
 
   // NUEVO: Manejar inactivación de cliente con modal de confirmación
@@ -232,16 +232,14 @@ const ClientsManagement = () => {
               />
             </div>
 
-            {/* Botón de clientes inactivos */}
-            {permissions.canViewInactive && (
-              <button
-                onClick={toggleInactivos}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
-              >
-                <UserX className="w-4 h-4" />
-                Ver Inactivos
-              </button>
-            )}
+            {/* NUEVO: Botón para ver clientes inactivos */}
+            <button
+              onClick={toggleInactivos}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+            >
+              <UserX className="w-4 h-4" />
+              Ver Inactivos
+            </button>
 
             {/* Botón de refrescar */}
             <button
@@ -264,22 +262,23 @@ const ClientsManagement = () => {
                   {exporting ? 'Exportando...' : 'Exportar'}
                 </button>
 
+                {/* Menú de exportación */}
                 {showExportMenu && (
-                  <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-10 min-w-[150px]">
-                    <button
-                      onClick={() => handleExport('excel')}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <Download className="w-4 h-4 text-green-600" />
-                      Excel
-                    </button>
-                    <button
-                      onClick={() => handleExport('csv')}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <Download className="w-4 h-4 text-blue-600" />
-                      CSV
-                    </button>
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                    <div className="py-1">
+                      <button
+                        onClick={() => handleExport('excel')}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Exportar a Excel
+                      </button>
+                      <button
+                        onClick={() => handleExport('csv')}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Exportar a CSV
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -342,6 +341,7 @@ const ClientsManagement = () => {
         loading={loading}
         onClientSelect={handleClientSelect}
         onEditClient={handleEditClient}
+        onDeleteClient={handleDeleteClient}
         onInactivarCliente={handleInactivarCliente} // NUEVO: Función para inactivar
         onPageChange={changePage}
         onLimitChange={changeLimit}
@@ -376,7 +376,7 @@ const ClientsManagement = () => {
         />
       )}
 
-      {/* NUEVO: Formulario de edición de cliente */}
+      {/* Formulario de edición de cliente */}
       {showEditForm && selectedClient && (
         <ClientEditForm
           client={selectedClient}

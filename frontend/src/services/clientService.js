@@ -84,7 +84,43 @@ class ClientService {
 
     return cleanedData;
   }
+handleError(error, operacion = 'operación') {
+    let mensaje = `Error al ${operacion}`;
+    
+    if (error.response) {
+      const { status, data } = error.response;
+      
+      switch (status) {
+        case 400:
+          mensaje = data.message || 'Datos inválidos';
+          break;
+        case 401:
+          mensaje = 'No autorizado. Inicia sesión nuevamente';
+          break;
+        case 403:
+          mensaje = 'No tienes permisos para realizar esta acción';
+          break;
+        case 404:
+          mensaje = 'Cliente no encontrado';
+          break;
+        case 409:
+          mensaje = 'Conflicto en los datos';
+          break;
+        case 429:
+          mensaje = 'Demasiadas solicitudes. Intenta de nuevo más tarde';
+          break;
+        case 500:
+          mensaje = 'Error interno del servidor';
+          break;
+        default:
+          mensaje = data.message || `Error ${status}`;
+      }
+    } else if (error.message) {
+      mensaje = error.message;
+    }
 
+    return new Error(mensaje);
+  }
   // Obtener lista de clientes con filtros y paginación
   async getClients(params = {}) {
     try {
@@ -288,6 +324,77 @@ class ClientService {
     }
   }
 
+  async inactivarCliente(clienteId, datos) {
+    try {
+      this.log('Inactivando cliente', { clienteId, datos });
+
+      const response = await apiService.put(`/clients/${clienteId}/inactivar`, datos);
+
+      if (response.success) {
+        this.log('Cliente inactivado exitosamente', response);
+        return response;
+      } else {
+        throw new Error(response.message || 'Error al inactivar cliente');
+      }
+
+    } catch (error) {
+      this.log('Error inactivando cliente', error);
+      throw this.handleError(error, 'inactivar cliente');
+    }
+  }
+
+  /**
+   * Obtener clientes inactivos
+   */
+  async getClientesInactivos(params = {}) {
+    try {
+      this.log('Obteniendo clientes inactivos', params);
+
+      const queryParams = new URLSearchParams();
+      
+      if (params.page) queryParams.append('page', params.page);
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.search) queryParams.append('search', params.search);
+
+      const url = `/clients/inactivos${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const response = await apiService.get(url);
+
+      if (response.success) {
+        this.log('Clientes inactivos obtenidos', response);
+        return response;
+      } else {
+        throw new Error(response.message || 'Error obteniendo clientes inactivos');
+      }
+
+    } catch (error) {
+      this.log('Error obteniendo clientes inactivos', error);
+      throw this.handleError(error, 'obtener clientes inactivos');
+    }
+  }
+
+  /**
+   * Reactivar cliente inactivo
+   */
+  async reactivarCliente(clienteId, datos = {}) {
+    try {
+      this.log('Reactivando cliente', { clienteId, datos });
+
+      const response = await apiService.put(`/clients/${clienteId}/reactivar`, datos);
+
+      if (response.success) {
+        this.log('Cliente reactivado exitosamente', response);
+        return response;
+      } else {
+        throw new Error(response.message || 'Error al reactivar cliente');
+      }
+
+    } catch (error) {
+      this.log('Error reactivando cliente', error);
+      throw this.handleError(error, 'reactivar cliente');
+    }
+  }
+
+  
   // Buscar clientes
   async buscarClientes(termino) {
     try {

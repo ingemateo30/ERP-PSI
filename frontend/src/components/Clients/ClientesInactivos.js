@@ -1,12 +1,11 @@
 // =============================================
-// FRONTEND: COMPONENTE CLIENTES INACTIVOS
+// FRONTEND: frontend/src/components/Clients/ClientesInactivos.js
 // =============================================
 
-// frontend/src/components/Clients/ClientesInactivos.js
 import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Search, RefreshCw, UserCheck, Calendar,
-  Clock, AlertTriangle, Eye, FileText
+  Clock, AlertTriangle, Eye, FileText, UserPlus
 } from 'lucide-react';
 import { clientService } from '../../services/clientService';
 
@@ -46,54 +45,57 @@ const ClientesInactivos = ({ onVolver, permissions }) => {
           totalPages: response.data.pagination.totalPages
         }));
       } else {
-        throw new Error(response.message || 'Error al cargar clientes inactivos');
+        throw new Error(response.message || 'Error cargando clientes inactivos');
       }
 
     } catch (error) {
-      console.error('Error cargando clientes inactivos:', error);
+      console.error('❌ Error cargando clientes inactivos:', error);
       setError(error.message);
-      setClientes([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = (term) => {
-    setSearchTerm(term);
+  const formatearFecha = (fecha) => {
+    if (!fecha) return '-';
+    return new Date(fecha).toLocaleDateString('es-ES');
+  };
+
+  const calcularTiempoInactivo = (dias) => {
+    if (dias < 30) return `${dias} días`;
+    if (dias < 365) return `${Math.floor(dias / 30)} meses`;
+    return `${Math.floor(dias / 365)} años`;
+  };
+
+  const handleReactivar = async (cliente) => {
+    if (!window.confirm(`¿Está seguro de reactivar al cliente ${cliente.nombre}?`)) {
+      return;
+    }
+
+    try {
+      const response = await clientService.reactivarCliente(cliente.cliente_id);
+      
+      if (response.success) {
+        if (window.showNotification) {
+          window.showNotification('success', 'Cliente reactivado exitosamente');
+        }
+        cargarClientesInactivos();
+      }
+    } catch (error) {
+      console.error('Error reactivando cliente:', error);
+      if (window.showNotification) {
+        window.showNotification('error', 'Error al reactivar cliente');
+      }
+    }
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   const handlePageChange = (newPage) => {
     setPagination(prev => ({ ...prev, page: newPage }));
-  };
-
-  const formatearFecha = (fecha) => {
-    if (!fecha) return 'N/A';
-    return new Date(fecha).toLocaleDateString('es-CO');
-  };
-
-  const getMotivoColor = (motivo) => {
-    const colores = {
-      'voluntario': 'bg-blue-100 text-blue-800',
-      'mora': 'bg-red-100 text-red-800',
-      'traslado': 'bg-yellow-100 text-yellow-800',
-      'fallecimiento': 'bg-gray-100 text-gray-800',
-      'duplicado': 'bg-orange-100 text-orange-800',
-      'otro': 'bg-purple-100 text-purple-800'
-    };
-    return colores[motivo] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getMotivoLabel = (motivo) => {
-    const labels = {
-      'voluntario': 'Voluntario',
-      'mora': 'Por Mora',
-      'traslado': 'Traslado',
-      'fallecimiento': 'Fallecimiento',
-      'duplicado': 'Duplicado',
-      'otro': 'Otro'
-    };
-    return labels[motivo] || motivo;
   };
 
   return (
@@ -104,39 +106,42 @@ const ClientesInactivos = ({ onVolver, permissions }) => {
           <div className="flex items-center gap-4">
             <button
               onClick={onVolver}
-              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
+              <span>Volver a Clientes Activos</span>
             </button>
+            
+            <div className="h-6 w-px bg-gray-300"></div>
             
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Clientes Inactivos</h1>
-              <p className="text-gray-600 mt-1">
-                {pagination.total || 0} clientes inactivos registrados
+              <p className="text-sm text-gray-600">
+                Gestiona los clientes que han sido inactivados
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Búsqueda */}
+            {/* Buscador */}
             <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
+                placeholder="Buscar clientes..."
                 value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
-                placeholder="Buscar clientes inactivos..."
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+                onChange={handleSearchChange}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
               />
             </div>
 
-            {/* Refrescar */}
+            {/* Botón refrescar */}
             <button
               onClick={cargarClientesInactivos}
               disabled={loading}
-              className="p-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="p-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
@@ -202,13 +207,13 @@ const ClientesInactivos = ({ onVolver, permissions }) => {
                       <UserCheck className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                       <p className="text-lg font-medium mb-2">No hay clientes inactivos</p>
                       <p className="text-sm">
-                        {searchTerm ? 'No se encontraron resultados para tu búsqueda' : 'Todos los clientes están activos'}
+                        {searchTerm ? 'No se encontraron clientes con esos criterios' : 'Todos los clientes están activos'}
                       </p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                clientes.map((cliente) => (
+                clientes.map(cliente => (
                   <tr key={cliente.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div>
@@ -218,69 +223,63 @@ const ClientesInactivos = ({ onVolver, permissions }) => {
                         <div className="text-sm text-gray-500">
                           {cliente.identificacion}
                         </div>
+                        <div className="text-xs text-gray-400">
+                          {cliente.direccion}
+                        </div>
                       </div>
                     </td>
                     
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900">
-                        {cliente.telefono || 'N/A'}
+                        {cliente.telefono || '-'}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {cliente.direccion || 'Sin dirección'}
-                      </div>
-                    </td>
-                    
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-900">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        {formatearFecha(cliente.fecha_inactivacion)}
-                      </div>
-                    </td>
-                    
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMotivoColor(cliente.motivo_inactivacion)}`}>
-                        {getMotivoLabel(cliente.motivo_inactivacion)}
-                      </span>
-                    </td>
-                    
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-900">
-                        <Clock className="w-4 h-4 text-gray-400" />
-                        {cliente.dias_inactivo || 0} días
+                      <div className="text-xs text-gray-500">
+                        {cliente.barrio || '-'}
                       </div>
                     </td>
                     
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        {permissions.canView && (
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-900">
+                          {formatearFecha(cliente.fecha_inactivacion)}
+                        </span>
+                      </div>
+                    </td>
+                    
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        {cliente.motivo_inactivacion || 'No especificado'}
+                      </span>
+                    </td>
+                    
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-600">
+                          {calcularTiempoInactivo(cliente.dias_inactivo)}
+                        </span>
+                      </div>
+                    </td>
+                    
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {permissions.canCreate && (
                           <button
-                            onClick={() => {/* Abrir modal de detalles */}}
-                            className="p-1 text-gray-600 hover:text-blue-600 transition-colors"
-                            title="Ver detalles"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        )}
-                        
-                        {permissions.canView && (
-                          <button
-                            onClick={() => {/* Mostrar observaciones */}}
-                            className="p-1 text-gray-600 hover:text-green-600 transition-colors"
-                            title="Ver observaciones"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </button>
-                        )}
-                        
-                        {permissions.canReactivate && (
-                          <button
-                            onClick={() => {/* Reactivar cliente */}}
-                            className="p-1 text-gray-600 hover:text-green-600 transition-colors"
+                            onClick={() => handleReactivar(cliente)}
+                            className="text-green-600 hover:text-green-800 p-1 rounded transition-colors"
                             title="Reactivar cliente"
                           >
-                            <UserCheck className="w-4 h-4" />
+                            <UserPlus className="w-4 h-4" />
                           </button>
                         )}
+                        
+                        <button
+                          className="text-gray-600 hover:text-gray-800 p-1 rounded transition-colors"
+                          title="Ver detalles"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -291,7 +290,7 @@ const ClientesInactivos = ({ onVolver, permissions }) => {
         </div>
 
         {/* Paginación */}
-        {!loading && clientes.length > 0 && (
+        {clientes.length > 0 && (
           <div className="px-6 py-4 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-700">
@@ -304,19 +303,19 @@ const ClientesInactivos = ({ onVolver, permissions }) => {
                 <button
                   onClick={() => handlePageChange(pagination.page - 1)}
                   disabled={pagination.page <= 1}
-                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Anterior
                 </button>
                 
-                <span className="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded-md">
+                <span className="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded">
                   {pagination.page} de {pagination.totalPages}
                 </span>
                 
                 <button
                   onClick={() => handlePageChange(pagination.page + 1)}
                   disabled={pagination.page >= pagination.totalPages}
-                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Siguiente
                 </button>
