@@ -13,26 +13,54 @@ export const instalacionesService = {
   /**
    * Obtener todas las instalaciones con filtros y paginación
    */
-  async getInstalaciones(params = {}) {
-    try {
-      console.log('📡 Obteniendo instalaciones con parámetros:', params);
-      const response = await apiService.get(`${API_BASE}`, { params });
+ async getInstalaciones(params = {}) {
+  try {
+    console.log('📡 Obteniendo instalaciones con parámetros:', params);
+    const response = await apiService.get(`${API_BASE}`, { params });
+    
+    console.log('📥 RESPUESTA COMPLETA DEL API:', response);
+    console.log('📊 Tipo de response:', typeof response);
+    console.log('📊 Keys de response:', Object.keys(response));
+    
+    if (response && response.success) {
+      console.log('✅ Response exitoso');
+      console.log('📋 response.data:', response.data);
+      console.log('📋 Tipo de response.data:', typeof response.data);
+      console.log('📋 Es array response.data?', Array.isArray(response.data));
       
-      if (response.success) {
-        return {
-          success: true,
-          instalaciones: response.data || [],
-          pagination: response.pagination || {},
-          estadisticas: response.estadisticas || {}
-        };
-      }
+      // El backend devuelve response.data, no response.instalaciones
+      const instalacionesData = Array.isArray(response.data) ? response.data : [];
       
-      throw new Error(response.message || 'Error obteniendo instalaciones');
-    } catch (error) {
-      console.error('❌ Error obteniendo instalaciones:', error);
-      throw error;
+      console.log('📋 Instalaciones finales:', instalacionesData);
+      
+      return {
+        success: true,
+        instalaciones: instalacionesData,
+        pagination: response.pagination || {},
+        estadisticas: response.estadisticas || {}
+      };
+    } else {
+      console.error('❌ Response no exitoso:', response);
+      return {
+        success: false,
+        instalaciones: [],
+        pagination: {},
+        estadisticas: {},
+        message: response.message || 'Error desconocido'
+      };
     }
-  },
+    
+  } catch (error) {
+    console.error('❌ Error obteniendo instalaciones:', error);
+    return {
+      success: false,
+      instalaciones: [],
+      pagination: {},
+      estadisticas: {},
+      message: error.message || 'Error de conexión'
+    };
+  }
+},
 
   /**
    * Obtener una instalación por ID (CORREGIDO)

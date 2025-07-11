@@ -130,16 +130,19 @@ const InstalacionesManagement = () => {
     const response = await instalacionesService.getInstalaciones(params);
     
     console.log('📥 Respuesta del servicio:', response);
+    console.log('📋 response.instalaciones:', response.instalaciones);
+    console.log('📋 Tipo de instalaciones:', typeof response.instalaciones);
+    console.log('📋 Es array?', Array.isArray(response.instalaciones));
 
     if (response.success) {
       // Asegurar que instalaciones sea siempre un array
       const instalacionesData = Array.isArray(response.instalaciones) 
         ? response.instalaciones 
-        : Array.isArray(response.data) 
-          ? response.data 
-          : [];
+        : [];
       
       console.log('📋 Instalaciones procesadas:', instalacionesData);
+      console.log('📋 Cantidad de instalaciones:', instalacionesData.length);
+      
       setInstalaciones(instalacionesData);
       
       if (response.pagination) {
@@ -156,12 +159,12 @@ const InstalacionesManagement = () => {
     } else {
       console.error('❌ Error en respuesta del servicio:', response);
       setError(response.message || 'Error cargando instalaciones');
-      setInstalaciones([]); // Asegurar que sea un array vacío
+      setInstalaciones([]);
     }
   } catch (error) {
     console.error('❌ Error cargando instalaciones:', error);
     setError('Error cargando instalaciones: ' + error.message);
-    setInstalaciones([]); // Asegurar que sea un array vacío en caso de error
+    setInstalaciones([]);
   } finally {
     if (mostrarCargando) setCargando(false);
   }

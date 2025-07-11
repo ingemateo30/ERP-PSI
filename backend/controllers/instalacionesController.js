@@ -31,178 +31,129 @@ class InstalacionesController {
     // Listar instalaciones con filtros y paginación
     static async listar(req, res) {
         try {
-            console.log('📋 Listando instalaciones con filtros:', req.query);
+            console.log('📋 Listando instalaciones con parámetros:', req.query);
 
             const {
-                pagina = 1,
-                limite = 20,
+                page = 1,
+                limit = 20,
                 busqueda = '',
                 estado = '',
-                tipo_instalacion = '',
                 instalador_id = '',
                 fecha_desde = '',
                 fecha_hasta = '',
-                cliente_id = '',
                 vencidas = false
             } = req.query;
 
-            // Construir consulta base
-            let consulta = `
-        SELECT 
-          i.id,
-          i.cliente_id,
-          i.servicio_cliente_id,
-          i.instalador_id,
-          i.fecha_programada,
-          i.hora_programada,
-          i.fecha_realizada,
-          i.hora_inicio,
-          i.hora_fin,
-          i.estado,
-          i.direccion_instalacion,
-          i.barrio,
-          i.telefono_contacto,
-          i.persona_recibe,
-          i.tipo_instalacion,
-          i.observaciones,
-          i.equipos_instalados,
-          i.fotos_instalacion,
-          i.coordenadas_lat,
-          i.coordenadas_lng,
-          i.costo_instalacion,
-          i.created_at,
-          i.updated_at,
-          i.contrato_id,
-          i.tipo_orden,
-          
-          -- Datos del cliente
-          c.identificacion as cliente_identificacion,
-          c.nombre as cliente_nombre,
-          c.telefono as cliente_telefono,
-          c.direccion as cliente_direccion,
-          c.correo as cliente_email,
-          
-          -- Datos del instalador
-          u.nombre as instalador_nombres,
-          u.telefono as instalador_telefono,
-          
-          -- Datos del servicio
-          sc.plan_id,
-          sc.estado as servicio_estado,
-          
-          -- Datos del plan
-          ps.nombre as plan_nombre,
-          ps.tipo as plan_tipo,
-          ps.precio as plan_precio,
-          
-          -- Información geográfica
-          s.nombre as sector_nombre,
-          cd.nombre as ciudad_nombre,
-          d.nombre as departamento_nombre,
-          
-          -- Cálculos
-          CASE 
-            WHEN i.estado = 'completada' THEN 'Completada'
-            WHEN i.estado = 'cancelada' THEN 'Cancelada'
-            WHEN i.estado = 'reagendada' THEN 'Reagendada'
-            WHEN i.estado = 'en_proceso' THEN 'En Proceso'
-            WHEN i.fecha_programada < CURDATE() THEN 'Vencida'
-            WHEN i.fecha_programada = CURDATE() THEN 'Hoy'
-            ELSE 'Programada'
-          END as estado_descriptivo,
-          
-          DATEDIFF(CURDATE(), i.fecha_programada) as dias_desde_programacion,
-          
-          CASE 
-            WHEN i.fecha_programada < CURDATE() AND i.estado IN ('programada', 'en_proceso') THEN 1
-            ELSE 0
-          END as es_vencida
+            // Construir WHERE clause
+            let whereClause = 'WHERE 1=1';
+            const params = [];
 
-        FROM instalaciones i
-        LEFT JOIN clientes c ON i.cliente_id = c.id
-        LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
-        LEFT JOIN servicios_cliente sc ON i.servicio_cliente_id = sc.id
-        LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-        LEFT JOIN sectores s ON c.sector_id = s.id
-        LEFT JOIN ciudades cd ON s.ciudad_id = cd.id
-        LEFT JOIN departamentos d ON cd.departamento_id = d.id
-        WHERE 1=1
-      `;
-
-            const parametros = [];
-
-            // Aplicar filtros
-            if (busqueda) {
-                consulta += ` AND (
-          c.nombre LIKE ? OR 
-          c.identificacion LIKE ? OR 
-          i.direccion_instalacion LIKE ? OR
-          i.persona_recibe LIKE ? OR
-          i.telefono_contacto LIKE ?
-        )`;
-                const busquedaParam = `%${busqueda}%`;
-                parametros.push(busquedaParam, busquedaParam, busquedaParam, busquedaParam, busquedaParam);
+            if (busqueda.trim()) {
+                whereClause += ` AND (
+        CONCAT(c.nombres, ' ', c.apellidos) LIKE ? OR
+        c.identificacion LIKE ? OR
+        i.direccion_instalacion LIKE ? OR
+        i.telefono_contacto LIKE ?
+      )`;
+                const searchTerm = `%${busqueda}%`;
+                params.push(searchTerm, searchTerm, searchTerm, searchTerm);
             }
 
             if (estado) {
-                consulta += ` AND i.estado = ?`;
-                parametros.push(estado);
-            }
-
-            if (tipo_instalacion) {
-                consulta += ` AND i.tipo_instalacion = ?`;
-                parametros.push(tipo_instalacion);
+                whereClause += ' AND i.estado = ?';
+                params.push(estado);
             }
 
             if (instalador_id) {
-                consulta += ` AND i.instalador_id = ?`;
-                parametros.push(instalador_id);
-            }
-
-            if (cliente_id) {
-                consulta += ` AND i.cliente_id = ?`;
-                parametros.push(cliente_id);
+                if (instalador_id === 'sin_asignar') {
+                    whereClause += ' AND i.instalador_id IS NULL';
+                } else {
+                    whereClause += ' AND i.instalador_id = ?';
+                    params.push(instalador_id);
+                }
             }
 
             if (fecha_desde) {
-                consulta += ` AND i.fecha_programada >= ?`;
-                parametros.push(fecha_desde);
+                whereClause += ' AND DATE(i.fecha_programada) >= ?';
+                params.push(fecha_desde);
             }
 
             if (fecha_hasta) {
-                consulta += ` AND i.fecha_programada <= ?`;
-                parametros.push(fecha_hasta);
+                whereClause += ' AND DATE(i.fecha_programada) <= ?';
+                params.push(fecha_hasta);
             }
 
-            if (vencidas === 'true') {
-                consulta += ` AND i.fecha_programada < CURDATE() AND i.estado IN ('programada', 'en_proceso')`;
+            if (vencidas === 'true' || vencidas === true) {
+                whereClause += ` AND DATE(i.fecha_programada) < CURDATE() 
+                      AND i.estado NOT IN ('completada', 'cancelada')`;
             }
+
+            // Query base
+            const baseQuery = `
+      FROM instalaciones i
+      INNER JOIN clientes c ON i.cliente_id = c.id
+      LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
+      LEFT JOIN servicios_cliente sc ON i.servicio_cliente_id = sc.id
+      LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+      ${whereClause}
+    `;
 
             // Contar total de registros
-            const consultaConteo = consulta.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
-            const [conteoResult] = await Database.query(consultaConteo, parametros);
-            const totalRegistros = conteoResult.total;
+            const countQuery = `SELECT COUNT(*) as total ${baseQuery}`;
+            const [{ total }] = await Database.query(countQuery, params);
 
-            // Agregar ordenamiento y paginación
-            consulta += ` ORDER BY 
-        CASE 
-          WHEN i.estado = 'en_proceso' THEN 1
-          WHEN i.fecha_programada = CURDATE() THEN 2
-          WHEN i.fecha_programada < CURDATE() AND i.estado IN ('programada', 'en_proceso') THEN 3
-          ELSE 4
-        END,
-        i.fecha_programada ASC,
-        i.hora_programada ASC
+            console.log('📊 Total de registros encontrados:', total);
+
+            // Si es para exportar, devolver todos los datos
+            if (req.query.export || (res && typeof res.json !== 'function')) {
+                const exportQuery = `
+        SELECT 
+          i.*,
+          CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+          c.identificacion as cliente_identificacion,
+          c.telefono as cliente_telefono,
+          CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre
+        ${baseQuery}
+        ORDER BY i.created_at DESC
       `;
 
-            const offset = (parseInt(pagina) - 1) * parseInt(limite);
-            consulta += ` LIMIT ? OFFSET ?`;
-            parametros.push(parseInt(limite), offset);
+                const instalaciones = await Database.query(exportQuery, params);
 
-            // Ejecutar consulta principal
-            const instalaciones = await Database.query(consulta, parametros);
+                return {
+                    success: true,
+                    data: instalaciones,
+                    total: total
+                };
+            }
 
-            // Procesar equipos instalados (JSON)
+            // Calcular paginación
+            const pageNum = Math.max(1, parseInt(page));
+            const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+            const offset = (pageNum - 1) * limitNum;
+            const totalPages = Math.ceil(total / limitNum);
+
+            // Query con paginación
+            const selectQuery = `
+      SELECT 
+        i.*,
+        c.nombre as cliente_nombre,
+        c.identificacion as cliente_identificacion,
+        c.telefono as cliente_telefono,
+        c.correo as cliente_email,
+        u.nombre as instalador_nombre,
+        ps.nombre as plan_nombre,
+        ps.precio as plan_precio
+      ${baseQuery}
+      ORDER BY i.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+            const instalaciones = await Database.query(selectQuery, [...params, limitNum, offset]);
+
+            console.log('📋 Instalaciones obtenidas:', instalaciones.length);
+            console.log('📋 Primera instalación:', instalaciones[0] || 'Ninguna');
+
+            // Procesar equipos instalados para cada instalación
             instalaciones.forEach(instalacion => {
                 if (instalacion.equipos_instalados) {
                     try {
@@ -213,42 +164,68 @@ class InstalacionesController {
                 } else {
                     instalacion.equipos_instalados = [];
                 }
-
-                if (instalacion.fotos_instalacion) {
-                    try {
-                        instalacion.fotos_instalacion = JSON.parse(instalacion.fotos_instalacion);
-                    } catch (e) {
-                        instalacion.fotos_instalacion = [];
-                    }
-                } else {
-                    instalacion.fotos_instalacion = [];
-                }
             });
 
-            const totalPaginas = Math.ceil(totalRegistros / parseInt(limite));
+            // Obtener estadísticas
+            const estadisticasQuery = `
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN i.estado = 'programada' THEN 1 ELSE 0 END) as programadas,
+        SUM(CASE WHEN i.estado = 'en_proceso' THEN 1 ELSE 0 END) as en_proceso,
+        SUM(CASE WHEN i.estado = 'completada' THEN 1 ELSE 0 END) as completadas,
+        SUM(CASE WHEN i.estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas,
+        SUM(CASE WHEN i.estado = 'reagendada' THEN 1 ELSE 0 END) as reagendadas,
+        SUM(CASE WHEN DATE(i.fecha_programada) < CURDATE() 
+            AND i.estado NOT IN ('completada', 'cancelada') THEN 1 ELSE 0 END) as vencidas
+      ${baseQuery}
+    `;
 
-            res.json({
+            const [estadisticas] = await Database.query(estadisticasQuery, params);
+
+            const response = {
                 success: true,
-                data: {
-                    instalaciones,
-                    paginacion: {
-                        pagina_actual: parseInt(pagina),
-                        total_paginas: totalPaginas,
-                        total_registros: totalRegistros,
-                        registros_por_pagina: parseInt(limite),
-                        tiene_siguiente: parseInt(pagina) < totalPaginas,
-                        tiene_anterior: parseInt(pagina) > 1
-                    }
+                data: instalaciones, // IMPORTANTE: usar 'data', no 'instalaciones'
+                pagination: {
+                    page: pageNum,
+                    limit: limitNum,
+                    total: total,
+                    totalPages: totalPages,
+                    hasNext: pageNum < totalPages,
+                    hasPrev: pageNum > 1
+                },
+                estadisticas: estadisticas || {
+                    total: 0,
+                    programadas: 0,
+                    en_proceso: 0,
+                    completadas: 0,
+                    canceladas: 0,
+                    reagendadas: 0,
+                    vencidas: 0
                 }
+            };
+
+            console.log('📤 Enviando respuesta:', {
+                success: response.success,
+                dataLength: response.data.length,
+                pagination: response.pagination,
+                estadisticas: response.estadisticas
             });
+
+            res.json(response);
 
         } catch (error) {
             console.error('❌ Error listando instalaciones:', error);
-            res.status(500).json({
+
+            const errorResponse = {
                 success: false,
-                message: 'Error al obtener las instalaciones',
-                error: error.message
-            });
+                message: 'Error obteniendo instalaciones',
+                error: error.message,
+                data: [], // Asegurar que siempre hay un array
+                pagination: {},
+                estadisticas: {}
+            };
+
+            res.status(500).json(errorResponse);
         }
     }
 
