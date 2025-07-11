@@ -444,7 +444,7 @@ export const instalacionesService = {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${API_URL}/exportar?${params.toString()}`, {
+      const response = await fetch(`${API_BASE_URL}/instalaciones/exportar?${params.toString()}`, {
         method: 'GET',
         headers: headers
       });

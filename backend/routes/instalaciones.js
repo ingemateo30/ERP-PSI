@@ -147,20 +147,23 @@ router.get('/exportar',
     requireRole('administrador', 'supervisor'),
     async (req, res) => {
         try {
-            // Esta funcionalidad puede implementarse más tarde
-            res.status(501).json({
-                success: false,
-                message: 'Funcionalidad de exportación no implementada aún'
+            // REEMPLAZAR TODO EL CONTENIDO POR:
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Content-Disposition', 'attachment; filename=instalaciones.json');
+            
+            const instalaciones = await InstalacionesController.listar(req, { 
+              json: (data) => data 
             });
+            
+            res.json(instalaciones.data);
         } catch (error) {
             res.status(500).json({
                 success: false,
-                message: 'Error interno del servidor'
+                message: 'Error exportando reporte'
             });
         }
     }
 );
-
 // ==========================================
 // MANEJO DE ERRORES
 // ==========================================

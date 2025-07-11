@@ -36,7 +36,11 @@ const InstalacionesManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+  const [mostrarModalAsignar, setMostrarModalAsignar] = useState(false);
+  const abrirModalAsignar = (instalacion) => {
+  setInstalacionSeleccionada(instalacion);
+  setMostrarModalAsignar(true);
+};
   // Estados de filtros
   const [filtros, setFiltros] = useState({
     busqueda: '',
@@ -268,17 +272,27 @@ const InstalacionesManagement = () => {
   };
 
   const cancelarInstalacion = async (instalacion) => {
-    const motivo = window.prompt('Motivo de cancelación:');
-    if (motivo !== null) {
-      await cambiarEstadoInstalacion(instalacion.id, ESTADOS_INSTALACION.CANCELADA, {
-        observaciones: motivo
-      });
-    }
-  };
+  const motivo = window.prompt('Motivo de cancelación:');
+  if (motivo !== null) {
+    await cambiarEstadoInstalacion(instalacion.id, 'cancelada', {
+      observaciones: motivo
+    });
+  }
+};
 
-  const reagendarInstalacion = (instalacion) => {
-    abrirModal('reagendar', instalacion);
-  };
+ const reagendarInstalacion = async (instalacion) => {
+  const nuevaFecha = window.prompt('Nueva fecha (YYYY-MM-DD):');
+  const nuevaHora = window.prompt('Nueva hora (HH:MM):');
+  
+  if (nuevaFecha && nuevaHora) {
+    await cambiarEstadoInstalacion(instalacion.id, 'reagendada', {
+      fecha_programada: nuevaFecha,
+      hora_programada: nuevaHora,
+      observaciones: 'Reagendada'
+    });
+  }
+};
+
 
   // ==========================================
   // MANEJO DE PAGINACIÓN
@@ -376,14 +390,7 @@ const InstalacionesManagement = () => {
               <Download className="w-4 h-4 mr-2" />
               Exportar
             </button>
-            
-            <button
-              onClick={() => abrirModal('crear')}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nueva Instalación
-            </button>
+    
           </div>
         </div>
       </div>

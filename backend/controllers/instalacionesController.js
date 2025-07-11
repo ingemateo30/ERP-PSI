@@ -517,10 +517,10 @@ class InstalacionesController {
 
   // Actualizar instalación
   static async actualizar(req, res) {
-    const connection = await Database.getConnection();
+    const connection = await Database.getConnection(); 
     
     try {
-      await connection.beginTransaction();
+       await connection.beginTransaction();
       
       const { id } = req.params;
       console.log('📝 Actualizando instalación ID:', id, 'Datos:', req.body);
