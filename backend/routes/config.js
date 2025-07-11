@@ -64,7 +64,7 @@ router.use(authenticateToken);
 router.get('/conceptos', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('📋 GET /config/conceptos - Redirigiendo a conceptos');
-    
+
     // Importar el controlador de conceptos
     let conceptosController;
     try {
@@ -96,7 +96,7 @@ router.get('/conceptos', requireRole('administrador', 'supervisor'), async (req,
 router.get('/conceptos/stats', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('📊 GET /config/conceptos/stats');
-    
+
     let conceptosController;
     try {
       conceptosController = require('../controllers/conceptosController');
@@ -126,7 +126,7 @@ router.get('/conceptos/stats', requireRole('administrador', 'supervisor'), async
 router.get('/conceptos/tipos', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('📋 GET /config/conceptos/tipos');
-    
+
     let conceptosController;
     try {
       conceptosController = require('../controllers/conceptosController');
@@ -157,7 +157,7 @@ router.get('/conceptos/:id', requireRole('administrador', 'supervisor'), async (
   try {
     const { id } = req.params;
     console.log('🔍 GET /config/conceptos/:id con ID:', id);
-    
+
     let conceptosController;
     try {
       conceptosController = require('../controllers/conceptosController');
@@ -187,7 +187,7 @@ router.get('/conceptos/:id', requireRole('administrador', 'supervisor'), async (
 router.post('/conceptos', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('➕ POST /config/conceptos');
-    
+
     let conceptosController;
     try {
       conceptosController = require('../controllers/conceptosController');
@@ -217,7 +217,7 @@ router.post('/conceptos', requireRole('administrador', 'supervisor'), async (req
 router.put('/conceptos/:id', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('✏️ PUT /config/conceptos/:id');
-    
+
     let conceptosController;
     try {
       conceptosController = require('../controllers/conceptosController');
@@ -247,7 +247,7 @@ router.put('/conceptos/:id', requireRole('administrador', 'supervisor'), async (
 router.post('/conceptos/:id/toggle', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('🔄 POST /config/conceptos/:id/toggle');
-    
+
     let conceptosController;
     try {
       conceptosController = require('../controllers/conceptosController');
@@ -277,7 +277,7 @@ router.post('/conceptos/:id/toggle', requireRole('administrador', 'supervisor'),
 router.delete('/conceptos/:id', requireRole('administrador'), async (req, res) => {
   try {
     console.log('🗑️ DELETE /config/conceptos/:id');
-    
+
     let conceptosController;
     try {
       conceptosController = require('../controllers/conceptosController');
@@ -1381,9 +1381,9 @@ router.get('/service-plans', async (req, res) => {
   try {
     console.log('🔄 Backend: GET /config/service-plans');
     console.log('📊 Backend: Query params:', req.query);
-    
+
     const { Database } = require('../models/Database');
-    
+
     const planes = await Database.query(`
       SELECT * FROM planes_servicio 
       WHERE 1 = 1 
@@ -1500,7 +1500,7 @@ router.get('/service-plans/:id', async (req, res) => {
 
     const plan = {
       ...planes[0],
-      conceptos_incluidos: planes[0].conceptos_incluidos ? 
+      conceptos_incluidos: planes[0].conceptos_incluidos ?
         JSON.parse(planes[0].conceptos_incluidos) : null
     };
 
@@ -1556,7 +1556,7 @@ router.post('/service-plans', requireRole('administrador'), async (req, res) => 
 
     // Verificar código único
     const codigoExistente = await Database.query(
-      'SELECT id FROM planes_servicio WHERE codigo = ?', 
+      'SELECT id FROM planes_servicio WHERE codigo = ?',
       [codigo]
     );
 
@@ -1642,89 +1642,154 @@ router.post('/service-plans', requireRole('administrador'), async (req, res) => 
   }
 });
 
+// backend/routes/config.js - CORRECCIÓN DEL ENDPOINT PUT /service-plans/:id
+
 router.put('/service-plans/:id', requireRole('administrador'), async (req, res) => {
   try {
     const { id } = req.params;
     const datosActualizacion = req.body;
 
+    console.log('🔧 Actualizando plan ID:', id);
+    console.log('📋 Datos recibidos:', datosActualizacion);
+
     // Verificar que el plan existe
-    const planExistente = await Database.query(
-      'SELECT * FROM planes_servicio WHERE id = ?', 
+    const [planExistente] = await Database.query(
+      'SELECT * FROM planes_servicio WHERE id = ?',
       [id]
     );
 
-    if (planExistente.length === 0) {
+    if (!planExistente) {
       return res.status(404).json({
         success: false,
         message: 'Plan no encontrado'
       });
     }
 
-    const plan = planExistente[0];
+    console.log('📋 Plan existente encontrado');
 
-    // Campos que se pueden actualizar
+    // Verificar qué campos existen en la tabla de forma más segura
+    let camposExistentes = [];
+    try {
+      const tableInfo = await Database.query("DESCRIBE planes_servicio");
+      console.log('📋 TableInfo raw:', tableInfo);
+      console.log('📋 TableInfo type:', typeof tableInfo);
+      console.log('📋 TableInfo isArray:', Array.isArray(tableInfo));
+
+      if (Array.isArray(tableInfo)) {
+        camposExistentes = tableInfo.map(field => field.Field);
+      } else {
+        // Si no es array, usar los campos conocidos de la estructura SQL
+        camposExistentes = [
+          'id', 'codigo', 'nombre', 'tipo', 'precio', 'velocidad_subida', 'velocidad_bajada',
+          'canales_tv', 'descripcion', 'aplica_iva', 'activo', 'created_at', 'updated_at',
+          'precio_internet', 'precio_television', 'precio_instalacion', 'requiere_instalacion',
+          'segmento', 'tecnologia', 'permanencia_meses', 'descuento_combo', 'conceptos_incluidos',
+          'orden_visualizacion', 'promocional', 'fecha_inicio_promocion', 'fecha_fin_promocion'
+        ];
+      }
+    } catch (error) {
+      console.warn('⚠️ Error obteniendo estructura de tabla, usando campos conocidos');
+      // Usar campos conocidos como fallback
+      camposExistentes = [
+        'id', 'codigo', 'nombre', 'tipo', 'precio', 'velocidad_subida', 'velocidad_bajada',
+        'canales_tv', 'descripcion', 'aplica_iva', 'activo', 'created_at', 'updated_at',
+        'precio_internet', 'precio_television', 'precio_instalacion', 'requiere_instalacion',
+        'segmento', 'tecnologia', 'permanencia_meses', 'descuento_combo', 'conceptos_incluidos',
+        'orden_visualizacion', 'promocional', 'fecha_inicio_promocion', 'fecha_fin_promocion'
+      ];
+    }
+
+    console.log('📋 Campos existentes detectados:', camposExistentes);
+
+    // Campos que se pueden actualizar (solo los que existen en la tabla)
     const camposPermitidos = [
       'nombre', 'precio', 'precio_internet', 'precio_television',
       'velocidad_subida', 'velocidad_bajada', 'canales_tv', 'descripcion',
       'precio_instalacion', 'requiere_instalacion', 'segmento', 'tecnologia',
       'permanencia_meses', 'descuento_combo', 'orden_visualizacion',
       'promocional', 'fecha_inicio_promocion', 'fecha_fin_promocion', 'aplica_iva'
-    ];
+    ].filter(campo => camposExistentes.includes(campo));
 
-    const actualizaciones = {};
+    console.log('📋 Campos permitidos:', camposPermitidos);
+
+    const setClauses = [];
     const valores = [];
-    
+
+    // Agregar campos básicos
     camposPermitidos.forEach(campo => {
       if (datosActualizacion.hasOwnProperty(campo)) {
-        actualizaciones[campo] = '?';
+        setClauses.push(`${campo} = ?`);
         valores.push(datosActualizacion[campo]);
+        console.log(`✅ Agregando campo: ${campo} = ${datosActualizacion[campo]}`);
       }
     });
 
-    if (Object.keys(actualizaciones).length === 0) {
+    if (setClauses.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No se proporcionaron campos para actualizar'
+        message: 'No se proporcionaron campos válidos para actualizar'
       });
     }
 
-    // Actualizar conceptos incluidos si cambió algo relevante
-    if (datosActualizacion.precio || datosActualizacion.precio_internet || 
-        datosActualizacion.precio_television || datosActualizacion.descuento_combo) {
-      
-      const conceptosActualizados = JSON.parse(plan.conceptos_incluidos || '{}');
-      
-      if (datosActualizacion.precio_internet) {
+    // Actualizar conceptos incluidos si existe el campo y hay cambios relevantes
+    if (camposExistentes.includes('conceptos_incluidos') &&
+      (datosActualizacion.precio || datosActualizacion.precio_internet ||
+        datosActualizacion.precio_television || datosActualizacion.descuento_combo !== undefined)) {
+
+      let conceptosActualizados = {};
+
+      // Intentar parsear los conceptos existentes
+      try {
+        conceptosActualizados = planExistente.conceptos_incluidos ?
+          JSON.parse(planExistente.conceptos_incluidos) : {};
+      } catch (e) {
+        console.warn('⚠️ Error parseando conceptos existentes:', e);
+        conceptosActualizados = {};
+      }
+
+      // Actualizar conceptos según los cambios
+      if (datosActualizacion.precio_internet !== undefined) {
         conceptosActualizados.internet = datosActualizacion.precio_internet;
       }
-      if (datosActualizacion.precio_television) {
+      if (datosActualizacion.precio_television !== undefined) {
         conceptosActualizados.television = datosActualizacion.precio_television;
       }
-      if (datosActualizacion.descuento_combo) {
+      if (datosActualizacion.descuento_combo !== undefined) {
         conceptosActualizados.descuento_combo = datosActualizacion.descuento_combo;
       }
 
-      actualizaciones.conceptos_incluidos = '?';
+      setClauses.push('conceptos_incluidos = ?');
       valores.push(JSON.stringify(conceptosActualizados));
+      console.log('✅ Actualizando conceptos incluidos:', conceptosActualizados);
     }
 
-    // Agregar updated_at
-    actualizaciones.updated_at = 'NOW()';
+    // Agregar updated_at si existe el campo
+    if (camposExistentes.includes('updated_at')) {
+      setClauses.push('updated_at = NOW()');
+    }
+
+    // Agregar ID al final para el WHERE
     valores.push(id);
 
-    const setClauses = Object.keys(actualizaciones).map(key => 
-      `${key} = ${actualizaciones[key]}`
-    ).join(', ');
+    const query = `UPDATE planes_servicio SET ${setClauses.join(', ')} WHERE id = ?`;
 
-    await Database.query(`
-      UPDATE planes_servicio 
-      SET ${setClauses}
-      WHERE id = ?
-    `, valores);
+    console.log('📝 Query a ejecutar:', query);
+    console.log('📝 Valores:', valores);
+
+    await Database.query(query, valores);
+
+    console.log('✅ Plan actualizado exitosamente');
+
+    // Obtener el plan actualizado
+    const [planActualizado] = await Database.query(
+      'SELECT * FROM planes_servicio WHERE id = ?',
+      [id]
+    );
 
     res.json({
       success: true,
-      message: 'Plan actualizado exitosamente'
+      message: 'Plan actualizado exitosamente',
+      data: planActualizado
     });
 
   } catch (error) {
@@ -1736,6 +1801,7 @@ router.put('/service-plans/:id', requireRole('administrador'), async (req, res) 
     });
   }
 });
+
 
 router.delete('/service-plans/:id', requireRole('administrador'), async (req, res) => {
   try {
