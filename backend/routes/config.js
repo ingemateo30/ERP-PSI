@@ -1642,7 +1642,6 @@ router.post('/service-plans', requireRole('administrador'), async (req, res) => 
   }
 });
 
-// backend/routes/config.js - CORRECCIÓN DEL ENDPOINT PUT /service-plans/:id
 
 router.put('/service-plans/:id', requireRole('administrador'), async (req, res) => {
   try {

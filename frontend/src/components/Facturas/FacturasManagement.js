@@ -1,6 +1,6 @@
-// components/Facturas/FacturasManagement.js - Componente principal corregido
+// frontend/src/components/Facturas/FacturasManagement.js - CORREGIDO COMPLETAMENTE
 import React, { useState, useCallback, useEffect } from 'react';
-import { Info, Calculator, PieChart } from 'lucide-react';
+import { Info, Calculator, PieChart, AlertTriangle } from 'lucide-react';
 import { useFacturas, useFacturasAcciones } from '../../hooks/useFacturacionManual';
 import FacturasStats from './FacturasStats';
 import FacturasFilters from './FacturasFilters';
@@ -8,7 +8,6 @@ import FacturasList from './FacturasList';
 import FacturaModal from './FacturaModal';
 import PagoModal from './PagoModal';
 import AnularModal from './AnularModal';
-import FacturasService from '../../services/facturacionManualService';
 
 const FacturasManagement = () => {
   const {
@@ -48,9 +47,9 @@ const FacturasManagement = () => {
   const [filtrosAvanzados, setFiltrosAvanzados] = useState(false);
   const [notificacion, setNotificacion] = useState(null);
 
-  // Manejar notificaciones
+  // Manejar notificaciones mejorado
   const mostrarNotificacion = useCallback((mensaje, tipo = 'success') => {
-    setNotificacion({ mensaje, tipo });
+    setNotificacion({ mensaje, tipo, timestamp: Date.now() });
     setTimeout(() => setNotificacion(null), 5000);
   }, []);
 
@@ -59,20 +58,40 @@ const FacturasManagement = () => {
     clearError();
   }, [clearError]);
 
-  // Manejar búsqueda sin duplicados
+  // ==========================================
+  // MANEJO DE FILTROS CORREGIDO
+  // ==========================================
+
+  // Aplicar filtros desde FacturasFilters - CORREGIDO
   const handleBuscar = useCallback((filtrosBusqueda) => {
-    console.log('🔍 Aplicando filtros desde FacturasManagement:', filtrosBusqueda);
-    aplicarFiltros(filtrosBusqueda);
-  }, [aplicarFiltros]);
+    console.log('🔍 [FacturasManagement] Aplicando filtros:', filtrosBusqueda);
+    
+    // Validar que los filtros no estén vacíos
+    const filtrosValidos = Object.fromEntries(
+      Object.entries(filtrosBusqueda).filter(([key, value]) => 
+        value !== '' && value !== null && value !== undefined
+      )
+    );
+    
+    if (Object.keys(filtrosValidos).length === 0) {
+      mostrarNotificacion('Por favor ingresa al menos un criterio de búsqueda', 'warning');
+      return;
+    }
 
-  // Limpiar filtros
+    aplicarFiltros(filtrosValidos);
+  }, [aplicarFiltros, mostrarNotificacion]);
+
+  // Limpiar filtros completamente - CORREGIDO
   const handleLimpiarFiltros = useCallback(() => {
-    console.log('🗑️ Limpiando filtros desde FacturasManagement');
+    console.log('🗑️ [FacturasManagement] Limpiando todos los filtros');
     limpiarFiltros();
-    setFiltrosAvanzados(false);
-  }, [limpiarFiltros]);
+    mostrarNotificacion('Filtros limpiados exitosamente', 'info');
+  }, [limpiarFiltros, mostrarNotificacion]);
 
-  // Funciones de modales
+  // ==========================================
+  // FUNCIONES DE MODALES CORREGIDAS
+  // ==========================================
+
   const handleCrearFactura = useCallback(() => {
     setModalState({
       crear: true,
@@ -85,10 +104,19 @@ const FacturasManagement = () => {
   }, [clearError]);
 
   const handleEditarFactura = useCallback((factura) => {
-    if (factura.estado === 'pagada') {
-      mostrarNotificacion('No se puede editar una factura pagada', 'error');
+    console.log('✏️ [FacturasManagement] Intentando editar factura:', factura);
+    
+    // VALIDACIONES CORREGIDAS
+    if (!factura || !factura.id) {
+      mostrarNotificacion('Factura no válida para editar', 'error');
       return;
     }
+
+    if (factura.estado === 'pagada') {
+      mostrarNotificacion('No se puede editar una factura que ya está pagada', 'error');
+      return;
+    }
+    
     if (factura.estado === 'anulada') {
       mostrarNotificacion('No se puede editar una factura anulada', 'error');
       return;
@@ -105,8 +133,21 @@ const FacturasManagement = () => {
   }, [clearError, mostrarNotificacion]);
 
   const handleAbrirPago = useCallback((factura) => {
-    if (factura.estado !== 'pendiente') {
-      mostrarNotificacion('Solo se pueden marcar como pagadas las facturas pendientes', 'error');
+    console.log('💰 [FacturasManagement] Abriendo modal de pago para:', factura);
+    
+    // VALIDACIONES CORREGIDAS
+    if (!factura || !factura.id) {
+      mostrarNotificacion('Factura no válida para marcar como pagada', 'error');
+      return;
+    }
+
+    if (factura.estado === 'pagada') {
+      mostrarNotificacion('Esta factura ya está marcada como pagada', 'warning');
+      return;
+    }
+
+    if (factura.estado === 'anulada') {
+      mostrarNotificacion('No se puede marcar como pagada una factura anulada', 'error');
       return;
     }
 
@@ -121,12 +162,21 @@ const FacturasManagement = () => {
   }, [clearError, mostrarNotificacion]);
 
   const handleAbrirAnular = useCallback((factura) => {
-    if (factura.estado === 'pagada') {
-      mostrarNotificacion('No se puede anular una factura pagada', 'error');
+    console.log('🚫 [FacturasManagement] Abriendo modal de anulación para:', factura);
+    
+    // VALIDACIONES CORREGIDAS
+    if (!factura || !factura.id) {
+      mostrarNotificacion('Factura no válida para anular', 'error');
       return;
     }
+
     if (factura.estado === 'anulada') {
-      mostrarNotificacion('La factura ya está anulada', 'error');
+      mostrarNotificacion('Esta factura ya está anulada', 'warning');
+      return;
+    }
+
+    if (factura.estado === 'pagada') {
+      mostrarNotificacion('No se puede anular una factura que ya está pagada', 'error');
       return;
     }
 
@@ -151,267 +201,378 @@ const FacturasManagement = () => {
     clearError();
   }, [clearError]);
 
-  // Acciones de facturas corregidas
+  // ==========================================
+  // ACCIONES DE FACTURAS CORREGIDAS
+  // ==========================================
+
   const handleMarcarPagada = useCallback(async (datosPago) => {
-    if (!modalState.facturaSeleccionada) return;
+    if (!modalState.facturaSeleccionada) {
+      mostrarNotificacion('No hay factura seleccionada', 'error');
+      return;
+    }
 
     try {
-      console.log('💰 Marcando factura como pagada:', datosPago);
+      console.log('💰 [FacturasManagement] Marcando factura como pagada:', {
+        factura: modalState.facturaSeleccionada.id,
+        ...datosPago
+      });
       
-      await marcarComoPagada(modalState.facturaSeleccionada.id, datosPago);
+      // VALIDACIONES DE PAGO
+      if (!datosPago.valor_pagado || datosPago.valor_pagado <= 0) {
+        mostrarNotificacion('El valor del pago debe ser mayor a 0', 'error');
+        return;
+      }
+
+      if (!datosPago.metodo_pago) {
+        mostrarNotificacion('Debe seleccionar un método de pago', 'error');
+        return;
+      }
+
+      const resultado = await marcarComoPagada(modalState.facturaSeleccionada.id, datosPago);
       
       handleCerrarModal();
       refrescar();
-      mostrarNotificacion('Factura marcada como pagada exitosamente', 'success');
+      mostrarNotificacion(
+        `Factura ${modalState.facturaSeleccionada.numero_factura} marcada como pagada exitosamente`, 
+        'success'
+      );
+      
     } catch (error) {
-      console.error('❌ Error al marcar como pagada:', error);
-      mostrarNotificacion(error.message || 'Error al marcar como pagada', 'error');
+      console.error('❌ [FacturasManagement] Error al marcar como pagada:', error);
+      mostrarNotificacion(
+        error.message || 'Error al marcar la factura como pagada', 
+        'error'
+      );
     }
   }, [modalState.facturaSeleccionada, marcarComoPagada, handleCerrarModal, refrescar, mostrarNotificacion]);
 
   const handleAnularFactura = useCallback(async (motivo) => {
-    if (!modalState.facturaSeleccionada || !motivo) return;
+    if (!modalState.facturaSeleccionada) {
+      mostrarNotificacion('No hay factura seleccionada para anular', 'error');
+      return;
+    }
+
+    if (!motivo || motivo.trim().length < 10) {
+      mostrarNotificacion('Debe proporcionar un motivo de anulación de al menos 10 caracteres', 'error');
+      return;
+    }
 
     try {
-      console.log('🚫 Anulando factura:', motivo);
+      console.log('🚫 [FacturasManagement] Anulando factura:', {
+        factura: modalState.facturaSeleccionada.id,
+        motivo: motivo.trim()
+      });
       
-      await anularFactura(modalState.facturaSeleccionada.id, motivo);
+      const resultado = await anularFactura(modalState.facturaSeleccionada.id, motivo.trim());
       
       handleCerrarModal();
       refrescar();
-      mostrarNotificacion('Factura anulada exitosamente', 'success');
+      mostrarNotificacion(
+        `Factura ${modalState.facturaSeleccionada.numero_factura} anulada exitosamente`, 
+        'success'
+      );
+      
     } catch (error) {
-      console.error('❌ Error al anular factura:', error);
-      mostrarNotificacion(error.message || 'Error al anular factura', 'error');
+      console.error('❌ [FacturasManagement] Error al anular factura:', error);
+      mostrarNotificacion(
+        error.message || 'Error al anular la factura', 
+        'error'
+      );
     }
   }, [modalState.facturaSeleccionada, anularFactura, handleCerrarModal, refrescar, mostrarNotificacion]);
 
   const handleDuplicarFactura = useCallback(async (facturaId) => {
+    if (!facturaId) {
+      mostrarNotificacion('ID de factura no válido para duplicar', 'error');
+      return;
+    }
+
     try {
-      console.log('📋 Duplicando factura:', facturaId);
+      console.log('📋 [FacturasManagement] Duplicando factura:', facturaId);
       
-      await duplicarFactura(facturaId);
+      const resultado = await duplicarFactura(facturaId);
       
       refrescar();
       mostrarNotificacion('Factura duplicada exitosamente', 'success');
+      
     } catch (error) {
-      console.error('❌ Error al duplicar factura:', error);
-      mostrarNotificacion(error.message || 'Error al duplicar factura', 'error');
+      console.error('❌ [FacturasManagement] Error al duplicar factura:', error);
+      mostrarNotificacion(
+        error.message || 'Error al duplicar la factura', 
+        'error'
+      );
     }
   }, [duplicarFactura, refrescar, mostrarNotificacion]);
 
   const handleDescargarPDF = useCallback(async (facturaId) => {
+    if (!facturaId) {
+      mostrarNotificacion('ID de factura no válido para descargar PDF', 'error');
+      return;
+    }
+
     try {
-      console.log('📄 Descargando PDF:', facturaId);
+      console.log('📄 [FacturasManagement] Descargando PDF:', facturaId);
       
-      await descargarPDF(facturaId);
+      const resultado = await descargarPDF(facturaId);
       
       mostrarNotificacion('PDF descargado exitosamente', 'success');
+      
     } catch (error) {
-      console.error('❌ Error al descargar PDF:', error);
-      mostrarNotificacion(error.message || 'Error al descargar PDF', 'error');
+      console.error('❌ [FacturasManagement] Error al descargar PDF:', error);
+      mostrarNotificacion(
+        error.message || 'Error al descargar el PDF', 
+        'error'
+      );
     }
   }, [descargarPDF, mostrarNotificacion]);
 
   const handleVerPDF = useCallback(async (facturaId) => {
+    if (!facturaId) {
+      mostrarNotificacion('ID de factura no válido para ver PDF', 'error');
+      return;
+    }
+
     try {
-      console.log('👁️ Visualizando PDF:', facturaId);
+      console.log('👁️ [FacturasManagement] Visualizando PDF:', facturaId);
       
-      await verPDF(facturaId);
+      const resultado = await verPDF(facturaId);
+      
     } catch (error) {
-      console.error('❌ Error al visualizar PDF:', error);
-      mostrarNotificacion(error.message || 'Error al visualizar PDF', 'error');
+      console.error('❌ [FacturasManagement] Error al ver PDF:', error);
+      mostrarNotificacion(
+        error.message || 'Error al visualizar el PDF', 
+        'error'
+      );
     }
   }, [verPDF, mostrarNotificacion]);
 
-  const handleFacturaGuardada = useCallback(() => {
-    handleCerrarModal();
-    refrescar();
-    mostrarNotificacion('Factura guardada exitosamente', 'success');
-  }, [handleCerrarModal, refrescar, mostrarNotificacion]);
-
+  // ==========================================
+  // FUNCIÓN DE PRUEBA PDF
+  // ==========================================
   const handleProbarPDF = useCallback(async () => {
     try {
-      console.log('🧪 Probando generación de PDF...');
+      console.log('🧪 [FacturasManagement] Probando generación de PDF...');
       
-      await FacturasService.probarPDF();
+      if (!facturas || facturas.length === 0) {
+        mostrarNotificacion('No hay facturas disponibles para probar PDF', 'warning');
+        return;
+      }
+
+      const primeraFactura = facturas[0];
+      await handleVerPDF(primeraFactura.id);
       
-      mostrarNotificacion('PDF de prueba generado exitosamente', 'success');
     } catch (error) {
-      console.error('❌ Error al probar PDF:', error);
-      mostrarNotificacion(error.message || 'Error al generar PDF de prueba', 'error');
+      console.error('❌ [FacturasManagement] Error en prueba de PDF:', error);
+      mostrarNotificacion('Error al probar la funcionalidad de PDF', 'error');
     }
-  }, [mostrarNotificacion]);
+  }, [facturas, handleVerPDF, mostrarNotificacion]);
 
-  // Manejo de errores global
-  useEffect(() => {
-    if (error) {
-      mostrarNotificacion(error, 'error');
-    }
-  }, [error, mostrarNotificacion]);
-
-  useEffect(() => {
-    if (actionError) {
-      mostrarNotificacion(actionError, 'error');
-    }
-  }, [actionError, mostrarNotificacion]);
-
-  
-const formatearPesos = (valor) => {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    minimumFractionDigits: 0
-  }).format(valor || 0);
-};
+  // ==========================================
+  // RENDER DEL COMPONENTE
+  // ==========================================
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {/* Notificación */}
-        {notificacion && (
-          <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
-            notificacion.tipo === 'success' 
-              ? 'bg-green-50 border border-green-200 text-green-800' 
-              : 'bg-red-50 border border-red-200 text-red-800'
-          }`}>
-            <div className="flex items-center">
-              <span className="mr-2">
-                {notificacion.tipo === 'success' ? '✅' : '❌'}
-              </span>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Notificaciones mejoradas */}
+      {notificacion && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-md ${
+          notificacion.tipo === 'success' 
+            ? 'bg-green-50 border border-green-200 text-green-800' 
+            : notificacion.tipo === 'warning'
+            ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+            : notificacion.tipo === 'info'
+            ? 'bg-blue-50 border border-blue-200 text-blue-800'
+            : 'bg-red-50 border border-red-200 text-red-800'
+        }`}>
+          <div className="flex items-start">
+            <span className="mr-3 mt-0.5">
+              {notificacion.tipo === 'success' ? '✅' : 
+               notificacion.tipo === 'warning' ? '⚠️' :
+               notificacion.tipo === 'info' ? 'ℹ️' : '❌'}
+            </span>
+            <div className="flex-1">
               <span className="font-medium">{notificacion.mensaje}</span>
-              <button
-                onClick={() => setNotificacion(null)}
-                className="ml-3 text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
             </div>
-          </div>
-        )}
-
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Gestión de Facturas
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Administra facturas, pagos y genera reportes del sistema PSI
-            </p>
-          </div>
-          <div className="flex space-x-3">
             <button
-              onClick={() => setFiltrosAvanzados(!filtrosAvanzados)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filtrosAvanzados
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-              }`}
+              onClick={() => setNotificacion(null)}
+              className="ml-3 text-gray-400 hover:text-gray-600 focus:outline-none"
             >
-              🔧 {filtrosAvanzados ? 'Ocultar' : 'Mostrar'} Filtros
-            </button>
-            <button
-              onClick={handleCrearFactura}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors font-medium"
-            >
-              ➕ Nueva Factura
-            </button>
-            <button
-              onClick={handleProbarPDF}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors font-medium"
-            >
-              🧪 Probar PDF
+              ✕
             </button>
           </div>
         </div>
+      )}
 
-        {/* Estadísticas */}
-        <FacturasStats />
+      {/* Manejo de errores mejorado */}
+      {(error || actionError) && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <AlertTriangle className="w-5 h-5 text-red-600 mr-3" />
+            <div>
+              <h3 className="text-sm font-medium text-red-800">Error en el Sistema</h3>
+              <p className="text-sm text-red-700 mt-1">
+                {error || actionError}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                clearError();
+                refrescar();
+              }}
+              className="ml-auto px-3 py-1 bg-red-100 text-red-800 rounded hover:bg-red-200 transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      )}
 
-        {/* Filtros */}
-        {filtrosAvanzados && (
-          <FacturasFilters
-            onBuscar={handleBuscar}
-            onLimpiar={handleLimpiarFiltros}
-            filtrosIniciales={filtros}
-            loading={loading}
-          />
-        )}
+      {/* Header mejorado */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Gestión de Facturas Manual
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Administra facturas, pagos y genera reportes
+          </p>
+          {facturas.length > 0 && (
+            <p className="text-sm text-gray-500 mt-1">
+              Mostrando {facturas.length} facturas 
+              {pagination.total && ` de ${pagination.total} total`}
+            </p>
+          )}
+        </div>
+        
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setFiltrosAvanzados(!filtrosAvanzados)}
+            className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+              filtrosAvanzados
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+            }`}
+          >
+            🔧 {filtrosAvanzados ? 'Ocultar' : 'Mostrar'} Filtros
+          </button>
+          
+          <button
+            onClick={handleCrearFactura}
+            disabled={loading}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            ➕ Nueva Factura
+          </button>
+          
+          <button
+            onClick={handleProbarPDF}
+            disabled={loading || !facturas.length}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            🧪 Probar PDF
+          </button>
 
-        {/* Lista de facturas */}
-        <FacturasList
-          facturas={facturas}
+          <button
+            onClick={refrescar}
+            disabled={loading}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            🔄 Refrescar
+          </button>
+        </div>
+      </div>
+
+      {/* Estadísticas */}
+      <FacturasStats facturas={facturas} loading={loading} />
+
+      {/* Filtros con transición */}
+      <div className={`transition-all duration-300 ease-in-out ${
+        filtrosAvanzados 
+          ? 'opacity-100 max-h-96 mb-6' 
+          : 'opacity-0 max-h-0 overflow-hidden'
+      }`}>
+        <FacturasFilters
+          onBuscar={handleBuscar}
+          onLimpiar={handleLimpiarFiltros}
+          filtrosIniciales={filtros}
           loading={loading}
-          pagination={pagination}
-          onEditarFactura={handleEditarFactura}
-          onMarcarPagada={handleAbrirPago}
-          onAnularFactura={handleAbrirAnular}
-          onDuplicarFactura={handleDuplicarFactura}
-          onDescargarPDF={handleDescargarPDF}
-          onVerPDF={handleVerPDF}
-          onCambiarPagina={cambiarPagina}
-          actionLoading={actionLoading}
         />
+      </div>
 
-        {/* Modales */}
-        {modalState.crear && (
-          <FacturaModal
-            isOpen={modalState.crear}
-            onClose={handleCerrarModal}
-            onGuardar={handleFacturaGuardada}
-            title="Crear Nueva Factura"
-            loading={actionLoading}
-            error={actionError}
-          />
-        )}
+      {/* Lista de facturas mejorada */}
+      <FacturasList
+        facturas={facturas}
+        loading={loading}
+        pagination={pagination}
+        onCambiarPagina={cambiarPagina}
+        onEditarFactura={handleEditarFactura}
+        onMarcarPagada={handleAbrirPago}
+        onAnularFactura={handleAbrirAnular}
+        onDuplicarFactura={handleDuplicarFactura}
+        onDescargarPDF={handleDescargarPDF}
+        onVerPDF={handleVerPDF}
+      />
 
-        {modalState.editar && modalState.facturaSeleccionada && (
-          <FacturaModal
-            isOpen={modalState.editar}
-            onClose={handleCerrarModal}
-            onGuardar={handleFacturaGuardada}
-            factura={modalState.facturaSeleccionada}
-            title="Editar Factura"
-            loading={actionLoading}
-            error={actionError}
-          />
-        )}
+      {/* Modales */}
+      {modalState.crear && (
+        <FacturaModal
+          isOpen={modalState.crear}
+          onClose={handleCerrarModal}
+          onSuccess={() => {
+            handleCerrarModal();
+            refrescar();
+            mostrarNotificacion('Factura creada exitosamente', 'success');
+          }}
+        />
+      )}
 
-        {modalState.pago && modalState.facturaSeleccionada && (
-          <PagoModal
-            isOpen={modalState.pago}
-            onClose={handleCerrarModal}
-            onConfirmar={handleMarcarPagada}
-            factura={modalState.facturaSeleccionada}
-            loading={actionLoading}
-            error={actionError}
-          />
-        )}
+      {modalState.editar && modalState.facturaSeleccionada && (
+        <FacturaModal
+          isOpen={modalState.editar}
+          onClose={handleCerrarModal}
+          factura={modalState.facturaSeleccionada}
+          modo="editar"
+          onSuccess={() => {
+            handleCerrarModal();
+            refrescar();
+            mostrarNotificacion('Factura actualizada exitosamente', 'success');
+          }}
+        />
+      )}
 
-        {modalState.anular && modalState.facturaSeleccionada && (
-          <AnularModal
-            isOpen={modalState.anular}
-            onClose={handleCerrarModal}
-            onConfirmar={handleAnularFactura}
-            factura={modalState.facturaSeleccionada}
-            loading={actionLoading}
-            error={actionError}
-          />
-        )}
+      {modalState.pago && modalState.facturaSeleccionada && (
+        <PagoModal
+          isOpen={modalState.pago}
+          onClose={handleCerrarModal}
+          factura={modalState.facturaSeleccionada}
+          onPagar={handleMarcarPagada}
+          loading={actionLoading}
+        />
+      )}
 
-        {/* Loading overlay */}
-        {actionLoading && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-xl">
-              <div className="flex items-center space-x-3">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="text-lg font-medium">Procesando...</span>
-              </div>
+      {modalState.anular && modalState.facturaSeleccionada && (
+        <AnularModal
+          isOpen={modalState.anular}
+          onClose={handleCerrarModal}
+          factura={modalState.facturaSeleccionada}
+          onAnular={handleAnularFactura}
+          loading={actionLoading}
+        />
+      )}
+
+      {/* Indicador de carga global */}
+      {(loading || actionLoading) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 shadow-xl">
+            <div className="flex items-center space-x-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <span className="font-medium text-gray-900">
+                {loading ? 'Cargando facturas...' : 'Procesando...'}
+              </span>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
