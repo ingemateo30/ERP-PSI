@@ -1,693 +1,728 @@
-// components/Facturas/FacturaModal.js - Corregido
-import React, { useState, useEffect } from 'react';
-import { useFacturasAcciones, useFormularioFactura, useFacturasUtilidades } from '../../hooks/useFacturacionManual';
-import clientService from '../../services/clientService';
-import FacturasService from '../../services/facturacionManualService';
+// frontend/src/components/Facturas/FacturaModal.js - COMPLETAMENTE CORREGIDO
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { 
+  X, 
+  Search, 
+  User, 
+  Calendar, 
+  DollarSign, 
+  FileText, 
+  Save, 
+  AlertTriangle,
+  Loader2
+} from 'lucide-react';
 
-const FacturaModal = ({ isOpen, isEditing, factura, onClose, onSuccess }) => {
-  const { crearFactura, actualizarFactura, loading, error, clearError } = useFacturasAcciones();
-  const { generarNumero } = useFacturasUtilidades();
-
+const FacturaModal = ({ 
+  isOpen, 
+  onClose, 
+  factura = null, // Factura para editar (null para crear nueva)
+  modo = 'crear', // 'crear' o 'editar'
+  onSuccess 
+}) => {
+  // ==========================================
+  // ESTADOS DEL FORMULARIO
+  // ==========================================
   const [formData, setFormData] = useState({
+    numero_factura: '',
     cliente_id: '',
-    periodo_facturacion: '',
-    fecha_emision: new Date().toISOString().split('T')[0],
+    fecha_emision: '',
     fecha_vencimiento: '',
-    fecha_desde: '',
-    fecha_hasta: '',
-    internet: 0,
-    television: 0,
-    saldo_anterior: 0,
-    interes: 0,
-    reconexion: 0,
-    descuento: 0,
-    varios: 0,
-    publicidad: 0,
-    ruta: '',
-    observaciones: ''
+    periodo_desde: '',
+    periodo_hasta: '',
+    subtotal: '',
+    impuestos: '',
+    descuentos: '',
+    total: '',
+    observaciones: '',
+    items: []
   });
 
-  const [clientes, setClientes] = useState([]);
-  const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+  const [clienteInfo, setClienteInfo] = useState(null);
   const [busquedaCliente, setBusquedaCliente] = useState('');
-  const [mostrarListaClientes, setMostrarListaClientes] = useState(false);
+  const [clientesEncontrados, setClientesEncontrados] = useState([]);
+  const [mostrarBusqueda, setMostrarBusqueda] = useState(false);
+  
+  const [loading, setLoading] = useState(false);
+  const [loadingClientes, setLoadingClientes] = useState(false);
   const [errors, setErrors] = useState({});
-  const [calculandoTotal, setCalculandoTotal] = useState(false);
+  const [touched, setTouched] = useState({});
 
-  // Inicializar formulario
+  // ==========================================
+  // DETECTAR MODO DE OPERACIÓN
+  // ==========================================
+  const esEdicion = useMemo(() => {
+    return modo === 'editar' || (factura && factura.id);
+  }, [modo, factura]);
+
+  // ==========================================
+  // CARGAR DATOS INICIALES
+  // ==========================================
   useEffect(() => {
-    if (isOpen) {
-      if (isEditing && factura) {
-        // Cargar datos de la factura existente
-        setFormData({
-          cliente_id: factura.cliente_id || '',
-          periodo_facturacion: factura.periodo_facturacion || '',
-          fecha_emision: factura.fecha_emision || new Date().toISOString().split('T')[0],
-          fecha_vencimiento: factura.fecha_vencimiento || '',
-          fecha_desde: factura.fecha_desde || '',
-          fecha_hasta: factura.fecha_hasta || '',
-          internet: factura.internet || 0,
-          television: factura.television || 0,
-          saldo_anterior: factura.saldo_anterior || 0,
-          interes: factura.interes || 0,
-          reconexion: factura.reconexion || 0,
-          descuento: factura.descuento || 0,
-          varios: factura.varios || 0,
-          publicidad: factura.publicidad || 0,
-          ruta: factura.ruta || '',
-          observaciones: factura.observaciones || ''
-        });
-        setBusquedaCliente(factura.nombre_cliente || '');
-        setClienteSeleccionado({
-          id: factura.cliente_id,
-          nombre: factura.nombre_cliente
-        });
-      } else {
-        // Generar número de factura para nueva factura
-        generarNumeroFactura();
-        
-        // Formulario limpio para nueva factura
-        const fechaVencimiento = new Date();
-        fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
-        
-        setFormData({
-          cliente_id: '',
-          periodo_facturacion: '',
-          fecha_emision: new Date().toISOString().split('T')[0],
-          fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
-          fecha_desde: '',
-          fecha_hasta: '',
-          internet: 0,
-          television: 0,
-          saldo_anterior: 0,
-          interes: 0,
-          reconexion: 0,
-          descuento: 0,
-          varios: 0,
-          publicidad: 0,
-          ruta: '',
-          observaciones: ''
-        });
-        setBusquedaCliente('');
-        setClienteSeleccionado(null);
-      }
-      setErrors({});
-      clearError();
-    }
-  }, [isOpen, isEditing, factura, clearError]);
+    if (!isOpen) return;
 
-  // Generar número de factura automáticamente
-  const generarNumeroFactura = async () => {
+    console.log('🔄 [FacturaModal] Inicializando modal:', { esEdicion, factura });
+
+    if (esEdicion && factura) {
+      // MODO EDICIÓN: Cargar datos de la factura existente
+      console.log('✏️ [FacturaModal] Cargando datos para edición:', factura);
+      
+      setFormData({
+        numero_factura: factura.numero_factura || '',
+        cliente_id: factura.cliente_id || '',
+        fecha_emision: factura.fecha_emision || '',
+        fecha_vencimiento: factura.fecha_vencimiento || '',
+        periodo_desde: factura.periodo_desde || '',
+        periodo_hasta: factura.periodo_hasta || '',
+        subtotal: factura.subtotal || '',
+        impuestos: factura.impuestos || '',
+        descuentos: factura.descuentos || '',
+        total: factura.total || '',
+        observaciones: factura.observaciones || '',
+        items: factura.items || []
+      });
+
+      // Configurar información del cliente
+      setClienteInfo({
+        id: factura.cliente_id,
+        nombre: factura.nombre_cliente || '',
+        identificacion: factura.identificacion_cliente || '',
+        direccion: factura.direccion_cliente || '',
+        telefono: factura.telefono_cliente || '',
+        email: factura.email_cliente || ''
+      });
+
+      setBusquedaCliente(factura.nombre_cliente || '');
+      
+    } else {
+      // MODO CREACIÓN: Formulario limpio con valores por defecto
+      console.log('➕ [FacturaModal] Inicializando para creación');
+      
+      const fechaHoy = new Date().toISOString().split('T')[0];
+      const fechaVencimiento = new Date();
+      fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+      
+      setFormData({
+        numero_factura: '',
+        cliente_id: '',
+        fecha_emision: fechaHoy,
+        fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
+        periodo_desde: '',
+        periodo_hasta: '',
+        subtotal: '0',
+        impuestos: '0',
+        descuentos: '0',
+        total: '0',
+        observaciones: '',
+        items: [{
+          concepto_id: '',
+          descripcion: '',
+          cantidad: 1,
+          precio_unitario: 0
+        }]
+      });
+
+      setClienteInfo(null);
+      setBusquedaCliente('');
+      
+      // Generar número de factura automáticamente
+      generarNumeroFactura();
+    }
+
+    // Limpiar errores
+    setErrors({});
+    setTouched({});
+    
+  }, [isOpen, esEdicion, factura]);
+
+  // ==========================================
+  // GENERAR NÚMERO DE FACTURA
+  // ==========================================
+  const generarNumeroFactura = useCallback(async () => {
+    if (esEdicion) return; // No generar nuevo número en edición
+    
     try {
-      const numero = await generarNumero();
-      if (numero) {
-        setFormData(prev => ({ ...prev, numero_factura: numero }));
+      const response = await fetch('/api/v1/facturas/generar-numero', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data?.numero_factura) {
+          setFormData(prev => ({
+            ...prev,
+            numero_factura: data.data.numero_factura
+          }));
+        }
       }
     } catch (error) {
-      console.error('Error generando número de factura:', error);
+      console.error('❌ [FacturaModal] Error generando número:', error);
     }
-  };
+  }, [esEdicion]);
 
-  // Buscar clientes
-  const buscarClientes = async (termino) => {
-    if (termino.length < 2) {
-      setClientes([]);
+  // ==========================================
+  // BÚSQUEDA DE CLIENTES
+  // ==========================================
+  const buscarClientes = useCallback(async (termino) => {
+    if (!termino || termino.length < 2) {
+      setClientesEncontrados([]);
+      setMostrarBusqueda(false);
       return;
     }
 
     try {
-      const response = await clientService.buscarClientes(termino);
-      setClientes(response.data || []);
+      setLoadingClientes(true);
+      
+      const response = await fetch(`/api/v1/clientes/search?q=${encodeURIComponent(termino)}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const clientes = data.data || data.clientes || [];
+        setClientesEncontrados(clientes);
+        setMostrarBusqueda(clientes.length > 0);
+      }
     } catch (error) {
-      console.error('Error al buscar clientes:', error);
-      setClientes([]);
+      console.error('❌ [FacturaModal] Error buscando clientes:', error);
+      setClientesEncontrados([]);
+      setMostrarBusqueda(false);
+    } finally {
+      setLoadingClientes(false);
     }
-  };
+  }, []);
 
-  // Manejar búsqueda de cliente
-  const handleBusquedaCliente = (e) => {
-    const valor = e.target.value;
-    setBusquedaCliente(valor);
-    setMostrarListaClientes(true);
+  // Debounce para búsqueda de clientes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (busquedaCliente && !esEdicion) {
+        buscarClientes(busquedaCliente);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [busquedaCliente, buscarClientes, esEdicion]);
+
+  // ==========================================
+  // MANEJO DE FORMULARIO
+  // ==========================================
+  const handleInputChange = useCallback((campo, valor) => {
+    setFormData(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+
+    // Marcar campo como tocado
+    setTouched(prev => ({
+      ...prev,
+      [campo]: true
+    }));
+
+    // Limpiar error si existe
+    if (errors[campo]) {
+      setErrors(prev => ({
+        ...prev,
+        [campo]: null
+      }));
+    }
+
+    // Recalcular totales automáticamente
+    if (['subtotal', 'impuestos', 'descuentos'].includes(campo)) {
+      setTimeout(() => recalcularTotales(), 100);
+    }
+  }, [errors]);
+
+  const seleccionarCliente = useCallback((cliente) => {
+    console.log('👤 [FacturaModal] Cliente seleccionado:', cliente);
     
-    if (valor.length >= 2) {
-      buscarClientes(valor);
-    } else {
-      setClientes([]);
-    }
-  };
-
-  // Seleccionar cliente
-  const seleccionarCliente = (cliente) => {
-    setClienteSeleccionado(cliente);
+    setClienteInfo(cliente);
     setBusquedaCliente(cliente.nombre);
-    setFormData(prev => ({ ...prev, cliente_id: cliente.id }));
-    setMostrarListaClientes(false);
-    setClientes([]);
+    setFormData(prev => ({
+      ...prev,
+      cliente_id: cliente.id
+    }));
+    setMostrarBusqueda(false);
     
     // Limpiar error de cliente
     if (errors.cliente_id) {
-      setErrors(prev => ({ ...prev, cliente_id: null }));
+      setErrors(prev => ({
+        ...prev,
+        cliente_id: null
+      }));
     }
-  };
+  }, [errors.cliente_id]);
 
-  // Manejar cambios en inputs
-  const handleInputChange = (e) => {
-    const { name, value, type } = e.target;
-    const valorFinal = type === 'number' ? (value === '' ? 0 : parseFloat(value) || 0) : value;
+  // ==========================================
+  // CÁLCULO DE TOTALES
+  // ==========================================
+  const recalcularTotales = useCallback(() => {
+    const subtotal = parseFloat(formData.subtotal) || 0;
+    const impuestos = parseFloat(formData.impuestos) || 0;
+    const descuentos = parseFloat(formData.descuentos) || 0;
+    
+    const total = subtotal + impuestos - descuentos;
     
     setFormData(prev => ({
       ...prev,
-      [name]: valorFinal
+      total: total.toString()
     }));
+  }, [formData.subtotal, formData.impuestos, formData.descuentos]);
 
-    // Limpiar error del campo
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: null
-      }));
-    }
-
-    // Auto-calcular fechas de período si se cambia el período de facturación
-    if (name === 'periodo_facturacion' && value) {
-      const [year, month] = value.split('-');
-      const primerDia = new Date(parseInt(year), parseInt(month) - 1, 1);
-      const ultimoDia = new Date(parseInt(year), parseInt(month), 0);
-      
-      setFormData(prev => ({
-        ...prev,
-        fecha_desde: primerDia.toISOString().split('T')[0],
-        fecha_hasta: ultimoDia.toISOString().split('T')[0]
-      }));
-    }
-  };
-
-  // Calcular total
-  const calcularTotal = () => {
-    const servicios = (formData.internet || 0) + (formData.television || 0);
-    const cargos = (formData.saldo_anterior || 0) + (formData.interes || 0) + 
-                   (formData.reconexion || 0) + (formData.varios || 0) + (formData.publicidad || 0);
-    const descuentos = formData.descuento || 0;
-    
-    const subtotal = servicios + cargos - descuentos;
-    const iva = subtotal > 0 ? subtotal * 0.19 : 0;
-    const total = subtotal + iva;
-    
-    return {
-      servicios: servicios.toFixed(2),
-      cargos: cargos.toFixed(2),
-      descuentos: descuentos.toFixed(2),
-      subtotal: subtotal.toFixed(2),
-      iva: iva.toFixed(2),
-      total: total.toFixed(2)
-    };
-  };
-
-  // Validar formulario
-  const validarFormulario = () => {
+  // ==========================================
+  // VALIDACIONES
+  // ==========================================
+  const validarFormulario = useCallback(() => {
     const nuevosErrores = {};
-    
+
+    // Validaciones básicas
+    if (!formData.numero_factura.trim()) {
+      nuevosErrores.numero_factura = 'Número de factura es requerido';
+    }
+
     if (!formData.cliente_id) {
       nuevosErrores.cliente_id = 'Debe seleccionar un cliente';
     }
-    
+
     if (!formData.fecha_emision) {
-      nuevosErrores.fecha_emision = 'La fecha de emisión es requerida';
+      nuevosErrores.fecha_emision = 'Fecha de emisión es requerida';
     }
-    
+
     if (!formData.fecha_vencimiento) {
-      nuevosErrores.fecha_vencimiento = 'La fecha de vencimiento es requerida';
+      nuevosErrores.fecha_vencimiento = 'Fecha de vencimiento es requerida';
     }
-    
-    // Validar que la fecha de vencimiento sea posterior a la de emisión
+
+    // Validar que fecha de vencimiento sea posterior a emisión
     if (formData.fecha_emision && formData.fecha_vencimiento) {
-      const emision = new Date(formData.fecha_emision);
-      const vencimiento = new Date(formData.fecha_vencimiento);
-      
-      if (vencimiento <= emision) {
-        nuevosErrores.fecha_vencimiento = 'La fecha de vencimiento debe ser posterior a la de emisión';
+      if (new Date(formData.fecha_vencimiento) <= new Date(formData.fecha_emision)) {
+        nuevosErrores.fecha_vencimiento = 'Fecha de vencimiento debe ser posterior a la emisión';
       }
     }
-    
-    // Validar que al menos un servicio tenga valor
-    const tieneServicios = (formData.internet || 0) > 0 || 
-                          (formData.television || 0) > 0 || 
-                          (formData.varios || 0) > 0 || 
-                          (formData.publicidad || 0) > 0;
-    
-    if (!tieneServicios) {
-      nuevosErrores.servicios = 'Debe especificar al menos un servicio o concepto';
+
+    // Validar totales
+    const total = parseFloat(formData.total) || 0;
+    if (total <= 0) {
+      nuevosErrores.total = 'El total debe ser mayor a 0';
     }
-    
+
     setErrors(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
-  };
+  }, [formData]);
 
-  // Manejar envío del formulario
-  const handleSubmit = async (e) => {
+  // ==========================================
+  // GUARDAR FACTURA
+  // ==========================================
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     
     if (!validarFormulario()) {
+      console.warn('⚠️ [FacturaModal] Formulario con errores:', errors);
       return;
     }
-    
-    try {
-      setCalculandoTotal(true);
-      
-      // Usar el service para formatear y calcular totales
-      const datosFormateados = FacturasService.formatearDatosFactura(formData);
-      
-      let resultado;
-      if (isEditing && factura) {
-        resultado = await actualizarFactura(factura.id, datosFormateados);
-      } else {
-        resultado = await crearFactura(datosFormateados);
-      }
-      
-      if (resultado && onSuccess) {
-        onSuccess(resultado);
-      }
-      
-      if (onClose) {
-        onClose();
-      }
-    } catch (error) {
-      console.error('Error al guardar factura:', error);
-    } finally {
-      setCalculandoTotal(false);
-    }
-  };
 
-  // Manejar cierre del modal
-  const handleClose = () => {
+    setLoading(true);
+
+    try {
+      // Preparar datos para envío
+      const datosParaEnvio = {
+        numero_factura: formData.numero_factura.trim(),
+        cliente_id: parseInt(formData.cliente_id),
+        fecha_emision: formData.fecha_emision,
+        fecha_vencimiento: formData.fecha_vencimiento,
+        periodo_desde: formData.periodo_desde || null,
+        periodo_hasta: formData.periodo_hasta || null,
+        subtotal: parseFloat(formData.subtotal) || 0,
+        impuestos: parseFloat(formData.impuestos) || 0,
+        descuentos: parseFloat(formData.descuentos) || 0,
+        total: parseFloat(formData.total) || 0,
+        observaciones: formData.observaciones.trim(),
+        items: formData.items.filter(item => 
+          item.descripcion && item.cantidad > 0 && item.precio_unitario > 0
+        )
+      };
+
+      console.log('💾 [FacturaModal] Guardando factura:', { esEdicion, datos: datosParaEnvio });
+
+      let response;
+      
+      if (esEdicion) {
+        // ACTUALIZAR FACTURA EXISTENTE
+        response = await fetch(`/api/v1/facturas/${factura.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(datosParaEnvio)
+        });
+      } else {
+        // CREAR NUEVA FACTURA
+        response = await fetch('/api/v1/facturas', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(datosParaEnvio)
+        });
+      }
+
+      const resultado = await response.json();
+
+      if (response.ok && resultado.success) {
+        console.log('✅ [FacturaModal] Factura guardada exitosamente:', resultado);
+        
+        if (onSuccess) {
+          onSuccess(resultado.data);
+        }
+        
+        handleClose();
+      } else {
+        throw new Error(resultado.message || 'Error al guardar la factura');
+      }
+
+    } catch (error) {
+      console.error('❌ [FacturaModal] Error guardando factura:', error);
+      setErrors({ 
+        general: error.message || 'Error al guardar la factura' 
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [formData, esEdicion, factura, validarFormulario, onSuccess]);
+
+  // ==========================================
+  // CERRAR MODAL
+  // ==========================================
+  const handleClose = useCallback(() => {
+    if (loading) return; // No cerrar si está guardando
+    
+    setFormData({
+      numero_factura: '',
+      cliente_id: '',
+      fecha_emision: '',
+      fecha_vencimiento: '',
+      periodo_desde: '',
+      periodo_hasta: '',
+      subtotal: '',
+      impuestos: '',
+      descuentos: '',
+      total: '',
+      observaciones: '',
+      items: []
+    });
+    
+    setClienteInfo(null);
+    setBusquedaCliente('');
+    setClientesEncontrados([]);
+    setMostrarBusqueda(false);
+    setErrors({});
+    setTouched({});
+    
     if (onClose) {
       onClose();
     }
-  };
+  }, [loading, onClose]);
 
-  const totales = calcularTotal();
+  // ==========================================
+  // COMPONENTE DE CAMPO CON ERROR
+  // ==========================================
+  const CampoConError = ({ label, error, children, required = false }) => (
+    <div className="space-y-1">
+      <label className="block text-sm font-medium text-gray-700">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      {children}
+      {error && (
+        <p className="text-sm text-red-600 flex items-center">
+          <AlertTriangle className="w-4 h-4 mr-1" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
 
+  // ==========================================
+  // RENDER
+  // ==========================================
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gray-50">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {isEditing ? 'Editar Factura' : 'Nueva Factura'}
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+              <FileText className="w-6 h-6 mr-2" />
+              {esEdicion ? 'Editar Factura' : 'Nueva Factura'}
             </h2>
             <p className="text-gray-600 mt-1">
-              {isEditing 
-                ? `Modificar factura ${factura?.numero_factura || 'N/A'}`
-                : 'Crear una nueva factura manual'
+              {esEdicion 
+                ? `Modificando factura ${factura?.numero_factura || ''}`
+                : 'Crear una nueva factura para el cliente'
               }
             </p>
           </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            disabled={loading}
+            className="p-2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Error display */}
-        {error && (
-          <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error</h3>
-                <div className="mt-2 text-sm text-red-700">{error}</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Información del Cliente */}
-            <div className="md:col-span-2">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Información del Cliente</h3>
-            </div>
-
-            {/* Búsqueda de Cliente */}
-            <div className="md:col-span-2 relative">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cliente *
-              </label>
-              <input
-                type="text"
-                value={busquedaCliente}
-                onChange={handleBusquedaCliente}
-                placeholder="Buscar cliente por nombre o identificación..."
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.cliente_id ? 'border-red-500' : ''
-                }`}
-              />
-              {errors.cliente_id && (
-                <p className="mt-1 text-sm text-red-600">{errors.cliente_id}</p>
-              )}
-              
-              {/* Lista de clientes */}
-              {mostrarListaClientes && clientes.length > 0 && (
-                <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
-                  {clientes.map((cliente) => (
-                    <div
-                      key={cliente.id}
-                      onClick={() => seleccionarCliente(cliente)}
-                      className="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                    >
-                      <div className="font-medium text-gray-900">{cliente.nombre}</div>
-                      <div className="text-sm text-gray-600">{cliente.identificacion}</div>
-                      {cliente.direccion && (
-                        <div className="text-xs text-gray-500">{cliente.direccion}</div>
-                      )}
-                    </div>
-                  ))}
+        {/* Contenido del formulario */}
+        <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {/* Error general */}
+            {errors.general && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
+                  <span className="text-red-800">{errors.general}</span>
                 </div>
-              )}
+              </div>
+            )}
+
+            {/* Información básica */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Número de factura */}
+              <CampoConError 
+                label="Número de Factura" 
+                error={errors.numero_factura}
+                required
+              >
+                <input
+                  type="text"
+                  value={formData.numero_factura}
+                  onChange={(e) => handleInputChange('numero_factura', e.target.value)}
+                  disabled={esEdicion} // No editable en modo edición
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  placeholder="F000001"
+                />
+              </CampoConError>
+
+              {/* Búsqueda de cliente */}
+              <CampoConError 
+                label="Cliente" 
+                error={errors.cliente_id}
+                required
+              >
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={busquedaCliente}
+                    onChange={(e) => setBusquedaCliente(e.target.value)}
+                    disabled={esEdicion} // No editable en modo edición
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Buscar cliente por nombre o identificación..."
+                  />
+                  <Search className="absolute right-3 top-3 w-4 h-4 text-gray-400" />
+                  
+                  {/* Loading de búsqueda */}
+                  {loadingClientes && (
+                    <div className="absolute right-10 top-3">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                    </div>
+                  )}
+                  
+                  {/* Resultados de búsqueda */}
+                  {mostrarBusqueda && clientesEncontrados.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {clientesEncontrados.map((cliente) => (
+                        <button
+                          key={cliente.id}
+                          type="button"
+                          onClick={() => seleccionarCliente(cliente)}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                        >
+                          <div className="font-medium text-gray-900">{cliente.nombre}</div>
+                          <div className="text-sm text-gray-500">{cliente.identificacion}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Información del cliente seleccionado */}
+                {clienteInfo && (
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center text-blue-800">
+                      <User className="w-4 h-4 mr-2" />
+                      <span className="font-medium">{clienteInfo.nombre}</span>
+                    </div>
+                    <div className="text-sm text-blue-600 mt-1">
+                      ID: {clienteInfo.identificacion} | Tel: {clienteInfo.telefono}
+                    </div>
+                  </div>
+                )}
+              </CampoConError>
             </div>
 
-            {/* Información de Facturación */}
-            <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Información de Facturación</h3>
+            {/* Fechas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <CampoConError 
+                label="Fecha de Emisión" 
+                error={errors.fecha_emision}
+                required
+              >
+                <input
+                  type="date"
+                  value={formData.fecha_emision}
+                  onChange={(e) => handleInputChange('fecha_emision', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </CampoConError>
+
+              <CampoConError 
+                label="Fecha de Vencimiento" 
+                error={errors.fecha_vencimiento}
+                required
+              >
+                <input
+                  type="date"
+                  value={formData.fecha_vencimiento}
+                  onChange={(e) => handleInputChange('fecha_vencimiento', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </CampoConError>
             </div>
 
-            {/* Período de Facturación */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Período de Facturación
-              </label>
-              <input
-                type="month"
-                name="periodo_facturacion"
-                value={formData.periodo_facturacion}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            {/* Período de facturación */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <CampoConError label="Período Desde" error={errors.periodo_desde}>
+                <input
+                  type="date"
+                  value={formData.periodo_desde}
+                  onChange={(e) => handleInputChange('periodo_desde', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </CampoConError>
+
+              <CampoConError label="Período Hasta" error={errors.periodo_hasta}>
+                <input
+                  type="date"
+                  value={formData.periodo_hasta}
+                  onChange={(e) => handleInputChange('periodo_hasta', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </CampoConError>
             </div>
 
-            {/* Ruta */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ruta
-              </label>
-              <input
-                type="text"
-                name="ruta"
-                value={formData.ruta}
-                onChange={handleInputChange}
-                placeholder="Ej: Ruta 1, Centro, etc."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            {/* Valores financieros */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <CampoConError label="Subtotal" error={errors.subtotal}>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.subtotal}
+                    onChange={(e) => handleInputChange('subtotal', e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="0.00"
+                  />
+                </div>
+              </CampoConError>
+
+              <CampoConError label="Impuestos" error={errors.impuestos}>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.impuestos}
+                    onChange={(e) => handleInputChange('impuestos', e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="0.00"
+                  />
+                </div>
+              </CampoConError>
+
+              <CampoConError label="Descuentos" error={errors.descuentos}>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.descuentos}
+                    onChange={(e) => handleInputChange('descuentos', e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="0.00"
+                  />
+                </div>
+              </CampoConError>
             </div>
 
-            {/* Fecha de Emisión */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Fecha de Emisión *
-              </label>
-              <input
-                type="date"
-                name="fecha_emision"
-                value={formData.fecha_emision}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.fecha_emision ? 'border-red-500' : ''
-                }`}
-              />
-              {errors.fecha_emision && (
-                <p className="mt-1 text-sm text-red-600">{errors.fecha_emision}</p>
-              )}
-            </div>
-
-            {/* Fecha de Vencimiento */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Fecha de Vencimiento *
-              </label>
-              <input
-                type="date"
-                name="fecha_vencimiento"
-                value={formData.fecha_vencimiento}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.fecha_vencimiento ? 'border-red-500' : ''
-                }`}
-              />
-              {errors.fecha_vencimiento && (
-                <p className="mt-1 text-sm text-red-600">{errors.fecha_vencimiento}</p>
-              )}
-            </div>
-
-            {/* Fecha Desde */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Período Desde
-              </label>
-              <input
-                type="date"
-                name="fecha_desde"
-                value={formData.fecha_desde}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Fecha Hasta */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Período Hasta
-              </label>
-              <input
-                type="date"
-                name="fecha_hasta"
-                value={formData.fecha_hasta}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Servicios y Conceptos */}
-            <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Servicios y Conceptos</h3>
-            </div>
-
-            {/* Internet */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Internet ($)
-              </label>
-              <input
-                type="number"
-                name="internet"
-                value={formData.internet}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Televisión */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Televisión ($)
-              </label>
-              <input
-                type="number"
-                name="television"
-                value={formData.television}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Saldo Anterior */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Saldo Anterior ($)
-              </label>
-              <input
-                type="number"
-                name="saldo_anterior"
-                value={formData.saldo_anterior}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Interés */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Interés ($)
-              </label>
-              <input
-                type="number"
-                name="interes"
-                value={formData.interes}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Reconexión */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Reconexión ($)
-              </label>
-              <input
-                type="number"
-                name="reconexion"
-                value={formData.reconexion}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Descuento */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Descuento ($)
-              </label>
-              <input
-                type="number"
-                name="descuento"
-                value={formData.descuento}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Varios */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Varios ($)
-              </label>
-              <input
-                type="number"
-                name="varios"
-                value={formData.varios}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Publicidad */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Publicidad ($)
-              </label>
-              <input
-                type="number"
-                name="publicidad"
-                value={formData.publicidad}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            {/* Total calculado */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-medium text-gray-900">Total de la Factura:</span>
+                <span className="text-2xl font-bold text-blue-600">
+                  ${parseFloat(formData.total || 0).toLocaleString('es-CO', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
             </div>
 
             {/* Observaciones */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Observaciones
-              </label>
+            <CampoConError label="Observaciones" error={errors.observaciones}>
               <textarea
-                name="observaciones"
                 value={formData.observaciones}
-                onChange={handleInputChange}
-                rows="3"
-                placeholder="Observaciones adicionales sobre la factura..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => handleInputChange('observaciones', e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Observaciones adicionales para la factura..."
               />
-            </div>
+            </CampoConError>
+          </form>
+        </div>
 
-            {/* Error de servicios */}
-            {errors.servicios && (
-              <div className="md:col-span-2">
-                <p className="text-sm text-red-600">{errors.servicios}</p>
-              </div>
+        {/* Footer con botones */}
+        <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={loading}
+            className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50 flex items-center"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {esEdicion ? 'Actualizando...' : 'Creando...'}
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                {esEdicion ? 'Actualizar Factura' : 'Crear Factura'}
+              </>
             )}
-          </div>
-
-          {/* Resumen de Totales */}
-          <div className="mt-8 bg-gray-50 p-6 rounded-lg">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumen de Totales</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Servicios:</span>
-                <span className="font-medium">${totales.servicios}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Otros Cargos:</span>
-                <span className="font-medium">${totales.cargos}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Descuentos:</span>
-                <span className="font-medium text-red-600">-${totales.descuentos}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Subtotal:</span>
-                <span className="font-medium">${totales.subtotal}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">IVA (19%):</span>
-                <span className="font-medium">${totales.iva}</span>
-              </div>
-              <div className="flex justify-between border-t pt-2">
-                <span className="text-lg font-bold text-gray-900">Total:</span>
-                <span className="text-lg font-bold text-blue-600">${totales.total}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Botones */}
-          <div className="flex justify-end space-x-4 mt-8">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-              disabled={loading || calculandoTotal}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading || calculandoTotal}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading || calculandoTotal ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  {calculandoTotal ? 'Calculando...' : 'Guardando...'}
-                </div>
-              ) : (
-                isEditing ? 'Actualizar Factura' : 'Crear Factura'
-              )}
-            </button>
-          </div>
-        </form>
+          </button>
+        </div>
       </div>
+
+      {/* Overlay para cerrar búsqueda */}
+      {mostrarBusqueda && (
+        <div 
+          className="fixed inset-0 z-0" 
+          onClick={() => setMostrarBusqueda(false)}
+        />
+      )}
     </div>
   );
 };

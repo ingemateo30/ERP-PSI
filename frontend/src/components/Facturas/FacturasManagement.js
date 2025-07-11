@@ -434,7 +434,7 @@ const FacturasManagement = () => {
             Gestión de Facturas Manual
           </h1>
           <p className="text-gray-600 mt-2">
-            Administra facturas, pagos y genera reportes
+            Sistema PSI - Administra facturas, pagos y genera reportes
           </p>
           {facturas.length > 0 && (
             <p className="text-sm text-gray-500 mt-1">
