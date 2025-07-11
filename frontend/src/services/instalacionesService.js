@@ -1,491 +1,520 @@
 // frontend/src/services/instalacionesService.js
 
-// Importar el servicio base existente
-import authService from './authService';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = `${API_BASE_URL}/instalaciones`;
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1';
-const BASE_URL = '/instalaciones';
+// Función helper para manejar respuestas
+const handleResponse = async (response) => {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: 'Error del servidor' }));
+    throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+  }
+  return await response.json();
+};
 
-class InstalacionesService {
-  
-  // Realizar petición HTTP básica
-  async makeRequest(url, options = {}) {
-    const token = authService.getToken();
-    const headers = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
+// Función helper para obtener headers con autenticación
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+};
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
+export const instalacionesService = {
+  // Test del servicio
+  async test() {
     try {
-      const fullUrl = `${API_BASE_URL}${url}`;
-      console.log('🌐 Realizando petición a:', fullUrl);
-      
-      const response = await fetch(fullUrl, {
-        ...options,
-        headers,
-        credentials: 'include',
+      const response = await fetch(`${API_URL}/test`, {
+        method: 'GET',
+        headers: getAuthHeaders()
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
-      }
-
-      return data;
+      return await handleResponse(response);
     } catch (error) {
-      console.error('Error en InstalacionesService:', error);
-      
-      if (error.message.includes('401')) {
-        try {
-          await authService.refreshToken();
-          // Reintentar la petición original
-          const newToken = authService.getToken();
-          if (newToken) {
-            headers.Authorization = `Bearer ${newToken}`;
-            const retryResponse = await fetch(`${API_BASE_URL}${url}`, { ...options, headers });
-            const retryData = await retryResponse.json();
-            
-            if (!retryResponse.ok) {
-              throw new Error(retryData.message || 'Error en reintento');
-            }
-            
-            return retryData;
-          }
-        } catch (refreshError) {
-          // Si falla el refresh, redirigir al login
-          authService.removeToken();
-          window.location.href = '/login';
-          throw new Error('Sesión expirada');
-        }
-      }
-      
+      console.error('Error en test instalaciones:', error);
       throw error;
     }
-  }
-  
-  // Listar instalaciones con filtros y paginación
-  async getInstalaciones(params = {}) {
+  },
+
+  // Obtener lista de instalaciones con filtros
+  async getInstalaciones(filtros = {}) {
     try {
-      console.log('🔍 Obteniendo instalaciones con parámetros:', params);
+      const params = new URLSearchParams();
       
-      const queryParams = new URLSearchParams();
+      // Agregar filtros como parámetros de consulta
+      Object.entries(filtros).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value);
+        }
+      });
+
+      const url = `${API_URL}?${params.toString()}`;
       
-      // Agregar parámetros de paginación
-      if (params.pagina) queryParams.append('pagina', params.pagina);
-      if (params.limite) queryParams.append('limite', params.limite);
-      
-      // Agregar filtros
-      if (params.estado) queryParams.append('estado', params.estado);
-      if (params.instalador_id) queryParams.append('instalador_id', params.instalador_id);
-      if (params.fecha_desde) queryParams.append('fecha_desde', params.fecha_desde);
-      if (params.fecha_hasta) queryParams.append('fecha_hasta', params.fecha_hasta);
-      if (params.tipo_instalacion) queryParams.append('tipo_instalacion', params.tipo_instalacion);
-      if (params.ciudad_id) queryParams.append('ciudad_id', params.ciudad_id);
-      if (params.busqueda) queryParams.append('busqueda', params.busqueda);
-      
-      const url = `${BASE_URL}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      console.log('🌐 URL solicitada:', url);
-      
-      const response = await this.makeRequest(url);
-      console.log('✅ Respuesta de instalaciones:', response);
-      
-      return response;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+
+      return await handleResponse(response);
     } catch (error) {
-      console.error('❌ Error obteniendo instalaciones:', error);
-      throw this.handleError(error, 'obtener instalaciones');
+      console.error('Error obteniendo instalaciones:', error);
+      throw error;
     }
-  }
+  },
 
   // Obtener instalación por ID
-  async getInstalacion(id) {
+  async getInstalacionById(id) {
     try {
-      console.log('🔍 Obteniendo instalación ID:', id);
-      const response = await this.makeRequest(`${BASE_URL}/${id}`);
-      console.log('✅ Instalación obtenida:', response);
-      return response;
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+
+      return await handleResponse(response);
     } catch (error) {
-      console.error('❌ Error obteniendo instalación:', error);
-      throw this.handleError(error, 'obtener instalación');
+      console.error('Error obteniendo instalación:', error);
+      throw error;
     }
-  }
+  },
 
   // Crear nueva instalación
   async createInstalacion(datosInstalacion) {
     try {
-      console.log('➕ Creando instalación:', datosInstalacion);
-      
-      // Validar datos requeridos
-      this.validateInstalacionData(datosInstalacion);
-      
-      const response = await this.makeRequest(BASE_URL, {
+      const response = await fetch(API_URL, {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: JSON.stringify(datosInstalacion)
       });
-      console.log('✅ Instalación creada:', response);
-      return response;
+
+      return await handleResponse(response);
     } catch (error) {
-      console.error('❌ Error creando instalación:', error);
-      throw this.handleError(error, 'crear instalación');
+      console.error('Error creando instalación:', error);
+      throw error;
     }
-  }
+  },
 
   // Actualizar instalación
-  async updateInstalacion(id, datosActualizacion) {
+  async updateInstalacion(id, datosInstalacion) {
     try {
-      console.log('✏️ Actualizando instalación:', id, datosActualizacion);
-      const response = await this.makeRequest(`${BASE_URL}/${id}`, {
+      const response = await fetch(`${API_URL}/${id}`, {
         method: 'PUT',
-        body: JSON.stringify(datosActualizacion)
+        headers: getAuthHeaders(),
+        body: JSON.stringify(datosInstalacion)
       });
-      console.log('✅ Instalación actualizada:', response);
-      return response;
+
+      return await handleResponse(response);
     } catch (error) {
-      console.error('❌ Error actualizando instalación:', error);
-      throw this.handleError(error, 'actualizar instalación');
+      console.error('Error actualizando instalación:', error);
+      throw error;
     }
-  }
+  },
 
   // Cambiar estado de instalación
-  async cambiarEstado(id, estado, datos = {}) {
+  async cambiarEstado(id, nuevoEstado, datosAdicionales = {}) {
     try {
-      console.log('🔄 Cambiando estado de instalación:', id, 'a', estado);
-      
-      const payload = {
-        estado,
-        ...datos
-      };
-      
-      // Si es completada, requerir fecha de realización
-      if (estado === 'completada' && !datos.fecha_realizada) {
-        payload.fecha_realizada = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      }
-      
-      const response = await this.makeRequest(`${BASE_URL}/${id}/estado`, {
+      const response = await fetch(`${API_URL}/${id}/estado`, {
         method: 'PATCH',
-        body: JSON.stringify(payload)
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          estado: nuevoEstado,
+          ...datosAdicionales
+        })
       });
-      console.log('✅ Estado cambiado:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ Error cambiando estado:', error);
-      throw this.handleError(error, 'cambiar estado de instalación');
-    }
-  }
 
-  // Reagendar instalación
-  async reagendarInstalacion(id, nuevaFecha, motivo = '') {
-    try {
-      console.log('📅 Reagendando instalación:', id, 'para', nuevaFecha);
-      
-      const payload = {
-        nueva_fecha: nuevaFecha,
-        motivo
-      };
-      
-      const response = await this.makeRequest(`${BASE_URL}/${id}/reagendar`, {
-        method: 'PATCH',
-        body: JSON.stringify(payload)
-      });
-      console.log('✅ Instalación reagendada:', response);
-      return response;
+      return await handleResponse(response);
     } catch (error) {
-      console.error('❌ Error reagendando instalación:', error);
-      throw this.handleError(error, 'reagendar instalación');
+      console.error('Error cambiando estado:', error);
+      throw error;
     }
-  }
-
-  // Asignar instalador
-  async asignarInstalador(id, instaladorId) {
-    try {
-      console.log('👷 Asignando instalador:', instaladorId, 'a instalación:', id);
-      
-      const payload = {
-        instalador_id: instaladorId
-      };
-      
-      const response = await this.makeRequest(`${BASE_URL}/${id}/asignar-instalador`, {
-        method: 'PATCH',
-        body: JSON.stringify(payload)
-      });
-      console.log('✅ Instalador asignado:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ Error asignando instalador:', error);
-      throw this.handleError(error, 'asignar instalador');
-    }
-  }
+  },
 
   // Eliminar instalación
   async deleteInstalacion(id) {
     try {
-      console.log('🗑️ Eliminando instalación:', id);
-      const response = await this.makeRequest(`${BASE_URL}/${id}`, {
-        method: 'DELETE'
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
       });
-      console.log('✅ Instalación eliminada:', response);
-      return response;
+
+      return await handleResponse(response);
     } catch (error) {
-      console.error('❌ Error eliminando instalación:', error);
-      throw this.handleError(error, 'eliminar instalación');
+      console.error('Error eliminando instalación:', error);
+      throw error;
     }
-  }
+  },
 
   // Obtener estadísticas
   async getEstadisticas(filtros = {}) {
     try {
-      console.log('📊 Obteniendo estadísticas con filtros:', filtros);
+      const params = new URLSearchParams();
       
-      const queryParams = new URLSearchParams();
-      if (filtros.fecha_desde) queryParams.append('fecha_desde', filtros.fecha_desde);
-      if (filtros.fecha_hasta) queryParams.append('fecha_hasta', filtros.fecha_hasta);
-      if (filtros.instalador_id) queryParams.append('instalador_id', filtros.instalador_id);
-      
-      const url = `${BASE_URL}/estadisticas${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      
-      const response = await this.makeRequest(url);
-      console.log('✅ Estadísticas obtenidas:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ Error obteniendo estadísticas:', error);
-      throw this.handleError(error, 'obtener estadísticas');
-    }
-  }
+      Object.entries(filtros).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value);
+        }
+      });
 
-  // Obtener instalaciones pendientes por instalador
-  async getPendientesPorInstalador(instaladorId) {
+      const url = `${API_URL}/estadisticas?${params.toString()}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error obteniendo estadísticas:', error);
+      throw error;
+    }
+  },
+
+  // Obtener instaladores disponibles
+  async getInstaladores() {
     try {
-      console.log('⏳ Obteniendo pendientes del instalador:', instaladorId);
-      const response = await this.makeRequest(`${BASE_URL}/instalador/${instaladorId}/pendientes`);
-      console.log('✅ Pendientes obtenidos:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ Error obteniendo pendientes:', error);
-      throw this.handleError(error, 'obtener instalaciones pendientes');
-    }
-  }
+      const response = await fetch(`${API_BASE_URL}/api/v1/users?rol=instalador&activo=1`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
 
-  // Obtener agenda del instalador
-  async getAgendaInstalador(instaladorId, fechaDesde = null, fechaHasta = null) {
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error obteniendo instaladores:', error);
+      throw error;
+    }
+  },
+
+  // Obtener clientes activos
+  async getClientes(busqueda = '') {
     try {
-      console.log('📅 Obteniendo agenda del instalador:', instaladorId);
-      
-      const queryParams = new URLSearchParams();
-      if (fechaDesde) queryParams.append('fecha_desde', fechaDesde);
-      if (fechaHasta) queryParams.append('fecha_hasta', fechaHasta);
-      
-      const url = `${BASE_URL}/instalador/${instaladorId}/agenda${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      
-      const response = await this.makeRequest(url);
-      console.log('✅ Agenda obtenida:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ Error obteniendo agenda:', error);
-      throw this.handleError(error, 'obtener agenda del instalador');
-    }
-  }
-
-  // Obtener información de la API
-  async getInfo() {
-    try {
-      const response = await this.makeRequest(`${BASE_URL}/info`);
-      return response;
-    } catch (error) {
-      console.error('❌ Error obteniendo info de API:', error);
-      throw this.handleError(error, 'obtener información de la API');
-    }
-  }
-
-  // Validar datos de instalación
-  validateInstalacionData(datos) {
-    const errores = [];
-
-    if (!datos.cliente_id) {
-      errores.push('Cliente es requerido');
-    }
-
-    if (!datos.plan_id) {
-      errores.push('Plan de servicio es requerido');
-    }
-
-    if (!datos.fecha_programada) {
-      errores.push('Fecha programada es requerida');
-    } else {
-      const fechaProgramada = new Date(datos.fecha_programada);
-      const ahora = new Date();
-      if (fechaProgramada <= ahora) {
-        errores.push('La fecha programada debe ser futura');
+      const params = new URLSearchParams();
+      if (busqueda) {
+        params.append('busqueda', busqueda);
       }
-    }
-
-    if (!datos.direccion_instalacion || datos.direccion_instalacion.trim().length < 5) {
-      errores.push('Dirección de instalación debe tener al menos 5 caracteres');
-    }
-
-    if (datos.coordenadas_lat && (datos.coordenadas_lat < -90 || datos.coordenadas_lat > 90)) {
-      errores.push('Latitud debe estar entre -90 y 90 grados');
-    }
-
-    if (datos.coordenadas_lng && (datos.coordenadas_lng < -180 || datos.coordenadas_lng > 180)) {
-      errores.push('Longitud debe estar entre -180 y 180 grados');
-    }
-
-    if (datos.costo_instalacion && datos.costo_instalacion < 0) {
-      errores.push('El costo de instalación no puede ser negativo');
-    }
-
-    if (errores.length > 0) {
-      throw new Error(`Errores de validación: ${errores.join(', ')}`);
-    }
-  }
-
-  // Manejar errores
-  handleError(error, operacion) {
-    let mensaje = `Error al ${operacion}`;
-    
-    if (error.response) {
-      const { status, data } = error.response;
+      params.append('estado', 'activo');
       
-      switch (status) {
-        case 400:
-          mensaje = data.message || 'Datos inválidos';
-          break;
-        case 401:
-          mensaje = 'No autorizado. Inicia sesión nuevamente';
-          break;
-        case 403:
-          mensaje = 'No tienes permisos para realizar esta acción';
-          break;
-        case 404:
-          mensaje = 'Instalación no encontrada';
-          break;
-        case 409:
-          mensaje = 'Conflicto en los datos';
-          break;
-        case 429:
-          mensaje = 'Demasiadas solicitudes. Intenta más tarde';
-          break;
-        case 500:
-          mensaje = 'Error interno del servidor';
-          break;
-        default:
-          mensaje = data.message || `Error ${status}`;
-      }
-    } else if (error.message) {
-      mensaje = error.message;
+      const response = await fetch(`${API_BASE_URL}/api/v1/clients?${params.toString()}`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error obteniendo clientes:', error);
+      throw error;
     }
+  },
 
-    return new Error(mensaje);
-  }
-
-  // Funciones de utilidad para el frontend
-  
-  // Formatear fecha para visualización
-  formatFecha(fecha) {
-    if (!fecha) return 'No especificada';
-    
+  // Obtener servicios de un cliente
+  async getServiciosCliente(clienteId) {
     try {
-      return new Date(fecha).toLocaleString('es-CO', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
+      const response = await fetch(`${API_BASE_URL}/api/v1/clients/${clienteId}/servicios`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error obteniendo servicios del cliente:', error);
+      throw error;
+    }
+  },
+
+  // Obtener equipos disponibles
+  async getEquiposDisponibles() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/inventory?estado=disponible&estado=asignado`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error obteniendo equipos:', error);
+      throw error;
+    }
+  },
+
+  // Reagendar instalación
+  async reagendarInstalacion(id, nuevaFecha, nuevaHora, observaciones = '') {
+    try {
+      const response = await fetch(`${API_URL}/${id}/estado`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          estado: 'reagendada',
+          fecha_programada: nuevaFecha,
+          hora_programada: nuevaHora,
+          observaciones: observaciones
+        })
+      });
+
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error reagendando instalación:', error);
+      throw error;
+    }
+  },
+
+  // Completar instalación
+  async completarInstalacion(id, datosCompletacion) {
+    try {
+      const {
+        fecha_realizada,
+        hora_inicio,
+        hora_fin,
+        equipos_instalados = [],
+        fotos_instalacion = [],
+        observaciones = '',
+        coordenadas_lat,
+        coordenadas_lng
+      } = datosCompletacion;
+
+      const response = await fetch(`${API_URL}/${id}/estado`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          estado: 'completada',
+          fecha_realizada,
+          hora_inicio,
+          hora_fin,
+          equipos_instalados,
+          fotos_instalacion,
+          observaciones,
+          coordenadas_lat,
+          coordenadas_lng
+        })
+      });
+
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error completando instalación:', error);
+      throw error;
+    }
+  },
+
+  // Cancelar instalación
+  async cancelarInstalacion(id, motivo = '') {
+    try {
+      const response = await fetch(`${API_URL}/${id}/estado`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          estado: 'cancelada',
+          observaciones: motivo
+        })
+      });
+
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error cancelando instalación:', error);
+      throw error;
+    }
+  },
+
+  // Iniciar instalación
+  async iniciarInstalacion(id, hora_inicio = null, observaciones = '') {
+    try {
+      const response = await fetch(`${API_URL}/${id}/estado`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          estado: 'en_proceso',
+          hora_inicio: hora_inicio || new Date().toTimeString().split(' ')[0].substring(0, 5),
+          observaciones
+        })
+      });
+
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error iniciando instalación:', error);
+      throw error;
+    }
+  },
+
+  // Obtener instalaciones del instalador actual (para vista móvil)
+  async getMisInstalaciones(filtros = {}) {
+    try {
+      // Se asume que el backend filtrará automáticamente por el instalador actual
+      // basado en el token de autenticación
+      return await this.getInstalaciones({
+        ...filtros,
+        solo_mis_instalaciones: true
       });
     } catch (error) {
-      return fecha;
+      console.error('Error obteniendo mis instalaciones:', error);
+      throw error;
     }
-  }
+  },
 
-  // Formatear fecha solo
-  formatFechaSolo(fecha) {
-    if (!fecha) return 'No especificada';
-    
+  // Subir foto de instalación
+  async subirFoto(archivo, instalacionId, descripcion = '') {
     try {
-      return new Date(fecha).toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+      const formData = new FormData();
+      formData.append('foto', archivo);
+      formData.append('descripcion', descripcion);
+      formData.append('instalacion_id', instalacionId);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/v1/instalaciones/${instalacionId}/fotos`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+          // No incluir Content-Type para FormData
+        },
+        body: formData
       });
+
+      return await handleResponse(response);
     } catch (error) {
-      return fecha;
+      console.error('Error subiendo foto:', error);
+      throw error;
+    }
+  },
+
+  // Exportar reporte de instalaciones
+  async exportarReporte(filtros = {}, formato = 'excel') {
+    try {
+      const params = new URLSearchParams();
+      
+      Object.entries(filtros).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value);
+        }
+      });
+      
+      params.append('formato', formato);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/exportar?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al exportar reporte');
+      }
+
+      // Descargar archivo
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `instalaciones_${new Date().toISOString().split('T')[0]}.${formato === 'excel' ? 'xlsx' : 'pdf'}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      return { success: true, message: 'Reporte descargado exitosamente' };
+    } catch (error) {
+      console.error('Error exportando reporte:', error);
+      throw error;
     }
   }
+};
 
-  // Obtener color del estado
-  getEstadoColor(estado) {
-    const colores = {
-      'programada': 'bg-blue-100 text-blue-800 border-blue-200',
-      'en_proceso': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'completada': 'bg-green-100 text-green-800 border-green-200',
-      'cancelada': 'bg-red-100 text-red-800 border-red-200',
-      'reagendada': 'bg-purple-100 text-purple-800 border-purple-200'
-    };
-    
-    return colores[estado] || 'bg-gray-100 text-gray-800 border-gray-200';
-  }
-
-  // Obtener etiqueta del estado
-  getEstadoLabel(estado) {
-    const etiquetas = {
+// Funciones auxiliares para el frontend
+export const instalacionesHelpers = {
+  // Formatear estado para mostrar
+  formatearEstado(estado) {
+    const estados = {
       'programada': 'Programada',
       'en_proceso': 'En Proceso',
       'completada': 'Completada',
       'cancelada': 'Cancelada',
       'reagendada': 'Reagendada'
     };
-    
-    return etiquetas[estado] || estado;
-  }
+    return estados[estado] || estado;
+  },
 
-  // Obtener etiqueta del tipo
-  getTipoLabel(tipo) {
-    const etiquetas = {
+  // Obtener color CSS para estado
+  getColorEstado(estado) {
+    const colores = {
+      'programada': 'blue',
+      'en_proceso': 'yellow',
+      'completada': 'green',
+      'cancelada': 'red',
+      'reagendada': 'purple'
+    };
+    return colores[estado] || 'gray';
+  },
+
+  // Obtener clases CSS para badge de estado
+  getClasesEstado(estado) {
+    const clases = {
+      'programada': 'bg-blue-100 text-blue-800 border-blue-200',
+      'en_proceso': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'completada': 'bg-green-100 text-green-800 border-green-200',
+      'cancelada': 'bg-red-100 text-red-800 border-red-200',
+      'reagendada': 'bg-purple-100 text-purple-800 border-purple-200'
+    };
+    return clases[estado] || 'bg-gray-100 text-gray-800 border-gray-200';
+  },
+
+  // Formatear tipo de instalación
+  formatearTipo(tipo) {
+    const tipos = {
       'nueva': 'Nueva Instalación',
       'migracion': 'Migración',
       'upgrade': 'Actualización',
       'reparacion': 'Reparación'
     };
-    
-    return etiquetas[tipo] || tipo;
-  }
+    return tipos[tipo] || tipo;
+  },
 
-  // Calcular tiempo transcurrido
-  calcularTiempoTranscurrido(fechaCreacion) {
-    if (!fechaCreacion) return 'No disponible';
-    
-    const ahora = new Date();
-    const fecha = new Date(fechaCreacion);
-    const diferencia = ahora - fecha;
-    
-    const dias = Math.floor(diferencia / (1000 * 60 * 60 * 24));
-    const horas = Math.floor((diferencia % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
-    if (dias > 0) {
-      return `Hace ${dias} día${dias > 1 ? 's' : ''}`;
-    } else if (horas > 0) {
-      return `Hace ${horas} hora${horas > 1 ? 's' : ''}`;
-    } else {
-      return 'Hace unos minutos';
-    }
-  }
-
-  // Verificar si la instalación está vencida
+  // Verificar si una instalación está vencida
   esVencida(fechaProgramada, estado) {
-    if (estado === 'completada' || estado === 'cancelada') {
+    if (['completada', 'cancelada'].includes(estado)) {
       return false;
     }
-    
-    const ahora = new Date();
+    const hoy = new Date();
     const fecha = new Date(fechaProgramada);
-    
-    return fecha < ahora;
-  }
-}
+    return fecha < hoy;
+  },
 
-// Exportar instancia única
-export const instalacionesService = new InstalacionesService();
+  // Calcular días desde programación
+  diasDesdeProgramacion(fechaProgramada) {
+    const hoy = new Date();
+    const fecha = new Date(fechaProgramada);
+    const diffTime = hoy - fecha;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  },
+
+  // Validar datos de instalación
+  validarDatosInstalacion(datos) {
+    const errores = [];
+
+    if (!datos.cliente_id) {
+      errores.push('El cliente es obligatorio');
+    }
+
+    if (!datos.servicio_cliente_id) {
+      errores.push('El servicio del cliente es obligatorio');
+    }
+
+    if (!datos.fecha_programada) {
+      errores.push('La fecha programada es obligatoria');
+    } else {
+      const fecha = new Date(datos.fecha_programada);
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      
+      if (fecha < hoy) {
+        errores.push('La fecha programada no puede ser anterior a hoy');
+      }
+    }
+
+    if (datos.telefono_contacto && !/^[0-9+\-\s()]{7,20}$/.test(datos.telefono_contacto)) {
+      errores.push('El formato del teléfono de contacto no es válido');
+    }
+
+    if (datos.costo_instalacion && datos.costo_instalacion < 0) {
+      errores.push('El costo de instalación no puede ser negativo');
+    }
+
+    return errores;
+  }
+};

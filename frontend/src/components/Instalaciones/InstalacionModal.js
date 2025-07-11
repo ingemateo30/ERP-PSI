@@ -1,574 +1,931 @@
 // frontend/src/components/Instalaciones/InstalacionModal.js
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    X,
-    Edit,
-    Trash2,
-    Calendar,
-    MapPin,
-    User,
-    Phone,
-    Clock,
-    CheckCircle,
-    XCircle,
-    AlertTriangle,
-    RotateCcw,
-    Play,
-    FileText,
-    Camera,
-    DollarSign,
-    Navigation,
-    Package,
-    Info,
-    Settings
+  X, Calendar, Clock, User, MapPin, Phone, Wrench, 
+  Search, Plus, Trash2, AlertCircle, CheckCircle,
+  Camera, Upload, FileText, DollarSign
 } from 'lucide-react';
 
-const InstalacionModal = ({
-    instalacion,
-    onClose,
-    onEdit,
-    onDelete,
-    onEstadoChange,
-    onReagendar,
-    onAsignarInstalador,
-    permissions
-}) => {
-    // Estado para controlar confirmaciones
-    const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-    const [showEstadoChange, setShowEstadoChange] = useState(false);
-    const [nuevoEstado, setNuevoEstado] = useState('');
-    const [observacionesCambio, setObservacionesCambio] = useState('');
+import { instalacionesService, instalacionesHelpers } from '../../services/instalacionesService';
 
-    // Función para formatear fecha
-    const formatFecha = (fecha) => {
-        if (!fecha) return 'No especificada';
+const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando = false }) => {
+  // Estados del formulario
+  const [formData, setFormData] = useState({
+    cliente_id: '',
+    servicio_cliente_id: '',
+    instalador_id: '',
+    fecha_programada: '',
+    hora_programada: '09:00',
+    direccion_instalacion: '',
+    barrio: '',
+    telefono_contacto: '',
+    persona_recibe: '',
+    tipo_instalacion: 'nueva',
+    observaciones: '',
+    equipos_instalados: [],
+    costo_instalacion: 0,
+    coordenadas_lat: null,
+    coordenadas_lng: null,
+    contrato_id: null,
+    tipo_orden: 'instalacion'
+  });
 
-        try {
-            return new Date(fecha).toLocaleString('es-CO', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        } catch (error) {
-            return fecha;
-        }
+  // Estados auxiliares
+  const [errores, setErrores] = useState({});
+  const [cargando, setCargando] = useState(false);
+  const [pestañaActiva, setPestañaActiva] = useState('general');
+
+  // Datos para selects
+  const [clientes, setClientes] = useState([]);
+  const [serviciosCliente, setServiciosCliente] = useState([]);
+  const [instaladores, setInstaladores] = useState([]);
+  const [equiposDisponibles, setEquiposDisponibles] = useState([]);
+
+  // Estados para búsqueda
+  const [busquedaCliente, setBusquedaCliente] = useState('');
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+
+  // Estados para completar instalación
+  const [datosCompletacion, setDatosCompletacion] = useState({
+    fecha_realizada: new Date().toISOString().split('T')[0],
+    hora_inicio: '',
+    hora_fin: '',
+    equipos_finales: [],
+    fotos_instalacion: [],
+    observaciones_finales: ''
+  });
+
+  // ==========================================
+  // EFECTOS
+  // ==========================================
+
+  useEffect(() => {
+    cargarDatosIniciales();
+  }, []);
+
+  useEffect(() => {
+    if (instalacion && modo !== 'crear') {
+      cargarDatosInstalacion();
+    }
+  }, [instalacion, modo]);
+
+  useEffect(() => {
+    if (formData.cliente_id) {
+      cargarServiciosCliente(formData.cliente_id);
+    }
+  }, [formData.cliente_id]);
+
+  // ==========================================
+  // CARGA DE DATOS
+  // ==========================================
+
+  const cargarDatosIniciales = async () => {
+    try {
+      setCargando(true);
+      
+      const [clientesRes, instaladoresRes, equiposRes] = await Promise.all([
+        instalacionesService.getClientes(),
+        instalacionesService.getInstaladores(),
+        instalacionesService.getEquiposDisponibles()
+      ]);
+
+      if (clientesRes.success) setClientes(clientesRes.data);
+      if (instaladoresRes.success) setInstaladores(instaladoresRes.data);
+      if (equiposRes.success) setEquiposDisponibles(equiposRes.data);
+
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const cargarDatosInstalacion = () => {
+    if (!instalacion) return;
+
+    setFormData({
+      cliente_id: instalacion.cliente_id || '',
+      servicio_cliente_id: instalacion.servicio_cliente_id || '',
+      instalador_id: instalacion.instalador_id || '',
+      fecha_programada: instalacion.fecha_programada || '',
+      hora_programada: instalacion.hora_programada || '09:00',
+      direccion_instalacion: instalacion.direccion_instalacion || '',
+      barrio: instalacion.barrio || '',
+      telefono_contacto: instalacion.telefono_contacto || '',
+      persona_recibe: instalacion.persona_recibe || '',
+      tipo_instalacion: instalacion.tipo_instalacion || 'nueva',
+      observaciones: instalacion.observaciones || '',
+      equipos_instalados: instalacion.equipos_instalados || [],
+      costo_instalacion: instalacion.costo_instalacion || 0,
+      coordenadas_lat: instalacion.coordenadas_lat,
+      coordenadas_lng: instalacion.coordenadas_lng,
+      contrato_id: instalacion.contrato_id,
+      tipo_orden: instalacion.tipo_orden || 'instalacion'
+    });
+
+    // Cargar datos del cliente si existe
+    if (instalacion.cliente_nombre) {
+      setClienteSeleccionado({
+        id: instalacion.cliente_id,
+        nombre: instalacion.cliente_nombre,
+        identificacion: instalacion.cliente_identificacion,
+        telefono: instalacion.cliente_telefono
+      });
+    }
+
+    // Para modo completar, cargar datos adicionales
+    if (modo === 'completar') {
+      setDatosCompletacion(prev => ({
+        ...prev,
+        hora_inicio: instalacion.hora_inicio || '',
+        equipos_finales: instalacion.equipos_instalados || []
+      }));
+    }
+  };
+
+  const cargarServiciosCliente = async (clienteId) => {
+    try {
+      const response = await instalacionesService.getServiciosCliente(clienteId);
+      if (response.success) {
+        setServiciosCliente(response.data);
+      }
+    } catch (error) {
+      console.error('Error cargando servicios:', error);
+    }
+  };
+
+  // ==========================================
+  // MANEJO DEL FORMULARIO
+  // ==========================================
+
+  const handleChange = (campo, valor) => {
+    setFormData(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+
+    // Limpiar error del campo
+    if (errores[campo]) {
+      setErrores(prev => ({
+        ...prev,
+        [campo]: null
+      }));
+    }
+  };
+
+  const buscarClientes = async (termino) => {
+    if (termino.length < 2) return;
+    
+    try {
+      const response = await instalacionesService.getClientes(termino);
+      if (response.success) {
+        setClientes(response.data);
+      }
+    } catch (error) {
+      console.error('Error buscando clientes:', error);
+    }
+  };
+
+  const seleccionarCliente = (cliente) => {
+    setClienteSeleccionado(cliente);
+    handleChange('cliente_id', cliente.id);
+    setBusquedaCliente('');
+    
+    // Prellenar datos del cliente
+    if (cliente.telefono && !formData.telefono_contacto) {
+      handleChange('telefono_contacto', cliente.telefono);
+    }
+    if (cliente.direccion && !formData.direccion_instalacion) {
+      handleChange('direccion_instalacion', cliente.direccion);
+    }
+  };
+
+  // ==========================================
+  // MANEJO DE EQUIPOS
+  // ==========================================
+
+  const agregarEquipo = () => {
+    const nuevosEquipos = [...formData.equipos_instalados, {
+      equipo_id: '',
+      equipo_codigo: '',
+      equipo_nombre: '',
+      cantidad: 1,
+      numero_serie: '',
+      observaciones: ''
+    }];
+    handleChange('equipos_instalados', nuevosEquipos);
+  };
+
+  const actualizarEquipo = (index, campo, valor) => {
+    const equiposActualizados = [...formData.equipos_instalados];
+    equiposActualizados[index] = {
+      ...equiposActualizados[index],
+      [campo]: valor
     };
 
-    // Función para formatear moneda
-    const formatCurrency = (amount) => {
-        if (!amount) return 'No especificado';
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0
-        }).format(amount);
-    };
+    // Si cambia el equipo, actualizar nombre y código
+    if (campo === 'equipo_id' && valor) {
+      const equipo = equiposDisponibles.find(e => e.id === parseInt(valor));
+      if (equipo) {
+        equiposActualizados[index].equipo_codigo = equipo.codigo;
+        equiposActualizados[index].equipo_nombre = equipo.nombre;
+      }
+    }
 
-    // Función para obtener información del estado
-    const getEstadoInfo = (estado) => {
-        const estadosInfo = {
-            programada: {
-                label: 'Programada',
-                icon: <Calendar className="w-4 h-4" />,
-                color: 'bg-blue-100 text-blue-800 border-blue-200'
-            },
-            en_proceso: {
-                label: 'En Proceso',
-                icon: <Play className="w-4 h-4" />,
-                color: 'bg-yellow-100 text-yellow-800 border-yellow-200'
-            },
-            completada: {
-                label: 'Completada',
-                icon: <CheckCircle className="w-4 h-4" />,
-                color: 'bg-green-100 text-green-800 border-green-200'
-            },
-            cancelada: {
-                label: 'Cancelada',
-                icon: <XCircle className="w-4 h-4" />,
-                color: 'bg-red-100 text-red-800 border-red-200'
-            },
-            reagendada: {
-                label: 'Reagendada',
-                icon: <RotateCcw className="w-4 h-4" />,
-                color: 'bg-purple-100 text-purple-800 border-purple-200'
-            }
-        };
+    handleChange('equipos_instalados', equiposActualizados);
+  };
 
-        return estadosInfo[estado] || {
-            label: estado,
-            icon: <Clock className="w-4 h-4" />,
-            color: 'bg-gray-100 text-gray-800 border-gray-200'
-        };
-    };
+  const eliminarEquipo = (index) => {
+    const equiposActualizados = formData.equipos_instalados.filter((_, i) => i !== index);
+    handleChange('equipos_instalados', equiposActualizados);
+  };
 
-    // Función para obtener información del tipo
-    const getTipoInfo = (tipo) => {
-        const tiposInfo = {
-            nueva: 'Nueva Instalación',
-            migracion: 'Migración',
-            upgrade: 'Upgrade',
-            reparacion: 'Reparación'
-        };
+  // ==========================================
+  // VALIDACIÓN Y ENVÍO
+  // ==========================================
 
-        return tiposInfo[tipo] || tipo;
-    };
+  const validarFormulario = () => {
+    const nuevosErrores = {};
 
-    // Verificar si está vencida
-    const isVencida = () => {
-        if (instalacion.estado === 'completada' || instalacion.estado === 'cancelada') {
-            return false;
-        }
+    if (!formData.cliente_id) {
+      nuevosErrores.cliente_id = 'El cliente es obligatorio';
+    }
 
-        const ahora = new Date();
-        const fechaProgramada = new Date(instalacion.fecha_programada);
+    if (!formData.servicio_cliente_id) {
+      nuevosErrores.servicio_cliente_id = 'El servicio del cliente es obligatorio';
+    }
 
-        return fechaProgramada < ahora;
-    };
+    if (!formData.fecha_programada) {
+      nuevosErrores.fecha_programada = 'La fecha programada es obligatoria';
+    } else {
+      const fecha = new Date(formData.fecha_programada);
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      
+      if (fecha < hoy && modo === 'crear') {
+        nuevosErrores.fecha_programada = 'La fecha no puede ser anterior a hoy';
+      }
+    }
 
-    // Manejar cambio de estado
-    const handleEstadoChange = () => {
-        if (!nuevoEstado) return;
+    if (formData.telefono_contacto && !/^[0-9+\-\s()]{7,20}$/.test(formData.telefono_contacto)) {
+      nuevosErrores.telefono_contacto = 'Formato de teléfono inválido';
+    }
 
-        onEstadoChange(instalacion.id, nuevoEstado, observacionesCambio);
-        setShowEstadoChange(false);
-        setNuevoEstado('');
-        setObservacionesCambio('');
-    };
+    if (formData.costo_instalacion < 0) {
+      nuevosErrores.costo_instalacion = 'El costo no puede ser negativo';
+    }
 
-    // Manejar eliminación
-    const handleDelete = () => {
-        onDelete(instalacion.id);
-        setShowConfirmDelete(false);
-    };
+    // Validaciones específicas para completar instalación
+    if (modo === 'completar') {
+      if (!datosCompletacion.fecha_realizada) {
+        nuevosErrores.fecha_realizada = 'La fecha de realización es obligatoria';
+      }
+      if (!datosCompletacion.hora_inicio) {
+        nuevosErrores.hora_inicio = 'La hora de inicio es obligatoria';
+      }
+      if (!datosCompletacion.hora_fin) {
+        nuevosErrores.hora_fin = 'La hora de fin es obligatoria';
+      }
+    }
 
-    const estadoInfo = getEstadoInfo(instalacion.estado);
+    setErrores(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
+  };
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
-                    <div className="flex items-center gap-3">
-                        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border ${estadoInfo.color}`}>
-                            {estadoInfo.icon}
-                            <span className="font-medium">{estadoInfo.label}</span>
-                        </div>
-                        {isVencida() && (
-                            <div className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
-                                <AlertTriangle className="w-3 h-3" />
-                                Vencida
-                            </div>
-                        )}
-                    </div>
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validarFormulario()) {
+      return;
+    }
 
-                    <div className="flex items-center gap-2">
-                        {/* Botones de acción */}
-                        {permissions.canEdit && (
-                            <button
-                                onClick={() => onEdit(instalacion)}
-                                className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                title="Editar instalación"
-                            >
-                                <Edit className="w-5 h-5" />
-                            </button>
-                        )}
+    try {
+      if (modo === 'completar') {
+        // Completar instalación
+        await instalacionesService.completarInstalacion(instalacion.id, {
+          ...datosCompletacion,
+          equipos_instalados: datosCompletacion.equipos_finales,
+          observaciones: datosCompletacion.observaciones_finales
+        });
+      } else {
+        // Crear o actualizar
+        await onGuardar(formData);
+      }
+    } catch (error) {
+      console.error('Error en submit:', error);
+    }
+  };
 
-                        {permissions.canDelete && (
-                            <button
-                                onClick={() => setShowConfirmDelete(true)}
-                                className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                                title="Eliminar instalación"
-                            >
-                                <Trash2 className="w-5 h-5" />
-                            </button>
-                        )}
+  // ==========================================
+  // MANEJO DE GEOLOCALIZACIÓN
+  // ==========================================
 
-                        <button
-                            onClick={onClose}
-                            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                        >
-                            <X className="w-6 h-6" />
-                        </button>
-                    </div>
-                </div>
+  const obtenerUbicacion = () => {
+    if (!navigator.geolocation) {
+      alert('La geolocalización no está soportada en este navegador');
+      return;
+    }
 
-                {/* Contenido */}
-                <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
-                    <div className="p-6 space-y-6">
-
-                        {/* Información Principal */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                            {/* Información del Cliente */}
-                            <div className="bg-blue-50 p-4 rounded-lg">
-                                <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
-                                    <User className="w-5 h-5 mr-2" />
-                                    Información del Cliente
-                                </h3>
-
-                                <div className="space-y-3">
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Cliente</p>
-                                        <p className="text-gray-900 font-medium">
-                                            {instalacion.cliente_nombres} {instalacion.cliente_apellidos}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Documento</p>
-                                        <p className="text-gray-900">{instalacion.numero_documento}</p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Email</p>
-                                        <p className="text-gray-900">{instalacion.cliente_email}</p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Teléfono</p>
-                                        <p className="text-gray-900">{instalacion.cliente_telefono}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Información del Plan */}
-                            <div className="bg-green-50 p-4 rounded-lg">
-                                <h3 className="text-lg font-semibold text-green-900 mb-4 flex items-center">
-                                    <Package className="w-5 h-5 mr-2" />
-                                    Plan de Servicio
-                                </h3>
-
-                                <div className="space-y-3">
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Plan</p>
-                                        <p className="text-gray-900 font-medium">{instalacion.plan_nombre}</p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Tipo</p>
-                                        <p className="text-gray-900">{instalacion.plan_tipo}</p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Precio Mensual</p>
-                                        <p className="text-gray-900 font-bold text-green-700">
-                                            {formatCurrency(instalacion.plan_precio)}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Tipo de Instalación</p>
-                                        <p className="text-gray-900">{getTipoInfo(instalacion.tipo_instalacion)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Detalles de la Instalación */}
-                        <div className="bg-yellow-50 p-4 rounded-lg">
-                            <h3 className="text-lg font-semibold text-yellow-900 mb-4 flex items-center">
-                                <Settings className="w-5 h-5 mr-2" />
-                                Detalles de la Instalación
-                            </h3>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div>
-                                    <p className="text-sm font-medium text-gray-600">Fecha Programada</p>
-                                    <p className="text-gray-900 font-medium">{formatFecha(instalacion.fecha_programada)}</p>
-                                </div>
-
-                                {instalacion.fecha_realizada && (
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Fecha Realizada</p>
-                                        <p className="text-gray-900 font-medium">{formatFecha(instalacion.fecha_realizada)}</p>
-                                    </div>
-                                )}
-
-                                <div>
-                                    <p className="text-sm font-medium text-gray-600">Instalador Asignado</p>
-                                    <p className="text-gray-900">
-                                        {instalacion.instalador_nombres ?
-                                            `${instalacion.instalador_nombres} ${instalacion.instalador_apellidos}` :
-                                            'Sin asignar'
-                                        }
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <p className="text-sm font-medium text-gray-600">Costo de Instalación</p>
-                                    <p className="text-gray-900 font-medium">
-                                        {formatCurrency(instalacion.costo_instalacion)}
-                                    </p>
-                                </div>
-
-                                <div className="md:col-span-2">
-                                    <p className="text-sm font-medium text-gray-600 flex items-center">
-                                        <MapPin className="w-4 h-4 mr-1" />
-                                        Dirección
-                                    </p>
-                                    <p className="text-gray-900">
-                                        {instalacion.direccion_instalacion}
-                                        {instalacion.barrio && `, ${instalacion.barrio}`}
-                                        {instalacion.ciudad_nombre && `, ${instalacion.ciudad_nombre}`}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Información de Contacto */}
-                        <div className="bg-purple-50 p-4 rounded-lg">
-                            <h3 className="text-lg font-semibold text-purple-900 mb-4 flex items-center">
-                                <Phone className="w-5 h-5 mr-2" />
-                                Información de Contacto
-                            </h3>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-sm font-medium text-gray-600">Teléfono de Contacto</p>
-                                    <p className="text-gray-900 font-medium">{instalacion.telefono_contacto}</p>
-                                </div>
-
-                                <div>
-                                    <p className="text-sm font-medium text-gray-600">Persona que Recibe</p>
-                                    <p className="text-gray-900">{instalacion.persona_recibe || 'No especificado'}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Coordenadas GPS */}
-                        {(instalacion.coordenadas_lat || instalacion.coordenadas_lng) && (
-                            <div className="bg-indigo-50 p-4 rounded-lg">
-                                <h3 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center">
-                                    <Navigation className="w-5 h-5 mr-2" />
-                                    Coordenadas GPS
-                                </h3>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Latitud</p>
-                                        <p className="text-gray-900 font-mono">{instalacion.coordenadas_lat}</p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Longitud</p>
-                                        <p className="text-gray-900 font-mono">{instalacion.coordenadas_lng}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Equipos Instalados */}
-                        {instalacion.equipos_instalados && instalacion.equipos_instalados.length > 0 && (
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                                    <Package className="w-5 h-5 mr-2" />
-                                    Equipos Instalados
-                                </h3>
-
-                                <div className="space-y-3">
-                                    {instalacion.equipos_instalados.map((equipo, index) => (
-                                        <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
-                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                                <div>
-                                                    <p className="text-xs font-medium text-gray-600">Equipo</p>
-                                                    <p className="text-sm text-gray-900">{equipo.nombre || equipo.codigo}</p>
-                                                </div>
-
-                                                <div>
-                                                    <p className="text-xs font-medium text-gray-600">Cantidad</p>
-                                                    <p className="text-sm text-gray-900">{equipo.cantidad}</p>
-                                                </div>
-
-                                                <div>
-                                                    <p className="text-xs font-medium text-gray-600">Número de Serie</p>
-                                                    <p className="text-sm text-gray-900 font-mono">
-                                                        {equipo.numero_serie || 'No especificado'}
-                                                    </p>
-                                                </div>
-
-                                                <div>
-                                                    <p className="text-xs font-medium text-gray-600">Observaciones</p>
-                                                    <p className="text-sm text-gray-900">
-                                                        {equipo.observaciones || 'Sin observaciones'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Observaciones */}
-                        {instalacion.observaciones && (
-                            <div className="bg-orange-50 p-4 rounded-lg">
-                                <h3 className="text-lg font-semibold text-orange-900 mb-4 flex items-center">
-                                    <FileText className="w-5 h-5 mr-2" />
-                                    Observaciones
-                                </h3>
-
-                                <p className="text-gray-900 whitespace-pre-wrap">{instalacion.observaciones}</p>
-                            </div>
-                        )}
-
-                        {/* Fotos de la Instalación */}
-                        {instalacion.fotos_instalacion && instalacion.fotos_instalacion.length > 0 && (
-                            <div className="bg-pink-50 p-4 rounded-lg">
-                                <h3 className="text-lg font-semibold text-pink-900 mb-4 flex items-center">
-                                    <Camera className="w-5 h-5 mr-2" />
-                                    Fotos de la Instalación
-                                </h3>
-
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                    {instalacion.fotos_instalacion.map((foto, index) => (
-                                        <div key={index} className="relative">
-                                            <img
-                                                src={foto.url}
-                                                alt={foto.descripcion || `Foto ${index + 1}`}
-                                                className="w-full h-32 object-cover rounded-lg border border-pink-200"
-                                            />
-                                            {foto.descripcion && (
-                                                <p className="text-xs text-gray-600 mt-1">{foto.descripcion}</p>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Footer con acciones rápidas */}
-                {permissions.canChangeStatus && instalacion.estado !== 'completada' && instalacion.estado !== 'cancelada' && (
-                    <div className="p-4 border-t border-gray-200 bg-gray-50">
-                        <h4 className="text-sm font-medium text-gray-900 mb-3">Acciones Rápidas</h4>
-                        <div className="flex flex-wrap gap-2">
-                            {instalacion.estado === 'programada' && (
-                                <button
-                                    onClick={() => {
-                                        setNuevoEstado('en_proceso');
-                                        setShowEstadoChange(true);
-                                    }}
-                                    className="flex items-center gap-2 px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm"
-                                >
-                                    <Play className="w-4 h-4" />
-                                    Iniciar Instalación
-                                </button>
-                            )}
-
-                            {instalacion.estado === 'en_proceso' && (
-                                <button
-                                    onClick={() => {
-                                        setNuevoEstado('completada');
-                                        setShowEstadoChange(true);
-                                    }}
-                                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-                                >
-                                    <CheckCircle className="w-4 h-4" />
-                                    Marcar Completada
-                                </button>
-                            )}
-
-                            <button
-                                onClick={() => {
-                                    setNuevoEstado('reagendada');
-                                    setShowEstadoChange(true);
-                                }}
-                                className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
-                            >
-                                <RotateCcw className="w-4 h-4" />
-                                Reagendar
-                            </button>
-
-                            <button
-                                onClick={() => {
-                                    setNuevoEstado('cancelada');
-                                    setShowEstadoChange(true);
-                                }}
-                                className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-                            >
-                                <XCircle className="w-4 h-4" />
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Modal de confirmación para eliminar */}
-            {showConfirmDelete && (
-                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-60">
-                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-md">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Confirmar Eliminación</h3>
-                        <p className="text-gray-600 mb-6">
-                            ¿Estás seguro de que deseas eliminar esta instalación? Esta acción no se puede deshacer.
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={() => setShowConfirmDelete(false)}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-                            >
-                                Eliminar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal para cambio de estado */}
-            {showEstadoChange && (
-                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-60">
-                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                            Cambiar Estado a: {getEstadoInfo(nuevoEstado).label}
-                        </h3>
-
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Observaciones del Cambio
-                            </label>
-                            <textarea
-                                rows="3"
-                                value={observacionesCambio}
-                                onChange={(e) => setObservacionesCambio(e.target.value)}
-                                placeholder="Describe el motivo del cambio de estado..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                            />
-                        </div>
-
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowEstadoChange(false);
-                                    setNuevoEstado('');
-                                    setObservacionesCambio('');
-                                }}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleEstadoChange}
-                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                Confirmar Cambio
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        handleChange('coordenadas_lat', position.coords.latitude);
+        handleChange('coordenadas_lng', position.coords.longitude);
+      },
+      (error) => {
+        console.error('Error obteniendo ubicación:', error);
+        alert('No se pudo obtener la ubicación');
+      }
     );
+  };
+
+  // ==========================================
+  // RENDER DE PESTAÑAS
+  // ==========================================
+
+  const renderPestañaGeneral = () => (
+    <div className="space-y-6">
+      {/* Selección de Cliente */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Cliente *
+        </label>
+        {clienteSeleccionado ? (
+          <div className="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-gray-50">
+            <div>
+              <div className="font-medium">{clienteSeleccionado.nombre}</div>
+              <div className="text-sm text-gray-500">{clienteSeleccionado.identificacion}</div>
+            </div>
+            {modo === 'crear' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setClienteSeleccionado(null);
+                  handleChange('cliente_id', '');
+                  setServiciosCliente([]);
+                }}
+                className="text-red-600 hover:text-red-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar cliente por nombre o identificación..."
+              value={busquedaCliente}
+              onChange={(e) => {
+                setBusquedaCliente(e.target.value);
+                buscarClientes(e.target.value);
+              }}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            
+            {busquedaCliente && clientes.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {clientes.map(cliente => (
+                  <button
+                    key={cliente.id}
+                    type="button"
+                    onClick={() => seleccionarCliente(cliente)}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                  >
+                    <div className="font-medium">{cliente.nombre}</div>
+                    <div className="text-sm text-gray-500">{cliente.identificacion}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {errores.cliente_id && (
+          <p className="text-red-600 text-sm mt-1">{errores.cliente_id}</p>
+        )}
+      </div>
+
+      {/* Servicio del Cliente */}
+      {formData.cliente_id && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Servicio *
+          </label>
+          <select
+            value={formData.servicio_cliente_id}
+            onChange={(e) => handleChange('servicio_cliente_id', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">Seleccione un servicio</option>
+            {serviciosCliente.map(servicio => (
+              <option key={servicio.id} value={servicio.id}>
+                {servicio.plan_nombre} - {servicio.estado}
+              </option>
+            ))}
+          </select>
+          {errores.servicio_cliente_id && (
+            <p className="text-red-600 text-sm mt-1">{errores.servicio_cliente_id}</p>
+          )}
+        </div>
+      )}
+
+      {/* Instalador */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Instalador
+        </label>
+        <select
+          value={formData.instalador_id}
+          onChange={(e) => handleChange('instalador_id', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="">Sin asignar</option>
+          {instaladores.map(instalador => (
+            <option key={instalador.id} value={instalador.id}>
+              {instalador.nombres} {instalador.apellidos}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Fecha y Hora */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Fecha Programada *
+          </label>
+          <input
+            type="date"
+            value={formData.fecha_programada}
+            onChange={(e) => handleChange('fecha_programada', e.target.value)}
+            min={new Date().toISOString().split('T')[0]}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {errores.fecha_programada && (
+            <p className="text-red-600 text-sm mt-1">{errores.fecha_programada}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Hora Programada
+          </label>
+          <input
+            type="time"
+            value={formData.hora_programada}
+            onChange={(e) => handleChange('hora_programada', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+
+      {/* Tipo de Instalación */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Tipo de Instalación
+        </label>
+        <select
+          value={formData.tipo_instalacion}
+          onChange={(e) => handleChange('tipo_instalacion', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="nueva">Nueva Instalación</option>
+          <option value="migracion">Migración</option>
+          <option value="upgrade">Actualización</option>
+          <option value="reparacion">Reparación</option>
+        </select>
+      </div>
+
+      {/* Costo */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Costo de Instalación
+        </label>
+        <div className="relative">
+          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="number"
+            value={formData.costo_instalacion}
+            onChange={(e) => handleChange('costo_instalacion', parseFloat(e.target.value) || 0)}
+            min="0"
+            step="1000"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        {errores.costo_instalacion && (
+          <p className="text-red-600 text-sm mt-1">{errores.costo_instalacion}</p>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderPestañaUbicacion = () => (
+    <div className="space-y-6">
+      {/* Dirección */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Dirección de Instalación
+        </label>
+        <textarea
+          value={formData.direccion_instalacion}
+          onChange={(e) => handleChange('direccion_instalacion', e.target.value)}
+          rows={3}
+          placeholder="Ingrese la dirección completa..."
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+
+      {/* Barrio */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Barrio
+        </label>
+        <input
+          type="text"
+          value={formData.barrio}
+          onChange={(e) => handleChange('barrio', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+
+      {/* Datos de Contacto */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Teléfono de Contacto
+          </label>
+          <input
+            type="tel"
+            value={formData.telefono_contacto}
+            onChange={(e) => handleChange('telefono_contacto', e.target.value)}
+            placeholder="3001234567"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {errores.telefono_contacto && (
+            <p className="text-red-600 text-sm mt-1">{errores.telefono_contacto}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Persona que Recibe
+          </label>
+          <input
+            type="text"
+            value={formData.persona_recibe}
+            onChange={(e) => handleChange('persona_recibe', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+
+      {/* Coordenadas */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Coordenadas GPS
+        </label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <input
+            type="number"
+            value={formData.coordenadas_lat || ''}
+            onChange={(e) => handleChange('coordenadas_lat', parseFloat(e.target.value) || null)}
+            placeholder="Latitud"
+            step="any"
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <input
+            type="number"
+            value={formData.coordenadas_lng || ''}
+            onChange={(e) => handleChange('coordenadas_lng', parseFloat(e.target.value) || null)}
+            placeholder="Longitud"
+            step="any"
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <button
+            type="button"
+            onClick={obtenerUbicacion}
+            className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <MapPin className="w-4 h-4 mr-2" />
+            GPS
+          </button>
+        </div>
+      </div>
+
+      {/* Observaciones */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Observaciones
+        </label>
+        <textarea
+          value={formData.observaciones}
+          onChange={(e) => handleChange('observaciones', e.target.value)}
+          rows={4}
+          placeholder="Observaciones adicionales sobre la instalación..."
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+    </div>
+  );
+
+  const renderPestañaEquipos = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-medium">Equipos para Instalación</h3>
+        <button
+          type="button"
+          onClick={agregarEquipo}
+          className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Agregar Equipo
+        </button>
+      </div>
+
+      {formData.equipos_instalados.length === 0 ? (
+        <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+          <Wrench className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <p className="text-gray-600">No hay equipos agregados</p>
+          <button
+            type="button"
+            onClick={agregarEquipo}
+            className="mt-2 text-blue-600 hover:text-blue-800"
+          >
+            Agregar primer equipo
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {formData.equipos_instalados.map((equipo, index) => (
+            <div key={index} className="border border-gray-300 rounded-lg p-4">
+              <div className="flex justify-between items-start mb-4">
+                <h4 className="font-medium">Equipo #{index + 1}</h4>
+                <button
+                  type="button"
+                  onClick={() => eliminarEquipo(index)}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Equipo
+                  </label>
+                  <select
+                    value={equipo.equipo_id}
+                    onChange={(e) => actualizarEquipo(index, 'equipo_id', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Seleccione un equipo</option>
+                    {equiposDisponibles.map(equipoDisp => (
+                      <option key={equipoDisp.id} value={equipoDisp.id}>
+                        {equipoDisp.codigo} - {equipoDisp.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cantidad
+                  </label>
+                  <input
+                    type="number"
+                    value={equipo.cantidad}
+                    onChange={(e) => actualizarEquipo(index, 'cantidad', parseInt(e.target.value) || 1)}
+                    min="1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Número de Serie
+                  </label>
+                  <input
+                    type="text"
+                    value={equipo.numero_serie}
+                    onChange={(e) => actualizarEquipo(index, 'numero_serie', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Observaciones
+                  </label>
+                  <input
+                    type="text"
+                    value={equipo.observaciones}
+                    onChange={(e) => actualizarEquipo(index, 'observaciones', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderPestañaCompletacion = () => (
+    <div className="space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center">
+          <CheckCircle className="w-5 h-5 text-blue-600 mr-3" />
+          <div>
+            <h3 className="font-medium text-blue-900">Completar Instalación</h3>
+            <p className="text-blue-700 text-sm">Registre los detalles finales de la instalación</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Fechas y Horas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Fecha Realizada *
+          </label>
+          <input
+            type="date"
+            value={datosCompletacion.fecha_realizada}
+            onChange={(e) => setDatosCompletacion(prev => ({ ...prev, fecha_realizada: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {errores.fecha_realizada && (
+            <p className="text-red-600 text-sm mt-1">{errores.fecha_realizada}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Hora Inicio *
+          </label>
+          <input
+            type="time"
+            value={datosCompletacion.hora_inicio}
+            onChange={(e) => setDatosCompletacion(prev => ({ ...prev, hora_inicio: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {errores.hora_inicio && (
+            <p className="text-red-600 text-sm mt-1">{errores.hora_inicio}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Hora Fin *
+          </label>
+          <input
+            type="time"
+            value={datosCompletacion.hora_fin}
+            onChange={(e) => setDatosCompletacion(prev => ({ ...prev, hora_fin: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {errores.hora_fin && (
+            <p className="text-red-600 text-sm mt-1">{errores.hora_fin}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Observaciones Finales */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Observaciones de Completación
+        </label>
+        <textarea
+          value={datosCompletacion.observaciones_finales}
+          onChange={(e) => setDatosCompletacion(prev => ({ ...prev, observaciones_finales: e.target.value }))}
+          rows={4}
+          placeholder="Detalles de la instalación, problemas encontrados, recomendaciones..."
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+    </div>
+  );
+
+  // ==========================================
+  // RENDER PRINCIPAL
+  // ==========================================
+
+  const obtenerTituloModal = () => {
+    switch (modo) {
+      case 'crear': return 'Nueva Instalación';
+      case 'editar': return 'Editar Instalación';
+      case 'ver': return 'Detalles de Instalación';
+      case 'completar': return 'Completar Instalación';
+      case 'reagendar': return 'Reagendar Instalación';
+      default: return 'Instalación';
+    }
+  };
+
+  const pestañas = [
+    { id: 'general', nombre: 'General', icono: FileText },
+    { id: 'ubicacion', nombre: 'Ubicación', icono: MapPin },
+    { id: 'equipos', nombre: 'Equipos', icono: Wrench }
+  ];
+
+  if (modo === 'completar') {
+    pestañas.push({ id: 'completacion', nombre: 'Completación', icono: CheckCircle });
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900">
+            {obtenerTituloModal()}
+          </h2>
+          <button
+            onClick={onCerrar}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Pestañas */}
+        {modo !== 'ver' && (
+          <div className="border-b border-gray-200">
+            <nav className="flex space-x-8 px-6" aria-label="Tabs">
+              {pestañas.map((pestaña) => {
+                const Icono = pestaña.icono;
+                return (
+                  <button
+                    key={pestaña.id}
+                    onClick={() => setPestañaActiva(pestaña.id)}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
+                      pestañaActiva === pestaña.id
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <Icono className="w-4 h-4 mr-2" />
+                    {pestaña.nombre}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        )}
+
+        {/* Contenido */}
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          <div className="flex-1 overflow-y-auto p-6">
+            {cargando ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Cargando datos...</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {(pestañaActiva === 'general' || modo === 'ver') && renderPestañaGeneral()}
+                {pestañaActiva === 'ubicacion' && renderPestañaUbicacion()}
+                {pestañaActiva === 'equipos' && renderPestañaEquipos()}
+                {pestañaActiva === 'completacion' && renderPestañaCompletacion()}
+              </>
+            )}
+          </div>
+
+          {/* Footer */}
+          {modo !== 'ver' && (
+            <div className="border-t border-gray-200 px-6 py-4 bg-gray-50">
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={onCerrar}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={procesando || cargando}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {procesando && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  )}
+                  {modo === 'crear' && 'Crear Instalación'}
+                  {modo === 'editar' && 'Actualizar'}
+                  {modo === 'completar' && 'Completar'}
+                  {modo === 'reagendar' && 'Reagendar'}
+                </button>
+              </div>
+            </div>
+          )}
+        </form>
+      </div>
+    </div>
+  );
 };
 
 export default InstalacionModal;

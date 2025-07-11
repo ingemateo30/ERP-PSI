@@ -1,11 +1,19 @@
-// backend/routes/instalaciones.js
-// RUTAS DE INSTALACIONES CORREGIDAS
-
 const express = require('express');
 const router = express.Router();
 
 // Middleware de autenticación
 const { authenticateToken, requireRole } = require('../middleware/auth');
+
+// Validaciones
+const { 
+  validarCrearInstalacion,
+  validarActualizarInstalacion,
+  validarCambiarEstado,
+  validarObtenerPorId,
+  validarEquiposDisponibles,
+  validarPermisosInstalacion,
+  handleValidationErrors
+} = require('../middleware/instalacionValidations');
 
 // Controlador de instalaciones
 const InstalacionesController = require('../controllers/instalacionesController');
@@ -43,7 +51,7 @@ router.get('/estadisticas', InstalacionesController.obtenerEstadisticas);
 
 /**
  * @route GET /api/v1/instalaciones
- * @desc Listar instalaciones
+ * @desc Listar instalaciones con filtros y paginación
  */
 router.get('/', InstalacionesController.listar);
 
@@ -51,7 +59,11 @@ router.get('/', InstalacionesController.listar);
  * @route GET /api/v1/instalaciones/:id
  * @desc Obtener instalación por ID
  */
-router.get('/:id', InstalacionesController.obtenerPorId);
+router.get('/:id', 
+    validarObtenerPorId,
+    handleValidationErrors,
+    InstalacionesController.obtenerPorId
+);
 
 /**
  * @route POST /api/v1/instalaciones
@@ -59,6 +71,10 @@ router.get('/:id', InstalacionesController.obtenerPorId);
  */
 router.post('/', 
     requireRole('administrador', 'supervisor'),
+    validarCrearInstalacion,
+    handleValidationErrors,
+    validarEquiposDisponibles,
+    validarPermisosInstalacion,
     InstalacionesController.crear
 );
 
@@ -67,7 +83,10 @@ router.post('/',
  * @desc Actualizar instalación
  */
 router.put('/:id',
-    requireRole('administrador', 'supervisor'),
+    requireRole('administrador', 'supervisor', 'instalador'),
+    validarActualizarInstalacion,
+    handleValidationErrors,
+    validarPermisosInstalacion,
     InstalacionesController.actualizar
 );
 
@@ -75,7 +94,12 @@ router.put('/:id',
  * @route PATCH /api/v1/instalaciones/:id/estado
  * @desc Cambiar estado de instalación
  */
-router.patch('/:id/estado', InstalacionesController.cambiarEstado);
+router.patch('/:id/estado', 
+    validarCambiarEstado,
+    handleValidationErrors,
+    validarPermisosInstalacion,
+    InstalacionesController.cambiarEstado
+);
 
 /**
  * @route DELETE /api/v1/instalaciones/:id
@@ -83,7 +107,58 @@ router.patch('/:id/estado', InstalacionesController.cambiarEstado);
  */
 router.delete('/:id',
     requireRole('administrador'),
+    validarObtenerPorId,
+    handleValidationErrors,
     InstalacionesController.eliminar
+);
+
+// ==========================================
+// RUTAS ADICIONALES
+// ==========================================
+
+/**
+ * @route POST /api/v1/instalaciones/:id/fotos
+ * @desc Subir fotos de instalación
+ */
+router.post('/:id/fotos',
+    validarObtenerPorId,
+    handleValidationErrors,
+    async (req, res) => {
+        try {
+            // Esta funcionalidad puede implementarse más tarde
+            res.status(501).json({
+                success: false,
+                message: 'Funcionalidad de subida de fotos no implementada aún'
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: 'Error interno del servidor'
+            });
+        }
+    }
+);
+
+/**
+ * @route GET /api/v1/instalaciones/exportar
+ * @desc Exportar reporte de instalaciones
+ */
+router.get('/exportar',
+    requireRole('administrador', 'supervisor'),
+    async (req, res) => {
+        try {
+            // Esta funcionalidad puede implementarse más tarde
+            res.status(501).json({
+                success: false,
+                message: 'Funcionalidad de exportación no implementada aún'
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: 'Error interno del servidor'
+            });
+        }
+    }
 );
 
 // ==========================================

@@ -1,4 +1,23 @@
-const { body, param, query, validationResult } = require('express-validator');
+// backend/middleware/instalacionValidations.js
+
+const { body, param, validationResult } = require('express-validator');
+
+// Middleware para manejar errores de validación
+const handleValidationErrors = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Errores de validación',
+      errors: errors.array().map(error => ({
+        field: error.path,
+        message: error.msg,
+        value: error.value
+      }))
+    });
+  }
+  next();
+};
 
 // Validaciones para crear instalación
 const validarCrearInstalacion = [
@@ -6,31 +25,41 @@ const validarCrearInstalacion = [
     .isInt({ min: 1 })
     .withMessage('El ID del cliente debe ser un número entero positivo'),
   
-  body('plan_id')
+  body('servicio_cliente_id')
     .isInt({ min: 1 })
-    .withMessage('El ID del plan debe ser un número entero positivo'),
-  
-  body('fecha_programada')
-    .isISO8601()
-    .withMessage('La fecha programada debe tener formato válido (YYYY-MM-DD HH:MM:SS)')
-    .custom((value) => {
-      const fecha = new Date(value);
-      const ahora = new Date();
-      if (fecha <= ahora) {
-        throw new Error('La fecha programada debe ser futura');
-      }
-      return true;
-    }),
-  
-  body('direccion_instalacion')
-    .isLength({ min: 5, max: 255 })
-    .withMessage('La dirección debe tener entre 5 y 255 caracteres')
-    .trim(),
+    .withMessage('El ID del servicio del cliente debe ser un número entero positivo'),
   
   body('instalador_id')
     .optional()
     .isInt({ min: 1 })
     .withMessage('El ID del instalador debe ser un número entero positivo'),
+  
+  body('fecha_programada')
+    .notEmpty()
+    .withMessage('La fecha programada es obligatoria')
+    .isISO8601()
+    .withMessage('La fecha programada debe tener formato válido (YYYY-MM-DD)')
+    .custom((value) => {
+      const fecha = new Date(value);
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      
+      if (fecha < hoy) {
+        throw new Error('La fecha programada no puede ser anterior a hoy');
+      }
+      return true;
+    }),
+  
+  body('hora_programada')
+    .optional()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('La hora programada debe tener formato HH:MM'),
+  
+  body('direccion_instalacion')
+    .optional()
+    .isLength({ max: 255 })
+    .withMessage('La dirección no puede exceder 255 caracteres')
+    .trim(),
   
   body('barrio')
     .optional()
@@ -38,17 +67,11 @@ const validarCrearInstalacion = [
     .withMessage('El barrio no puede exceder 100 caracteres')
     .trim(),
   
-  body('ciudad_id')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('El ID de la ciudad debe ser un número entero positivo'),
-  
   body('telefono_contacto')
     .optional()
-    .matches(/^[0-9+\-\s()]+$/)
-    .withMessage('El teléfono de contacto solo puede contener números y símbolos válidos')
-    .isLength({ max: 20 })
-    .withMessage('El teléfono no puede exceder 20 caracteres'),
+    .matches(/^[0-9+\-\s()]{7,20}$/)
+    .withMessage('El teléfono de contacto debe tener entre 7 y 20 caracteres y solo contener números, espacios, +, - y paréntesis')
+    .trim(),
   
   body('persona_recibe')
     .optional()
@@ -72,10 +95,16 @@ const validarCrearInstalacion = [
     .isArray()
     .withMessage('Los equipos instalados deben ser un array'),
   
-  body('equipos_instalados.*.tipo')
+  body('equipos_instalados.*.equipo_id')
+    .if(body('equipos_instalados').exists())
+    .isInt({ min: 1 })
+    .withMessage('El ID del equipo debe ser un número entero positivo'),
+  
+  body('equipos_instalados.*.cantidad')
+    .if(body('equipos_instalados').exists())
     .optional()
-    .isIn(['router', 'decodificador', 'cable', 'antena', 'splitter', 'amplificador', 'otro'])
-    .withMessage('Tipo de equipo inválido'),
+    .isInt({ min: 1 })
+    .withMessage('La cantidad del equipo debe ser un número entero positivo'),
   
   body('coordenadas_lat')
     .optional()
@@ -91,6 +120,16 @@ const validarCrearInstalacion = [
     .optional()
     .isFloat({ min: 0 })
     .withMessage('El costo de instalación debe ser un número positivo'),
+  
+  body('contrato_id')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('El ID del contrato debe ser un número entero positivo'),
+  
+  body('tipo_orden')
+    .optional()
+    .isIn(['instalacion', 'cambio_plan', 'traslado', 'reconexion', 'retiro', 'mantenimiento'])
+    .withMessage('El tipo de orden debe ser: instalacion, cambio_plan, traslado, reconexion, retiro o mantenimiento')
 ];
 
 // Validaciones para actualizar instalación
@@ -107,17 +146,17 @@ const validarActualizarInstalacion = [
   body('fecha_programada')
     .optional()
     .isISO8601()
-    .withMessage('La fecha programada debe tener formato válido'),
+    .withMessage('La fecha programada debe tener formato válido (YYYY-MM-DD)'),
   
-  body('fecha_realizada')
+  body('hora_programada')
     .optional()
-    .isISO8601()
-    .withMessage('La fecha realizada debe tener formato válido'),
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('La hora programada debe tener formato HH:MM'),
   
   body('direccion_instalacion')
     .optional()
-    .isLength({ min: 5, max: 255 })
-    .withMessage('La dirección debe tener entre 5 y 255 caracteres')
+    .isLength({ max: 255 })
+    .withMessage('La dirección no puede exceder 255 caracteres')
     .trim(),
   
   body('barrio')
@@ -126,17 +165,11 @@ const validarActualizarInstalacion = [
     .withMessage('El barrio no puede exceder 100 caracteres')
     .trim(),
   
-  body('ciudad_id')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('El ID de la ciudad debe ser un número entero positivo'),
-  
   body('telefono_contacto')
     .optional()
-    .matches(/^[0-9+\-\s()]+$/)
-    .withMessage('El teléfono de contacto solo puede contener números y símbolos válidos')
-    .isLength({ max: 20 })
-    .withMessage('El teléfono no puede exceder 20 caracteres'),
+    .matches(/^[0-9+\-\s()]{7,20}$/)
+    .withMessage('El teléfono de contacto debe tener entre 7 y 20 caracteres')
+    .trim(),
   
   body('persona_recibe')
     .optional()
@@ -164,11 +197,6 @@ const validarActualizarInstalacion = [
     .optional()
     .isArray()
     .withMessage('Los equipos instalados deben ser un array'),
-  
-  body('fotos_instalacion')
-    .optional()
-    .isArray()
-    .withMessage('Las fotos de instalación deben ser un array'),
   
   body('coordenadas_lat')
     .optional()
@@ -209,6 +237,16 @@ const validarCambiarEstado = [
     .isISO8601()
     .withMessage('La fecha realizada debe tener formato válido'),
   
+  body('hora_inicio')
+    .optional()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('La hora de inicio debe tener formato HH:MM'),
+  
+  body('hora_fin')
+    .optional()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('La hora de fin debe tener formato HH:MM'),
+  
   body('equipos_instalados')
     .optional()
     .isArray()
@@ -220,150 +258,113 @@ const validarCambiarEstado = [
     .withMessage('Las fotos de instalación deben ser un array'),
 ];
 
-// Validaciones para reagendar
-const validarReagendar = [
+// Validación para obtener por ID
+const validarObtenerPorId = [
   param('id')
     .isInt({ min: 1 })
-    .withMessage('El ID de la instalación debe ser un número entero positivo'),
-  
-  body('nueva_fecha')
-    .isISO8601()
-    .withMessage('La nueva fecha debe tener formato válido (YYYY-MM-DD HH:MM:SS)')
-    .custom((value) => {
-      const fecha = new Date(value);
-      const ahora = new Date();
-      if (fecha <= ahora) {
-        throw new Error('La nueva fecha debe ser futura');
-      }
-      return true;
-    }),
-  
-  body('motivo')
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage('El motivo no puede exceder 500 caracteres')
-    .trim(),
+    .withMessage('El ID de la instalación debe ser un número entero positivo')
 ];
 
-// Validaciones para asignar instalador
-const validarAsignarInstalador = [
-  param('id')
-    .isInt({ min: 1 })
-    .withMessage('El ID de la instalación debe ser un número entero positivo'),
-  
-  body('instalador_id')
-    .isInt({ min: 1 })
-    .withMessage('El ID del instalador debe ser un número entero positivo'),
-];
-
-// Validaciones para parámetros de consulta
-const validarParametrosConsulta = [
-  query('pagina')
+// Validaciones para filtros de listado
+const validarFiltrosListado = [
+  body('pagina')
     .optional()
     .isInt({ min: 1 })
     .withMessage('La página debe ser un número entero positivo'),
   
-  query('limite')
+  body('limite')
     .optional()
     .isInt({ min: 1, max: 100 })
     .withMessage('El límite debe ser un número entre 1 y 100'),
   
-  query('estado')
+  body('estado')
     .optional()
     .isIn(['programada', 'en_proceso', 'completada', 'cancelada', 'reagendada'])
-    .withMessage('Estado inválido'),
+    .withMessage('El estado debe ser válido'),
   
-  query('instalador_id')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('El ID del instalador debe ser un número entero positivo'),
-  
-  query('fecha_desde')
-    .optional()
-    .isDate()
-    .withMessage('La fecha desde debe tener formato válido (YYYY-MM-DD)'),
-  
-  query('fecha_hasta')
-    .optional()
-    .isDate()
-    .withMessage('La fecha hasta debe tener formato válido (YYYY-MM-DD)'),
-  
-  query('tipo_instalacion')
+  body('tipo_instalacion')
     .optional()
     .isIn(['nueva', 'migracion', 'upgrade', 'reparacion'])
-    .withMessage('Tipo de instalación inválido'),
+    .withMessage('El tipo de instalación debe ser válido'),
   
-  query('ciudad_id')
+  body('instalador_id')
     .optional()
-    .isInt({ min: 1 })
-    .withMessage('El ID de la ciudad debe ser un número entero positivo'),
-  
-  query('busqueda')
-    .optional()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('La búsqueda debe tener entre 2 y 100 caracteres')
-    .trim(),
-];
-
-// Validaciones para parámetros de ID
-const validarId = [
-  param('id')
-    .isInt({ min: 1 })
-    .withMessage('El ID debe ser un número entero positivo'),
-];
-
-const validarInstaladorId = [
-  param('instalador_id')
     .isInt({ min: 1 })
     .withMessage('El ID del instalador debe ser un número entero positivo'),
+  
+  body('fecha_desde')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha desde debe tener formato válido'),
+  
+  body('fecha_hasta')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha hasta debe tener formato válido'),
 ];
 
-// Middleware para manejar errores de validación
-const manejarErroresValidacion = (req, res, next) => {
-  const errores = validationResult(req);
-  
-  if (!errores.isEmpty()) {
-    const erroresFormateados = errores.array().map(error => ({
-      campo: error.param,
-      valor: error.value,
-      mensaje: error.msg
-    }));
-
-    return res.status(400).json({
-      success: false,
-      message: 'Errores de validación en los datos enviados',
-      errores: erroresFormateados,
-      timestamp: new Date().toISOString()
-    });
-  }
-  
-  next();
-};
-
-// Validación personalizada para verificar fechas coherentes
-const validarFechasCoherentes = (req, res, next) => {
-  const { fecha_desde, fecha_hasta } = req.query;
-  
-  if (fecha_desde && fecha_hasta) {
-    const desde = new Date(fecha_desde);
-    const hasta = new Date(fecha_hasta);
+// Validación personalizada para verificar equipos disponibles
+const validarEquiposDisponibles = async (req, res, next) => {
+  try {
+    const { equipos_instalados } = req.body;
     
-    if (desde > hasta) {
-      return res.status(400).json({
-        success: false,
-        message: 'La fecha desde no puede ser mayor que la fecha hasta',
-        timestamp: new Date().toISOString()
-      });
+    if (!equipos_instalados || !Array.isArray(equipos_instalados)) {
+      return next();
+    }
+
+    const { Database } = require('../models/Database');
+    
+    for (const equipo of equipos_instalados) {
+      if (equipo.equipo_id) {
+        const [equipoDb] = await Database.query(
+          'SELECT id, estado, nombre FROM inventario_equipos WHERE id = ?',
+          [equipo.equipo_id]
+        );
+        
+        if (!equipoDb) {
+          return res.status(400).json({
+            success: false,
+            message: `El equipo con ID ${equipo.equipo_id} no existe`
+          });
+        }
+        
+        if (equipoDb.estado !== 'disponible' && equipoDb.estado !== 'asignado') {
+          return res.status(400).json({
+            success: false,
+            message: `El equipo "${equipoDb.nombre}" no está disponible para asignación`
+          });
+        }
+      }
     }
     
-    // Verificar que el rango no sea mayor a 1 año
-    const unAno = 365 * 24 * 60 * 60 * 1000; // 1 año en milisegundos
-    if (hasta - desde > unAno) {
-      return res.status(400).json({
-        success: false,
-        message: 'El rango de fechas no puede ser mayor a 1 año',
-        timestamp: new Date().toISOString()
-      });
+    next();
+  } catch (error) {
+    console.error('Error validando equipos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error validando disponibilidad de equipos'
+    });
+  }
+};
+
+// Validación para verificar permisos según rol del usuario
+const validarPermisosInstalacion = (req, res, next) => {
+  const { rol } = req.user;
+  const { instalador_id } = req.body;
+  
+  // Los instaladores solo pueden ver/editar sus propias instalaciones
+  if (rol === 'instalador') {
+    if (req.method === 'GET' && req.params.id) {
+      // Verificar que la instalación pertenece al instalador
+      // Esta validación se podría hacer en el controlador
+    } else if (req.method === 'POST' || req.method === 'PUT') {
+      // Al crear/actualizar, el instalador debe ser el mismo usuario
+      if (instalador_id && instalador_id !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permisos para asignar instalaciones a otros instaladores'
+        });
+      }
     }
   }
   
@@ -371,14 +372,12 @@ const validarFechasCoherentes = (req, res, next) => {
 };
 
 module.exports = {
+  handleValidationErrors,
   validarCrearInstalacion,
   validarActualizarInstalacion,
   validarCambiarEstado,
-  validarReagendar,
-  validarAsignarInstalador,
-  validarParametrosConsulta,
-  validarId,
-  validarInstaladorId,
-  manejarErroresValidacion,
-  validarFechasCoherentes
+  validarObtenerPorId,
+  validarFiltrosListado,
+  validarEquiposDisponibles,
+  validarPermisosInstalacion
 };
