@@ -1,3 +1,5 @@
+// backend/routes/instalaciones.js - VERSIÓN CORREGIDA COMPLETA
+
 const express = require('express');
 const router = express.Router();
 
@@ -50,6 +52,76 @@ router.get('/test', InstalacionesController.test);
 router.get('/estadisticas', InstalacionesController.obtenerEstadisticas);
 
 /**
+ * @route GET /api/v1/instalaciones/exportar
+ * @desc Exportar reporte de instalaciones (CORREGIDO)
+ */
+router.get('/exportar',
+    requireRole('administrador', 'supervisor'),
+    async (req, res) => {
+        try {
+            console.log('📊 Exportando reporte de instalaciones');
+            
+            const formato = req.query.formato || 'excel';
+            const filtros = {
+                estado: req.query.estado,
+                instalador_id: req.query.instalador_id,
+                fecha_desde: req.query.fecha_desde,
+                fecha_hasta: req.query.fecha_hasta,
+                busqueda: req.query.busqueda
+            };
+
+            // Obtener datos para exportar
+            const response = await InstalacionesController.listar(req, { 
+                json: (data) => data 
+            });
+
+            if (!response.success) {
+                throw new Error('Error obteniendo datos para exportar');
+            }
+
+            const instalaciones = response.data;
+            const timestamp = new Date().toISOString().split('T')[0];
+
+            if (formato === 'json') {
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Content-Disposition', `attachment; filename=instalaciones_${timestamp}.json`);
+                return res.json({
+                    fecha_exportacion: new Date().toISOString(),
+                    total_registros: instalaciones.length,
+                    filtros_aplicados: filtros,
+                    instalaciones: instalaciones
+                });
+            }
+
+            if (formato === 'csv') {
+                // Generar CSV
+                const csv = generarCSV(instalaciones);
+                res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+                res.setHeader('Content-Disposition', `attachment; filename=instalaciones_${timestamp}.csv`);
+                return res.send('\uFEFF' + csv); // BOM para UTF-8
+            }
+
+            // Por defecto, JSON
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Content-Disposition', `attachment; filename=instalaciones_${timestamp}.json`);
+            res.json({
+                fecha_exportacion: new Date().toISOString(),
+                total_registros: instalaciones.length,
+                instalaciones: instalaciones
+            });
+
+        } catch (error) {
+            console.error('❌ Error exportando reporte:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error exportando reporte de instalaciones',
+                error: error.message
+            });
+        }
+    }
+);
+
+/**
  * @route GET /api/v1/instalaciones
  * @desc Listar instalaciones con filtros y paginación
  */
@@ -57,7 +129,7 @@ router.get('/', InstalacionesController.listar);
 
 /**
  * @route GET /api/v1/instalaciones/:id
- * @desc Obtener instalación por ID
+ * @desc Obtener instalación por ID (CORREGIDO)
  */
 router.get('/:id', 
     validarObtenerPorId,
@@ -80,7 +152,7 @@ router.post('/',
 
 /**
  * @route PUT /api/v1/instalaciones/:id
- * @desc Actualizar instalación
+ * @desc Actualizar instalación (CORREGIDO)
  */
 router.put('/:id',
     requireRole('administrador', 'supervisor', 'instalador'),
@@ -102,8 +174,130 @@ router.patch('/:id/estado',
 );
 
 /**
+ * @route PATCH /api/v1/instalaciones/:id/asignar-instalador
+ * @desc Asignar instalador a una instalación (NUEVO)
+ */
+router.patch('/:id/asignar-instalador',
+    requireRole('administrador', 'supervisor'),
+    validarObtenerPorId,
+    handleValidationErrors,
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { instalador_id } = req.body;
+
+            if (!instalador_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El ID del instalador es requerido'
+                });
+            }
+
+            // Llamar al controlador para asignar instalador
+            const resultado = await InstalacionesController.asignarInstalador(id, instalador_id);
+            
+            res.json({
+                success: true,
+                message: 'Instalador asignado exitosamente',
+                data: resultado
+            });
+
+        } catch (error) {
+            console.error('❌ Error asignando instalador:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Error al asignar instalador'
+            });
+        }
+    }
+);
+
+/**
+ * @route PATCH /api/v1/instalaciones/:id/reagendar
+ * @desc Reagendar una instalación (NUEVO)
+ */
+router.patch('/:id/reagendar',
+    requireRole('administrador', 'supervisor'),
+    validarObtenerPorId,
+    handleValidationErrors,
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { fecha_programada, hora_programada, observaciones } = req.body;
+
+            if (!fecha_programada || !hora_programada) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Fecha y hora programada son requeridas'
+                });
+            }
+
+            // Llamar al controlador para reagendar
+            const resultado = await InstalacionesController.reagendarInstalacion(
+                id, 
+                fecha_programada, 
+                hora_programada, 
+                observaciones
+            );
+            
+            res.json({
+                success: true,
+                message: 'Instalación reagendada exitosamente',
+                data: resultado
+            });
+
+        } catch (error) {
+            console.error('❌ Error reagendando instalación:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Error al reagendar instalación'
+            });
+        }
+    }
+);
+
+/**
+ * @route PATCH /api/v1/instalaciones/:id/cancelar
+ * @desc Cancelar una instalación (NUEVO)
+ */
+router.patch('/:id/cancelar',
+    requireRole('administrador', 'supervisor'),
+    validarObtenerPorId,
+    handleValidationErrors,
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { motivo_cancelacion } = req.body;
+
+            if (!motivo_cancelacion) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El motivo de cancelación es requerido'
+                });
+            }
+
+            // Llamar al controlador para cancelar
+            const resultado = await InstalacionesController.cancelarInstalacion(id, motivo_cancelacion);
+            
+            res.json({
+                success: true,
+                message: 'Instalación cancelada exitosamente',
+                data: resultado
+            });
+
+        } catch (error) {
+            console.error('❌ Error cancelando instalación:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Error al cancelar instalación'
+            });
+        }
+    }
+);
+
+/**
  * @route DELETE /api/v1/instalaciones/:id
- * @desc Eliminar instalación
+ * @desc Eliminar instalación (CORREGIDO)
  */
 router.delete('/:id',
     requireRole('administrador'),
@@ -140,30 +334,96 @@ router.post('/:id/fotos',
 );
 
 /**
- * @route GET /api/v1/instalaciones/exportar
- * @desc Exportar reporte de instalaciones
+ * @route GET /api/v1/instalaciones/equipos/disponibles
+ * @desc Obtener equipos disponibles para instalación
  */
-router.get('/exportar',
-    requireRole('administrador', 'supervisor'),
+router.get('/equipos/disponibles',
+    requireRole('administrador', 'supervisor', 'instalador'),
     async (req, res) => {
         try {
-            // REEMPLAZAR TODO EL CONTENIDO POR:
-            res.setHeader('Content-Type', 'application/json');
-            res.setHeader('Content-Disposition', 'attachment; filename=instalaciones.json');
-            
-            const instalaciones = await InstalacionesController.listar(req, { 
-              json: (data) => data 
+            const equipos = await InstalacionesController.obtenerEquiposDisponibles();
+            res.json({
+                success: true,
+                data: equipos
             });
-            
-            res.json(instalaciones.data);
         } catch (error) {
+            console.error('❌ Error obteniendo equipos disponibles:', error);
             res.status(500).json({
                 success: false,
-                message: 'Error exportando reporte'
+                message: 'Error obteniendo equipos disponibles'
             });
         }
     }
 );
+
+/**
+ * @route GET /api/v1/instalaciones/instaladores/disponibles
+ * @desc Obtener lista de instaladores disponibles
+ */
+router.get('/instaladores/disponibles',
+    requireRole('administrador', 'supervisor'),
+    async (req, res) => {
+        try {
+            const instaladores = await InstalacionesController.obtenerInstaladores();
+            res.json({
+                success: true,
+                data: instaladores
+            });
+        } catch (error) {
+            console.error('❌ Error obteniendo instaladores:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error obteniendo instaladores disponibles'
+            });
+        }
+    }
+);
+
+// ==========================================
+// FUNCIONES AUXILIARES
+// ==========================================
+
+/**
+ * Generar CSV a partir de los datos de instalaciones
+ */
+function generarCSV(instalaciones) {
+    const headers = [
+        'ID',
+        'Cliente',
+        'Identificación',
+        'Teléfono',
+        'Dirección',
+        'Instalador',
+        'Fecha Programada',
+        'Hora Programada',
+        'Estado',
+        'Tipo Instalación',
+        'Costo',
+        'Observaciones',
+        'Fecha Creación'
+    ];
+
+    const rows = instalaciones.map(inst => [
+        inst.id,
+        inst.cliente_nombre || '',
+        inst.cliente_identificacion || '',
+        inst.telefono_contacto || '',
+        inst.direccion_instalacion || '',
+        inst.instalador_nombre || 'Sin asignar',
+        inst.fecha_programada || '',
+        inst.hora_programada || '',
+        inst.estado || '',
+        inst.tipo_instalacion || '',
+        inst.costo_instalacion || '0',
+        inst.observaciones || '',
+        inst.created_at || ''
+    ]);
+
+    return [headers.join(','), ...rows.map(row => 
+        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    )].join('\n');
+}
+
 // ==========================================
 // MANEJO DE ERRORES
 // ==========================================

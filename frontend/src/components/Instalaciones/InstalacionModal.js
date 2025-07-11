@@ -1,22 +1,43 @@
-// frontend/src/components/Instalaciones/InstalacionModal.js
+// frontend/src/components/Instalaciones/InstalacionModal.js - VERSIÓN COMPLETA
 
-import React, { useState, useEffect } from 'react';
-import {
-  X, Calendar, Clock, User, MapPin, Phone, Wrench, 
-  Search, Plus, Trash2, AlertCircle, CheckCircle,
-  Camera, Upload, FileText, DollarSign
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  X, 
+  Calendar, 
+  User, 
+  MapPin, 
+  Phone, 
+  Clock, 
+  Package, 
+  CheckCircle,
+  AlertCircle,
+  Search,
+  Plus,
+  Trash2,
+  Eye,
+  Edit3
 } from 'lucide-react';
 
-import { instalacionesService, instalacionesHelpers } from '../../services/instalacionesService';
+import { instalacionesService } from '../../services/instalacionesService';
+import { useAuth } from '../../contexts/AuthContext';
 
-const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando = false }) => {
-  // Estados del formulario
+const InstalacionModal = ({ 
+  instalacion = null, 
+  modo = 'crear', // crear, editar, ver, completar, reagendar
+  onCerrar, 
+  onGuardar 
+}) => {
+  
+  // ==========================================
+  // ESTADOS PRINCIPALES
+  // ==========================================
+  
   const [formData, setFormData] = useState({
     cliente_id: '',
     servicio_cliente_id: '',
     instalador_id: '',
     fecha_programada: '',
-    hora_programada: '09:00',
+    hora_programada: '',
     direccion_instalacion: '',
     barrio: '',
     telefono_contacto: '',
@@ -25,28 +46,10 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
     observaciones: '',
     equipos_instalados: [],
     costo_instalacion: 0,
-    coordenadas_lat: null,
-    coordenadas_lng: null,
-    contrato_id: null,
-    tipo_orden: 'instalacion'
+    coordenadas_lat: '',
+    coordenadas_lng: ''
   });
 
-  // Estados auxiliares
-  const [errores, setErrores] = useState({});
-  const [cargando, setCargando] = useState(false);
-  const [pestañaActiva, setPestañaActiva] = useState('general');
-
-  // Datos para selects
-  const [clientes, setClientes] = useState([]);
-  const [serviciosCliente, setServiciosCliente] = useState([]);
-  const [instaladores, setInstaladores] = useState([]);
-  const [equiposDisponibles, setEquiposDisponibles] = useState([]);
-
-  // Estados para búsqueda
-  const [busquedaCliente, setBusquedaCliente] = useState('');
-  const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
-
-  // Estados para completar instalación
   const [datosCompletacion, setDatosCompletacion] = useState({
     fecha_realizada: new Date().toISOString().split('T')[0],
     hora_inicio: '',
@@ -55,6 +58,35 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
     fotos_instalacion: [],
     observaciones_finales: ''
   });
+
+  // Estados de UI
+  const [cargando, setCargando] = useState(false);
+  const [procesando, setProcesando] = useState(false);
+  const [errores, setErrores] = useState({});
+  const [pestañaActiva, setPestañaActiva] = useState('general');
+
+  // Estados para datos auxiliares
+  const [clientes, setClientes] = useState([]);
+  const [serviciosCliente, setServiciosCliente] = useState([]);
+  const [instaladores, setInstaladores] = useState([]);
+  const [equiposDisponibles, setEquiposDisponibles] = useState([]);
+  
+  // Estados para búsqueda
+  const [busquedaCliente, setBusquedaCliente] = useState('');
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+
+  const { user } = useAuth();
+
+  // ==========================================
+  // CONFIGURACIÓN DE PESTAÑAS
+  // ==========================================
+  
+  const pestañas = [
+    { id: 'general', nombre: 'Información General', icono: User },
+    { id: 'ubicacion', nombre: 'Ubicación', icono: MapPin },
+    { id: 'equipos', nombre: 'Equipos', icono: Package },
+    ...(modo === 'completar' ? [{ id: 'completacion', nombre: 'Completar', icono: CheckCircle }] : [])
+  ];
 
   // ==========================================
   // EFECTOS
@@ -65,10 +97,10 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
   }, []);
 
   useEffect(() => {
-    if (instalacion && modo !== 'crear') {
-      cargarDatosInstalacion();
+    if (instalacion) {
+      cargarDatosInstalacion(instalacion);
     }
-  }, [instalacion, modo]);
+  }, [instalacion]);
 
   useEffect(() => {
     if (formData.cliente_id) {
@@ -81,54 +113,57 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
   // ==========================================
 
   const cargarDatosIniciales = async () => {
+    setCargando(true);
     try {
-      setCargando(true);
-      
-      const [clientesRes, instaladoresRes, equiposRes] = await Promise.all([
-        instalacionesService.getClientes(),
-        instalacionesService.getInstaladores(),
-        instalacionesService.getEquiposDisponibles()
-      ]);
+      // Cargar instaladores
+      const responseInstaladores = await instalacionesService.getInstaladores();
+      if (responseInstaladores.success) {
+        setInstaladores(responseInstaladores.instaladores);
+      }
 
-      if (clientesRes.success) setClientes(clientesRes.data);
-      if (instaladoresRes.success) setInstaladores(instaladoresRes.data);
-      if (equiposRes.success) setEquiposDisponibles(equiposRes.data);
+      // Cargar equipos disponibles
+      const responseEquipos = await instalacionesService.getEquiposDisponibles();
+      if (responseEquipos.success) {
+        setEquiposDisponibles(responseEquipos.equipos);
+      }
 
     } catch (error) {
-      console.error('Error cargando datos:', error);
+      console.error('Error cargando datos iniciales:', error);
     } finally {
       setCargando(false);
     }
   };
 
-  const cargarDatosInstalacion = () => {
-    if (!instalacion) return;
+  const cargarDatosInstalacion = (instalacion) => {
+    console.log('📝 Cargando datos de instalación:', instalacion);
 
+    // Cargar datos básicos
     setFormData({
       cliente_id: instalacion.cliente_id || '',
       servicio_cliente_id: instalacion.servicio_cliente_id || '',
       instalador_id: instalacion.instalador_id || '',
-      fecha_programada: instalacion.fecha_programada || '',
-      hora_programada: instalacion.hora_programada || '09:00',
+      fecha_programada: instalacion.fecha_programada ? 
+        new Date(instalacion.fecha_programada).toISOString().split('T')[0] : '',
+      hora_programada: instalacion.hora_programada || '',
       direccion_instalacion: instalacion.direccion_instalacion || '',
       barrio: instalacion.barrio || '',
       telefono_contacto: instalacion.telefono_contacto || '',
       persona_recibe: instalacion.persona_recibe || '',
       tipo_instalacion: instalacion.tipo_instalacion || 'nueva',
       observaciones: instalacion.observaciones || '',
-      equipos_instalados: instalacion.equipos_instalados || [],
+      equipos_instalados: instalacion.equipos_instalados ? 
+        (typeof instalacion.equipos_instalados === 'string' ? 
+          JSON.parse(instalacion.equipos_instalados) : instalacion.equipos_instalados) : [],
       costo_instalacion: instalacion.costo_instalacion || 0,
-      coordenadas_lat: instalacion.coordenadas_lat,
-      coordenadas_lng: instalacion.coordenadas_lng,
-      contrato_id: instalacion.contrato_id,
-      tipo_orden: instalacion.tipo_orden || 'instalacion'
+      coordenadas_lat: instalacion.coordenadas_lat || '',
+      coordenadas_lng: instalacion.coordenadas_lng || ''
     });
 
-    // Cargar datos del cliente si existe
+    // Si hay información del cliente, cargarla
     if (instalacion.cliente_nombre) {
       setClienteSeleccionado({
         id: instalacion.cliente_id,
-        nombre: instalacion.cliente_nombre,
+        nombre_completo: instalacion.cliente_nombre,
         identificacion: instalacion.cliente_identificacion,
         telefono: instalacion.cliente_telefono
       });
@@ -174,8 +209,11 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
     }
   };
 
-  const buscarClientes = async (termino) => {
-    if (termino.length < 2) return;
+  const buscarClientes = useCallback(async (termino) => {
+    if (termino.length < 2) {
+      setClientes([]);
+      return;
+    }
     
     try {
       const response = await instalacionesService.getClientes(termino);
@@ -185,12 +223,13 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
     } catch (error) {
       console.error('Error buscando clientes:', error);
     }
-  };
+  }, []);
 
   const seleccionarCliente = (cliente) => {
     setClienteSeleccionado(cliente);
     handleChange('cliente_id', cliente.id);
     setBusquedaCliente('');
+    setClientes([]);
     
     // Prellenar datos del cliente
     if (cliente.telefono && !formData.telefono_contacto) {
@@ -248,6 +287,7 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
   const validarFormulario = () => {
     const nuevosErrores = {};
 
+    // Validaciones básicas
     if (!formData.cliente_id) {
       nuevosErrores.cliente_id = 'El cliente es obligatorio';
     }
@@ -268,7 +308,13 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
       }
     }
 
-    if (formData.telefono_contacto && !/^[0-9+\-\s()]{7,20}$/.test(formData.telefono_contacto)) {
+    if (!formData.direccion_instalacion.trim()) {
+      nuevosErrores.direccion_instalacion = 'La dirección de instalación es obligatoria';
+    }
+
+    if (!formData.telefono_contacto.trim()) {
+      nuevosErrores.telefono_contacto = 'El teléfono de contacto es obligatorio';
+    } else if (!/^[0-9+\-\s()]{7,20}$/.test(formData.telefono_contacto)) {
       nuevosErrores.telefono_contacto = 'Formato de teléfono inválido';
     }
 
@@ -276,7 +322,7 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
       nuevosErrores.costo_instalacion = 'El costo no puede ser negativo';
     }
 
-    // Validaciones específicas para completar instalación
+    // Validaciones específicas para completar
     if (modo === 'completar') {
       if (!datosCompletacion.fecha_realizada) {
         nuevosErrores.fecha_realizada = 'La fecha de realización es obligatoria';
@@ -297,50 +343,52 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
     e.preventDefault();
     
     if (!validarFormulario()) {
+      setPestañaActiva('general'); // Ir a la primera pestaña donde pueden estar los errores
       return;
     }
 
+    setProcesando(true);
+    
     try {
-      if (modo === 'completar') {
-        // Completar instalación
-        await instalacionesService.completarInstalacion(instalacion.id, {
+      let response;
+      
+      if (modo === 'crear') {
+        response = await instalacionesService.createInstalacion(formData);
+      } else if (modo === 'editar') {
+        response = await instalacionesService.updateInstalacion(instalacion.id, formData);
+      } else if (modo === 'completar') {
+        // Combinar datos de formulario con datos de completación
+        const datosCompletos = {
+          ...formData,
           ...datosCompletacion,
-          equipos_instalados: datosCompletacion.equipos_finales,
-          observaciones: datosCompletacion.observaciones_finales
-        });
-      } else {
-        // Crear o actualizar
-        await onGuardar(formData);
+          estado: 'completada'
+        };
+        response = await instalacionesService.cambiarEstado(instalacion.id, 'completada', datosCompletos);
+      } else if (modo === 'reagendar') {
+        response = await instalacionesService.reagendarInstalacion(
+          instalacion.id,
+          formData.fecha_programada,
+          formData.hora_programada,
+          formData.observaciones
+        );
+      }
+
+      if (response && response.success) {
+        if (onGuardar) {
+          onGuardar(response.instalacion);
+        }
+        onCerrar();
       }
     } catch (error) {
-      console.error('Error en submit:', error);
+      console.error('Error guardando instalación:', error);
+      setErrores({ general: error.message || 'Error al guardar la instalación' });
+    } finally {
+      setProcesando(false);
     }
   };
 
   // ==========================================
-  // MANEJO DE GEOLOCALIZACIÓN
-  // ==========================================
-
-  const obtenerUbicacion = () => {
-    if (!navigator.geolocation) {
-      alert('La geolocalización no está soportada en este navegador');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        handleChange('coordenadas_lat', position.coords.latitude);
-        handleChange('coordenadas_lng', position.coords.longitude);
-      },
-      (error) => {
-        console.error('Error obteniendo ubicación:', error);
-        alert('No se pudo obtener la ubicación');
-      }
-    );
-  };
-
-  // ==========================================
-  // RENDER DE PESTAÑAS
+  // RENDERIZADO DE PESTAÑAS
   // ==========================================
 
   const renderPestañaGeneral = () => (
@@ -350,59 +398,66 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Cliente *
         </label>
-        {clienteSeleccionado ? (
-          <div className="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-gray-50">
+        
+        {modo === 'ver' ? (
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="font-medium">{clienteSeleccionado?.nombre_completo}</p>
+            <p className="text-sm text-gray-600">ID: {clienteSeleccionado?.identificacion}</p>
+          </div>
+        ) : clienteSeleccionado ? (
+          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
             <div>
-              <div className="font-medium">{clienteSeleccionado.nombre}</div>
-              <div className="text-sm text-gray-500">{clienteSeleccionado.identificacion}</div>
+              <p className="font-medium text-blue-900">{clienteSeleccionado.nombre_completo}</p>
+              <p className="text-sm text-blue-600">ID: {clienteSeleccionado.identificacion}</p>
             </div>
-            {modo === 'crear' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setClienteSeleccionado(null);
-                  handleChange('cliente_id', '');
-                  setServiciosCliente([]);
-                }}
-                className="text-red-600 hover:text-red-800"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setClienteSeleccionado(null);
+                handleChange('cliente_id', '');
+                handleChange('servicio_cliente_id', '');
+                setServiciosCliente([]);
+              }}
+              className="text-blue-600 hover:text-blue-800"
+            >
+              Cambiar
+            </button>
           </div>
         ) : (
           <div className="relative">
             <input
               type="text"
-              placeholder="Buscar cliente por nombre o identificación..."
               value={busquedaCliente}
               onChange={(e) => {
                 setBusquedaCliente(e.target.value);
                 buscarClientes(e.target.value);
               }}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Buscar cliente por nombre, ID o teléfono..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             
-            {busquedaCliente && clientes.length > 0 && (
+            {clientes.length > 0 && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                 {clientes.map(cliente => (
                   <button
                     key={cliente.id}
                     type="button"
                     onClick={() => seleccionarCliente(cliente)}
-                    className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                   >
-                    <div className="font-medium">{cliente.nombre}</div>
-                    <div className="text-sm text-gray-500">{cliente.identificacion}</div>
+                    <div className="font-medium">{cliente.nombre_completo}</div>
+                    <div className="text-sm text-gray-600">
+                      ID: {cliente.identificacion} • Tel: {cliente.telefono}
+                    </div>
                   </button>
                 ))}
               </div>
             )}
           </div>
         )}
+        
         {errores.cliente_id && (
-          <p className="text-red-600 text-sm mt-1">{errores.cliente_id}</p>
+          <p className="mt-1 text-sm text-red-600">{errores.cliente_id}</p>
         )}
       </div>
 
@@ -410,22 +465,30 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
       {formData.cliente_id && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Servicio *
+            Servicio del Cliente *
           </label>
-          <select
-            value={formData.servicio_cliente_id}
-            onChange={(e) => handleChange('servicio_cliente_id', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Seleccione un servicio</option>
-            {serviciosCliente.map(servicio => (
-              <option key={servicio.id} value={servicio.id}>
-                {servicio.plan_nombre} - {servicio.estado}
-              </option>
-            ))}
-          </select>
+          
+          {modo === 'ver' ? (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              {serviciosCliente.find(s => s.id === formData.servicio_cliente_id)?.plan_nombre || 'No especificado'}
+            </div>
+          ) : (
+            <select
+              value={formData.servicio_cliente_id}
+              onChange={(e) => handleChange('servicio_cliente_id', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Seleccionar servicio...</option>
+              {serviciosCliente.map(servicio => (
+                <option key={servicio.id} value={servicio.id}>
+                  {servicio.plan_nombre} - ${servicio.precio_mensual?.toLocaleString()}
+                </option>
+              ))}
+            </select>
+          )}
+          
           {errores.servicio_cliente_id && (
-            <p className="text-red-600 text-sm mt-1">{errores.servicio_cliente_id}</p>
+            <p className="mt-1 text-sm text-red-600">{errores.servicio_cliente_id}</p>
           )}
         </div>
       )}
@@ -435,18 +498,25 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Instalador
         </label>
-        <select
-          value={formData.instalador_id}
-          onChange={(e) => handleChange('instalador_id', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="">Sin asignar</option>
-          {instaladores.map(instalador => (
-            <option key={instalador.id} value={instalador.id}>
-              {instalador.nombres} {instalador.apellidos}
-            </option>
-          ))}
-        </select>
+        
+        {modo === 'ver' ? (
+          <div className="p-3 bg-gray-50 rounded-lg">
+            {instaladores.find(i => i.id === formData.instalador_id)?.nombre_completo || 'Sin asignar'}
+          </div>
+        ) : (
+          <select
+            value={formData.instalador_id}
+            onChange={(e) => handleChange('instalador_id', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Sin asignar</option>
+            {instaladores.map(instalador => (
+              <option key={instalador.id} value={instalador.id}>
+                {instalador.nombre_completo} ({instalador.instalaciones_activas} activas)
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Fecha y Hora */}
@@ -455,15 +525,26 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Fecha Programada *
           </label>
-          <input
-            type="date"
-            value={formData.fecha_programada}
-            onChange={(e) => handleChange('fecha_programada', e.target.value)}
-            min={new Date().toISOString().split('T')[0]}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+          
+          {modo === 'ver' ? (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              {formData.fecha_programada ? 
+                new Date(formData.fecha_programada).toLocaleDateString('es-CO') : 
+                'No especificada'
+              }
+            </div>
+          ) : (
+            <input
+              type="date"
+              value={formData.fecha_programada}
+              onChange={(e) => handleChange('fecha_programada', e.target.value)}
+              min={modo === 'crear' ? new Date().toISOString().split('T')[0] : undefined}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          )}
+          
           {errores.fecha_programada && (
-            <p className="text-red-600 text-sm mt-1">{errores.fecha_programada}</p>
+            <p className="mt-1 text-sm text-red-600">{errores.fecha_programada}</p>
           )}
         </div>
 
@@ -471,12 +552,19 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Hora Programada
           </label>
-          <input
-            type="time"
-            value={formData.hora_programada}
-            onChange={(e) => handleChange('hora_programada', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+          
+          {modo === 'ver' ? (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              {formData.hora_programada || 'No especificada'}
+            </div>
+          ) : (
+            <input
+              type="time"
+              value={formData.hora_programada}
+              onChange={(e) => handleChange('hora_programada', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          )}
         </div>
       </div>
 
@@ -485,132 +573,54 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Tipo de Instalación
         </label>
-        <select
-          value={formData.tipo_instalacion}
-          onChange={(e) => handleChange('tipo_instalacion', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="nueva">Nueva Instalación</option>
-          <option value="migracion">Migración</option>
-          <option value="upgrade">Actualización</option>
-          <option value="reparacion">Reparación</option>
-        </select>
+        
+        {modo === 'ver' ? (
+          <div className="p-3 bg-gray-50 rounded-lg">
+            {formData.tipo_instalacion === 'nueva' ? 'Nueva Instalación' :
+             formData.tipo_instalacion === 'migracion' ? 'Migración' :
+             formData.tipo_instalacion === 'upgrade' ? 'Actualización' :
+             formData.tipo_instalacion === 'reparacion' ? 'Reparación' :
+             formData.tipo_instalacion}
+          </div>
+        ) : (
+          <select
+            value={formData.tipo_instalacion}
+            onChange={(e) => handleChange('tipo_instalacion', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="nueva">Nueva Instalación</option>
+            <option value="migracion">Migración</option>
+            <option value="upgrade">Actualización</option>
+            <option value="reparacion">Reparación</option>
+          </select>
+        )}
       </div>
 
-      {/* Costo */}
+      {/* Costo de Instalación */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Costo de Instalación
         </label>
-        <div className="relative">
-          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        
+        {modo === 'ver' ? (
+          <div className="p-3 bg-gray-50 rounded-lg">
+            ${formData.costo_instalacion?.toLocaleString() || '0'}
+          </div>
+        ) : (
           <input
             type="number"
-            value={formData.costo_instalacion}
-            onChange={(e) => handleChange('costo_instalacion', parseFloat(e.target.value) || 0)}
             min="0"
             step="1000"
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            value={formData.costo_instalacion}
+            onChange={(e) => handleChange('costo_instalacion', parseFloat(e.target.value) || 0)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="0"
           />
-        </div>
-        {errores.costo_instalacion && (
-          <p className="text-red-600 text-sm mt-1">{errores.costo_instalacion}</p>
         )}
-      </div>
-    </div>
-  );
-
-  const renderPestañaUbicacion = () => (
-    <div className="space-y-6">
-      {/* Dirección */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Dirección de Instalación
-        </label>
-        <textarea
-          value={formData.direccion_instalacion}
-          onChange={(e) => handleChange('direccion_instalacion', e.target.value)}
-          rows={3}
-          placeholder="Ingrese la dirección completa..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
-      </div>
-
-      {/* Barrio */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Barrio
-        </label>
-        <input
-          type="text"
-          value={formData.barrio}
-          onChange={(e) => handleChange('barrio', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
-      </div>
-
-      {/* Datos de Contacto */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Teléfono de Contacto
-          </label>
-          <input
-            type="tel"
-            value={formData.telefono_contacto}
-            onChange={(e) => handleChange('telefono_contacto', e.target.value)}
-            placeholder="3001234567"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          {errores.telefono_contacto && (
-            <p className="text-red-600 text-sm mt-1">{errores.telefono_contacto}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Persona que Recibe
-          </label>
-          <input
-            type="text"
-            value={formData.persona_recibe}
-            onChange={(e) => handleChange('persona_recibe', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-      </div>
-
-      {/* Coordenadas */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Coordenadas GPS
-        </label>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input
-            type="number"
-            value={formData.coordenadas_lat || ''}
-            onChange={(e) => handleChange('coordenadas_lat', parseFloat(e.target.value) || null)}
-            placeholder="Latitud"
-            step="any"
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <input
-            type="number"
-            value={formData.coordenadas_lng || ''}
-            onChange={(e) => handleChange('coordenadas_lng', parseFloat(e.target.value) || null)}
-            placeholder="Longitud"
-            step="any"
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <button
-            type="button"
-            onClick={obtenerUbicacion}
-            className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <MapPin className="w-4 h-4 mr-2" />
-            GPS
-          </button>
-        </div>
+        
+        {errores.costo_instalacion && (
+          <p className="mt-1 text-sm text-red-600">{errores.costo_instalacion}</p>
+        )}
       </div>
 
       {/* Observaciones */}
@@ -618,56 +628,200 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Observaciones
         </label>
-        <textarea
-          value={formData.observaciones}
-          onChange={(e) => handleChange('observaciones', e.target.value)}
-          rows={4}
-          placeholder="Observaciones adicionales sobre la instalación..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
+        
+        {modo === 'ver' ? (
+          <div className="p-3 bg-gray-50 rounded-lg min-h-[80px]">
+            {formData.observaciones || 'Sin observaciones'}
+          </div>
+        ) : (
+          <textarea
+            value={formData.observaciones}
+            onChange={(e) => handleChange('observaciones', e.target.value)}
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Observaciones adicionales..."
+          />
+        )}
       </div>
+    </div>
+  );
+
+  const renderPestañaUbicacion = () => (
+    <div className="space-y-6">
+      {/* Dirección de Instalación */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Dirección de Instalación *
+        </label>
+        
+        {modo === 'ver' ? (
+          <div className="p-3 bg-gray-50 rounded-lg">
+            {formData.direccion_instalacion || 'No especificada'}
+          </div>
+        ) : (
+          <textarea
+            value={formData.direccion_instalacion}
+            onChange={(e) => handleChange('direccion_instalacion', e.target.value)}
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Dirección completa de la instalación..."
+          />
+        )}
+        
+        {errores.direccion_instalacion && (
+          <p className="mt-1 text-sm text-red-600">{errores.direccion_instalacion}</p>
+        )}
+      </div>
+
+      {/* Barrio */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Barrio
+        </label>
+        
+        {modo === 'ver' ? (
+          <div className="p-3 bg-gray-50 rounded-lg">
+            {formData.barrio || 'No especificado'}
+          </div>
+        ) : (
+          <input
+            type="text"
+            value={formData.barrio}
+            onChange={(e) => handleChange('barrio', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Nombre del barrio..."
+          />
+        )}
+      </div>
+
+      {/* Información de Contacto */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Teléfono de Contacto *
+          </label>
+          
+          {modo === 'ver' ? (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              {formData.telefono_contacto || 'No especificado'}
+            </div>
+          ) : (
+            <input
+              type="tel"
+              value={formData.telefono_contacto}
+              onChange={(e) => handleChange('telefono_contacto', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Número de teléfono..."
+            />
+          )}
+          
+          {errores.telefono_contacto && (
+            <p className="mt-1 text-sm text-red-600">{errores.telefono_contacto}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Persona que Recibe
+          </label>
+          
+          {modo === 'ver' ? (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              {formData.persona_recibe || 'No especificada'}
+            </div>
+          ) : (
+            <input
+              type="text"
+              value={formData.persona_recibe}
+              onChange={(e) => handleChange('persona_recibe', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Nombre de la persona..."
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Coordenadas GPS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Latitud
+          </label>
+          
+          {modo === 'ver' ? (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              {formData.coordenadas_lat || 'No especificada'}
+            </div>
+          ) : (
+            <input
+              type="number"
+              step="any"
+              value={formData.coordenadas_lng}
+              onChange={(e) => handleChange('coordenadas_lng', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ej: -74.08175"
+            />
+          )}
+        </div>
+      </div>
+
+      {(formData.coordenadas_lat && formData.coordenadas_lng) && (
+        <div className="p-4 bg-blue-50 rounded-lg">
+          <p className="text-sm text-blue-800">
+            📍 Coordenadas: {formData.coordenadas_lat}, {formData.coordenadas_lng}
+          </p>
+        </div>
+      )}
     </div>
   );
 
   const renderPestañaEquipos = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Equipos para Instalación</h3>
-        <button
-          type="button"
-          onClick={agregarEquipo}
-          className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Agregar Equipo
-        </button>
-      </div>
-
-      {formData.equipos_instalados.length === 0 ? (
-        <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-          <Wrench className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <p className="text-gray-600">No hay equipos agregados</p>
+        <h3 className="text-lg font-medium text-gray-900">Equipos para Instalación</h3>
+        
+        {modo !== 'ver' && (
           <button
             type="button"
             onClick={agregarEquipo}
-            className="mt-2 text-blue-600 hover:text-blue-800"
+            className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Agregar primer equipo
+            <Plus className="w-4 h-4 mr-2" />
+            Agregar Equipo
           </button>
+        )}
+      </div>
+
+      {formData.equipos_instalados.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          <Package className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+          <p>No hay equipos asignados</p>
+          {modo !== 'ver' && (
+            <button
+              type="button"
+              onClick={agregarEquipo}
+              className="mt-2 text-blue-600 hover:text-blue-800"
+            >
+              Agregar primer equipo
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
           {formData.equipos_instalados.map((equipo, index) => (
-            <div key={index} className="border border-gray-300 rounded-lg p-4">
+            <div key={index} className="p-4 border border-gray-200 rounded-lg">
               <div className="flex justify-between items-start mb-4">
-                <h4 className="font-medium">Equipo #{index + 1}</h4>
-                <button
-                  type="button"
-                  onClick={() => eliminarEquipo(index)}
-                  className="text-red-600 hover:text-red-800"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <h4 className="font-medium text-gray-900">Equipo #{index + 1}</h4>
+                
+                {modo !== 'ver' && (
+                  <button
+                    type="button"
+                    onClick={() => eliminarEquipo(index)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -675,55 +829,85 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Equipo
                   </label>
-                  <select
-                    value={equipo.equipo_id}
-                    onChange={(e) => actualizarEquipo(index, 'equipo_id', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Seleccione un equipo</option>
-                    {equiposDisponibles.map(equipoDisp => (
-                      <option key={equipoDisp.id} value={equipoDisp.id}>
-                        {equipoDisp.codigo} - {equipoDisp.nombre}
-                      </option>
-                    ))}
-                  </select>
+                  
+                  {modo === 'ver' ? (
+                    <div className="p-2 bg-gray-50 rounded text-sm">
+                      {equipo.equipo_nombre || 'No especificado'}
+                    </div>
+                  ) : (
+                    <select
+                      value={equipo.equipo_id}
+                      onChange={(e) => actualizarEquipo(index, 'equipo_id', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Seleccionar equipo...</option>
+                      {equiposDisponibles.map(equipoDisp => (
+                        <option key={equipoDisp.id} value={equipoDisp.id}>
+                          {equipoDisp.codigo} - {equipoDisp.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Cantidad
                   </label>
-                  <input
-                    type="number"
-                    value={equipo.cantidad}
-                    onChange={(e) => actualizarEquipo(index, 'cantidad', parseInt(e.target.value) || 1)}
-                    min="1"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  
+                  {modo === 'ver' ? (
+                    <div className="p-2 bg-gray-50 rounded text-sm">
+                      {equipo.cantidad || 1}
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      min="1"
+                      value={equipo.cantidad}
+                      onChange={(e) => actualizarEquipo(index, 'cantidad', parseInt(e.target.value) || 1)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Número de Serie
                   </label>
-                  <input
-                    type="text"
-                    value={equipo.numero_serie}
-                    onChange={(e) => actualizarEquipo(index, 'numero_serie', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  
+                  {modo === 'ver' ? (
+                    <div className="p-2 bg-gray-50 rounded text-sm">
+                      {equipo.numero_serie || 'No especificado'}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={equipo.numero_serie}
+                      onChange={(e) => actualizarEquipo(index, 'numero_serie', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Serie del equipo..."
+                    />
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Observaciones
                   </label>
-                  <input
-                    type="text"
-                    value={equipo.observaciones}
-                    onChange={(e) => actualizarEquipo(index, 'observaciones', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  
+                  {modo === 'ver' ? (
+                    <div className="p-2 bg-gray-50 rounded text-sm">
+                      {equipo.observaciones || 'Sin observaciones'}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={equipo.observaciones}
+                      onChange={(e) => actualizarEquipo(index, 'observaciones', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Observaciones del equipo..."
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -735,60 +919,66 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
 
   const renderPestañaCompletacion = () => (
     <div className="space-y-6">
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-center">
-          <CheckCircle className="w-5 h-5 text-blue-600 mr-3" />
-          <div>
-            <h3 className="font-medium text-blue-900">Completar Instalación</h3>
-            <p className="text-blue-700 text-sm">Registre los detalles finales de la instalación</p>
-          </div>
-        </div>
+      <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+        <h3 className="font-medium text-green-900 mb-2">Completar Instalación</h3>
+        <p className="text-sm text-green-700">
+          Registra los detalles finales de la instalación completada.
+        </p>
       </div>
 
-      {/* Fechas y Horas */}
+      {/* Fecha y Horas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Fecha Realizada *
+            Fecha de Realización *
           </label>
           <input
             type="date"
             value={datosCompletacion.fecha_realizada}
-            onChange={(e) => setDatosCompletacion(prev => ({ ...prev, fecha_realizada: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            onChange={(e) => setDatosCompletacion(prev => ({
+              ...prev,
+              fecha_realizada: e.target.value
+            }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {errores.fecha_realizada && (
-            <p className="text-red-600 text-sm mt-1">{errores.fecha_realizada}</p>
+            <p className="mt-1 text-sm text-red-600">{errores.fecha_realizada}</p>
           )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Hora Inicio *
+            Hora de Inicio *
           </label>
           <input
             type="time"
             value={datosCompletacion.hora_inicio}
-            onChange={(e) => setDatosCompletacion(prev => ({ ...prev, hora_inicio: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            onChange={(e) => setDatosCompletacion(prev => ({
+              ...prev,
+              hora_inicio: e.target.value
+            }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {errores.hora_inicio && (
-            <p className="text-red-600 text-sm mt-1">{errores.hora_inicio}</p>
+            <p className="mt-1 text-sm text-red-600">{errores.hora_inicio}</p>
           )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Hora Fin *
+            Hora de Fin *
           </label>
           <input
             type="time"
             value={datosCompletacion.hora_fin}
-            onChange={(e) => setDatosCompletacion(prev => ({ ...prev, hora_fin: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            onChange={(e) => setDatosCompletacion(prev => ({
+              ...prev,
+              hora_fin: e.target.value
+            }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {errores.hora_fin && (
-            <p className="text-red-600 text-sm mt-1">{errores.hora_fin}</p>
+            <p className="mt-1 text-sm text-red-600">{errores.hora_fin}</p>
           )}
         </div>
       </div>
@@ -800,67 +990,64 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
         </label>
         <textarea
           value={datosCompletacion.observaciones_finales}
-          onChange={(e) => setDatosCompletacion(prev => ({ ...prev, observaciones_finales: e.target.value }))}
+          onChange={(e) => setDatosCompletacion(prev => ({
+            ...prev,
+            observaciones_finales: e.target.value
+          }))}
           rows={4}
-          placeholder="Detalles de la instalación, problemas encontrados, recomendaciones..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+          placeholder="Detalles de la instalación completada, problemas encontrados, etc..."
         />
       </div>
     </div>
   );
 
   // ==========================================
-  // RENDER PRINCIPAL
+  // RENDERIZADO PRINCIPAL
   // ==========================================
 
-  const obtenerTituloModal = () => {
-    switch (modo) {
-      case 'crear': return 'Nueva Instalación';
-      case 'editar': return 'Editar Instalación';
-      case 'ver': return 'Detalles de Instalación';
-      case 'completar': return 'Completar Instalación';
-      case 'reagendar': return 'Reagendar Instalación';
-      default: return 'Instalación';
-    }
-  };
-
-  const pestañas = [
-    { id: 'general', nombre: 'General', icono: FileText },
-    { id: 'ubicacion', nombre: 'Ubicación', icono: MapPin },
-    { id: 'equipos', nombre: 'Equipos', icono: Wrench }
-  ];
-
-  if (modo === 'completar') {
-    pestañas.push({ id: 'completacion', nombre: 'Completación', icono: CheckCircle });
-  }
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {obtenerTituloModal()}
-          </h2>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {modo === 'crear' && 'Nueva Instalación'}
+              {modo === 'editar' && 'Editar Instalación'}
+              {modo === 'ver' && 'Detalles de Instalación'}
+              {modo === 'completar' && 'Completar Instalación'}
+              {modo === 'reagendar' && 'Reagendar Instalación'}
+            </h2>
+            
+            {instalacion && (
+              <p className="text-sm text-gray-600 mt-1">
+                ID: {instalacion.id} • 
+                Cliente: {clienteSeleccionado?.nombre_completo}
+              </p>
+            )}
+          </div>
+          
           <button
             onClick={onCerrar}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Pestañas */}
-        {modo !== 'ver' && (
+        {pestañas.length > 1 && (
           <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6" aria-label="Tabs">
-              {pestañas.map((pestaña) => {
+            <nav className="flex space-x-8 px-6">
+              {pestañas.map(pestaña => {
                 const Icono = pestaña.icono;
                 return (
                   <button
                     key={pestaña.id}
+                    type="button"
                     onClick={() => setPestañaActiva(pestaña.id)}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
+                    className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors ${
                       pestañaActiva === pestaña.id
                         ? 'border-blue-500 text-blue-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -892,6 +1079,16 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
                 {pestañaActiva === 'equipos' && renderPestañaEquipos()}
                 {pestañaActiva === 'completacion' && renderPestañaCompletacion()}
               </>
+            )}
+
+            {/* Error general */}
+            {errores.general && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex">
+                  <AlertCircle className="w-5 h-5 text-red-400 mr-2" />
+                  <p className="text-red-800">{errores.general}</p>
+                </div>
+              </div>
             )}
           </div>
 
@@ -929,3 +1126,4 @@ const InstalacionModal = ({ modo, instalacion, onGuardar, onCerrar, procesando =
 };
 
 export default InstalacionModal;
+        
