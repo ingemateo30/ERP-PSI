@@ -57,6 +57,38 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     }
   }, [client]);
 
+  const recalcularPreciosEnTiempoReal = () => {
+    if (!planSeleccionado || !formData.estrato) return;
+
+    const estratoNum = parseInt(formData.estrato) || 4;
+    const precioBase = parseFloat(formData.precio_personalizado) || planSeleccionado.precio;
+
+    let precioFinal = precioBase;
+    let aplicaIva = false;
+    let valorIva = 0;
+
+    // Determinar si aplica IVA según tipo y estrato
+    if (planSeleccionado.tipo === 'internet') {
+      aplicaIva = estratoNum >= 4;  // ✅ CORRECTO
+    } else if (planSeleccionado.tipo === 'television') {
+      aplicaIva = true;
+    } else if (planSeleccionado.tipo === 'combo') {
+      aplicaIva = estratoNum >= 4;  // ✅ CORRECTO
+    }
+
+    if (aplicaIva) {
+      valorIva = Math.round(precioBase * 0.19);
+      precioFinal = precioBase + valorIva;
+    }
+
+    return {
+      precio_base: precioBase,
+      valor_iva: valorIva,
+      precio_final: precioFinal,
+      aplica_iva: aplicaIva,
+      porcentaje_iva: aplicaIva ? 19 : 0
+    };
+  };
 
   useEffect(() => {
     // Recargar sectores cuando cambie la ciudad seleccionada
@@ -280,6 +312,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   };
 
   const crearClienteCompleto = async () => {
+    const calculos = recalcularPreciosEnTiempoReal();
     // Preparar datos para crear cliente completo
     const datosCompletos = {
       cliente: {
@@ -298,9 +331,11 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
         fecha_inicio_contrato: formData.fecha_activacion
       },
       servicio: {
-        plan_id: formData.plan_id,
-        tipo_permanencia: formData.tipo_permanencia,
-        precio_personalizado: formData.precio_personalizado || null,
+        plan_id: parseInt(formData.plan_id),
+        precio_personalizado: calculos.precio_final,  // ✅ Precio CON IVA incluido
+        precio_sin_iva: calculos.precio_base,         // ✅ Precio base sin IVA
+        valor_iva: calculos.valor_iva,                // ✅ Valor del IVA
+        aplica_iva: calculos.aplica_iva,              // ✅ Si aplica IVA
         fecha_activacion: formData.fecha_activacion,
         observaciones: formData.observaciones_servicio
       },
@@ -357,6 +392,29 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     await clientService.updateClientService(client.id, datosServicio);
   };
 
+  const verificarCalculosIVA = (estrato, tipoServicio, precioBase) => {
+    console.log('🔍 Verificando cálculo IVA:');
+    console.log(`  - Estrato: ${estrato}`);
+    console.log(`  - Tipo: ${tipoServicio}`);
+    console.log(`  - Precio base: ${precioBase}`);
+
+    let aplicaIva = false;
+
+    if (tipoServicio === 'internet' || tipoServicio === 'combo') {
+      aplicaIva = parseInt(estrato) >= 4;
+    } else if (tipoServicio === 'television') {
+      aplicaIva = true;
+    }
+
+    const valorIva = aplicaIva ? Math.round(precioBase * 0.19) : 0;
+    const precioFinal = precioBase + valorIva;
+
+    console.log(`  - Aplica IVA: ${aplicaIva}`);
+    console.log(`  - Valor IVA: ${valorIva}`);
+    console.log(`  - Precio final: ${precioFinal}`);
+
+    return { aplicaIva, valorIva, precioFinal };
+  };
   const mostrarResumenCreacion = (response) => {
     const documentos = response.documentos_generados;
     let mensaje = `Cliente creado exitosamente.\n\n`;
@@ -697,28 +755,52 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                       <p><strong>Canales:</strong> {planSeleccionado.canales_tv}</p>
                     )}
 
-                    {/* Calcular IVA según estrato */}
                     {(() => {
                       const estratoNum = parseInt(formData.estrato) || 4;
                       let aplicaIva = false;
 
                       if (planSeleccionado.tipo === 'internet') {
-                        aplicaIva = estratoNum > 3;
+                        aplicaIva = estratoNum >= 4;  // ✅ CORRECTO: >= 4
                       } else if (planSeleccionado.tipo === 'television') {
                         aplicaIva = true;
                       } else if (planSeleccionado.tipo === 'combo') {
-                        aplicaIva = estratoNum > 3;
+                        aplicaIva = estratoNum >= 4;  // ✅ CORRECTO: >= 4
                       }
 
-                      const precio = parseFloat(formData.precio_personalizado) || planSeleccionado.precio;
-                      const iva = aplicaIva ? precio * 0.19 : 0;
-                      const total = precio + iva;
+                      // ✅ CONVERSIÓN CORRECTA A NÚMEROS
+                      const precioBase = parseFloat(formData.precio_personalizado) || parseFloat(planSeleccionado.precio) || 0;
+                      const valorIva = aplicaIva ? Math.round(precioBase * 0.19) : 0;
+                      const precioTotal = precioBase + valorIva;
 
                       return (
                         <div className="border-t border-blue-300 pt-2 mt-2">
-                          <p><strong>Precio base:</strong> ${precio.toLocaleString()}</p>
-                          <p><strong>IVA (19%):</strong> ${iva.toLocaleString()} {!aplicaIva && '(Exento)'}</p>
-                          <p className="text-lg"><strong>Total:</strong> ${total.toLocaleString()}</p>
+                          <div className="text-sm space-y-1">
+                            <div className="flex justify-between">
+                              <span>Precio base:</span>
+                              <span>${precioBase.toLocaleString('es-CO')}</span>
+                            </div>
+                            {aplicaIva ? (
+                              <div className="flex justify-between text-blue-600">
+                                <span>IVA (19%):</span>
+                                <span>${valorIva.toLocaleString('es-CO')}</span>
+                              </div>
+                            ) : (
+                              <div className="flex justify-between text-green-600">
+                                <span>IVA:</span>
+                                <span>Exento (Estrato {estratoNum})</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between font-bold text-lg border-t pt-1">
+                              <span>Total a pagar:</span>
+                              <span className="text-blue-700">${precioTotal.toLocaleString('es-CO')}</span>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {aplicaIva
+                                ? `Estrato ${estratoNum}: Aplica IVA del 19%`
+                                : `Estrato ${estratoNum}: Internet sin IVA`
+                              }
+                            </div>
+                          </div>
                         </div>
                       );
                     })()}

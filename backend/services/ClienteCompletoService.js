@@ -239,60 +239,71 @@ class ClienteCompletoService {
       // 6. Período de facturación formato YYYY-MM
       const periodoFacturacion = `${fechaEmision.getFullYear()}-${String(fechaEmision.getMonth() + 1).padStart(2, '0')}`;
 
-      // 7. Calcular totales
+      // 7. CALCULAR IVA CORRECTAMENTE SEGÚN ESTRATO
+      const estratoCliente = parseInt(datos.estrato) || 3;
+      console.log(`📊 Cliente estrato ${estratoCliente} calculando IVA...`);
+
+      let valorIvaInternet = 0;
+      let valorIvaTelevision = 0;
+
+      // Calcular IVA para Internet según estrato
+      if (valorInternet > 0) {
+        if (estratoCliente >= 4) {
+          valorIvaInternet = Math.round(valorInternet * 0.19);
+          console.log(`💰 Internet Estrato ${estratoCliente}: $${valorInternet} + IVA $${valorIvaInternet}`);
+        } else {
+          valorIvaInternet = 0;
+          console.log(`💚 Internet Estrato ${estratoCliente}: $${valorInternet} sin IVA`);
+        }
+      }
+
+      // Calcular IVA para TV (siempre aplica)
+      if (valorTelevision > 0) {
+        valorIvaTelevision = Math.round(valorTelevision * 0.19);
+        console.log(`📺 TV: $${valorTelevision} + IVA $${valorIvaTelevision}`);
+      }
+
       const subtotal = valorInternet + valorTelevision;
-      const iva = 0; // Sin IVA para estratos 1,2,3
-      const total = subtotal + iva;
+      const totalIva = valorIvaInternet + valorIvaTelevision;
+      const total = subtotal + totalIva;
+
+      console.log(`📋 RESUMEN FACTURA:
+  - Subtotal: $${subtotal}
+  - IVA Internet: $${valorIvaInternet}
+  - IVA TV: $${valorIvaTelevision}
+  - Total IVA: $${totalIva}
+  - TOTAL FINAL: $${total}
+`);
 
       // 8. INSERTAR FACTURA CON TODOS LOS CAMPOS CORREGIDOS ✓
       const queryFactura = `
-      INSERT INTO facturas (
-        numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
-        periodo_facturacion, fecha_emision, fecha_vencimiento,
-        fecha_desde, fecha_hasta,
-        internet, television, saldo_anterior, interes, reconexion,
-        descuento, varios, publicidad,
-        s_internet, s_television, s_interes, s_reconexion,
-        s_descuento, s_varios, s_publicidad, s_iva,
-        subtotal, iva, total, estado,
-        referencia_pago, resolucion, activo, observaciones,
-        created_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, '1', 'Primera factura automática', ?, NOW())
-    `;
+  INSERT INTO facturas (
+    numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
+    periodo_facturacion, fecha_emision, fecha_vencimiento,
+    internet, television, s_internet, s_television, s_iva,
+    subtotal, iva, total, estado, activo, observaciones, created_by
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', '1', 'Primera factura automática', ?)
+`;
 
       const valoresFactura = [
-        numeroFactura,                    // numero_factura
-        parseInt(clienteId),              // cliente_id
-        datos.identificacion,             // identificacion_cliente ✓ CORREGIDO
-        datos.nombre,                     // nombre_cliente ✓ CORREGIDO
-        periodoFacturacion,               // periodo_facturacion ✓ CORREGIDO
-        fechaEmision.toISOString().split('T')[0],     // fecha_emision
-        fechaVencimiento.toISOString().split('T')[0], // fecha_vencimiento
-        fechaDesde.toISOString().split('T')[0],       // fecha_desde ✓ CORREGIDO
-        fechaHasta.toISOString().split('T')[0],       // fecha_hasta ✓ CORREGIDO
-        valorInternet,                    // internet ✓ CORREGIDO
-        valorTelevision,                  // television ✓ CORREGIDO
-        0.00,                            // saldo_anterior
-        0.00,                            // interes
-        0.00,                            // reconexion
-        0.00,                            // descuento
-        0.00,                            // varios
-        0.00,                            // publicidad
-        valorInternet,                    // s_internet
-        valorTelevision,                  // s_television
-        0.00,                            // s_interes
-        0.00,                            // s_reconexion
-        0.00,                            // s_descuento
-        0.00,                            // s_varios
-        0.00,                            // s_publicidad
-        iva,                             // s_iva
-        subtotal,                        // subtotal
-        iva,                             // iva
-        total,                           // total
-        datos.identificacion,            // referencia_pago = misma cédula ✓ CORREGIDO
-        config.resolucion_facturacion || 'RESOLUCIÓN PENDIENTE', // resolucion ✓ CORREGIDO
-        parseInt(createdBy) || 1         // created_by ✓ CORREGIDO
+        numeroFactura,                                      // numero_factura
+        parseInt(clienteId),                                // cliente_id
+        datos.identificacion,                               // identificacion_cliente
+        datos.nombre,                                       // nombre_cliente
+        periodoFacturacion,                                 // periodo_facturacion
+        fechaEmision.toISOString().split('T')[0],          // fecha_emision
+        fechaVencimiento.toISOString().split('T')[0],      // fecha_vencimiento
+        valorInternet,                                      // internet
+        valorTelevision,                                    // television
+        valorIvaInternet,                                   // s_internet
+        valorIvaTelevision,                                 // s_television
+        totalIva,                                          // s_iva
+        subtotal,                                          // subtotal
+        totalIva,                                          // iva
+        total,                                             // total
+        parseInt(createdBy) || 1                           // created_by
       ];
+
 
       console.log('🔍 Insertando factura con valores corregidos:', valoresFactura);
 
@@ -305,16 +316,27 @@ class ClienteCompletoService {
     factura_id, concepto_nombre, cantidad,
     precio_unitario, descuento, subtotal, iva, total,
     servicio_cliente_id
-  ) VALUES (?, ?, 1, ?, 0.00, ?, 0.00, ?, ?)
+  ) VALUES (?, ?, 1, ?, 0.00, ?, ?, ?, ?)
 `, [
-        facturaId,                    // factura_id
-        `Plan ${datos.plan_nombre}`,  // concepto_nombre
-        valorInternet,                // precio_unitario
-        valorInternet,                // subtotal
-        valorInternet,                // total
-        servicioId                    // servicio_cliente_id
+        facturaId,
+        `SERVICIO DE INTERNET - ${datos.plan_nombre}`,
+        valorInternet,                    // precio_unitario (sin IVA)
+        valorInternet,                    // subtotal (sin IVA)
+        valorIvaInternet,                 // iva ✅ IVA CALCULADO CORRECTAMENTE
+        valorInternet + valorIvaInternet, // total ✅ PRECIO + IVA
+        servicioId
       ]);
-      console.log('✅ Factura completa creada con ID:', facturaId);
+
+      console.log('✅ Detalle de factura creado:', {
+        concepto: `SERVICIO DE INTERNET - ${datos.plan_nombre}`,
+        precio_unitario: valorInternet,
+        subtotal: valorInternet,
+        iva: valorIvaInternet,
+        total: valorInternet + valorIvaInternet,
+        estrato_cliente: estratoCliente,
+        aplica_iva: estratoCliente >= 4
+      });
+
 
       return {
         id: facturaId,
@@ -332,6 +354,7 @@ class ClienteCompletoService {
       throw error;
     }
   }
+
 
   /**
    * Crear detalle de factura
