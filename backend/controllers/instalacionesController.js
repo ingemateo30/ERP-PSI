@@ -80,12 +80,10 @@ class InstalacionesController {
           c.nombre as cliente_nombre,
           c.telefono as cliente_telefono,
           c.direccion as cliente_direccion,
-          c.email as cliente_email,
+          c.correo as cliente_email,
           
           -- Datos del instalador
-          u.nombres as instalador_nombres,
-          u.apellidos as instalador_apellidos,
-          CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre_completo,
+          u.nombre as instalador_nombres,
           u.telefono as instalador_telefono,
           
           -- Datos del servicio
@@ -269,12 +267,10 @@ class InstalacionesController {
           c.nombre as cliente_nombre,
           c.telefono as cliente_telefono,
           c.direccion as cliente_direccion,
-          c.email as cliente_email,
+          c.correo as cliente_email,
           
           -- Datos del instalador
-          u.nombres as instalador_nombres,
-          u.apellidos as instalador_apellidos,
-          CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre_completo,
+          u.nombre as instalador_nombres,
           u.telefono as instalador_telefono,
           u.email as instalador_email,
           
@@ -932,7 +928,7 @@ class InstalacionesController {
       let consultaInstaladores = `
         SELECT 
           i.instalador_id,
-          CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre,
+          u.nombre as instalador_nombre,
           COUNT(*) as total_instalaciones,
           SUM(CASE WHEN i.estado = 'completada' THEN 1 ELSE 0 END) as completadas,
           SUM(CASE WHEN i.estado = 'programada' THEN 1 ELSE 0 END) as programadas,
@@ -963,7 +959,7 @@ class InstalacionesController {
         parametrosInstaladores.push(instalador_id);
       }
 
-      consultaInstaladores += ` GROUP BY i.instalador_id, u.nombres, u.apellidos ORDER BY total_instalaciones DESC`;
+      consultaInstaladores += ` GROUP BY i.instalador_id, u.nombre ORDER BY total_instalaciones DESC`;
 
       const instaladores = await Database.query(consultaInstaladores, parametrosInstaladores);
 
@@ -1028,7 +1024,7 @@ class InstalacionesController {
           c.nombre as cliente_nombre,
           c.telefono as cliente_telefono,
           i.direccion_instalacion,
-          CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre,
+          u.nombre as instalador_nombre,
           ps.nombre as plan_nombre
         FROM instalaciones i
         LEFT JOIN clientes c ON i.cliente_id = c.id
