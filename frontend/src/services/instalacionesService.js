@@ -1,4 +1,4 @@
-// frontend/src/services/instalacionesService.js
+// frontend/src/services/instalacionesService.js - VERSIÓN CORREGIDA
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 const API_URL = `${API_BASE_URL}/instalaciones`;
@@ -12,19 +12,32 @@ const handleResponse = async (response) => {
   return await response.json();
 };
 
-// Función helper para obtener headers con autenticación
+// Función helper para obtener headers con autenticación - CORREGIDA
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+  // Intentar obtener token de diferentes lugares (según como lo guardes en tu AuthContext)
+  const token = localStorage.getItem('accessToken') || 
+                localStorage.getItem('token') || 
+                sessionStorage.getItem('accessToken') || 
+                sessionStorage.getItem('token');
+  
+  console.log('🔑 Token encontrado:', token ? 'SÍ' : 'NO');
+  
+  const headers = {
+    'Content-Type': 'application/json'
   };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
 };
 
 export const instalacionesService = {
   // Test del servicio
   async test() {
     try {
+      console.log('🧪 Probando servicio de instalaciones');
       const response = await fetch(`${API_URL}/test`, {
         method: 'GET',
         headers: getAuthHeaders()
@@ -39,6 +52,8 @@ export const instalacionesService = {
   // Obtener lista de instalaciones con filtros
   async getInstalaciones(filtros = {}) {
     try {
+      console.log('📋 Obteniendo instalaciones con filtros:', filtros);
+      
       const params = new URLSearchParams();
       
       // Agregar filtros como parámetros de consulta
@@ -49,10 +64,14 @@ export const instalacionesService = {
       });
 
       const url = `${API_URL}?${params.toString()}`;
+      console.log('🌐 URL de solicitud:', url);
+      
+      const headers = getAuthHeaders();
+      console.log('📤 Headers enviados:', headers);
       
       const response = await fetch(url, {
         method: 'GET',
-        headers: getAuthHeaders()
+        headers: headers
       });
 
       return await handleResponse(response);
@@ -62,9 +81,42 @@ export const instalacionesService = {
     }
   },
 
+  // Obtener estadísticas
+  async getEstadisticas(filtros = {}) {
+    try {
+      console.log('📊 Obteniendo estadísticas con filtros:', filtros);
+      
+      const params = new URLSearchParams();
+      
+      Object.entries(filtros).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value);
+        }
+      });
+
+      const url = `${API_URL}/estadisticas?${params.toString()}`;
+      console.log('🌐 URL estadísticas:', url);
+      
+      const headers = getAuthHeaders();
+      console.log('📤 Headers para estadísticas:', headers);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: headers
+      });
+
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error obteniendo estadísticas:', error);
+      throw error;
+    }
+  },
+
   // Obtener instalación por ID
   async getInstalacionById(id) {
     try {
+      console.log('🔍 Obteniendo instalación ID:', id);
+      
       const response = await fetch(`${API_URL}/${id}`, {
         method: 'GET',
         headers: getAuthHeaders()
@@ -80,6 +132,8 @@ export const instalacionesService = {
   // Crear nueva instalación
   async createInstalacion(datosInstalacion) {
     try {
+      console.log('➕ Creando instalación:', datosInstalacion);
+      
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -96,6 +150,8 @@ export const instalacionesService = {
   // Actualizar instalación
   async updateInstalacion(id, datosInstalacion) {
     try {
+      console.log('📝 Actualizando instalación ID:', id, 'con datos:', datosInstalacion);
+      
       const response = await fetch(`${API_URL}/${id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
@@ -112,6 +168,8 @@ export const instalacionesService = {
   // Cambiar estado de instalación
   async cambiarEstado(id, nuevoEstado, datosAdicionales = {}) {
     try {
+      console.log('🔄 Cambiando estado instalación ID:', id, 'a:', nuevoEstado);
+      
       const response = await fetch(`${API_URL}/${id}/estado`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
@@ -131,6 +189,8 @@ export const instalacionesService = {
   // Eliminar instalación
   async deleteInstalacion(id) {
     try {
+      console.log('🗑️ Eliminando instalación ID:', id);
+      
       const response = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
@@ -143,34 +203,11 @@ export const instalacionesService = {
     }
   },
 
-  // Obtener estadísticas
-  async getEstadisticas(filtros = {}) {
-    try {
-      const params = new URLSearchParams();
-      
-      Object.entries(filtros).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          params.append(key, value);
-        }
-      });
-
-      const url = `${API_URL}/estadisticas?${params.toString()}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: getAuthHeaders()
-      });
-
-      return await handleResponse(response);
-    } catch (error) {
-      console.error('Error obteniendo estadísticas:', error);
-      throw error;
-    }
-  },
-
   // Obtener instaladores disponibles
   async getInstaladores() {
     try {
+      console.log('👷 Obteniendo instaladores');
+      
       const response = await fetch(`${API_BASE_URL}/api/v1/users?rol=instalador&activo=1`, {
         method: 'GET',
         headers: getAuthHeaders()
@@ -186,6 +223,8 @@ export const instalacionesService = {
   // Obtener clientes activos
   async getClientes(busqueda = '') {
     try {
+      console.log('👥 Obteniendo clientes, búsqueda:', busqueda);
+      
       const params = new URLSearchParams();
       if (busqueda) {
         params.append('busqueda', busqueda);
@@ -207,6 +246,8 @@ export const instalacionesService = {
   // Obtener servicios de un cliente
   async getServiciosCliente(clienteId) {
     try {
+      console.log('🔧 Obteniendo servicios del cliente:', clienteId);
+      
       const response = await fetch(`${API_BASE_URL}/api/v1/clients/${clienteId}/servicios`, {
         method: 'GET',
         headers: getAuthHeaders()
@@ -222,6 +263,8 @@ export const instalacionesService = {
   // Obtener equipos disponibles
   async getEquiposDisponibles() {
     try {
+      console.log('📦 Obteniendo equipos disponibles');
+      
       const response = await fetch(`${API_BASE_URL}/api/v1/inventory?estado=disponible&estado=asignado`, {
         method: 'GET',
         headers: getAuthHeaders()
@@ -354,13 +397,20 @@ export const instalacionesService = {
       formData.append('descripcion', descripcion);
       formData.append('instalacion_id', instalacionId);
 
-      const token = localStorage.getItem('token');
+      // Para FormData no incluir Content-Type, obtener solo Authorization
+      const token = localStorage.getItem('accessToken') || 
+                    localStorage.getItem('token') || 
+                    sessionStorage.getItem('accessToken') || 
+                    sessionStorage.getItem('token');
+      
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/v1/instalaciones/${instalacionId}/fotos`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-          // No incluir Content-Type para FormData
-        },
+        headers: headers,
         body: formData
       });
 
@@ -384,12 +434,19 @@ export const instalacionesService = {
       
       params.append('formato', formato);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('accessToken') || 
+                    localStorage.getItem('token') || 
+                    sessionStorage.getItem('accessToken') || 
+                    sessionStorage.getItem('token');
+      
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_URL}/exportar?${params.toString()}`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: headers
       });
 
       if (!response.ok) {
