@@ -391,46 +391,79 @@ class ClienteCompletoService {
    * Generar orden de instalación interna COMPLETA
    */
   static async generarOrdenInstalacionInterno(conexion, clienteId, servicioId, datosServicio, createdBy = null) {
-    console.log('📋 Generando orden de instalación COMPLETA...');
+   try {
+    console.log('🔧 Generando orden de instalación usando contrato_id para trazabilidad...');
 
-    // Obtener datos del plan para el costo de instalación
-    const [planes] = await conexion.execute(`
-    SELECT costo_instalacion_sin_permanencia, costo_instalacion_permanencia 
-    FROM planes_servicio ps
-    JOIN servicios_cliente sc ON ps.id = sc.plan_id
-    WHERE sc.id = ?
-  `, [servicioId]);
+    // Generar número de orden
+    const numeroOrden = await this.generarNumeroOrden(conexion);
 
-    const planData = planes[0] || {};
-    const tipoPermanencia = datosServicio?.tipo_permanencia || 'sin_permanencia';
-    const costoInstalacion = tipoPermanencia === 'con_permanencia'
-      ? planData.costo_instalacion_permanencia
-      : planData.costo_instalacion_sin_permanencia;
+    // Calcular costo total de instalación
+    const costoInstalacionTotal = serviciosDeLaSede.length * 42016;
 
-    // Obtener contrato_id si existe
-    const [contratos] = await conexion.execute(`
-    SELECT id FROM contratos WHERE servicio_id = ? ORDER BY created_at DESC LIMIT 1
-  `, [servicioId]);
+    // Crear descripción detallada de servicios a instalar
+    const serviciosDescripcion = serviciosDeLaSede.map(s => 
+      `${s.tipo.toUpperCase()}: ${s.plan_nombre} - $${s.precio.toLocaleString()}`
+    ).join(' | ');
 
-    const contratoId = contratos[0]?.id || null;
+    // Observaciones con información completa de la sede y servicios
+    const observacionesInstalacion = JSON.stringify({
+      sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+      direccion_instalacion: sedeData.direccion_servicio,
+      contacto_sede: sedeData.contacto_sede,
+      telefono_sede: sedeData.telefono_sede,
+      servicios_descripcion: serviciosDescripcion,
+      cantidad_servicios: serviciosDeLaSede.length,
+      servicios_ids: serviciosDeLaSede.map(s => s.id), // IDs para referencia
+      tipo_instalacion: 'nueva_sede_completa',
+      generada_automaticamente: true,
+      contrato_relacionado: contratoId
+    });
 
+    // ✅ INSERTAR instalación con contrato_id para trazabilidad completa
     const query = `
-    INSERT INTO instalaciones (
-      cliente_id, servicio_cliente_id, contrato_id, fecha_programada, 
-      estado, tipo_instalacion, costo_instalacion, observaciones, created_at
-    ) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 2 DAY), 'programada', 'nueva', ?, 'Orden generada automáticamente', NOW())
-  `;
+      INSERT INTO instalaciones (
+        numero_orden, cliente_id, contrato_id, fecha_programada, 
+        hora_programada, direccion_instalacion, barrio, telefono_contacto,
+        persona_recibe, tipo_instalacion, estado, costo_instalacion,
+        observaciones, created_by, created_at
+      ) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 2 DAY), '09:00:00', ?, ?, ?, ?, 'nueva', 'programada', ?, ?, ?, NOW())
+    `;
 
-    await conexion.execute(query, [clienteId, servicioId, contratoId, costoInstalacion]);
+    const [resultado] = await conexion.execute(query, [
+      numeroOrden,                              // numero_orden
+      clienteId,                               // cliente_id
+      contratoId,                              // ✅ contrato_id (clave de trazabilidad)
+      sedeData.direccion_servicio,             // direccion_instalacion
+      sedeData.barrio || 'No especificado',   // barrio
+      sedeData.telefono_sede,                  // telefono_contacto
+      sedeData.contacto_sede,                  // persona_recibe
+      costoInstalacionTotal,                   // costo_instalacion
+      observacionesInstalacion,                // observaciones (JSON con todos los servicios)
+      createdBy || 1                          // created_by
+    ]);
 
-    console.log('✅ Orden de instalación creada con contrato_id y costo correcto');
+    const instalacionId = resultado.insertId;
+
+    console.log(`✅ Orden de instalación ${numeroOrden} creada:`, {
+      instalacion_id: instalacionId,
+      contrato_id: contratoId,
+      servicios_incluidos: serviciosDeLaSede.length,
+      costo_total: costoInstalacionTotal
+    });
 
     return {
-      numero: `ORD-${Date.now()}-${clienteId}`,
+      id: instalacionId,
+      numero: numeroOrden,
+      contrato_id: contratoId,                 // ✅ Retornar para trazabilidad
       estado: 'programada',
-      contrato_id: contratoId,
-      costo_instalacion: costoInstalacion
+      servicios_incluidos: serviciosDeLaSede.length,
+      costo_total: costoInstalacionTotal
     };
+
+  } catch (error) {
+    console.error('❌ Error generando orden de instalación con contrato_id:', error);
+    throw error;
+  }
   }
 
 
@@ -1434,59 +1467,114 @@ static async generarNumeroContrato(conexion) {
   /**
    * Generar UN contrato para TODA la sede (Internet + TV)
    */
-  static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, createdBy) {
-    const numeroContrato = await this.generarNumeroContrato(conexion);
+ static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, createdBy) {
+  const numeroContrato = await this.generarNumeroContrato(conexion);
 
-    // Calcular costo total de instalación para todos los servicios de la sede
-    const costoInstalacionTotal = serviciosDeLaSede.length * 42016; // o lógica más compleja
+  // Calcular costo total de instalación para todos los servicios de la sede
+  const costoInstalacionTotal = serviciosDeLaSede.length * 42016; // o lógica más compleja
 
-    // Determinar tipo de permanencia (aplica a todos los servicios de la sede)
-    const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
-    const mesesPermanencia = sedeData.mesesPermanencia || 0;
+  // ✅ CORRECCIÓN: Leer correctamente los datos de permanencia del frontend
+  const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
+  
+  // ✅ CORRECCIÓN: Asegurar que mesesPermanencia sea 6 cuando hay permanencia
+  let mesesPermanencia =0;
+  if (tipoPermanencia === 'con_permanencia') {
+    mesesPermanencia = 6; // Default 6 meses si no viene
+  }
 
-    // Descripción de servicios incluidos
-    const serviciosDescripcion = serviciosDeLaSede.map(s =>
-      `${s.tipo.toUpperCase()}: ${s.plan_nombre} ($${s.precio.toLocaleString()})`
-    ).join(' + ');
+  // ✅ CORRECCIÓN: Calcular fecha_vencimiento_permanencia correctamente
+  let fechaVencimientoPermanencia = null;
+  if (tipoPermanencia === 'con_permanencia' && mesesPermanencia > 0) {
+    const fechaInicio = new Date();
+    fechaVencimientoPermanencia = new Date(fechaInicio.setMonth(fechaInicio.getMonth() + mesesPermanencia))
+      .toISOString().split('T')[0];
+  }
 
-    const observacionesContrato = JSON.stringify({
-      sede_nombre: sedeData.nombre_sede || 'Sede Principal',
-      direccion_sede: sedeData.direccion_servicio,
-      contacto_sede: sedeData.contacto_sede,
-      telefono_sede: sedeData.telefono_sede,
-      servicios_incluidos: serviciosDescripcion,
-      cantidad_servicios: serviciosDeLaSede.length,
-      observaciones_adicionales: sedeData.observaciones
-    });
+  // Descripción de servicios incluidos
+  const serviciosDescripcion = serviciosDeLaSede.map(s => 
+    `${s.tipo.toUpperCase()}: ${s.plan_nombre} ($${s.precio.toLocaleString()})`
+  ).join(' + ');
 
-    const query = `
-      INSERT INTO contratos (
-        numero_contrato, cliente_id, tipo_contrato, tipo_permanencia, 
-        permanencia_meses, costo_instalacion, fecha_generacion, 
-        fecha_inicio, estado, observaciones, generado_automaticamente, created_by
-      ) VALUES (?, ?, 'servicio', ?, ?, ?, ?, ?, 'activo', ?, 1, ?)
-    `;
+  const observacionesContrato = JSON.stringify({
+    sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+    direccion_sede: sedeData.direccion_servicio,
+    contacto_sede: sedeData.contacto_sede,
+    telefono_sede: sedeData.telefono_sede,
+    servicios_incluidos: serviciosDescripcion,
+    cantidad_servicios: serviciosDeLaSede.length,
+    observaciones_adicionales: sedeData.observaciones,
+    tipo_permanencia: tipoPermanencia,
+    meses_permanencia: mesesPermanencia
+  });
 
-    const [resultado] = await conexion.execute(query, [
-      numeroContrato,
-      clienteId,
-      tipoPermanencia,
-      mesesPermanencia,
-      costoInstalacionTotal,
-      new Date().toISOString().split('T')[0],
-      new Date().toISOString().split('T')[0],
-      observacionesContrato,
-      createdBy
-    ]);
+  // ✅ CORRECCIÓN CRÍTICA: La tabla NO tiene servicio_id para contratos de sede
+  // Debe usar la estructura correcta sin servicio_id
+  const query = `
+    INSERT INTO contratos (
+      numero_contrato, cliente_id, tipo_contrato, tipo_permanencia, 
+      permanencia_meses, costo_instalacion, fecha_generacion, 
+      fecha_inicio, fecha_vencimiento_permanencia, estado, 
+      generado_automaticamente, observaciones, created_by
+    ) VALUES (?, ?, 'servicio', ?, ?, ?, ?, ?, ?, 'activo', 1, ?, ?)
+  `;
 
-    const contratoId = resultado.insertId;
+  console.log('🔍 Query contrato (SIN servicio_id):', query);
+  console.log('🔍 Valores contrato:', [
+    numeroContrato,
+    clienteId,
+    tipoPermanencia,
+    mesesPermanencia,
+    costoInstalacionTotal,
+    new Date().toISOString().split('T')[0],
+    new Date().toISOString().split('T')[0],
+    fechaVencimientoPermanencia,
+    observacionesContrato,
+    createdBy || 1
+  ]);
 
-    // Actualizar todos los servicios de la sede con el contrato_id
-    for (const servicio of serviciosDeLaSede) {
+  const [resultado] = await conexion.execute(query, [
+    numeroContrato,                                 // numero_contrato
+    clienteId,                                      // cliente_id
+    tipoPermanencia,                                // tipo_permanencia ✅
+    mesesPermanencia,                               // permanencia_meses ✅ (6 cuando es con_permanencia)
+    costoInstalacionTotal,                          // costo_instalacion
+    new Date().toISOString().split('T')[0],         // fecha_generacion
+    new Date().toISOString().split('T')[0],         // fecha_inicio
+    fechaVencimientoPermanencia,                    // fecha_vencimiento_permanencia ✅ (calculada correctamente)
+    observacionesContrato,                          // observaciones
+    createdBy                                       // created_by
+  ]);
+
+  const contratoId = resultado.insertId;
+
+  console.log(`✅ Contrato ${numeroContrato} creado:`, {
+    tipo_permanencia: tipoPermanencia,
+    meses: mesesPermanencia,
+    fecha_vencimiento: fechaVencimientoPermanencia,
+    contrato_id: contratoId
+  });
+
+  // Actualizar todos los servicios de la sede con el contrato_id
+  for (const servicio of serviciosDeLaSede) {
+    try {
+      // Verificar el tipo de sede_info antes de procesar
+      let sedeInfoBase = {};
+      
+      if (servicio.sede_info) {
+        if (typeof servicio.sede_info === 'string') {
+          try {
+            sedeInfoBase = JSON.parse(servicio.sede_info);
+          } catch (parseError) {
+            console.warn('⚠️ Error parseando sede_info como JSON:', parseError);
+            sedeInfoBase = {};
+          }
+        } else if (typeof servicio.sede_info === 'object' && servicio.sede_info !== null) {
+          sedeInfoBase = servicio.sede_info;
+        }
+      }
+      
       const observacionesActualizadas = JSON.stringify({
-        ...(typeof servicio.sede_info === 'string' ?
-          JSON.parse(servicio.sede_info) :
-          servicio.sede_info || {}), // ✅ Verificar tipo antes de parsear
+        ...sedeInfoBase,
         contrato_id: contratoId,
         numero_contrato: numeroContrato
       });
@@ -1495,13 +1583,18 @@ static async generarNumeroContrato(conexion) {
         'UPDATE servicios_cliente SET observaciones = ? WHERE id = ?',
         [observacionesActualizadas, servicio.id]
       );
+
+      console.log(`✅ Servicio ${servicio.id} actualizado con contrato ${numeroContrato}`);
+      
+    } catch (updateError) {
+      console.error(`❌ Error actualizando servicio ${servicio.id}:`, updateError);
     }
-
-    console.log(`✅ Contrato ${numeroContrato} creado para ${serviciosDeLaSede.length} servicios de la sede`);
-
-    return contratoId;
   }
 
+  console.log(`✅ Contrato ${numeroContrato} creado para ${serviciosDeLaSede.length} servicios de la sede`);
+
+  return contratoId;
+}
   /**
    * Generar UNA factura para TODA la sede (Internet + TV)
    */
