@@ -1333,6 +1333,26 @@ router.post('/sectors/:id/toggle', requireRole('administrador'), async (req, res
     });
   }
 });
+router.get('/sectores-por-ciudad/:ciudadId', async (req, res) => {
+  try {
+    const { ciudadId } = req.params;
+    const [sectores] = await pool.execute(
+      'SELECT * FROM sectores WHERE ciudad_id = ? AND activo = 1 ORDER BY nombre',
+      [ciudadId]
+    );
+    
+    res.json({
+      success: true,
+      data: sectores
+    });
+  } catch (error) {
+    console.error('Error obteniendo sectores:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error obteniendo sectores'
+    });
+  }
+});
 
 /**
  * @route GET /api/v1/config/banks
