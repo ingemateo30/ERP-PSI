@@ -1,5 +1,5 @@
 // =============================================
-// FRONTEND: frontend/src/components/Clients/ClientsManagement.js - COMPLETO ACTUALIZADO
+// FRONTEND: frontend/src/components/Clients/ClientsManagement.js - COMPLETO Y FUNCIONAL
 // =============================================
 
 import React, { useState, useEffect } from 'react';
@@ -21,9 +21,9 @@ import ClientModal from './ClientModal';
 import ClientesInactivos from './ClientesInactivos';
 
 // ================================================================
-// COMPONENTE PRINCIPAL: ServiciosSelector (NUEVO)
+// COMPONENTE: ServiciosSelector COMPLETO Y FUNCIONAL
 // ================================================================
-const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, planesDisponibles = [] }) => {
+const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, planesDisponibles = [], estratoCliente = 1 }) => {
   const [servicios, setServicios] = useState(serviciosSeleccionados);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
 
   const agregarServicio = () => {
     const nuevoServicio = {
-      id: Date.now(), // ID temporal
+      id: Date.now(),
       planInternetId: '',
       planTelevisionId: '',
       direccionServicio: '',
@@ -44,7 +44,9 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
       precioTelevisionCustom: '',
       descuentoCombo: 0,
       observaciones: '',
-      generarFacturaSeparada: false
+      generarFacturaSeparada: false,
+      tipoContrato: 'con_permanencia',
+      mesesPermanencia: 6
     };
     
     const nuevosServicios = [...servicios, nuevoServicio];
@@ -56,15 +58,27 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
     const nuevosServicios = [...servicios];
     nuevosServicios[index][campo] = valor;
     
-    // Auto-calcular descuento combo si selecciona ambos servicios
+    // Auto-calcular descuento combo
     if (campo === 'planInternetId' || campo === 'planTelevisionId') {
       if (nuevosServicios[index].planInternetId && nuevosServicios[index].planTelevisionId) {
-        // Aplicar descuento combo por defecto (15%)
         nuevosServicios[index].descuentoCombo = 15;
       } else {
-        // Sin descuento si solo tiene un servicio
         nuevosServicios[index].descuentoCombo = 0;
       }
+
+      // Auto-ajustar permanencia según los planes
+      const planInternet = planesDisponibles.find(p => p.id == nuevosServicios[index].planInternetId);
+      const planTV = planesDisponibles.find(p => p.id == nuevosServicios[index].planTelevisionId);
+      
+      let permanenciaMinima = 6; // Default
+      if (planInternet && planInternet.permanencia_minima_meses) {
+        permanenciaMinima = Math.max(permanenciaMinima, planInternet.permanencia_minima_meses);
+      }
+      if (planTV && planTV.permanencia_minima_meses) {
+        permanenciaMinima = Math.max(permanenciaMinima, planTV.permanencia_minima_meses);
+      }
+      
+      nuevosServicios[index].mesesPermanencia = permanenciaMinima;
     }
     
     setServicios(nuevosServicios);
@@ -77,8 +91,38 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
     onServiciosChange(nuevosServicios);
   };
 
+  // Función para calcular IVA según normativa
+  const calcularIVA = (precio, tipoServicio, estrato) => {
+    if (!precio || precio === 0) {
+      return { precioSinIVA: 0, precioConIVA: 0, valorIVA: 0, aplicaIVA: false };
+    }
+
+    let aplicaIVA = false;
+    
+    if (tipoServicio === 'internet') {
+      // Internet: Sin IVA para estratos 1,2,3 - Con IVA 19% para estratos 4,5,6
+      aplicaIVA = estrato >= 4;
+    } else if (tipoServicio === 'television') {
+      // Televisión: SIEMPRE IVA 19%
+      aplicaIVA = true;
+    }
+
+    const valorIVA = aplicaIVA ? (precio * 0.19) : 0;
+    const precioConIVA = precio + valorIVA;
+
+    return {
+      precioSinIVA: precio,
+      precioConIVA: precioConIVA,
+      valorIVA: valorIVA,
+      aplicaIVA: aplicaIVA
+    };
+  };
+
+  // Función para calcular precios del servicio
   const calcularPrecioServicio = (servicio) => {
-    let precioTotal = 0;
+    let totalSinIVA = 0;
+    let totalConIVA = 0;
+    let totalIVA = 0;
     let detalles = [];
     let planInternet = null;
     let planTV = null;
@@ -86,42 +130,106 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
     // Plan de Internet
     if (servicio.planInternetId) {
       planInternet = planesDisponibles.find(p => p.id == servicio.planInternetId);
-      const precioInternet = servicio.precioPersonalizado ? 
-        parseFloat(servicio.precioInternetCustom) || 0 : 
-        parseFloat(planInternet?.precio) || 0;
-      
-      precioTotal += precioInternet;
-      detalles.push(`Internet ${planInternet?.nombre || ''}: $${precioInternet.toLocaleString()}`);
+      if (planInternet) {
+        const precioBase = servicio.precioPersonalizado ? 
+          parseFloat(servicio.precioInternetCustom) || 0 : 
+          parseFloat(planInternet.precio) || 0;
+        
+        const calculoInternet = calcularIVA(precioBase, 'internet', parseInt(estratoCliente));
+        
+        totalSinIVA += calculoInternet.precioSinIVA;
+        totalConIVA += calculoInternet.precioConIVA;
+        totalIVA += calculoInternet.valorIVA;
+        
+        detalles.push({
+          concepto: `Internet ${planInternet.nombre} (${planInternet.velocidad_bajada}MB)`,
+          precioSinIVA: calculoInternet.precioSinIVA,
+          precioConIVA: calculoInternet.precioConIVA,
+          valorIVA: calculoInternet.valorIVA,
+          aplicaIVA: calculoInternet.aplicaIVA
+        });
+      }
     }
 
     // Plan de Televisión
     if (servicio.planTelevisionId) {
       planTV = planesDisponibles.find(p => p.id == servicio.planTelevisionId);
-      const precioTV = servicio.precioPersonalizado ? 
-        parseFloat(servicio.precioTelevisionCustom) || 0 : 
-        parseFloat(planTV?.precio) || 0;
-      
-      precioTotal += precioTV;
-      detalles.push(`TV ${planTV?.nombre || ''}: $${precioTV.toLocaleString()}`);
+      if (planTV) {
+        // Para TV, el precio en BD ya incluye IVA, debemos extraer la base
+        let precioBaseSinIVA;
+        if (servicio.precioPersonalizado) {
+          precioBaseSinIVA = parseFloat(servicio.precioTelevisionCustom) || 0;
+        } else {
+          const precioConIVA = parseFloat(planTV.precio) || 0;
+          precioBaseSinIVA = Math.round(precioConIVA / 1.19);
+        }
+        
+        const calculoTV = calcularIVA(precioBaseSinIVA, 'television', parseInt(estratoCliente));
+        
+        totalSinIVA += calculoTV.precioSinIVA;
+        totalConIVA += calculoTV.precioConIVA;
+        totalIVA += calculoTV.valorIVA;
+        
+        detalles.push({
+          concepto: `TV ${planTV.nombre} (${planTV.canales_tv} canales)`,
+          precioSinIVA: calculoTV.precioSinIVA,
+          precioConIVA: calculoTV.precioConIVA,
+          valorIVA: calculoTV.valorIVA,
+          aplicaIVA: calculoTV.aplicaIVA
+        });
+      }
     }
 
-    // Descuento combo
+    // Aplicar descuento combo
     let descuentoAplicado = 0;
-    if (servicio.descuentoCombo > 0 && precioTotal > 0) {
-      descuentoAplicado = precioTotal * (servicio.descuentoCombo / 100);
-      precioTotal -= descuentoAplicado;
-      detalles.push(`Descuento combo (${servicio.descuentoCombo}%): -$${descuentoAplicado.toLocaleString()}`);
+    if (servicio.descuentoCombo > 0 && totalSinIVA > 0) {
+      descuentoAplicado = totalSinIVA * (servicio.descuentoCombo / 100);
+      totalSinIVA -= descuentoAplicado;
+      
+      // Recalcular IVA después del descuento
+      totalIVA = 0;
+      if (servicio.planInternetId && parseInt(estratoCliente) >= 4) {
+        totalIVA += (totalSinIVA * 0.5) * 0.19;
+      }
+      if (servicio.planTelevisionId) {
+        totalIVA += (totalSinIVA * 0.5) * 0.19;
+      }
+      totalConIVA = totalSinIVA + totalIVA;
+      
+      detalles.push({
+        concepto: `Descuento combo (${servicio.descuentoCombo}%)`,
+        precioSinIVA: -descuentoAplicado,
+        precioConIVA: -descuentoAplicado,
+        valorIVA: 0,
+        aplicaIVA: false
+      });
+    }
+
+    // Costo de instalación
+    let costoInstalacion = 0;
+    if (planInternet || planTV) {
+      const planPrincipal = planInternet || planTV;
+      if (servicio.tipoContrato === 'con_permanencia') {
+        costoInstalacion = planPrincipal.costo_instalacion_permanencia || 50000;
+      } else {
+        costoInstalacion = planPrincipal.costo_instalacion_sin_permanencia || 150000;
+      }
     }
 
     return {
-      total: precioTotal,
+      totalSinIVA: totalSinIVA,
+      totalConIVA: totalConIVA,
+      totalIVA: totalIVA,
       detalles: detalles,
       tieneInternet: !!servicio.planInternetId,
       tieneTV: !!servicio.planTelevisionId,
       esCombo: !!(servicio.planInternetId && servicio.planTelevisionId),
       planInternet: planInternet,
       planTV: planTV,
-      descuentoAplicado: descuentoAplicado
+      descuentoAplicado: descuentoAplicado,
+      costoInstalacion: costoInstalacion,
+      tipoContrato: servicio.tipoContrato,
+      mesesPermanencia: servicio.mesesPermanencia
     };
   };
 
@@ -179,7 +287,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-lg font-semibold text-gray-900">
-                  ${precio.total.toLocaleString()}
+                  ${precio.totalConIVA.toLocaleString()}
                 </span>
                 <button
                   type="button"
@@ -210,7 +318,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                     <option value="">Sin Internet</option>
                     {planesInternet.map(plan => (
                       <option key={plan.id} value={plan.id}>
-                        {plan.nombre} - {plan.velocidad_bajada}MB - ${plan.precio.toLocaleString()}
+                        {plan.nombre} - {plan.velocidad_bajada}MB - ${plan.precio ? plan.precio.toLocaleString() : '0'}
                       </option>
                     ))}
                   </select>
@@ -230,7 +338,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                     <option value="">Sin Televisión</option>
                     {planesTV.map(plan => (
                       <option key={plan.id} value={plan.id}>
-                        {plan.nombre} - {plan.canales_tv} canales - ${plan.precio.toLocaleString()}
+                        {plan.nombre} - {plan.canales_tv} canales - ${plan.precio ? Math.round(plan.precio / 1.19).toLocaleString() : '0'} + IVA
                       </option>
                     ))}
                   </select>
@@ -297,6 +405,43 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
 
               {/* Opciones avanzadas */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Tipo de contrato y permanencia */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Tipo de Contrato
+                  </label>
+                  <select
+                    value={servicio.tipoContrato}
+                    onChange={(e) => actualizarServicio(index, 'tipoContrato', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="con_permanencia">Con Permanencia (Instalación: ${precio.costoInstalacion ? precio.costoInstalacion.toLocaleString() : '50,000'})</option>
+                    <option value="sin_permanencia">Sin Permanencia (Instalación: ${precio.costoInstalacion ? precio.costoInstalacion.toLocaleString() : '150,000'})</option>
+                  </select>
+                  
+                  {servicio.tipoContrato === 'con_permanencia' && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Meses de Permanencia
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="24"
+                        value={servicio.mesesPermanencia}
+                        onChange={(e) => actualizarServicio(index, 'mesesPermanencia', parseInt(e.target.value) || 6)}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Mínimo requerido: {Math.max(
+                          precio.planInternet?.permanencia_minima_meses || 0, 
+                          precio.planTV?.permanencia_minima_meses || 0
+                        ) || 6} meses
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {/* Precio personalizado */}
                 <div className="space-y-3">
                   <label className="flex items-center">
@@ -317,7 +462,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                       {servicio.planInternetId && (
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Precio Internet Personalizado
+                            Precio Internet Personalizado (Sin IVA)
                           </label>
                           <input
                             type="number"
@@ -331,7 +476,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                       {servicio.planTelevisionId && (
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Precio TV Personalizado
+                            Precio TV Personalizado (Sin IVA)
                           </label>
                           <input
                             type="number"
@@ -400,26 +545,74 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
 
             {/* Resumen de precios */}
             <div className="p-4 bg-blue-50 border-t border-gray-200">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-3">
                 <Calculator className="w-4 h-4 text-blue-600" />
                 <h5 className="font-medium text-blue-900">Resumen del Servicio:</h5>
+                <span className="text-xs text-blue-700 bg-blue-200 px-2 py-1 rounded">
+                  Estrato {estratoCliente}
+                </span>
               </div>
-              <div className="text-sm text-blue-800 space-y-1">
+              
+              <div className="text-sm space-y-2">
+                {/* Tabla de conceptos */}
+                <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-blue-800 border-b border-blue-200 pb-1">
+                  <div>Concepto</div>
+                  <div className="text-right">Sin IVA</div>
+                  <div className="text-right">IVA</div>
+                  <div className="text-right">Total</div>
+                </div>
+                
                 {precio.detalles.map((detalle, i) => (
-                  <div key={i} className="flex justify-between">
-                    <span>{detalle.split(':')[0]}:</span>
-                    <span className="font-medium">{detalle.split(':')[1]}</span>
+                  <div key={i} className="grid grid-cols-4 gap-2 text-xs">
+                    <div className="text-blue-800">{detalle.concepto}</div>
+                    <div className="text-right">${detalle.precioSinIVA.toLocaleString()}</div>
+                    <div className="text-right text-green-700">
+                      {detalle.valorIVA > 0 ? `$${detalle.valorIVA.toLocaleString()}` : '--'}
+                    </div>
+                    <div className="text-right font-medium">${detalle.precioConIVA.toLocaleString()}</div>
                   </div>
                 ))}
-                <div className="flex justify-between font-semibold border-t border-blue-200 pt-1 mt-2">
-                  <span>Total Mensual:</span>
-                  <span>${precio.total.toLocaleString()}</span>
-                </div>
-                {precio.esCombo && (
-                  <div className="text-xs text-green-700 mt-1">
-                    ✓ Descuento combo aplicado
+                
+                {/* Total final */}
+                <div className="grid grid-cols-4 gap-2 border-t border-blue-300 pt-2 mt-2 font-bold text-blue-900">
+                  <div>TOTAL MENSUAL:</div>
+                  <div className="text-right">${precio.totalSinIVA.toLocaleString()}</div>
+                  <div className="text-right text-green-700">
+                    {precio.totalIVA > 0 ? `$${precio.totalIVA.toLocaleString()}` : '--'}
                   </div>
-                )}
+                  <div className="text-right text-lg">${precio.totalConIVA.toLocaleString()}</div>
+                </div>
+                
+                {/* Información adicional */}
+                <div className="mt-3 pt-2 border-t border-blue-200 space-y-1">
+                  {precio.esCombo && (
+                    <div className="text-xs text-green-700 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      Descuento combo aplicado: {servicio.descuentoCombo}%
+                    </div>
+                  )}
+                  
+                  {precio.tipoContrato === 'con_permanencia' && (
+                    <div className="text-xs text-orange-700 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Permanencia: {precio.mesesPermanencia} meses
+                    </div>
+                  )}
+                  
+                  <div className="text-xs text-gray-600">
+                    💡 Instalación: ${precio.costoInstalacion.toLocaleString()} + IVA = ${(precio.costoInstalacion * 1.19).toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-600 mt-2">
+                    <div className="font-medium mb-1">Aplicación de IVA:</div>
+                    {precio.tieneInternet && (
+                      <div>• Internet: {parseInt(estratoCliente) >= 4 ? 'Con IVA 19%' : 'Sin IVA'} (Estrato {estratoCliente})</div>
+                    )}
+                    {precio.tieneTV && (
+                      <div>• Televisión: Con IVA 19% (Normativa)</div>
+                    )}
+                    <div>• Instalación: Con IVA 19% (Normativa)</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -448,8 +641,8 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
       {/* Resumen total */}
       {servicios.length > 0 && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <h4 className="font-semibold text-green-900 mb-2">Resumen Total:</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <h4 className="font-semibold text-green-900 mb-3">Resumen Total del Cliente:</h4>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <span className="text-green-700">Servicios:</span>
               <div className="font-semibold">{servicios.length}</div>
@@ -467,10 +660,38 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
               </div>
             </div>
             <div>
-              <span className="text-green-700">Total Mensual:</span>
-              <div className="font-semibold text-lg">
-                ${servicios.reduce((total, servicio) => total + calcularPrecioServicio(servicio).total, 0).toLocaleString()}
+              <span className="text-green-700">Total Sin IVA:</span>
+              <div className="font-semibold">
+                ${servicios.reduce((total, servicio) => total + calcularPrecioServicio(servicio).totalSinIVA, 0).toLocaleString()}
               </div>
+            </div>
+            <div>
+              <span className="text-green-700">Total Con IVA:</span>
+              <div className="font-semibold text-lg">
+                ${servicios.reduce((total, servicio) => total + calcularPrecioServicio(servicio).totalConIVA, 0).toLocaleString()}
+              </div>
+            </div>
+          </div>
+          
+          {/* Resumen de permanencia */}
+          <div className="mt-3 pt-3 border-t border-green-300">
+            <div className="text-sm text-green-800">
+              <div className="font-medium mb-1">Contratos de Permanencia:</div>
+              {servicios.filter(s => s.tipoContrato === 'con_permanencia').length > 0 ? (
+                <div>
+                  • {servicios.filter(s => s.tipoContrato === 'con_permanencia').length} servicio(s) con permanencia
+                  <br />
+                  • Instalación total: ${servicios.reduce((total, servicio) => {
+                    if (servicio.planInternetId || servicio.planTelevisionId) {
+                      const precio = calcularPrecioServicio(servicio);
+                      return total + (precio.costoInstalacion * 1.19);
+                    }
+                    return total;
+                  }, 0).toLocaleString()}
+                </div>
+              ) : (
+                <div>• Todos los servicios sin permanencia</div>
+              )}
             </div>
           </div>
         </div>
@@ -511,6 +732,7 @@ const ClientsManagement = () => {
   const [serviciosSeleccionados, setServiciosSeleccionados] = useState([]);
   const [planesDisponibles, setPlanesDisponibles] = useState([]);
   const [loadingPlanes, setLoadingPlanes] = useState(false);
+  const [estratoCliente, setEstratoCliente] = useState(1);
 
   // Estados para exportación
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -572,6 +794,7 @@ const ClientsManagement = () => {
   // Manejar creación de cliente con múltiples servicios
   const handleCreateClientWithServices = () => {
     setServiciosSeleccionados([]);
+    setEstratoCliente(1);
     setShowNewForm(true);
   };
 
@@ -583,6 +806,9 @@ const ClientsManagement = () => {
         return;
       }
 
+      // Incluir estrato en los datos del cliente
+      datosCliente.estrato = estratoCliente;
+
       const response = await clientService.createClientWithServices({
         datosCliente,
         servicios: serviciosSeleccionados
@@ -592,6 +818,7 @@ const ClientsManagement = () => {
         refresh();
         setShowNewForm(false);
         setServiciosSeleccionados([]);
+        setEstratoCliente(1);
         if (window.showNotification) {
           window.showNotification('success', 'Cliente creado exitosamente con todos los servicios');
         }
@@ -650,6 +877,7 @@ const ClientsManagement = () => {
     setShowNewForm(false);
     setSelectedClient(null);
     setServiciosSeleccionados([]);
+    setEstratoCliente(1);
   };
 
   // Manejar cliente guardado
@@ -853,7 +1081,7 @@ const ClientsManagement = () => {
         />
       )}
 
-      {/* NUEVO: Formulario de creación con múltiples servicios */}
+      {/* Formulario de creación con múltiples servicios */}
       {showNewForm && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-6xl shadow-lg rounded-md bg-white">
@@ -930,19 +1158,24 @@ const ClientsManagement = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Estrato
+                      Estrato *
                     </label>
                     <select
                       name="estrato"
+                      value={estratoCliente}
+                      onChange={(e) => setEstratoCliente(parseInt(e.target.value))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <option value="1">Estrato 1</option>
-                      <option value="2">Estrato 2</option>
-                      <option value="3">Estrato 3</option>
-                      <option value="4">Estrato 4</option>
-                      <option value="5">Estrato 5</option>
-                      <option value="6">Estrato 6</option>
+                      <option value="1">Estrato 1 (Internet sin IVA)</option>
+                      <option value="2">Estrato 2 (Internet sin IVA)</option>
+                      <option value="3">Estrato 3 (Internet sin IVA)</option>
+                      <option value="4">Estrato 4 (Internet con IVA 19%)</option>
+                      <option value="5">Estrato 5 (Internet con IVA 19%)</option>
+                      <option value="6">Estrato 6 (Internet con IVA 19%)</option>
                     </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      El estrato determina la aplicación del IVA en servicios de Internet
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -983,6 +1216,7 @@ const ClientsManagement = () => {
                     serviciosSeleccionados={serviciosSeleccionados}
                     onServiciosChange={setServiciosSeleccionados}
                     planesDisponibles={planesDisponibles}
+                    estratoCliente={estratoCliente}
                   />
                 )}
               </div>
@@ -1143,4 +1377,4 @@ const ModalInactivarCliente = ({ client, onConfirm, onCancel, loading }) => {
   );
 };
 
-export default ClientsManagement
+export default ClientsManagement;

@@ -391,6 +391,7 @@ router.use('*', (req, res) => {
     message: `Ruta ${req.method} ${req.originalUrl} no encontrada`,
     timestamp: new Date().toISOString()
   });
+  
 });
 router.post('/clientes-con-servicios', requireRole('administrador'), async (req, res) => {
   const conexion = await Database.getConnection();
