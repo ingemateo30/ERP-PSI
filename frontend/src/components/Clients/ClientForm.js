@@ -285,157 +285,142 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     return Object.keys(nuevosErrores).length === 0;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+ const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (!validarFormulario()) {
-      return;
+  if (!validarFormulario()) {
+    return;
+  }
+
+  try {
+    setSaving(true);
+    setErrors({});
+
+    if (client) {
+      // MODO EDICIÓN (mantener igual)
+      await actualizarCliente();
+    } else {
+      // MODO CREACIÓN - CORREGIR AQUÍ: Usar crearClienteConSede (no crearClienteCompleto)
+      await crearClienteConSede(); // ✅ Esta función ya existe y está bien
     }
 
-    try {
-      setSaving(true);
-      setErrors({});
+  } catch (error) {
+    console.error('❌ Error en formulario:', error);
+    setErrors({
+      general: error.message || 'Error al procesar la información'
+    });
+  } finally {
+    setSaving(false);
+  }
+};
 
-      if (client) {
-        // MODO EDICIÓN (mantener igual)
-        await actualizarCliente();
-      } else {
-        // MODO CREACIÓN - NUEVA LÓGICA DE SEDES
-        await crearClienteConSede();
-      }
+  const crearClienteConSede = async () => {
+  const calculos = recalcularPreciosEnTiempoReal();
 
-    } catch (error) {
-      console.error('❌ Error en formulario:', error);
-      setErrors({
-        general: error.message || 'Error al procesar la información'
-      });
-    } finally {
-      setSaving(false);
+  // 1. PREPARAR DATOS DEL CLIENTE (igual que antes)
+  const datosCliente = {
+    identificacion: formData.identificacion,
+    tipo_documento: formData.tipo_documento,
+    nombre: formData.nombre,
+    email: formData.email,
+    telefono: formData.telefono,
+    telefono_fijo: formData.telefono_fijo,
+    direccion: formData.direccion,
+    barrio: formData.barrio,
+    estrato: parseInt(formData.estrato),
+    ciudad_id: parseInt(formData.ciudad_id),
+    sector_id: formData.sector_id ? parseInt(formData.sector_id) : null,
+    observaciones: formData.observaciones,
+    fecha_inicio_contrato: formData.fecha_activacion
+  };
+
+  // 2. OBTENER EL PLAN SELECCIONADO
+  const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
+  if (!planSeleccionado) {
+    throw new Error('Plan seleccionado no encontrado');
+  }
+
+  // 3. PREPARAR SEDE INICIAL CON SERVICIOS
+  const sedeInicial = {
+    id: Date.now(), // ID temporal único
+    nombre_sede: 'Sede Principal',
+    direccion_servicio: formData.direccion,
+    contacto_sede: formData.nombre,
+    telefono_sede: formData.telefono,
+    planInternetId: null,
+    planTelevisionId: null,
+    precioPersonalizado: !!formData.precio_personalizado,
+    precioInternetCustom: '',
+    precioTelevisionCustom: '',
+    tipoContrato: formData.tipo_permanencia || 'sin_permanencia',
+    mesesPermanencia: formData.tipo_permanencia === 'con_permanencia' ? 6 : 0,
+    fechaActivacion: formData.fecha_activacion,
+    observaciones: formData.observaciones_servicio || ''
+  };
+
+  // 4. ASIGNAR SERVICIOS SEGÚN EL TIPO DE PLAN
+  if (planSeleccionado.tipo === 'internet') {
+    // Solo Internet
+    sedeInicial.planInternetId = parseInt(formData.plan_id);
+    if (formData.precio_personalizado) {
+      sedeInicial.precioInternetCustom = calculos.precio_base.toString();
+    }
+  } else if (planSeleccionado.tipo === 'television') {
+    // Solo Televisión
+    sedeInicial.planTelevisionId = parseInt(formData.plan_id);
+    if (formData.precio_personalizado) {
+      sedeInicial.precioTelevisionCustom = calculos.precio_base.toString();
+    }
+  } else if (planSeleccionado.tipo === 'combo') {
+    // COMBO = Internet + TV (usar el mismo plan para ambos por ahora)
+    sedeInicial.planInternetId = parseInt(formData.plan_id);
+    sedeInicial.planTelevisionId = parseInt(formData.plan_id);
+
+    if (formData.precio_personalizado) {
+      // Dividir el precio personalizado entre Internet y TV
+      const precioBase = calculos.precio_base;
+      sedeInicial.precioInternetCustom = (precioBase * 0.6).toString(); // 60% Internet
+      sedeInicial.precioTelevisionCustom = (precioBase * 0.4).toString(); // 40% TV
+    }
+  }
+
+  // 5. ESTRUCTURA FINAL DE DATOS (FORMATO CORRECTO PARA EL BACKEND)
+  const datosCompletos = {
+    cliente: datosCliente,
+    servicios: [sedeInicial], // ✅ Array con una sede inicial
+    opciones: {
+      generar_documentos: formData.generar_documentos,
+      enviar_bienvenida: formData.enviar_bienvenida,
+      programar_instalacion: formData.programar_instalacion
     }
   };
 
-  const crearClienteConSede = async () => {
-    const calculos = recalcularPreciosEnTiempoReal();
+  console.log('🚀 Creando cliente con sede inicial:', datosCompletos);
 
-    // Preparar datos del cliente
-    const datosCliente = {
-      identificacion: formData.identificacion,
-      tipo_documento: formData.tipo_documento,
-      nombre: formData.nombre,
-      email: formData.email,
-      telefono: formData.telefono,
-      telefono_fijo: formData.telefono_fijo,
-      direccion: formData.direccion,
-      barrio: formData.barrio,
-      estrato: parseInt(formData.estrato),
-      ciudad_id: formData.ciudad_id,
-      sector_id: formData.sector_id,
-      observaciones: formData.observaciones,
-      fecha_inicio_contrato: formData.fecha_activacion
-    };
+  // 6. LLAMAR AL SERVICIO CORRECTO
+  const response = await clienteCompletoService.createClienteCompleto(datosCompletos);
 
-    // Preparar servicios como SEDE PRINCIPAL
-    const serviciosSede = [];
+  if (response.success) {
+    console.log('✅ Cliente creado exitosamente:', response.data);
 
-    // Determinar qué servicios se van a crear según el plan seleccionado
-    const planesInternet = planesDisponibles.filter(p => p.tipo === 'internet');
-    const planesTelevision = planesDisponibles.filter(p => p.tipo === 'television');
-
-    if (!planesInternet.length && !planesTelevision.length) {
-      throw new Error('Debe seleccionar un plan de servicio');
-    }
-
-    // Crear la sede principal con los servicios correspondientes
-    const sedeInicial = {
-      id: Date.now(),
-      nombre_sede: 'Sede Principal',
-      direccion_servicio: formData.direccion,
-      contacto_sede: formData.nombre,
-      telefono_sede: formData.telefono,
-
-      // LÓGICA CORREGIDA:
-      planInternetId: formData.usarServiciosSeparados ? formData.planInternetId :
-        (planSeleccionado?.tipo === 'internet' ? formData.plan_id : ''),
-      planTelevisionId: formData.usarServiciosSeparados ? formData.planTelevisionId :
-        (planSeleccionado?.tipo === 'television' ? formData.plan_id : ''),
-
-      precioPersonalizado: !!formData.precio_personalizado,
-      precioInternetCustom: formData.precioInternetCustom || formData.precio_personalizado,
-      precioTelevisionCustom: formData.precioTelevisionCustom || formData.precio_personalizado,
-      tipoContrato: formData.tipo_permanencia || 'sin_permanencia',
-      mesesPermanencia: formData.tipo_permanencia === 'con_permanencia' ? 6 : 0,
-      fechaActivacion: formData.fecha_activacion,
-      observaciones: formData.observaciones_servicio || ''
-    };
-
-    // Lógica según el tipo de plan
-    if (planSeleccionado.tipo === 'internet') {
-      // Solo Internet
-      sedeInicial.planInternetId = formData.plan_id;
-      if (formData.precio_personalizado) {
-        sedeInicial.precioInternetCustom = calculos.precio_base;
-      }
-    } else if (planSeleccionado.tipo === 'television') {
-      // Solo Televisión
-      sedeInicial.planTelevisionId = formData.plan_id;
-      if (formData.precio_personalizado) {
-        sedeInicial.precioTelevisionCustom = calculos.precio_base;
-      }
-    } else if (planSeleccionado.tipo === 'combo') {
-      // COMBO = Internet + TV (crear como servicios separados)
-      // Necesitamos dividir el combo en planes individuales
-
-      // Por ahora, vamos a usar el plan combo para ambos servicios
-      // Pero idealmente deberías tener planes separados de Internet y TV
-      sedeInicial.planInternetId = formData.plan_id;
-      sedeInicial.planTelevisionId = formData.plan_id;
-
-      if (formData.precio_personalizado) {
-        // Dividir el precio personalizado entre Internet y TV
-        const precioBase = calculos.precio_base;
-        sedeInicial.precioInternetCustom = Math.round(precioBase * 0.6); // 60% Internet
-        sedeInicial.precioTelevisionCustom = Math.round(precioBase * 0.4); // 40% TV
-      }
-    }
-
-    // Preparar datos completos en el formato correcto
-    const datosCompletos = {
-      cliente: datosCliente,
-      servicios: [sedeInicial], // Array con una sede inicial
-      opciones: {
-        generar_documentos: formData.generar_documentos,
-        enviar_bienvenida: formData.enviar_bienvenida,
-        programar_instalacion: formData.programar_instalacion
-      }
-    };
-
-    console.log('🚀 Creando cliente con sede inicial:', datosCompletos);
-
-    // Llamar al servicio correcto
-    const response = await clienteCompletoService.createClienteCompleto(datosCompletos);
-
-    if (response.success) {
-      console.log('✅ Cliente creado exitosamente:', response.data);
-
-      // Mostrar mensaje de éxito
-      const resumen = response.data.resumen || response.data;
-      const mensaje = `Cliente creado exitosamente:
+    // Mostrar mensaje de éxito
+    const resumen = response.data.resumen || response.data;
+    const mensaje = `Cliente creado exitosamente:
 • ${resumen.total_sedes || 1} sede(s)
 • ${resumen.total_contratos || 1} contrato(s)
 • ${resumen.total_facturas || 1} factura(s)
 • ${resumen.total_servicios || 1} servicio(s)`;
 
-      if (window.showNotification) {
-        window.showNotification('success', mensaje);
-      } else {
-        alert(mensaje);
-      }
-
-      // Llamar callback de éxito
-      onSave(response.data);
+    if (window.showNotification) {
+      window.showNotification('success', mensaje);
+    } else {
+      alert(mensaje);
     }
-  };
 
+    // Llamar callback de éxito
+    onSave(response.data);
+  }
+};
   const crearClienteCompleto = async () => {
     const calculos = recalcularPreciosEnTiempoReal();
     // Preparar datos para crear cliente completo

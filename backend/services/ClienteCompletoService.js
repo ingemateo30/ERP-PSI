@@ -557,34 +557,82 @@ class ClienteCompletoService {
   /**
    * Generar número de contrato usando procedimiento almacenado
    */
-  static async generarNumeroContrato(conexion) {
-    try {
-      await conexion.execute('CALL GenerarNumeroContrato(@nuevo_numero)');
-      const [resultado] = await conexion.execute('SELECT @nuevo_numero as numero');
+static async generarNumeroContrato(conexion) {
+  try {
+    console.log('🔢 Generando número de contrato...');
 
-      if (resultado[0]?.numero) {
-        return resultado[0].numero;
-      }
-    } catch (error) {
-      console.warn('⚠️ No se pudo usar procedimiento almacenado para contrato');
+    // PASO 1: Obtener configuración actual con los nombres correctos de columnas
+    const [configActual] = await conexion.execute(`
+      SELECT 
+        prefijo_contrato,
+        consecutivo_contrato
+      FROM configuracion_empresa 
+      WHERE id = 1
+    `);
+
+    if (!configActual[0]) {
+      throw new Error('Configuración de empresa no encontrada');
     }
 
-    // Fallback manual
+    const { prefijo_contrato, consecutivo_contrato } = configActual[0];
+    
+    console.log(`📊 Configuración obtenida:`, {
+      prefijo: prefijo_contrato,
+      consecutivo: consecutivo_contrato
+    });
+    
+    // PASO 2: Generar número con el formato correcto
+    // Basado en tu BD: prefijo = "CON", consecutivo = 15
+    // Resultado esperado: CON-2025-000015
+    const numeroContrato = `${prefijo_contrato}-${new Date().getFullYear()}-${String(consecutivo_contrato).padStart(6, '0')}`;
+    
+    console.log(`📋 Número de contrato generado: ${numeroContrato}`);
+    
+    // PASO 3: Verificar que no existe (por seguridad)
+    const [existe] = await conexion.execute(`
+      SELECT COUNT(*) as count 
+      FROM contratos 
+      WHERE numero_contrato = ?
+    `, [numeroContrato]);
+
+    if (existe[0].count > 0) {
+      console.warn(`⚠️ El número ${numeroContrato} ya existe! Incrementando consecutivo...`);
+      
+      // Incrementar e intentar de nuevo
+      await conexion.execute(`
+        UPDATE configuracion_empresa 
+        SET consecutivo_contrato = consecutivo_contrato + 1 
+        WHERE id = 1
+      `);
+      
+      // Recursión para generar el siguiente número
+      return await this.generarNumeroContrato(conexion);
+    }
+    
+    // PASO 4: Incrementar el consecutivo DESPUÉS de verificar que está disponible
     await conexion.execute(`
       UPDATE configuracion_empresa 
       SET consecutivo_contrato = consecutivo_contrato + 1 
       WHERE id = 1
     `);
 
-    const [resultado] = await conexion.execute(`
-      SELECT 
-        CONCAT(COALESCE(prefijo_contrato, 'CON'), LPAD(consecutivo_contrato, 6, '0')) as numero
-      FROM configuracion_empresa 
-      WHERE id = 1
-    `);
+    console.log(`✅ Consecutivo actualizado de ${consecutivo_contrato} a ${consecutivo_contrato + 1}`);
+    console.log(`✅ Número de contrato final: ${numeroContrato}`);
 
-    return resultado[0]?.numero || `CON${Date.now()}`;
+    return numeroContrato;
+
+  } catch (error) {
+    console.error('❌ Error generando número de contrato:', error);
+    
+    // FALLBACK: Generar número único con timestamp
+    const timestamp = Date.now().toString().slice(-8);
+    const numeroFallback = `CON-${new Date().getFullYear()}-${timestamp}`;
+    
+    console.log(`🔄 Usando número fallback: ${numeroFallback}`);
+    return numeroFallback;
   }
+}
+
 
   /**
    * Generar código de usuario único
@@ -1543,7 +1591,7 @@ class ClienteCompletoService {
         s_internet, s_television, s_interes, s_reconexion, 
         s_descuento, s_varios, s_publicidad, s_iva,
         subtotal, iva, total, estado, contrato_id, 
-        observaciones, referencia_pago, resolucion_facturacion,
+        observaciones, referencia_pago, resolucion,
         created_by, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, NOW())
     `;
@@ -1779,21 +1827,87 @@ static calcularFechasFacturacion() {
   }
 
   // Funciones auxiliares (mismas de antes)
-  static async generarNumeroContrato(conexion) {
-    const [ultimoContrato] = await conexion.execute(
-      'SELECT numero_contrato FROM contratos ORDER BY id DESC LIMIT 1'
-    );
+ // FIX DEFINITIVO: Reemplazar el método generarNumeroContrato que usa el procedimiento defectuoso
 
-    if (ultimoContrato.length > 0) {
-      const ultimoNumero = ultimoContrato[0].numero_contrato;
-      const año = new Date().getFullYear();
-      const numero = parseInt(ultimoNumero.split('-')[2]) + 1;
-      return `CONT-${año}-${numero.toString().padStart(6, '0')}`;
-    } else {
-      const año = new Date().getFullYear();
-      return `CONT-${año}-000001`;
+/**
+ * MÉTODO CORREGIDO: NO usar procedimiento almacenado, generar directamente
+ */
+static async generarNumeroContrato(conexion) {
+  try {
+    console.log('🔢 Generando número de contrato (MÉTODO CORREGIDO)...');
+
+    // PASO 1: Obtener configuración actual DIRECTAMENTE (no procedimiento)
+    const [configActual] = await conexion.execute(`
+      SELECT 
+        prefijo_contrato,
+        consecutivo_contrato
+      FROM configuracion_empresa 
+      WHERE id = 1
+    `);
+
+    if (!configActual[0]) {
+      throw new Error('Configuración de empresa no encontrada');
     }
+
+    const { prefijo_contrato, consecutivo_contrato } = configActual[0];
+    
+    console.log('📊 Configuración actual:', {
+      prefijo: prefijo_contrato,
+      consecutivo: consecutivo_contrato
+    });
+
+    // PASO 2: Generar número usando los valores actuales
+    // Con tu BD: prefijo = "CON", consecutivo = 15
+    // Resultado: CON-2025-000015
+    const year = new Date().getFullYear();
+    const numeroContrato = `${prefijo_contrato}-${year}-${String(consecutivo_contrato).padStart(6, '0')}`;
+    
+    console.log(`📋 Número de contrato generado: ${numeroContrato}`);
+    
+    // PASO 3: Verificar que no existe (seguridad adicional)
+    const [existe] = await conexion.execute(`
+      SELECT COUNT(*) as count 
+      FROM contratos 
+      WHERE numero_contrato = ?
+    `, [numeroContrato]);
+
+    if (existe[0].count > 0) {
+      console.warn(`⚠️ El número ${numeroContrato} YA EXISTE. Forzando incremento...`);
+      
+      // Si existe, incrementar el consecutivo y generar nuevamente
+      await conexion.execute(`
+        UPDATE configuracion_empresa 
+        SET consecutivo_contrato = consecutivo_contrato + 1 
+        WHERE id = 1
+      `);
+      
+      // Llamada recursiva para generar el siguiente
+      return await this.generarNumeroContrato(conexion);
+    }
+    
+    // PASO 4: Incrementar consecutivo DESPUÉS de verificar disponibilidad
+    await conexion.execute(`
+      UPDATE configuracion_empresa 
+      SET consecutivo_contrato = consecutivo_contrato + 1 
+      WHERE id = 1
+    `);
+
+    console.log(`✅ Consecutivo actualizado de ${consecutivo_contrato} a ${consecutivo_contrato + 1}`);
+    console.log(`✅ Número de contrato FINAL: ${numeroContrato}`);
+
+    return numeroContrato;
+
+  } catch (error) {
+    console.error('❌ Error generando número de contrato:', error);
+    
+    // FALLBACK: Usar timestamp único si todo falla
+    const timestamp = Date.now().toString().slice(-8);
+    const numeroFallback = `CON-${new Date().getFullYear()}-${timestamp}`;
+    
+    console.log(`🔄 Usando número de emergencia: ${numeroFallback}`);
+    return numeroFallback;
   }
+}
 
   static async generarNumeroFactura(conexion) {
     const [ultimaFactura] = await conexion.execute(
