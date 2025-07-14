@@ -127,12 +127,21 @@ class ApiService {
     });
   }
 
-  async post(endpoint, data = {}) {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+async post(endpoint, data = {}) {
+  let body;
+  if (data instanceof FormData) {
+    body = data; // FormData no necesita serialización
+  } else if (typeof data === 'string') {
+    body = data; // Ya es string, no serializar
+  } else {
+    body = JSON.stringify(data); // Solo serializar objects
   }
+  
+  return this.request(endpoint, {
+    method: 'POST',
+    body: body
+  });
+}
 
   async put(endpoint, data = {}) {
     return this.request(endpoint, {

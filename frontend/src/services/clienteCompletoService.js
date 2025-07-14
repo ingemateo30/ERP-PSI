@@ -1,19 +1,26 @@
+// frontend/src/services/clienteCompletoService.js - CORREGIDO
+
 import apiService from './apiService';
 
 class ClienteCompletoService {
   
   /**
-   * Crear cliente completo con servicios agrupados por sede
+   * Crear cliente completo con servicios agrupados por sede - CORREGIDO
    */
   async createClienteCompleto(datosCompletos) {
     try {
       console.log('🚀 Enviando datos completos por sede:', datosCompletos);
       
-      // Validar estructura de datos
+      // Validar estructura de datos antes de enviar
       this.validarDatosCompletos(datosCompletos);
       
+      // SOLUCIÓN: Asegurar que los datos estén en el formato correcto
+      const datosLimpios = this.limpiarDatosParaEnvio(datosCompletos);
+      
+      console.log('📦 Datos limpios para envío:', datosLimpios);
+      
       // Enviar al endpoint correcto
-      const response = await apiService.post('/clientes-completo/crear', datosCompletos);
+      const response = await apiService.post('/clientes-completo/crear', datosLimpios);
       
       console.log('✅ Cliente completo creado:', response);
       return response;
@@ -21,11 +28,94 @@ class ClienteCompletoService {
     } catch (error) {
       console.error('❌ Error creando cliente completo:', error);
       
+      // Mejorar el manejo de errores
       if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
+      } else if (error.message) {
+        throw new Error(error.message);
       } else {
         throw new Error('Error al crear cliente con servicios');
       }
+    }
+  }
+
+  /**
+   * NUEVO: Limpiar datos para envío y evitar problemas de serialización
+   */
+  limpiarDatosParaEnvio(datos) {
+    try {
+      // Crear una copia profunda de los datos para evitar modificar el original
+      const datosCopia = JSON.parse(JSON.stringify(datos));
+      
+      // Limpiar datos del cliente
+      if (datosCopia.cliente) {
+        // Eliminar campos undefined o null
+        Object.keys(datosCopia.cliente).forEach(key => {
+          if (datosCopia.cliente[key] === undefined || datosCopia.cliente[key] === null) {
+            delete datosCopia.cliente[key];
+          }
+          // Limpiar strings
+          if (typeof datosCopia.cliente[key] === 'string') {
+            datosCopia.cliente[key] = datosCopia.cliente[key].trim();
+          }
+        });
+      }
+
+      // Limpiar servicios/sedes
+      if (datosCopia.servicios && Array.isArray(datosCopia.servicios)) {
+        datosCopia.servicios = datosCopia.servicios.map(servicio => {
+          const servicioLimpio = { ...servicio };
+          
+          // Eliminar campos undefined o null
+          Object.keys(servicioLimpio).forEach(key => {
+            if (servicioLimpio[key] === undefined || servicioLimpio[key] === null) {
+              delete servicioLimpio[key];
+            }
+            // Limpiar strings
+            if (typeof servicioLimpio[key] === 'string') {
+              servicioLimpio[key] = servicioLimpio[key].trim();
+            }
+          });
+
+          // Asegurar que los IDs sean números si están presentes
+          if (servicioLimpio.planInternetId) {
+            servicioLimpio.planInternetId = parseInt(servicioLimpio.planInternetId);
+          }
+          if (servicioLimpio.planTelevisionId) {
+            servicioLimpio.planTelevisionId = parseInt(servicioLimpio.planTelevisionId);
+          }
+          if (servicioLimpio.ciudad_id) {
+            servicioLimpio.ciudad_id = parseInt(servicioLimpio.ciudad_id);
+          }
+          if (servicioLimpio.sector_id) {
+            servicioLimpio.sector_id = parseInt(servicioLimpio.sector_id);
+          }
+
+          // Convertir precios a números si están presentes
+          if (servicioLimpio.precioInternetCustom) {
+            servicioLimpio.precioInternetCustom = parseFloat(servicioLimpio.precioInternetCustom);
+          }
+          if (servicioLimpio.precioTelevisionCustom) {
+            servicioLimpio.precioTelevisionCustom = parseFloat(servicioLimpio.precioTelevisionCustom);
+          }
+
+          return servicioLimpio;
+        });
+      }
+
+      // Limpiar opciones si están presentes
+      if (datosCopia.opciones) {
+        Object.keys(datosCopia.opciones).forEach(key => {
+          if (datosCopia.opciones[key] === undefined || datosCopia.opciones[key] === null) {
+            delete datosCopia.opciones[key];
+          }
+        });
+      }
+
+      return datosCopia;
+    } catch (error) {
+      console.error('❌ Error limpiando datos:', error);
+      throw new Error('Error al procesar datos para envío');
     }
   }
 
@@ -36,8 +126,11 @@ class ClienteCompletoService {
     try {
       console.log(`🏢 Agregando nueva sede al cliente ${clienteId}:`, nuevaSedeData);
       
+      // Limpiar datos de la nueva sede
+      const sedeDataLimpia = this.limpiarDatosParaEnvio({ sede: nuevaSedeData }).sede;
+      
       const response = await apiService.post(`/clientes-completo/${clienteId}/agregar-sede`, {
-        sede: nuevaSedeData
+        sede: sedeDataLimpia
       });
       
       console.log('✅ Nueva sede agregada:', response);
@@ -50,93 +143,40 @@ class ClienteCompletoService {
   }
 
   /**
-   * Listar todas las sedes de un cliente
+   * Previsualizar cliente antes de crear
    */
-  async listarSedesCliente(clienteId) {
+  async previsualizarCliente(datosCompletos) {
     try {
-      const response = await apiService.get(`/clientes-completo/${clienteId}/sedes`);
-      return response;
-    } catch (error) {
-      console.error('❌ Error listando sedes:', error);
-      throw new Error(error.response?.data?.message || 'Error al listar sedes del cliente');
-    }
-  }
-
-  /**
-   * Validar datos completos antes de enviar
-   */
-  validarDatosCompletos(datos) {
-    const errores = [];
-
-    // Validar cliente
-    if (!datos.cliente) {
-      errores.push('Datos del cliente son requeridos');
-    } else {
-      if (!datos.cliente.identificacion) errores.push('Identificación es requerida');
-      if (!datos.cliente.nombre) errores.push('Nombre es requerido');
-      if (!datos.cliente.email) errores.push('Email es requerido');
-      if (!datos.cliente.telefono) errores.push('Teléfono es requerido');
-    }
-
-    // Validar servicios/sedes
-    if (!datos.servicios || !Array.isArray(datos.servicios) || datos.servicios.length === 0) {
-      errores.push('Debe agregar al menos una sede con servicios');
-    } else {
-      datos.servicios.forEach((sede, index) => {
-        if (!sede.direccion_servicio) {
-          errores.push(`Sede ${index + 1}: Dirección es requerida`);
-        }
-        
-        if (!sede.planInternetId && !sede.planTelevisionId) {
-          errores.push(`Sede ${index + 1}: Debe tener al menos Internet o Televisión`);
-        }
-
-        // Validar precios personalizados si están habilitados
-        if (sede.precioPersonalizado) {
-          if (sede.planInternetId && !sede.precioInternetCustom) {
-            errores.push(`Sede ${index + 1}: Precio personalizado de Internet requerido`);
-          }
-          if (sede.planTelevisionId && !sede.precioTelevisionCustom) {
-            errores.push(`Sede ${index + 1}: Precio personalizado de TV requerido`);
-          }
-        }
-      });
-    }
-
-    if (errores.length > 0) {
-      throw new Error(`Errores de validación:\n${errores.join('\n')}`);
-    }
-  }
-
-  /**
-   * Previsualizar facturación por sedes
-   */
-  async previsualizarFacturacion(datosCliente, sedes) {
-    try {
+      console.log('👁️ Generando previsualización:', datosCompletos);
+      
+      // Validar datos
+      this.validarDatosCompletos(datosCompletos);
+      
       const preview = {
-        cliente: datosCliente,
+        cliente_info: {
+          identificacion: datosCompletos.cliente.identificacion,
+          nombre: datosCompletos.cliente.nombre,
+          email: datosCompletos.cliente.email,
+          telefono: datosCompletos.cliente.telefono,
+          estrato: datosCompletos.cliente.estrato || 3
+        },
         sedes_preview: []
       };
 
-      for (let i = 0; i < sedes.length; i++) {
-        const sede = sedes[i];
-        
+      // Generar preview de cada sede
+      for (const sede of datosCompletos.servicios) {
         const sedePreview = {
-          nombre: sede.nombre_sede || `Sede ${i + 1}`,
-          direccion: sede.direccion_servicio,
+          direccion: sede.direccion_servicio || sede.direccionServicio,
+          nombre_sede: sede.nombre_sede || sede.nombreSede || 'Sede Principal',
           servicios: [],
           totales: {
             subtotal: 0,
             iva: 0,
             total: 0
-          },
-          contrato: {
-            tipo_permanencia: sede.tipoContrato,
-            meses_permanencia: sede.mesesPermanencia || 0
           }
         };
 
-        // Calcular servicios de la sede
+        // Agregar Internet si está configurado
         if (sede.planInternetId) {
           const response = await apiService.get(`/config/planes/${sede.planInternetId}`);
           const planInternet = response.data;
@@ -147,10 +187,11 @@ class ClienteCompletoService {
             tipo: 'Internet',
             plan: planInternet.nombre,
             precio: precio,
-            iva: datosCliente.estrato >= 4 ? precio * 0.19 : 0
+            iva: datosCompletos.cliente.estrato >= 4 ? precio * 0.19 : 0
           });
         }
 
+        // Agregar Televisión si está configurado
         if (sede.planTelevisionId) {
           const response = await apiService.get(`/config/planes/${sede.planTelevisionId}`);
           const planTv = response.data;
@@ -187,6 +228,77 @@ class ClienteCompletoService {
       console.error('❌ Error en previsualización:', error);
       throw new Error('Error generando previsualización');
     }
+  }
+
+  /**
+   * Listar todas las sedes de un cliente
+   */
+  async listarSedesCliente(clienteId) {
+    try {
+      const response = await apiService.get(`/clientes-completo/${clienteId}/sedes`);
+      return response;
+    } catch (error) {
+      console.error('❌ Error listando sedes:', error);
+      throw new Error(error.response?.data?.message || 'Error al listar sedes del cliente');
+    }
+  }
+
+  /**
+   * Validar datos completos antes de enviar - MEJORADO
+   */
+  validarDatosCompletos(datos) {
+    const errores = [];
+
+    // Validar cliente
+    if (!datos.cliente) {
+      errores.push('Datos del cliente son requeridos');
+    } else {
+      if (!datos.cliente.identificacion || !datos.cliente.identificacion.trim()) {
+        errores.push('Identificación es requerida');
+      }
+      if (!datos.cliente.nombre || !datos.cliente.nombre.trim()) {
+        errores.push('Nombre es requerido');
+      }
+      if (!datos.cliente.email || !datos.cliente.email.trim()) {
+        errores.push('Email es requerido');
+      }
+      if (!datos.cliente.telefono || !datos.cliente.telefono.trim()) {
+        errores.push('Teléfono es requerido');
+      }
+    }
+
+    // Validar servicios/sedes
+    if (!datos.servicios || !Array.isArray(datos.servicios) || datos.servicios.length === 0) {
+      errores.push('Debe agregar al menos una sede con servicios');
+    } else {
+      datos.servicios.forEach((sede, index) => {
+        const direccion = sede.direccion_servicio || sede.direccionServicio;
+        if (!direccion || !direccion.trim()) {
+          errores.push(`Sede ${index + 1}: Dirección es requerida`);
+        }
+        
+        if (!sede.planInternetId && !sede.planTelevisionId) {
+          errores.push(`Sede ${index + 1}: Debe tener al menos Internet o Televisión`);
+        }
+
+        // Validar precios personalizados si están habilitados
+        if (sede.precioPersonalizado) {
+          if (sede.planInternetId && (!sede.precioInternetCustom || isNaN(parseFloat(sede.precioInternetCustom)))) {
+            errores.push(`Sede ${index + 1}: Precio personalizado de Internet es inválido`);
+          }
+          if (sede.planTelevisionId && (!sede.precioTelevisionCustom || isNaN(parseFloat(sede.precioTelevisionCustom)))) {
+            errores.push(`Sede ${index + 1}: Precio personalizado de Televisión es inválido`);
+          }
+        }
+      });
+    }
+
+    if (errores.length > 0) {
+      console.error('❌ Errores de validación:', errores);
+      throw new Error(`Errores de validación:\n${errores.join('\n')}`);
+    }
+
+    console.log('✅ Datos validados correctamente');
   }
 }
 

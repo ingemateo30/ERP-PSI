@@ -292,8 +292,8 @@ class ClienteCompletoService {
         datos.nombre,                                       // nombre_cliente
         periodoFacturacion,                                 // periodo_facturacion
         fechaEmision.toISOString().split('T')[0],          // fecha_emision
-        fechaVencimiento.toISOString().split('T')[0],   
-        fechaDesde.toISOString().split('T')[0],          
+        fechaVencimiento.toISOString().split('T')[0],
+        fechaDesde.toISOString().split('T')[0],
         fechaHasta.toISOString().split('T')[0],             // fecha_vencimiento
         valorInternet,                                      // internet
         valorTelevision,                                    // television
@@ -1224,14 +1224,14 @@ class ClienteCompletoService {
       // 2. PROCESAR CADA SEDE (cada sede = 1 contrato + 1 factura)
       for (let i = 0; i < datosCompletos.servicios.length; i++) {
         const sedeData = datosCompletos.servicios[i];
-        
+
         console.log(`🏢 Procesando sede: ${sedeData.nombre_sede || `Sede ${i + 1}`}`);
 
         // 2.1 Crear todos los servicios de esta sede
         const serviciosDeLaSede = await this.crearServiciosDeSede(
-          conexion, 
-          clienteId, 
-          sedeData, 
+          conexion,
+          clienteId,
+          sedeData,
           createdBy
         );
 
@@ -1283,54 +1283,54 @@ class ClienteCompletoService {
    * Crear todos los servicios de UNA sede específica
    */
   static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
-  const serviciosCreados = [];
+    const serviciosCreados = [];
 
-  // Obtener el plan para verificar si es combo
-  const [planes] = await conexion.execute(
-    'SELECT * FROM planes_servicio WHERE id IN (?, ?)', 
-    [sedeData.planInternetId || 0, sedeData.planTelevisionId || 0]
-  );
-
-  // INTERNET en esta sede
-  if (sedeData.planInternetId) {
-    const planInternet = planes.find(p => p.id == sedeData.planInternetId);
-    
-    const servicioInternet = await this.crearServicioIndividual(
-      conexion,
-      clienteId,
-      {
-        plan_id: sedeData.planInternetId,
-        precio: sedeData.precioPersonalizado ? sedeData.precioInternetCustom : 
-               (planInternet.tipo === 'combo' ? planInternet.precio_internet : planInternet.precio),
-        sede_data: sedeData,
-        tipo: 'internet'
-      },
-      createdBy
+    // Obtener el plan para verificar si es combo
+    const [planes] = await conexion.execute(
+      'SELECT * FROM planes_servicio WHERE id IN (?, ?)',
+      [sedeData.planInternetId || 0, sedeData.planTelevisionId || 0]
     );
-    serviciosCreados.push(servicioInternet);
-  }
 
-  // TELEVISION en esta sede
-  if (sedeData.planTelevisionId) {
-    const planTv = planes.find(p => p.id == sedeData.planTelevisionId);
-    
-    const servicioTv = await this.crearServicioIndividual(
-      conexion,
-      clienteId,
-      {
-        plan_id: sedeData.planTelevisionId,
-        precio: sedeData.precioPersonalizado ? sedeData.precioTelevisionCustom : 
-               (planTv.tipo === 'combo' ? planTv.precio_television : planTv.precio),
-        sede_data: sedeData,
-        tipo: 'television'
-      },
-      createdBy
-    );
-    serviciosCreados.push(servicioTv);
-  }
+    // INTERNET en esta sede
+    if (sedeData.planInternetId) {
+      const planInternet = planes.find(p => p.id == sedeData.planInternetId);
 
-  return serviciosCreados;
-}
+      const servicioInternet = await this.crearServicioIndividual(
+        conexion,
+        clienteId,
+        {
+          plan_id: sedeData.planInternetId,
+          precio: sedeData.precioPersonalizado ? sedeData.precioInternetCustom :
+            (planInternet.tipo === 'combo' ? planInternet.precio_internet : planInternet.precio),
+          sede_data: sedeData,
+          tipo: 'internet'
+        },
+        createdBy
+      );
+      serviciosCreados.push(servicioInternet);
+    }
+
+    // TELEVISION en esta sede
+    if (sedeData.planTelevisionId) {
+      const planTv = planes.find(p => p.id == sedeData.planTelevisionId);
+
+      const servicioTv = await this.crearServicioIndividual(
+        conexion,
+        clienteId,
+        {
+          plan_id: sedeData.planTelevisionId,
+          precio: sedeData.precioPersonalizado ? sedeData.precioTelevisionCustom :
+            (planTv.tipo === 'combo' ? planTv.precio_television : planTv.precio),
+          sede_data: sedeData,
+          tipo: 'television'
+        },
+        createdBy
+      );
+      serviciosCreados.push(servicioTv);
+    }
+
+    return serviciosCreados;
+  }
 
   /**
    * Crear un servicio individual
@@ -1338,7 +1338,7 @@ class ClienteCompletoService {
   static async crearServicioIndividual(conexion, clienteId, config, createdBy) {
     // Obtener plan
     const [planes] = await conexion.execute(
-      'SELECT * FROM planes_servicio WHERE id = ?', 
+      'SELECT * FROM planes_servicio WHERE id = ?',
       [config.plan_id]
     );
 
@@ -1397,7 +1397,7 @@ class ClienteCompletoService {
     const mesesPermanencia = sedeData.mesesPermanencia || 0;
 
     // Descripción de servicios incluidos
-    const serviciosDescripcion = serviciosDeLaSede.map(s => 
+    const serviciosDescripcion = serviciosDeLaSede.map(s =>
       `${s.tipo.toUpperCase()}: ${s.plan_nombre} ($${s.precio.toLocaleString()})`
     ).join(' + ');
 
@@ -1436,7 +1436,9 @@ class ClienteCompletoService {
     // Actualizar todos los servicios de la sede con el contrato_id
     for (const servicio of serviciosDeLaSede) {
       const observacionesActualizadas = JSON.stringify({
-        ...JSON.parse(servicio.sede_info || '{}'),
+        ...(typeof servicio.sede_info === 'string' ?
+          JSON.parse(servicio.sede_info) :
+          servicio.sede_info || {}), // ✅ Verificar tipo antes de parsear
         contrato_id: contratoId,
         numero_contrato: numeroContrato
       });
@@ -1456,19 +1458,48 @@ class ClienteCompletoService {
    * Generar UNA factura para TODA la sede (Internet + TV)
    */
   static async generarFacturaParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, contratoId, createdBy) {
-    // Obtener datos del cliente
+  try {
+    console.log('🧾 Generando factura para sede con todos los campos requeridos...');
+
+    // 1. OBTENER CONFIGURACIÓN DE EMPRESA (resolución, prefijos, etc.)
+    const [configEmpresa] = await conexion.execute(`
+      SELECT 
+        resolucion_facturacion, 
+        prefijo_factura, 
+        consecutivo_factura,
+        dias_mora_corte,
+        porcentaje_iva,
+        empresa_nombre,
+        empresa_nit
+      FROM configuracion_empresa 
+      WHERE id = 1
+    `);
+
+    const config = configEmpresa[0];
+    if (!config) {
+      throw new Error('Configuración de empresa no encontrada');
+    }
+
+    // 2. OBTENER DATOS COMPLETOS DEL CLIENTE
     const [clientes] = await conexion.execute(
       'SELECT * FROM clientes WHERE id = ?', 
       [clienteId]
     );
 
+    if (clientes.length === 0) {
+      throw new Error('Cliente no encontrado');
+    }
+
     const cliente = clientes[0];
     const estrato = parseInt(cliente.estrato) || 1;
 
-    // Generar número de factura
+    // 3. GENERAR NÚMERO DE FACTURA CON PREFIJO
     const numeroFactura = await this.generarNumeroFactura(conexion);
 
-    // Calcular totales UNIFICADOS de todos los servicios de la sede
+    // 4. CALCULAR FECHAS DEL PERÍODO SEGÚN REGLAS DE FACTURACIÓN
+    const fechasFacturacion = this.calcularFechasFacturacion();
+
+    // 5. CALCULAR TOTALES UNIFICADOS DE TODOS LOS SERVICIOS DE LA SEDE
     let valorInternet = 0;
     let valorTelevision = 0;
     let valorIvaInternet = 0;
@@ -1481,12 +1512,12 @@ class ClienteCompletoService {
         valorInternet += precio;
         // IVA para internet: solo estratos 4, 5, 6
         if (estrato >= 4) {
-          valorIvaInternet += precio * 0.19;
+          valorIvaInternet += precio * (parseFloat(config.porcentaje_iva) / 100);
         }
       } else if (servicio.tipo === 'television') {
         valorTelevision += precio;
         // IVA para televisión: todos los estratos
-        valorIvaTelevision += precio * 0.19;
+        valorIvaTelevision += precio * (parseFloat(config.porcentaje_iva) / 100);
       }
     }
 
@@ -1494,65 +1525,118 @@ class ClienteCompletoService {
     const totalIva = valorIvaInternet + valorIvaTelevision;
     const total = subtotal + totalIva;
 
-    // Fechas
-    const fechaEmision = new Date();
-    const fechaVencimiento = new Date();
-    fechaVencimiento.setDate(fechaVencimiento.getDate() + 15);
-    const fechaDesde = new Date(fechaEmision.getFullYear(), fechaEmision.getMonth(), 1);
-    const fechaHasta = new Date(fechaEmision.getFullYear(), fechaEmision.getMonth() + 1, 0);
-    const periodoFacturacion = `${fechaEmision.getFullYear()}-${(fechaEmision.getMonth() + 1).toString().padStart(2, '0')}`;
-
-    // Descripción de la factura
+    // 6. CREAR DESCRIPCIÓN DE SERVICIOS PARA OBSERVACIONES
     const sedeNombre = sedeData.nombre_sede || 'Sede Principal';
-    const serviciosFacturados = serviciosDeLaSede.map(s => s.tipo.toUpperCase()).join(' + ');
+    const serviciosFacturados = serviciosDeLaSede.map(s => 
+      `${s.tipo.toUpperCase()}: ${s.plan_nombre} ($${s.precio.toLocaleString()})`
+    ).join(' + ');
     const observacionesFactura = `Servicios para ${sedeNombre}: ${serviciosFacturados}`;
 
-    // Insertar factura UNIFICADA
+    // 7. INSERTAR FACTURA COMPLETA CON TODOS LOS CAMPOS
     const queryFactura = `
       INSERT INTO facturas (
         numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
-        periodo_facturacion, fecha_emision, fecha_vencimiento, fecha_desde, fecha_hasta,
-        internet, television, saldo_anterior, interes, reconexion, descuento, varios, publicidad,
-        s_internet, s_television, s_interes, s_reconexion, s_descuento, s_varios, s_publicidad, s_iva,
-        subtotal, iva, total, estado, contrato_id, observaciones, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?, ?, 0, 0, 0, 0, 0, ?, ?, ?, ?, 'pendiente', ?, ?, ?)
+        periodo_facturacion, fecha_emision, fecha_vencimiento, 
+        fecha_desde, fecha_hasta,
+        internet, television, saldo_anterior, interes, reconexion, 
+        descuento, varios, publicidad,
+        s_internet, s_television, s_interes, s_reconexion, 
+        s_descuento, s_varios, s_publicidad, s_iva,
+        subtotal, iva, total, estado, contrato_id, 
+        observaciones, referencia_pago, resolucion_facturacion,
+        created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, NOW())
     `;
 
-    const [resultadoFactura] = await conexion.execute(queryFactura, [
-      numeroFactura, clienteId, cliente.identificacion, cliente.nombre,
-      periodoFacturacion, fechaEmision.toISOString().split('T')[0], 
-      fechaVencimiento.toISOString().split('T')[0],
-      fechaDesde.toISOString().split('T')[0], fechaHasta.toISOString().split('T')[0],
-      valorInternet, valorTelevision,
-      valorIvaInternet, valorIvaTelevision, totalIva,
-      subtotal, totalIva, total,
-      contratoId, observacionesFactura, createdBy
-    ]);
+    const valoresFactura = [
+      numeroFactura,                              // numero_factura
+      clienteId,                                  // cliente_id
+      cliente.identificacion,                     // identificacion_cliente
+      cliente.nombre,                             // nombre_cliente
+      fechasFacturacion.periodoFacturacion,       // periodo_facturacion (YYYY-MM)
+      fechasFacturacion.fechaEmision,             // fecha_emision
+      fechasFacturacion.fechaVencimiento,         // fecha_vencimiento
+      fechasFacturacion.fechaDesde,               // fecha_desde
+      fechasFacturacion.fechaHasta,               // fecha_hasta
+      valorInternet,                              // internet
+      valorTelevision,                            // television
+      0,                                          // saldo_anterior
+      0,                                          // interes
+      0,                                          // reconexion
+      0,                                          // descuento
+      0,                                          // varios
+      0,                                          // publicidad
+      valorInternet,                              // s_internet (subtotal internet)
+      valorTelevision,                            // s_television (subtotal tv)
+      0,                                          // s_interes
+      0,                                          // s_reconexion
+      0,                                          // s_descuento
+      0,                                          // s_varios
+      0,                                          // s_publicidad
+      totalIva,                                   // s_iva
+      subtotal,                                   // subtotal
+      totalIva,                                   // iva
+      total,                                      // total
+      contratoId,                                 // contrato_id
+      observacionesFactura,                       // observaciones
+      cliente.identificacion,                     // referencia_pago (misma cédula/identificación)
+      config.resolucion_facturacion || 'DIAN-2024-001', // resolucion_facturacion
+      createdBy || 1                              // created_by
+    ];
 
-    const facturaId = resultadoFactura.insertId;
+    console.log('🔍 Query factura:', queryFactura);
+    console.log('🔍 Valores factura:', valoresFactura);
 
-    // Crear detalle UNIFICADO con todos los servicios de la sede
-    for (const servicio of serviciosDeLaSede) {
-      const precio = parseFloat(servicio.precio || 0);
-      const iva = servicio.tipo === 'television' ? precio * 0.19 : 
-                  (servicio.tipo === 'internet' && estrato >= 4) ? precio * 0.19 : 0;
-      
-      await conexion.execute(`
-        INSERT INTO detalle_facturas (
-          factura_id, concepto_nombre, cantidad, precio_unitario, 
-          descuento, subtotal, iva, total, servicio_cliente_id
-        ) VALUES (?, ?, 1, ?, 0, ?, ?, ?, ?)
-      `, [
-        facturaId,
-        `${servicio.tipo.toUpperCase()}: ${servicio.plan_nombre} - ${sedeNombre}`,
-        precio, precio, iva, precio + iva, servicio.id
-      ]);
-    }
+    const [resultado] = await conexion.execute(queryFactura, valoresFactura);
+    const facturaId = resultado.insertId;
 
-    console.log(`✅ Factura UNIFICADA ${numeroFactura} creada para ${serviciosDeLaSede.length} servicios - Total: $${total.toLocaleString()}`);
+    // 8. ACTUALIZAR CONSECUTIVO DE FACTURA EN CONFIGURACIÓN
+    await conexion.execute(
+      'UPDATE configuracion_empresa SET consecutivo_factura = consecutivo_factura + 1 WHERE id = 1'
+    );
+
+    console.log(`✅ Factura ${numeroFactura} creada exitosamente - Total: $${total.toLocaleString()}`);
 
     return facturaId;
+
+  } catch (error) {
+    console.error('❌ Error generando factura para sede:', error);
+    throw error;
   }
+}
+
+/**
+ * MÉTODO AUXILIAR: Calcular fechas de facturación según reglas de negocio
+ */
+static calcularFechasFacturacion() {
+  const fechaActual = new Date();
+  
+  // FECHA DE EMISIÓN: Hoy
+  const fechaEmision = fechaActual.toISOString().split('T')[0];
+  
+  // FECHA DE VENCIMIENTO: 5 días después de la generación (como se solicita)
+  const fechaVencimiento = new Date(fechaActual);
+  fechaVencimiento.setDate(fechaVencimiento.getDate() + 5);
+  
+  // PERÍODO DE FACTURACIÓN: Si se crea el 14 de julio, el primer ciclo va hasta el 13 de agosto
+  const fechaDesde = fechaActual.toISOString().split('T')[0]; // Desde hoy
+  
+  const fechaHasta = new Date(fechaActual);
+  fechaHasta.setMonth(fechaHasta.getMonth() + 1); // Un mes después
+  fechaHasta.setDate(fechaHasta.getDate() - 1);   // Un día antes (13 de agosto si se crea el 14 de julio)
+  
+  // PERÍODO FORMATO YYYY-MM
+  const periodoFacturacion = `${fechaActual.getFullYear()}-${String(fechaActual.getMonth() + 1).padStart(2, '0')}`;
+  
+  return {
+    fechaEmision: fechaEmision,
+    fechaVencimiento: fechaVencimiento.toISOString().split('T')[0],
+    fechaDesde: fechaDesde,
+    fechaHasta: fechaHasta.toISOString().split('T')[0],
+    periodoFacturacion: periodoFacturacion
+  };
+}
+
 
   /**
    * AGREGAR NUEVA SEDE a cliente existente
@@ -1564,7 +1648,7 @@ class ClienteCompletoService {
 
       // Verificar que el cliente existe
       const [clientes] = await conexion.execute(
-        'SELECT * FROM clientes WHERE id = ?', 
+        'SELECT * FROM clientes WHERE id = ?',
         [clienteId]
       );
 
@@ -1574,9 +1658,9 @@ class ClienteCompletoService {
 
       // Crear servicios de la nueva sede
       const serviciosDeLaNuevaSede = await this.crearServiciosDeSede(
-        conexion, 
-        clienteId, 
-        nuevaSedeData, 
+        conexion,
+        clienteId,
+        nuevaSedeData,
         createdBy
       );
 
@@ -1652,13 +1736,13 @@ class ClienteCompletoService {
 
       // Agrupar por contrato (sede)
       const sedesAgrupadas = {};
-      
+
       for (const row of resultados) {
         const contratoId = row.contrato_id;
-        
+
         if (!sedesAgrupadas[contratoId]) {
           const contratoObs = JSON.parse(row.contrato_observaciones || '{}');
-          
+
           sedesAgrupadas[contratoId] = {
             contrato_id: contratoId,
             numero_contrato: row.numero_contrato,
@@ -1676,7 +1760,7 @@ class ClienteCompletoService {
             servicios: []
           };
         }
-        
+
         if (row.servicio_id) {
           sedesAgrupadas[contratoId].servicios.push({
             servicio_id: row.servicio_id,
@@ -1699,7 +1783,7 @@ class ClienteCompletoService {
     const [ultimoContrato] = await conexion.execute(
       'SELECT numero_contrato FROM contratos ORDER BY id DESC LIMIT 1'
     );
-    
+
     if (ultimoContrato.length > 0) {
       const ultimoNumero = ultimoContrato[0].numero_contrato;
       const año = new Date().getFullYear();
@@ -1715,7 +1799,7 @@ class ClienteCompletoService {
     const [ultimaFactura] = await conexion.execute(
       'SELECT numero_factura FROM facturas ORDER BY id DESC LIMIT 1'
     );
-    
+
     if (ultimaFactura.length > 0) {
       const ultimoNumero = ultimaFactura[0].numero_factura;
       const numeroActual = parseInt(ultimoNumero.replace(/\D/g, '')) + 1;
