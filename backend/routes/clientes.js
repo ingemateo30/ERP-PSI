@@ -2,6 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
+const pool = require('../config/database');
 
 // Importar controlador con manejo de errores
 let ClienteController;
@@ -310,7 +311,7 @@ router.put('/:id/inactivar',
 router.post('/clientes-con-servicios', 
   requireRole('administrador'), 
   async (req, res) => {
-    const conexion = await Database.getConnection();
+    const conexion = await pool.getConnection();
     
     try {
       await conexion.beginTransaction();
@@ -335,11 +336,11 @@ router.post('/clientes-con-servicios',
       
       console.log('📋 Datos recibidos:', { datosCliente, servicios: servicios.length });
       
-      // 1. CREAR EL CLIENTE
+      // 1. CREAR EL CLIENTE - CORREGIDO
       const queryCliente = `
         INSERT INTO clientes (
-          identificacion, nombre, email, telefono, direccion, 
-          estrato, tipo_cliente, estado, created_by, created_at
+          identificacion, nombre, correo, telefono, direccion, 
+          estrato, tipo_documento, estado, created_by, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'activo', ?, NOW())
       `;
       
@@ -359,7 +360,19 @@ router.post('/clientes-con-servicios',
       
       console.log(`✅ Cliente creado con ID: ${clienteId}`);
       
-      // 2. CREAR SERVICIOS POR SEPARADO
+      // Verificar que el cliente se creó correctamente
+      const [clienteVerificacion] = await conexion.execute(
+        'SELECT id, nombre FROM clientes WHERE id = ?', 
+        [clienteId]
+      );
+      
+      if (clienteVerificacion.length === 0) {
+        throw new Error(`Cliente con ID ${clienteId} no encontrado después de la creación`);
+      }
+      
+      console.log(`🔍 Cliente verificado:`, clienteVerificacion[0]);
+      
+      // 2. CREAR SERVICIOS POR SEPARADO - COMPLETAMENTE CORREGIDO
       const serviciosCreados = [];
       
       for (let i = 0; i < servicios.length; i++) {
@@ -369,38 +382,23 @@ router.post('/clientes-con-servicios',
         // Si tiene ambos servicios (Internet + TV), crear registros separados
         if (servicio.planInternetId && servicio.planTelevisionId) {
           
-          // CREAR SERVICIO DE INTERNET
-          const servicioInternetData = {
-            cliente_id: clienteId,
-            plan_id: servicio.planInternetId,
-            direccion_servicio: servicio.direccionServicio,
-            nombre_sede: servicio.nombreSede || `Sede ${i + 1} - Internet`,
-            precio_personalizado: servicio.precioPersonalizado ? 
-              parseFloat(servicio.precioInternetCustom) : null,
-            observaciones: `Internet - ${servicio.observaciones || ''}`,
-            estado: 'activo',
-            fecha_activacion: new Date().toISOString().split('T')[0],
-            created_by: req.user?.id || 1
-          };
-          
+          // CREAR SERVICIO DE INTERNET - QUERY CORREGIDO
           const queryServicioInternet = `
             INSERT INTO servicios_cliente (
-              cliente_id, plan_id, direccion_servicio, nombre_sede, 
+              cliente_id, plan_id,
               precio_personalizado, observaciones, estado, 
-              fecha_activacion, created_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+              fecha_activacion, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW())
           `;
           
           const valoresInternet = [
-            servicioInternetData.cliente_id,
-            servicioInternetData.plan_id,
-            servicioInternetData.direccion_servicio,
-            servicioInternetData.nombre_sede,
-            servicioInternetData.precio_personalizado,
-            servicioInternetData.observaciones,
-            servicioInternetData.estado,
-            servicioInternetData.fecha_activacion,
-            servicioInternetData.created_by
+            clienteId,
+            servicio.planInternetId,
+            servicio.precioPersonalizado ? parseFloat(servicio.precioInternetCustom) : null,
+            `Internet - ${servicio.observaciones || ''}`,
+            'activo',
+            new Date().toISOString().split('T')[0],
+            
           ];
           
           const [resultadoInternet] = await conexion.execute(queryServicioInternet, valoresInternet);
@@ -408,33 +406,26 @@ router.post('/clientes-con-servicios',
           
           console.log(`✅ Servicio Internet creado con ID: ${servicioInternetId}`);
           
-          // CREAR SERVICIO DE TELEVISIÓN
-          const servicioTVData = {
-            cliente_id: clienteId,
-            plan_id: servicio.planTelevisionId,
-            direccion_servicio: servicio.direccionServicio,
-            nombre_sede: servicio.nombreSede || `Sede ${i + 1} - TV`,
-            precio_personalizado: servicio.precioPersonalizado ? 
-              parseFloat(servicio.precioTelevisionCustom) : null,
-            observaciones: `Televisión - ${servicio.observaciones || ''}`,
-            estado: 'activo',
-            fecha_activacion: new Date().toISOString().split('T')[0],
-            created_by: req.user?.id || 1
-          };
+          // CREAR SERVICIO DE TELEVISIÓN - QUERY CORREGIDO
+          const queryServicioTV = `
+            INSERT INTO servicios_cliente (
+              cliente_id, plan_id, 
+              precio_personalizado, observaciones, estado, 
+              fecha_activacion,  created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW())
+          `;
           
           const valoresTV = [
-            servicioTVData.cliente_id,
-            servicioTVData.plan_id,
-            servicioTVData.direccion_servicio,
-            servicioTVData.nombre_sede,
-            servicioTVData.precio_personalizado,
-            servicioTVData.observaciones,
-            servicioTVData.estado,
-            servicioTVData.fecha_activacion,
-            servicioTVData.created_by
+            clienteId,
+            servicio.planTelevisionId,
+            servicio.precioPersonalizado ? parseFloat(servicio.precioTelevisionCustom) : null,
+            `Televisión - ${servicio.observaciones || ''}`,
+            'activo',
+            new Date().toISOString().split('T')[0],
+            
           ];
           
-          const [resultadoTV] = await conexion.execute(queryServicioInternet, valoresTV);
+          const [resultadoTV] = await conexion.execute(queryServicioTV, valoresTV);
           const servicioTVId = resultadoTV.insertId;
           
           console.log(`✅ Servicio TV creado con ID: ${servicioTVId}`);
@@ -451,38 +442,23 @@ router.post('/clientes-con-servicios',
           });
           
         } else if (servicio.planInternetId) {
-          // SOLO INTERNET
-          const servicioData = {
-            cliente_id: clienteId,
-            plan_id: servicio.planInternetId,
-            direccion_servicio: servicio.direccionServicio,
-            nombre_sede: servicio.nombreSede || `Sede ${i + 1} - Internet`,
-            precio_personalizado: servicio.precioPersonalizado ? 
-              parseFloat(servicio.precioInternetCustom) : null,
-            observaciones: servicio.observaciones || '',
-            estado: 'activo',
-            fecha_activacion: new Date().toISOString().split('T')[0],
-            created_by: req.user?.id || 1
-          };
-          
+          // SOLO INTERNET - QUERY CORREGIDO
           const queryServicio = `
             INSERT INTO servicios_cliente (
-              cliente_id, plan_id, direccion_servicio, nombre_sede, 
+              cliente_id, plan_id,
               precio_personalizado, observaciones, estado, 
-              fecha_activacion, created_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+              fecha_activacion, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW())
           `;
           
           const valores = [
-            servicioData.cliente_id,
-            servicioData.plan_id,
-            servicioData.direccion_servicio,
-            servicioData.nombre_sede,
-            servicioData.precio_personalizado,
-            servicioData.observaciones,
-            servicioData.estado,
-            servicioData.fecha_activacion,
-            servicioData.created_by
+            clienteId,
+            servicio.planInternetId,
+            servicio.precioPersonalizado ? parseFloat(servicio.precioInternetCustom) : null,
+            servicio.observaciones || '',
+            'activo',
+            new Date().toISOString().split('T')[0],
+           
           ];
           
           const [resultado] = await conexion.execute(queryServicio, valores);
@@ -500,38 +476,23 @@ router.post('/clientes-con-servicios',
           });
           
         } else if (servicio.planTelevisionId) {
-          // SOLO TELEVISIÓN
-          const servicioData = {
-            cliente_id: clienteId,
-            plan_id: servicio.planTelevisionId,
-            direccion_servicio: servicio.direccionServicio,
-            nombre_sede: servicio.nombreSede || `Sede ${i + 1} - TV`,
-            precio_personalizado: servicio.precioPersonalizado ? 
-              parseFloat(servicio.precioTelevisionCustom) : null,
-            observaciones: servicio.observaciones || '',
-            estado: 'activo',
-            fecha_activacion: new Date().toISOString().split('T')[0],
-            created_by: req.user?.id || 1
-          };
-          
+          // SOLO TELEVISIÓN - QUERY CORREGIDO
           const queryServicio = `
             INSERT INTO servicios_cliente (
-              cliente_id, plan_id, direccion_servicio, nombre_sede, 
+              cliente_id, plan_id,
               precio_personalizado, observaciones, estado, 
-              fecha_activacion, created_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+              fecha_activacion, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW())
           `;
           
           const valores = [
-            servicioData.cliente_id,
-            servicioData.plan_id,
-            servicioData.direccion_servicio,
-            servicioData.nombre_sede,
-            servicioData.precio_personalizado,
-            servicioData.observaciones,
-            servicioData.estado,
-            servicioData.fecha_activacion,
-            servicioData.created_by
+            clienteId,
+            servicio.planTelevisionId,
+            servicio.precioPersonalizado ? parseFloat(servicio.precioTelevisionCustom) : null,
+            servicio.observaciones || '',
+            'activo',
+            new Date().toISOString().split('T')[0],
+            
           ];
           
           const [resultado] = await conexion.execute(queryServicio, valores);
@@ -560,9 +521,10 @@ router.post('/clientes-con-servicios',
             const numeroContrato = `CONT-${new Date().getFullYear()}-${String(clienteId).padStart(6, '0')}-${Date.now().toString().slice(-3)}`;
             
             // Obtener datos del plan para calcular costo de instalación
+            const servicioInternet = servicios.find(s => s.planInternetId);
             const [planesInternet] = await conexion.execute(
               'SELECT * FROM planes_servicio WHERE id = ?', 
-              [servicios.find(s => s.planInternetId)?.planInternetId]
+              [servicioInternet?.planInternetId]
             );
             const planInternet = planesInternet[0];
             
