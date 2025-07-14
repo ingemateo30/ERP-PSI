@@ -336,24 +336,50 @@ router.post('/clientes-con-servicios',
       
       console.log('📋 Datos recibidos:', { datosCliente, servicios: servicios.length });
       
-      // 1. CREAR EL CLIENTE - CORREGIDO
+      // ===================================================================
+      // 1. CREAR EL CLIENTE CON TODOS LOS CAMPOS REQUERIDOS - CORREGIDO
+      // ===================================================================
+      
+      // Generar código de usuario único
+      const codigoUsuario = await generarCodigoUsuario(conexion, datosCliente.identificacion);
+      
+      // Calcular fecha_hasta si tiene permanencia
+      let fechaHasta = null;
+      if (datosCliente.tiene_permanencia && datosCliente.permanencia_meses) {
+        const fecha = new Date();
+        fecha.setMonth(fecha.getMonth() + parseInt(datosCliente.permanencia_meses));
+        fechaHasta = fecha.toISOString().split('T')[0];
+      }
+      
       const queryCliente = `
         INSERT INTO clientes (
-          identificacion, nombre, correo, telefono, direccion, 
-          estrato, tipo_documento, estado, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'activo', ?, NOW())
+          identificacion, tipo_documento, nombre, correo, telefono, telefono_2,
+          direccion, barrio, estrato, ciudad_id, sector_id, observaciones,
+          fecha_registro, fecha_hasta, codigo_usuario, estado, created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?, NOW())
       `;
       
       const valoresCliente = [
         datosCliente.identificacion,
+        datosCliente.tipo_documento || 'cedula',        // ✅ CORREGIDO: Se guarda tipo_documento
         datosCliente.nombre,
         datosCliente.email || datosCliente.correo,
         datosCliente.telefono,
+        datosCliente.telefono_fijo || datosCliente.telefono_2 || null,  // ✅ CORREGIDO: Se guarda telefono_2
         datosCliente.direccion,
-        datosCliente.estrato || 1,
-        datosCliente.tipo_cliente || 'persona_natural',
+        datosCliente.barrio || null,                    // ✅ CORREGIDO: Se guarda barrio
+        datosCliente.estrato || 3,
+        datosCliente.ciudad_id ? parseInt(datosCliente.ciudad_id) : null,  // ✅ CORREGIDO: Se guarda ciudad
+        datosCliente.sector_id ? parseInt(datosCliente.sector_id) : null,  // ✅ CORREGIDO: Se guarda sector
+        datosCliente.observaciones || null,
+        new Date().toISOString().split('T')[0],         // ✅ CORREGIDO: Se guarda fecha_registro
+        fechaHasta,                                     // ✅ CORREGIDO: Se calcula fecha_hasta
+        codigoUsuario,                                  // ✅ CORREGIDO: Se guarda código_usuario
         req.user?.id || 1
       ];
+      
+      console.log('📝 Query cliente corregido:', queryCliente);
+      console.log('📝 Valores cliente:', valoresCliente);
       
       const [resultadoCliente] = await conexion.execute(queryCliente, valoresCliente);
       const clienteId = resultadoCliente.insertId;
@@ -362,7 +388,7 @@ router.post('/clientes-con-servicios',
       
       // Verificar que el cliente se creó correctamente
       const [clienteVerificacion] = await conexion.execute(
-        'SELECT id, nombre FROM clientes WHERE id = ?', 
+        'SELECT id, nombre, codigo_usuario, tipo_documento, barrio, ciudad_id, sector_id FROM clientes WHERE id = ?', 
         [clienteId]
       );
       
@@ -370,9 +396,25 @@ router.post('/clientes-con-servicios',
         throw new Error(`Cliente con ID ${clienteId} no encontrado después de la creación`);
       }
       
-      console.log(`🔍 Cliente verificado:`, clienteVerificacion[0]);
+      console.log(`🔍 Cliente verificado con todos los campos:`, clienteVerificacion[0]);
       
-      // 2. CREAR SERVICIOS POR SEPARADO - COMPLETAMENTE CORREGIDO
+      // ===================================================================
+      // 2. GENERAR CONTRATO CON CONSECUTIVO AUTOMÁTICO - CORREGIDO
+      // ===================================================================
+      
+      const contratoData = await generarContratoConConsecutivo(
+        conexion, 
+        clienteId, 
+        datosCliente, 
+        req.user?.id || 1
+      );
+      
+      console.log(`✅ Contrato generado: ${contratoData.numero_contrato}`);
+      
+      // ===================================================================
+      // 3. CREAR SERVICIOS ASOCIADOS - CORREGIDO
+      // ===================================================================
+      
       const serviciosCreados = [];
       
       for (let i = 0; i < servicios.length; i++) {
@@ -382,364 +424,382 @@ router.post('/clientes-con-servicios',
         // Si tiene ambos servicios (Internet + TV), crear registros separados
         if (servicio.planInternetId && servicio.planTelevisionId) {
           
-          // CREAR SERVICIO DE INTERNET - QUERY CORREGIDO
-          const queryServicioInternet = `
-            INSERT INTO servicios_cliente (
-              cliente_id, plan_id,
-              precio_personalizado, observaciones, estado, 
-              fecha_activacion, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, NOW())
-          `;
-          
-          const valoresInternet = [
+          // CREAR SERVICIO DE INTERNET
+          const servicioInternetId = await crearServicioCliente(
+            conexion,
             clienteId,
             servicio.planInternetId,
-            servicio.precioPersonalizado ? parseFloat(servicio.precioInternetCustom) : null,
-            `Internet - ${servicio.observaciones || ''}`,
-            'activo',
-            new Date().toISOString().split('T')[0],
-            
-          ];
+            servicio,
+            'internet'
+          );
+          serviciosCreados.push({ id: servicioInternetId, tipo: 'internet', plan_id: servicio.planInternetId });
           
-          const [resultadoInternet] = await conexion.execute(queryServicioInternet, valoresInternet);
-          const servicioInternetId = resultadoInternet.insertId;
-          
-          console.log(`✅ Servicio Internet creado con ID: ${servicioInternetId}`);
-          
-          // CREAR SERVICIO DE TELEVISIÓN - QUERY CORREGIDO
-          const queryServicioTV = `
-            INSERT INTO servicios_cliente (
-              cliente_id, plan_id, 
-              precio_personalizado, observaciones, estado, 
-              fecha_activacion,  created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, NOW())
-          `;
-          
-          const valoresTV = [
+          // CREAR SERVICIO DE TELEVISIÓN
+          const servicioTvId = await crearServicioCliente(
+            conexion,
             clienteId,
             servicio.planTelevisionId,
-            servicio.precioPersonalizado ? parseFloat(servicio.precioTelevisionCustom) : null,
-            `Televisión - ${servicio.observaciones || ''}`,
-            'activo',
-            new Date().toISOString().split('T')[0],
-            
-          ];
-          
-          const [resultadoTV] = await conexion.execute(queryServicioTV, valoresTV);
-          const servicioTVId = resultadoTV.insertId;
-          
-          console.log(`✅ Servicio TV creado con ID: ${servicioTVId}`);
-          
-          serviciosCreados.push({
-            tipo: 'combo',
-            internet_id: servicioInternetId,
-            television_id: servicioTVId,
-            descuento_combo: servicio.descuentoCombo || 0,
-            tipo_contrato: servicio.tipoContrato || 'con_permanencia',
-            meses_permanencia: servicio.mesesPermanencia || 6,
-            direccion: servicio.direccionServicio,
-            sede: servicio.nombreSede
-          });
+            servicio,
+            'television'
+          );
+          serviciosCreados.push({ id: servicioTvId, tipo: 'television', plan_id: servicio.planTelevisionId });
           
         } else if (servicio.planInternetId) {
-          // SOLO INTERNET - QUERY CORREGIDO
-          const queryServicio = `
-            INSERT INTO servicios_cliente (
-              cliente_id, plan_id,
-              precio_personalizado, observaciones, estado, 
-              fecha_activacion, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, NOW())
-          `;
-          
-          const valores = [
+          // SOLO INTERNET
+          const servicioId = await crearServicioCliente(
+            conexion,
             clienteId,
             servicio.planInternetId,
-            servicio.precioPersonalizado ? parseFloat(servicio.precioInternetCustom) : null,
-            servicio.observaciones || '',
-            'activo',
-            new Date().toISOString().split('T')[0],
-           
-          ];
-          
-          const [resultado] = await conexion.execute(queryServicio, valores);
-          const servicioId = resultado.insertId;
-          
-          console.log(`✅ Servicio Internet creado con ID: ${servicioId}`);
-          
-          serviciosCreados.push({
-            tipo: 'internet',
-            servicio_id: servicioId,
-            tipo_contrato: servicio.tipoContrato || 'con_permanencia',
-            meses_permanencia: servicio.mesesPermanencia || 6,
-            direccion: servicio.direccionServicio,
-            sede: servicio.nombreSede
-          });
+            servicio,
+            'internet'
+          );
+          serviciosCreados.push({ id: servicioId, tipo: 'internet', plan_id: servicio.planInternetId });
           
         } else if (servicio.planTelevisionId) {
-          // SOLO TELEVISIÓN - QUERY CORREGIDO
-          const queryServicio = `
-            INSERT INTO servicios_cliente (
-              cliente_id, plan_id,
-              precio_personalizado, observaciones, estado, 
-              fecha_activacion, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, NOW())
-          `;
-          
-          const valores = [
+          // SOLO TELEVISIÓN
+          const servicioId = await crearServicioCliente(
+            conexion,
             clienteId,
             servicio.planTelevisionId,
-            servicio.precioPersonalizado ? parseFloat(servicio.precioTelevisionCustom) : null,
-            servicio.observaciones || '',
-            'activo',
-            new Date().toISOString().split('T')[0],
-            
-          ];
-          
-          const [resultado] = await conexion.execute(queryServicio, valores);
-          const servicioId = resultado.insertId;
-          
-          console.log(`✅ Servicio TV creado con ID: ${servicioId}`);
-          
-          serviciosCreados.push({
-            tipo: 'television',
-            servicio_id: servicioId,
-            tipo_contrato: servicio.tipoContrato || 'con_permanencia',
-            meses_permanencia: servicio.mesesPermanencia || 6,
-            direccion: servicio.direccionServicio,
-            sede: servicio.nombreSede
-          });
+            servicio,
+            'television'
+          );
+          serviciosCreados.push({ id: servicioId, tipo: 'television', plan_id: servicio.planTelevisionId });
         }
       }
       
-      // 3. GENERAR CONTRATOS Y FACTURAS
-      console.log('📄 Generando contratos y facturas...');
+      console.log(`✅ ${serviciosCreados.length} servicios creados exitosamente`);
       
-      for (const servicioCreado of serviciosCreados) {
-        try {
-          if (servicioCreado.tipo === 'combo') {
-            // GENERAR CONTRATO COMBO (que agrupa ambos servicios)
-            const numeroContrato = `CONT-${new Date().getFullYear()}-${String(clienteId).padStart(6, '0')}-${Date.now().toString().slice(-3)}`;
-            
-            // Obtener datos del plan para calcular costo de instalación
-            const servicioInternet = servicios.find(s => s.planInternetId);
-            const [planesInternet] = await conexion.execute(
-              'SELECT * FROM planes_servicio WHERE id = ?', 
-              [servicioInternet?.planInternetId]
-            );
-            const planInternet = planesInternet[0];
-            
-            const costoInstalacion = servicioCreado.tipo_contrato === 'con_permanencia' ?
-              (planInternet?.costo_instalacion_permanencia || 50000) :
-              (planInternet?.costo_instalacion_sin_permanencia || 150000);
-            
-            const queryContrato = `
-              INSERT INTO contratos (
-                numero_contrato, cliente_id, tipo_contrato, tipo_permanencia,
-                permanencia_meses, costo_instalacion, fecha_generacion,
-                fecha_inicio, estado, generado_automaticamente, created_by, created_at
-              ) VALUES (?, ?, 'servicio', ?, ?, ?, CURDATE(), CURDATE(), 'activo', 1, ?, NOW())
-            `;
-            
-            await conexion.execute(queryContrato, [
-              numeroContrato,
-              clienteId,
-              servicioCreado.tipo_contrato,
-              servicioCreado.meses_permanencia,
-              costoInstalacion,
-              req.user?.id || 1
-            ]);
-            
-            console.log(`✅ Contrato combo generado: ${numeroContrato}`);
-            
-          } else {
-            // GENERAR CONTRATO INDIVIDUAL
-            const numeroContrato = `CONT-${new Date().getFullYear()}-${String(clienteId).padStart(6, '0')}-${Date.now().toString().slice(-3)}`;
-            
-            // Obtener datos del plan
-            const planId = servicioCreado.tipo === 'internet' ? 
-              servicios.find(s => s.planInternetId)?.planInternetId :
-              servicios.find(s => s.planTelevisionId)?.planTelevisionId;
-              
-            const [planes] = await conexion.execute(
-              'SELECT * FROM planes_servicio WHERE id = ?', 
-              [planId]
-            );
-            const plan = planes[0];
-            
-            const costoInstalacion = servicioCreado.tipo_contrato === 'con_permanencia' ?
-              (plan?.costo_instalacion_permanencia || 50000) :
-              (plan?.costo_instalacion_sin_permanencia || 150000);
-            
-            const queryContrato = `
-              INSERT INTO contratos (
-                numero_contrato, cliente_id, servicio_id, tipo_contrato, tipo_permanencia,
-                permanencia_meses, costo_instalacion, fecha_generacion,
-                fecha_inicio, estado, generado_automaticamente, created_by, created_at
-              ) VALUES (?, ?, ?, 'servicio', ?, ?, ?, CURDATE(), CURDATE(), 'activo', 1, ?, NOW())
-            `;
-            
-            await conexion.execute(queryContrato, [
-              numeroContrato,
-              clienteId,
-              servicioCreado.servicio_id,
-              servicioCreado.tipo_contrato,
-              servicioCreado.meses_permanencia,
-              costoInstalacion,
-              req.user?.id || 1
-            ]);
-            
-            console.log(`✅ Contrato individual generado: ${numeroContrato}`);
-          }
-        } catch (errorContrato) {
-          console.error('⚠️ Error generando contrato:', errorContrato);
-          // Continuar con otros contratos
-        }
-      }
+      // ===================================================================
+      // 4. GENERAR INSTALACIÓN AUTOMÁTICA - NUEVO
+      // ===================================================================
       
-      // 4. GENERAR PRIMERA FACTURA UNIFICADA
-      try {
-        console.log('🧾 Generando primera factura...');
-        
-        const numeroFactura = `FAC-${new Date().getFullYear()}-${String(Date.now()).slice(-8)}`;
-        const fechaEmision = new Date();
-        const fechaVencimiento = new Date();
-        fechaVencimiento.setDate(fechaVencimiento.getDate() + 15);
-        
-        // Calcular subtotal de todos los servicios
-        let subtotal = 0;
-        let totalIVA = 0;
-        
-        // Esta lógica se puede mejorar integrando el cálculo de IVA del frontend
-        for (const servicioCreado of serviciosCreados) {
-          if (servicioCreado.tipo === 'combo') {
-            // Para combo, sumar ambos servicios
-            const servicioInternet = servicios.find(s => s.planInternetId);
-            const servicioTV = servicios.find(s => s.planTelevisionId);
-            
-            // Obtener precios de los planes
-            const [planesInternet] = await conexion.execute('SELECT precio FROM planes_servicio WHERE id = ?', [servicioInternet.planInternetId]);
-            const [planesTV] = await conexion.execute('SELECT precio FROM planes_servicio WHERE id = ?', [servicioTV.planTelevisionId]);
-            
-            let precioInternet = servicioInternet.precioPersonalizado ? 
-              parseFloat(servicioInternet.precioInternetCustom) : 
-              parseFloat(planesInternet[0]?.precio || 0);
-              
-            let precioTV = servicioTV.precioPersonalizado ? 
-              parseFloat(servicioTV.precioTelevisionCustom) : 
-              Math.round(parseFloat(planesTV[0]?.precio || 0) / 1.19); // TV viene con IVA
-            
-            // Aplicar descuento combo
-            const totalSinDescuento = precioInternet + precioTV;
-            const descuento = totalSinDescuento * (servicioCreado.descuento_combo / 100);
-            const totalConDescuento = totalSinDescuento - descuento;
-            
-            subtotal += totalConDescuento;
-            
-            // Calcular IVA (Internet según estrato, TV siempre)
-            const estrato = parseInt(datosCliente.estrato) || 1;
-            if (estrato >= 4) {
-              totalIVA += (totalConDescuento * 0.5) * 0.19; // 50% del total para internet
-            }
-            totalIVA += (totalConDescuento * 0.5) * 0.19; // 50% del total para TV
-            
-          } else {
-            // Servicio individual
-            const servicio = servicios.find(s => 
-              (servicioCreado.tipo === 'internet' && s.planInternetId) ||
-              (servicioCreado.tipo === 'television' && s.planTelevisionId)
-            );
-            
-            const planId = servicioCreado.tipo === 'internet' ? 
-              servicio.planInternetId : servicio.planTelevisionId;
-              
-            const [planes] = await conexion.execute('SELECT precio FROM planes_servicio WHERE id = ?', [planId]);
-            
-            let precio = 0;
-            if (servicioCreado.tipo === 'internet') {
-              precio = servicio.precioPersonalizado ? 
-                parseFloat(servicio.precioInternetCustom) : 
-                parseFloat(planes[0]?.precio || 0);
-            } else {
-              precio = servicio.precioPersonalizado ? 
-                parseFloat(servicio.precioTelevisionCustom) : 
-                Math.round(parseFloat(planes[0]?.precio || 0) / 1.19);
-            }
-            
-            subtotal += precio;
-            
-            // Calcular IVA
-            const estrato = parseInt(datosCliente.estrato) || 1;
-            if (servicioCreado.tipo === 'internet' && estrato >= 4) {
-              totalIVA += precio * 0.19;
-            } else if (servicioCreado.tipo === 'television') {
-              totalIVA += precio * 0.19;
-            }
-          }
-        }
-        
-        const total = subtotal + totalIVA;
-        
-        const queryFactura = `
-          INSERT INTO facturas (
-            numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
-            subtotal, iva, total, fecha_emision, fecha_vencimiento,
-            periodo_facturacion, estado, tipo_factura, generada_automaticamente,
-            created_by, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', 'mensual', 1, ?, NOW())
-        `;
-        
-        const periodoFacturacion = `${fechaEmision.getFullYear()}-${String(fechaEmision.getMonth() + 1).padStart(2, '0')}`;
-        
-        await conexion.execute(queryFactura, [
-          numeroFactura,
-          clienteId,
-          datosCliente.identificacion,
-          datosCliente.nombre,
-          subtotal,
-          totalIVA,
-          total,
-          fechaEmision.toISOString().split('T')[0],
-          fechaVencimiento.toISOString().split('T')[0],
-          periodoFacturacion,
-          req.user?.id || 1
-        ]);
-        
-        console.log(`✅ Primera factura generada: ${numeroFactura} - Total: $${total.toLocaleString()}`);
-        
-      } catch (errorFactura) {
-        console.error('⚠️ Error generando factura:', errorFactura);
-        // Continuar sin factura por ahora
-      }
+      const instalacionData = await generarInstalacionAutomatica(
+        conexion,
+        clienteId,
+        serviciosCreados[0].id, // Usar el primer servicio
+        contratoData.id,
+        servicios[0],
+        req.user?.id || 1
+      );
+      
+      console.log(`✅ Instalación generada con ID: ${instalacionData.id}`);
+      
+      // ===================================================================
+      // 5. GENERAR PRIMERA FACTURA AUTOMÁTICA - NUEVO
+      // ===================================================================
+      
+      const facturaData = await generarPrimeraFacturaAutomatica(
+        conexion,
+        clienteId,
+        serviciosCreados,
+        contratoData.id,
+        datosCliente,
+        req.user?.id || 1
+      );
+      
+      console.log(`✅ Primera factura generada: ${facturaData.numero_factura}`);
       
       await conexion.commit();
       
-      console.log(`🎉 Cliente creado exitosamente con ${serviciosCreados.length} servicio(s)`);
-      
-      res.status(201).json({
+      const resultado = {
         success: true,
-        message: `Cliente creado exitosamente con ${serviciosCreados.length} servicio(s)`,
+        message: 'Cliente con servicios creado exitosamente',
         data: {
-          cliente_id: clienteId,
-          servicios_creados: serviciosCreados,
-          total_servicios: serviciosCreados.length,
-          mensaje_adicional: 'Contratos y factura inicial generados automáticamente'
+          cliente: {
+            id: clienteId,
+            identificacion: datosCliente.identificacion,
+            nombre: datosCliente.nombre,
+            codigo_usuario: codigoUsuario
+          },
+          contrato: contratoData,
+          servicios: serviciosCreados,
+          instalacion: instalacionData,
+          factura: facturaData,
+          resumen: {
+            cliente_creado: true,
+            contrato_generado: true,
+            servicios_creados: serviciosCreados.length,
+            instalacion_generada: true,
+            primera_factura_generada: true
+          }
         }
-      });
+      };
+      
+      console.log('🎉 Proceso completado exitosamente');
+      res.status(201).json(resultado);
       
     } catch (error) {
       await conexion.rollback();
-      console.error('❌ Error creando cliente con servicios:', error);
+      console.error('❌ Error en creación de cliente con servicios:', error);
+      
+      // Manejo de errores específicos
+      if (error.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe un cliente con esta identificación'
+        });
+      }
+      
       res.status(500).json({
         success: false,
-        message: 'Error creando cliente con servicios',
-        error: error.message,
-        detalles: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        message: error.message || 'Error interno del servidor',
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     } finally {
       conexion.release();
     }
   }
 );
+
+// ===================================================================
+// FUNCIONES AUXILIARES CORREGIDAS
+// ===================================================================
+
+/**
+ * Generar código de usuario único
+ */
+async function generarCodigoUsuario(conexion, identificacion) {
+  const sufijo = identificacion.slice(-4).padStart(4, '0');
+  const timestamp = Date.now().toString().slice(-4);
+  const codigoBase = `USR${sufijo}${timestamp}`;
+
+  // Verificar que no exista
+  const [existente] = await conexion.execute(
+    'SELECT id FROM clientes WHERE codigo_usuario = ?',
+    [codigoBase]
+  );
+
+  if (existente.length > 0) {
+    return `${codigoBase}${Math.floor(Math.random() * 99)}`;
+  }
+
+  return codigoBase;
+}
+
+/**
+ * Generar contrato con consecutivo de configuracion_empresa
+ */
+async function generarContratoConConsecutivo(conexion, clienteId, datosCliente, createdBy) {
+  // Obtener y actualizar consecutivo
+  await conexion.execute(`
+    UPDATE configuracion_empresa 
+    SET consecutivo_contrato = consecutivo_contrato + 1 
+    WHERE id = 1
+  `);
+
+  const [config] = await conexion.execute(`
+    SELECT 
+      CONCAT(COALESCE(prefijo_contrato, 'CON'), LPAD(consecutivo_contrato, 6, '0')) as numero_contrato,
+      consecutivo_contrato
+    FROM configuracion_empresa 
+    WHERE id = 1
+  `);
+
+  const numeroContrato = config[0]?.numero_contrato || `CON${String(Date.now()).substr(-6)}`;
+
+  // Determinar datos de permanencia
+  const tienePermancencia = datosCliente.tiene_permanencia || false;
+  const mesesPermanencia = tienePermancencia ? (datosCliente.permanencia_meses || 6) : 0;
+  
+  let fechaVencimientoPermanencia = null;
+  if (tienePermancencia && mesesPermanencia > 0) {
+    const fechaInicio = new Date();
+    fechaVencimientoPermanencia = new Date(fechaInicio.setMonth(fechaInicio.getMonth() + mesesPermanencia))
+      .toISOString().split('T')[0];
+  }
+
+  const queryContrato = `
+    INSERT INTO contratos (
+      numero_contrato, cliente_id, tipo_contrato,
+      tipo_permanencia, permanencia_meses, costo_instalacion,
+      fecha_generacion, fecha_inicio, fecha_vencimiento_permanencia,
+      estado, generado_automaticamente, created_by, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', 1, ?, NOW())
+  `;
+
+  const valoresContrato = [
+    numeroContrato,
+    parseInt(clienteId),
+    'servicio',
+    tienePermancencia ? 'con_permanencia' : 'sin_permanencia',
+    mesesPermanencia,
+    parseFloat(datosCliente.costo_instalacion || 150000),
+    new Date().toISOString().split('T')[0],
+    new Date().toISOString().split('T')[0],
+    fechaVencimientoPermanencia,
+    createdBy
+  ];
+
+  const [resultado] = await conexion.execute(queryContrato, valoresContrato);
+
+  return {
+    id: resultado.insertId,
+    numero_contrato: numeroContrato,
+    cliente_id: clienteId
+  };
+}
+
+/**
+ * Crear servicio individual
+ */
+async function crearServicioCliente(conexion, clienteId, planId, datosServicio, tipoServicio) {
+  const queryServicio = `
+    INSERT INTO servicios_cliente (
+      cliente_id, plan_id, precio_personalizado, observaciones, 
+      estado, fecha_activacion, created_at
+    ) VALUES (?, ?, ?, ?, 'activo', ?, NOW())
+  `;
+
+  const valoresServicio = [
+    clienteId,
+    planId,
+    datosServicio.precioPersonalizado ? parseFloat(datosServicio.precioPersonalizado) : null,
+    `${tipoServicio} - ${datosServicio.observaciones || 'Servicio creado automáticamente'}`,
+    datosServicio.fechaActivacion || new Date().toISOString().split('T')[0]
+  ];
+
+  const [resultado] = await conexion.execute(queryServicio, valoresServicio);
+  return resultado.insertId;
+}
+
+/**
+ * Generar instalación automática
+ */
+async function generarInstalacionAutomatica(conexion, clienteId, servicioId, contratoId, datosServicio, createdBy) {
+  const fechaInstalacion = datosServicio.fechaInstalacion || 
+    new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const queryInstalacion = `
+    INSERT INTO instalaciones (
+      cliente_id, servicio_cliente_id, contrato_id, fecha_programada,
+      estado, tipo_instalacion, observaciones, created_by, created_at
+    ) VALUES (?, ?, ?, ?, 'programada', 'nueva', ?, ?, NOW())
+  `;
+
+  const valoresInstalacion = [
+    parseInt(clienteId),
+    parseInt(servicioId),
+    parseInt(contratoId),
+    fechaInstalacion,
+    'Instalación automática generada para nuevo cliente',
+    createdBy
+  ];
+
+  const [resultado] = await conexion.execute(queryInstalacion, valoresInstalacion);
+
+  return {
+    id: resultado.insertId,
+    cliente_id: clienteId,
+    fecha_programada: fechaInstalacion
+  };
+}
+
+/**
+ * Generar primera factura automática
+ */
+async function generarPrimeraFacturaAutomatica(conexion, clienteId, serviciosCreados, contratoId, datosCliente, createdBy) {
+  // Obtener y actualizar consecutivo de factura
+  await conexion.execute(`
+    UPDATE configuracion_empresa 
+    SET consecutivo_factura = consecutivo_factura + 1 
+    WHERE id = 1
+  `);
+
+  const [config] = await conexion.execute(`
+    SELECT 
+      CONCAT(COALESCE(prefijo_factura, 'FAC'), LPAD(consecutivo_factura, 6, '0')) as numero_factura
+    FROM configuracion_empresa 
+    WHERE id = 1
+  `);
+
+  const numeroFactura = config[0]?.numero_factura || `FAC${String(Date.now()).substr(-6)}`;
+
+  // Calcular totales de todos los servicios
+  let subtotalTotal = 0;
+  let ivaTotal = 0;
+
+  for (const servicio of serviciosCreados) {
+    const [planData] = await conexion.execute(
+      'SELECT precio, aplica_iva, porcentaje_iva FROM planes_servicio WHERE id = ?',
+      [servicio.plan_id]
+    );
+
+    if (planData.length > 0) {
+      const plan = planData[0];
+      const precio = parseFloat(plan.precio);
+      subtotalTotal += precio;
+
+      if (plan.aplica_iva) {
+        ivaTotal += precio * ((plan.porcentaje_iva || 19) / 100);
+      }
+    }
+  }
+
+  const total = subtotalTotal + ivaTotal;
+
+  // Crear factura
+  const fechaGeneracion = new Date().toISOString().split('T')[0];
+  const fechaVencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const queryFactura = `
+    INSERT INTO facturas (
+      numero_factura, cliente_id, contrato_id, fecha_generacion,
+      fecha_vencimiento, subtotal, iva, total, estado,
+      tipo_factura, observaciones, created_by, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', 'primera', ?, ?, NOW())
+  `;
+
+  const valoresFactura = [
+    numeroFactura,
+    parseInt(clienteId),
+    parseInt(contratoId),
+    fechaGeneracion,
+    fechaVencimiento,
+    subtotalTotal,
+    ivaTotal,
+    total,
+    'Primera factura generada automáticamente',
+    createdBy
+  ];
+
+  const [resultado] = await conexion.execute(queryFactura, valoresFactura);
+
+  // Agregar detalles para cada servicio
+  for (const servicio of serviciosCreados) {
+    const [planData] = await conexion.execute(
+      'SELECT nombre, precio, aplica_iva, porcentaje_iva FROM planes_servicio WHERE id = ?',
+      [servicio.plan_id]
+    );
+
+    if (planData.length > 0) {
+      const plan = planData[0];
+      const precio = parseFloat(plan.precio);
+
+      await conexion.execute(`
+        INSERT INTO detalle_facturas (
+          factura_id, servicio_cliente_id, concepto_descripcion,
+          cantidad, valor_unitario, valor_total, aplica_iva, porcentaje_iva
+        ) VALUES (?, ?, ?, 1, ?, ?, ?, ?)
+      `, [
+        resultado.insertId,
+        servicio.id,
+        `${plan.nombre} - Primer período`,
+        precio,
+        precio,
+        plan.aplica_iva ? 1 : 0,
+        plan.porcentaje_iva || 0
+      ]);
+    }
+  }
+
+  return {
+    id: resultado.insertId,
+    numero_factura: numeroFactura,
+    total: total,
+    fecha_vencimiento: fechaVencimiento
+  };
+}
 
 router.put('/:id/reactivar',
   rateLimiter.clientes,

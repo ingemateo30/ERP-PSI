@@ -3,8 +3,8 @@
 // =============================================
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Plus, Search, Filter, Download, RefreshCw, UserX, Users, X, 
+import {
+  Plus, Search, Filter, Download, RefreshCw, UserX, Users, X,
   AlertCircle, Loader2, Trash2, Edit, Eye, MapPin, Phone, Mail,
   Building, Wifi, Tv, Package, DollarSign, Check, Calculator
 } from 'lucide-react';
@@ -26,9 +26,11 @@ import ClientesInactivos from './ClientesInactivos';
 const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, planesDisponibles = [], estratoCliente = 1 }) => {
   const [servicios, setServicios] = useState(serviciosSeleccionados);
 
+
   useEffect(() => {
     setServicios(serviciosSeleccionados);
   }, [serviciosSeleccionados]);
+
 
   const agregarServicio = () => {
     const nuevoServicio = {
@@ -48,7 +50,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
       tipoContrato: 'con_permanencia',
       mesesPermanencia: 6
     };
-    
+
     const nuevosServicios = [...servicios, nuevoServicio];
     setServicios(nuevosServicios);
     onServiciosChange(nuevosServicios);
@@ -57,7 +59,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
   const actualizarServicio = (index, campo, valor) => {
     const nuevosServicios = [...servicios];
     nuevosServicios[index][campo] = valor;
-    
+
     // Auto-calcular descuento combo
     if (campo === 'planInternetId' || campo === 'planTelevisionId') {
       if (nuevosServicios[index].planInternetId && nuevosServicios[index].planTelevisionId) {
@@ -69,7 +71,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
       // Auto-ajustar permanencia según los planes
       const planInternet = planesDisponibles.find(p => p.id == nuevosServicios[index].planInternetId);
       const planTV = planesDisponibles.find(p => p.id == nuevosServicios[index].planTelevisionId);
-      
+
       let permanenciaMinima = 6; // Default
       if (planInternet && planInternet.permanencia_minima_meses) {
         permanenciaMinima = Math.max(permanenciaMinima, planInternet.permanencia_minima_meses);
@@ -77,10 +79,10 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
       if (planTV && planTV.permanencia_minima_meses) {
         permanenciaMinima = Math.max(permanenciaMinima, planTV.permanencia_minima_meses);
       }
-      
+
       nuevosServicios[index].mesesPermanencia = permanenciaMinima;
     }
-    
+
     setServicios(nuevosServicios);
     onServiciosChange(nuevosServicios);
   };
@@ -98,7 +100,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
     }
 
     let aplicaIVA = false;
-    
+
     if (tipoServicio === 'internet') {
       // Internet: Sin IVA para estratos 1,2,3 - Con IVA 19% para estratos 4,5,6
       aplicaIVA = estrato >= 4;
@@ -131,16 +133,16 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
     if (servicio.planInternetId) {
       planInternet = planesDisponibles.find(p => p.id == servicio.planInternetId);
       if (planInternet) {
-        const precioBase = servicio.precioPersonalizado ? 
-          parseFloat(servicio.precioInternetCustom) || 0 : 
+        const precioBase = servicio.precioPersonalizado ?
+          parseFloat(servicio.precioInternetCustom) || 0 :
           parseFloat(planInternet.precio) || 0;
-        
+
         const calculoInternet = calcularIVA(precioBase, 'internet', parseInt(estratoCliente));
-        
+
         totalSinIVA += calculoInternet.precioSinIVA;
         totalConIVA += calculoInternet.precioConIVA;
         totalIVA += calculoInternet.valorIVA;
-        
+
         detalles.push({
           concepto: `Internet ${planInternet.nombre} (${planInternet.velocidad_bajada}MB)`,
           precioSinIVA: calculoInternet.precioSinIVA,
@@ -163,13 +165,13 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
           const precioConIVA = parseFloat(planTV.precio) || 0;
           precioBaseSinIVA = Math.round(precioConIVA / 1.19);
         }
-        
+
         const calculoTV = calcularIVA(precioBaseSinIVA, 'television', parseInt(estratoCliente));
-        
+
         totalSinIVA += calculoTV.precioSinIVA;
         totalConIVA += calculoTV.precioConIVA;
         totalIVA += calculoTV.valorIVA;
-        
+
         detalles.push({
           concepto: `TV ${planTV.nombre} (${planTV.canales_tv} canales)`,
           precioSinIVA: calculoTV.precioSinIVA,
@@ -185,7 +187,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
     if (servicio.descuentoCombo > 0 && totalSinIVA > 0) {
       descuentoAplicado = totalSinIVA * (servicio.descuentoCombo / 100);
       totalSinIVA -= descuentoAplicado;
-      
+
       // Recalcular IVA después del descuento
       totalIVA = 0;
       if (servicio.planInternetId && parseInt(estratoCliente) >= 4) {
@@ -195,7 +197,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
         totalIVA += (totalSinIVA * 0.5) * 0.19;
       }
       totalConIVA = totalSinIVA + totalIVA;
-      
+
       detalles.push({
         concepto: `Descuento combo (${servicio.descuentoCombo}%)`,
         precioSinIVA: -descuentoAplicado,
@@ -262,7 +264,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
       {/* Lista de servicios */}
       {servicios.map((servicio, index) => {
         const precio = calcularPrecioServicio(servicio);
-        
+
         return (
           <div key={servicio.id} className="border border-gray-300 rounded-lg bg-white shadow-sm">
             {/* Encabezado del servicio */}
@@ -279,9 +281,9 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                     {servicio.nombreSede && ` - ${servicio.nombreSede}`}
                   </h4>
                   <p className="text-sm text-gray-600">
-                    {precio.tieneInternet && precio.tieneTV ? 'Combo Internet + TV' : 
-                     precio.tieneInternet ? 'Solo Internet' : 
-                     precio.tieneTV ? 'Solo Televisión' : 'Sin servicios seleccionados'}
+                    {precio.tieneInternet && precio.tieneTV ? 'Combo Internet + TV' :
+                      precio.tieneInternet ? 'Solo Internet' :
+                        precio.tieneTV ? 'Solo Televisión' : 'Sin servicios seleccionados'}
                   </p>
                 </div>
               </div>
@@ -418,7 +420,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                     <option value="con_permanencia">Con Permanencia (Instalación: ${precio.costoInstalacion ? precio.costoInstalacion.toLocaleString() : '50,000'})</option>
                     <option value="sin_permanencia">Sin Permanencia (Instalación: ${precio.costoInstalacion ? precio.costoInstalacion.toLocaleString() : '150,000'})</option>
                   </select>
-                  
+
                   {servicio.tipoContrato === 'con_permanencia' && (
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -434,7 +436,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                       />
                       <p className="text-xs text-gray-500 mt-1">
                         Mínimo requerido: {Math.max(
-                          precio.planInternet?.permanencia_minima_meses || 0, 
+                          precio.planInternet?.permanencia_minima_meses || 0,
                           precio.planTV?.permanencia_minima_meses || 0
                         ) || 6} meses
                       </p>
@@ -552,7 +554,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                   Estrato {estratoCliente}
                 </span>
               </div>
-              
+
               <div className="text-sm space-y-2">
                 {/* Tabla de conceptos */}
                 <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-blue-800 border-b border-blue-200 pb-1">
@@ -561,7 +563,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                   <div className="text-right">IVA</div>
                   <div className="text-right">Total</div>
                 </div>
-                
+
                 {precio.detalles.map((detalle, i) => (
                   <div key={i} className="grid grid-cols-4 gap-2 text-xs">
                     <div className="text-blue-800">{detalle.concepto}</div>
@@ -572,7 +574,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                     <div className="text-right font-medium">${detalle.precioConIVA.toLocaleString()}</div>
                   </div>
                 ))}
-                
+
                 {/* Total final */}
                 <div className="grid grid-cols-4 gap-2 border-t border-blue-300 pt-2 mt-2 font-bold text-blue-900">
                   <div>TOTAL MENSUAL:</div>
@@ -582,7 +584,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                   </div>
                   <div className="text-right text-lg">${precio.totalConIVA.toLocaleString()}</div>
                 </div>
-                
+
                 {/* Información adicional */}
                 <div className="mt-3 pt-2 border-t border-blue-200 space-y-1">
                   {precio.esCombo && (
@@ -591,14 +593,14 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
                       Descuento combo aplicado: {servicio.descuentoCombo}%
                     </div>
                   )}
-                  
+
                   {precio.tipoContrato === 'con_permanencia' && (
                     <div className="text-xs text-orange-700 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
                       Permanencia: {precio.mesesPermanencia} meses
                     </div>
                   )}
-                  
+
                   <div className="text-xs text-gray-600">
                     💡 Instalación: ${precio.costoInstalacion.toLocaleString()} + IVA = ${(precio.costoInstalacion * 1.19).toLocaleString()}
                   </div>
@@ -672,7 +674,7 @@ const ServiciosSelector = ({ serviciosSeleccionados = [], onServiciosChange, pla
               </div>
             </div>
           </div>
-          
+
           {/* Resumen de permanencia */}
           <div className="mt-3 pt-3 border-t border-green-300">
             <div className="text-sm text-green-800">
@@ -726,7 +728,7 @@ const ClientsManagement = () => {
   const [selectedClient, setSelectedClient] = useState(null);
   const [showClientModal, setShowClientModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   // Estados para el nuevo formulario
   const [showNewForm, setShowNewForm] = useState(false);
   const [serviciosSeleccionados, setServiciosSeleccionados] = useState([]);
@@ -745,10 +747,47 @@ const ClientsManagement = () => {
   // Permisos del usuario actual
   const permissions = ROLE_PERMISSIONS[user?.role] || ROLE_PERMISSIONS.instalador;
 
+  const [ciudades, setCiudades] = useState([]);
+  const [sectores, setSectores] = useState([]);
+  const [ciudadSeleccionada, setCiudadSeleccionada] = useState('');
+
   // Cargar planes disponibles al montar el componente
   useEffect(() => {
     cargarPlanesDisponibles();
+    cargarCiudades();
   }, []);
+
+  const cargarCiudades = async () => {
+    try {
+      const response = await configService.getCities();
+      if (response.success) {
+        setCiudades(response.data);
+      }
+    } catch (error) {
+      console.error('Error cargando ciudades:', error);
+    }
+  };
+
+  const cargarSectoresPorCiudad = async (ciudadId) => {
+    try {
+      const response = await configService.getSectorsByCity(ciudadId);
+      if (response.success) {
+        setSectores(response.data);
+      }
+    } catch (error) {
+      console.error('Error cargando sectores:', error);
+      setSectores([]);
+    }
+  };
+
+  const handleCiudadChange = (ciudadId) => {
+    setCiudadSeleccionada(ciudadId);
+    if (ciudadId) {
+      cargarSectoresPorCiudad(ciudadId);
+    } else {
+      setSectores([]);
+    }
+  };
 
   const cargarPlanesDisponibles = async () => {
     try {
@@ -756,7 +795,7 @@ const ClientsManagement = () => {
       const response = await configService.getServicePlans();
       if (response.success) {
         // Filtrar solo planes activos y no combos
-        const planesActivos = response.data.filter(plan => 
+        const planesActivos = response.data.filter(plan =>
           plan.activo && plan.tipo !== 'combo'
         );
         setPlanesDisponibles(planesActivos);
@@ -806,11 +845,19 @@ const ClientsManagement = () => {
         return;
       }
 
-      // Incluir estrato en los datos del cliente
-      datosCliente.estrato = estratoCliente;
+      const datosClienteCompletos = {
+        ...datosCliente,
+        estrato: estratoCliente,
+        // ✅ CAMPOS FALTANTES AGREGADOS
+        tipo_documento: datosCliente.tipo_documento || 'cedula',
+        barrio: datosCliente.barrio || '',
+        ciudad_id: datosCliente.ciudad_id ? parseInt(datosCliente.ciudad_id) : null,
+        sector_id: datosCliente.sector_id ? parseInt(datosCliente.sector_id) : null,
+        telefono_fijo: datosCliente.telefono_fijo || null
+      };
 
       const response = await clientService.createClientWithServices({
-        datosCliente,
+        datosCliente: datosClienteCompletos,
         servicios: serviciosSeleccionados
       });
 
@@ -818,6 +865,8 @@ const ClientsManagement = () => {
         refresh();
         setShowNewForm(false);
         setServiciosSeleccionados([]);
+        setCiudadSeleccionada(''); // ✅ LIMPIAR CIUDAD
+        setSectores([]);
         setEstratoCliente(1);
         if (window.showNotification) {
           window.showNotification('success', 'Cliente creado exitosamente con todos los servicios');
@@ -843,7 +892,7 @@ const ClientsManagement = () => {
 
     try {
       setInactivandoCliente(true);
-      
+
       const response = await clientService.inactivarCliente(selectedClient.id, {
         motivo_inactivacion: motivo,
         observaciones_inactivacion: observaciones
@@ -936,11 +985,10 @@ const ClientsManagement = () => {
             {/* Toggle vista inactivos */}
             <button
               onClick={() => setShowInactivos(!showInactivos)}
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                showInactivos
-                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${showInactivos
+                ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
             >
               <UserX className="w-4 h-4 mr-1 inline" />
               {showInactivos ? 'Ver Activos' : 'Ver Inactivos'}
@@ -949,11 +997,10 @@ const ClientsManagement = () => {
             {/* Filtros */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                showFilters
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${showFilters
+                ? 'bg-blue-100 text-blue-700'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
             >
               <Filter className="w-4 h-4 mr-1 inline" />
               Filtros
@@ -982,13 +1029,13 @@ const ClientsManagement = () => {
                 {showExportMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border">
                     <button
-                      onClick={() => {/* Lógica de exportar Excel */}}
+                      onClick={() => {/* Lógica de exportar Excel */ }}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
                       Exportar a Excel
                     </button>
                     <button
-                      onClick={() => {/* Lógica de exportar PDF */}}
+                      onClick={() => {/* Lógica de exportar PDF */ }}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
                       Exportar a PDF
@@ -1110,8 +1157,25 @@ const ClientsManagement = () => {
                   <Users className="w-5 h-5" />
                   Información del Cliente
                 </h4>
-                
+
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tipo de Documento *
+                    </label>
+                    <select
+                      name="tipo_documento"
+                      defaultValue="cedula"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="cedula">Cédula de Ciudadanía</option>
+                      <option value="nit">NIT</option>
+                      <option value="pasaporte">Pasaporte</option>
+                      <option value="extranjeria">Cédula de Extranjería</option>
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Identificación *
@@ -1158,6 +1222,16 @@ const ClientsManagement = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Teléfono Fijo
+                    </label>
+                    <input
+                      type="tel"
+                      name="telefono_fijo"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Estrato *
                     </label>
                     <select
@@ -1179,28 +1253,71 @@ const ClientsManagement = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tipo de Cliente
+                      Ciudad *
                     </label>
                     <select
-                      name="tipo_cliente"
+                      name="ciudad_id"
+                      value={ciudadSeleccionada}
+                      onChange={(e) => handleCiudadChange(e.target.value)}
+                      required
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <option value="persona_natural">Persona Natural</option>
-                      <option value="persona_juridica">Persona Jurídica</option>
+                      <option value="">Seleccione una ciudad</option>
+                      {ciudades.map(ciudad => (
+                        <option key={ciudad.id} value={ciudad.id}>
+                          {ciudad.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* ✅ SECTOR - CAMPO NUEVO */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Sector *
+                    </label>
+                    <select
+                      name="sector_id"
+                      required
+                      disabled={!ciudadSeleccionada || sectores.length === 0}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                    >
+                      <option value="">Seleccione un sector</option>
+                      {sectores.map(sector => (
+                        <option key={sector.id} value={sector.id}>
+                          {sector.codigo} - {sector.nombre}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
 
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Dirección Principal
-                  </label>
-                  <input
-                    type="text"
-                    name="direccion"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
+                {/* ✅ DIRECCIÓN Y BARRIO - CAMPOS NUEVOS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Dirección Principal *
+                    </label>
+                    <input
+                      type="text"
+                      name="direccion"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* ✅ BARRIO - CAMPO NUEVO */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Barrio *
+                    </label>
+                    <input
+                      type="text"
+                      name="barrio"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1317,7 +1434,7 @@ const ModalInactivarCliente = ({ client, onConfirm, onCancel, loading }) => {
               Inactivar Cliente
             </h3>
           </div>
-          
+
           <p className="text-sm text-gray-600 mb-4">
             ¿Está seguro de inactivar al cliente <strong>{client.nombre}</strong>?
           </p>
