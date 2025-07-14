@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Save, Loader2, User, MapPin, Phone, Mail,
-  CreditCard, Building, Wifi, AlertCircle, Check,
+  CreditCard, Building, Wifi, Tv, AlertCircle, Check, // ← Agregar Tv aquí
   Calendar, DollarSign, Settings, Clock
 } from 'lucide-react';
 import { clientService } from '../../services/clientService';
@@ -18,6 +18,8 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   const [planesDisponibles, setPlanesDisponibles] = useState([]);
   const [sectores, setSectores] = useState([]);
   const [ciudades, setCiudades] = useState([]);
+   const planesInternet = planesDisponibles.filter(p => p.tipo === 'internet');
+    const planesTelevision = planesDisponibles.filter(p => p.tipo === 'television');
 
   // Estado del formulario
   const [formData, setFormData] = useState({
@@ -41,6 +43,11 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     precio_personalizado: '',
     fecha_activacion: new Date().toISOString().split('T')[0],
     observaciones_servicio: '',
+    planInternetId: '',
+    planTelevisionId: '',
+    precioInternetCustom: '',
+    precioTelevisionCustom: '',
+    usarServiciosSeparados: false,
 
     // Configuración adicional
     generar_documentos: true,
@@ -154,22 +161,19 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       console.log('🏙️ Respuesta de ciudades:', ciudadesResponse);
 
       // Manejar la respuesta de planes
-      const planes = planesResponse?.data || [];
+      const planesSinCombos = (planesResponse?.data || []).filter(plan => plan.tipo !== 'combo');
+
       const sectores = sectoresResponse?.data || [];
       const ciudades = ciudadesResponse?.data || [];
 
-      console.log('✅ Datos procesados:', {
-        planesCount: planes.length,
-        sectoresCount: sectores.length,
-        ciudadesCount: ciudades.length
-      });
 
-      setPlanesDisponibles(planes);
+
+      setPlanesDisponibles(planesSinCombos);
       setSectores(sectores);
       setCiudades(ciudades);
 
       // Validar que se cargaron los planes
-      if (planes.length === 0) {
+      if (planesSinCombos.length === 0) {
         console.warn('⚠️ No se encontraron planes de servicio activos');
         setErrors(prev => ({
           ...prev,
@@ -290,24 +294,145 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
     try {
       setSaving(true);
+      setErrors({});
 
       if (client) {
-        // Actualizar cliente existente
+        // MODO EDICIÓN (mantener igual)
         await actualizarCliente();
       } else {
-        // Crear nuevo cliente con servicio
-        await crearClienteCompleto();
+        // MODO CREACIÓN - NUEVA LÓGICA DE SEDES
+        await crearClienteConSede();
       }
 
-      onSave && onSave();
-
     } catch (error) {
-      console.error('Error guardando cliente:', error);
+      console.error('❌ Error en formulario:', error);
       setErrors({
-        general: error.response?.data?.message || 'Error al guardar el cliente'
+        general: error.message || 'Error al procesar la información'
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const crearClienteConSede = async () => {
+    const calculos = recalcularPreciosEnTiempoReal();
+
+    // Preparar datos del cliente
+    const datosCliente = {
+      identificacion: formData.identificacion,
+      tipo_documento: formData.tipo_documento,
+      nombre: formData.nombre,
+      email: formData.email,
+      telefono: formData.telefono,
+      telefono_fijo: formData.telefono_fijo,
+      direccion: formData.direccion,
+      barrio: formData.barrio,
+      estrato: parseInt(formData.estrato),
+      ciudad_id: formData.ciudad_id,
+      sector_id: formData.sector_id,
+      observaciones: formData.observaciones,
+      fecha_inicio_contrato: formData.fecha_activacion
+    };
+
+    // Preparar servicios como SEDE PRINCIPAL
+    const serviciosSede = [];
+
+    // Determinar qué servicios se van a crear según el plan seleccionado
+    const planesInternet = planesDisponibles.filter(p => p.tipo === 'internet');
+    const planesTelevision = planesDisponibles.filter(p => p.tipo === 'television');
+
+    if (!planesInternet.length && !planesTelevision.length) {
+      throw new Error('Debe seleccionar un plan de servicio');
+    }
+
+    // Crear la sede principal con los servicios correspondientes
+    const sedeInicial = {
+      id: Date.now(),
+      nombre_sede: 'Sede Principal',
+      direccion_servicio: formData.direccion,
+      contacto_sede: formData.nombre,
+      telefono_sede: formData.telefono,
+
+      // LÓGICA CORREGIDA:
+      planInternetId: formData.usarServiciosSeparados ? formData.planInternetId :
+        (planSeleccionado?.tipo === 'internet' ? formData.plan_id : ''),
+      planTelevisionId: formData.usarServiciosSeparados ? formData.planTelevisionId :
+        (planSeleccionado?.tipo === 'television' ? formData.plan_id : ''),
+
+      precioPersonalizado: !!formData.precio_personalizado,
+      precioInternetCustom: formData.precioInternetCustom || formData.precio_personalizado,
+      precioTelevisionCustom: formData.precioTelevisionCustom || formData.precio_personalizado,
+      tipoContrato: formData.tipo_permanencia || 'sin_permanencia',
+      mesesPermanencia: formData.tipo_permanencia === 'con_permanencia' ? 6 : 0,
+      fechaActivacion: formData.fecha_activacion,
+      observaciones: formData.observaciones_servicio || ''
+    };
+
+    // Lógica según el tipo de plan
+    if (planSeleccionado.tipo === 'internet') {
+      // Solo Internet
+      sedeInicial.planInternetId = formData.plan_id;
+      if (formData.precio_personalizado) {
+        sedeInicial.precioInternetCustom = calculos.precio_base;
+      }
+    } else if (planSeleccionado.tipo === 'television') {
+      // Solo Televisión
+      sedeInicial.planTelevisionId = formData.plan_id;
+      if (formData.precio_personalizado) {
+        sedeInicial.precioTelevisionCustom = calculos.precio_base;
+      }
+    } else if (planSeleccionado.tipo === 'combo') {
+      // COMBO = Internet + TV (crear como servicios separados)
+      // Necesitamos dividir el combo en planes individuales
+
+      // Por ahora, vamos a usar el plan combo para ambos servicios
+      // Pero idealmente deberías tener planes separados de Internet y TV
+      sedeInicial.planInternetId = formData.plan_id;
+      sedeInicial.planTelevisionId = formData.plan_id;
+
+      if (formData.precio_personalizado) {
+        // Dividir el precio personalizado entre Internet y TV
+        const precioBase = calculos.precio_base;
+        sedeInicial.precioInternetCustom = Math.round(precioBase * 0.6); // 60% Internet
+        sedeInicial.precioTelevisionCustom = Math.round(precioBase * 0.4); // 40% TV
+      }
+    }
+
+    // Preparar datos completos en el formato correcto
+    const datosCompletos = {
+      cliente: datosCliente,
+      servicios: [sedeInicial], // Array con una sede inicial
+      opciones: {
+        generar_documentos: formData.generar_documentos,
+        enviar_bienvenida: formData.enviar_bienvenida,
+        programar_instalacion: formData.programar_instalacion
+      }
+    };
+
+    console.log('🚀 Creando cliente con sede inicial:', datosCompletos);
+
+    // Llamar al servicio correcto
+    const response = await clienteCompletoService.createClienteCompleto(datosCompletos);
+
+    if (response.success) {
+      console.log('✅ Cliente creado exitosamente:', response.data);
+
+      // Mostrar mensaje de éxito
+      const resumen = response.data.resumen || response.data;
+      const mensaje = `Cliente creado exitosamente:
+• ${resumen.total_sedes || 1} sede(s)
+• ${resumen.total_contratos || 1} contrato(s)
+• ${resumen.total_facturas || 1} factura(s)
+• ${resumen.total_servicios || 1} servicio(s)`;
+
+      if (window.showNotification) {
+        window.showNotification('success', mensaje);
+      } else {
+        alert(mensaje);
+      }
+
+      // Llamar callback de éxito
+      onSave(response.data);
     }
   };
 
@@ -373,12 +498,10 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     const response = await clientService.updateClient(client.id, datosActualizacion);
 
     if (response.success) {
-      alert('Cliente actualizado exitosamente');
-      if (onSave) {
-        onSave(response);
+      if (window.showNotification) {
+        window.showNotification('success', 'Cliente actualizado exitosamente');
       }
-    } else {
-      throw new Error(response.message || 'Error actualizando cliente');
+      onSave(response.data);
     }
   };
 
@@ -717,93 +840,88 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                 )}
               </div>
 
-              {/* Selección de plan */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Plan de Servicio {!client && <span className="text-red-500">*</span>}
-                </label>
-                <select
-                  value={formData.plan_id}
-                  onChange={(e) => handleInputChange('plan_id', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.plan_id ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                  disabled={client && !permissions?.canEdit}
-                >
-                  <option value="">Seleccionar plan</option>
-                  {planesDisponibles.map(plan => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.nombre} - ${plan.precio.toLocaleString()}
-                    </option>
-                  ))}
-                </select>
-                {errors.plan_id && (
-                  <p className="mt-1 text-sm text-red-600">{errors.plan_id}</p>
-                )}
-              </div>
+              {!client && (
+                <div className="mb-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.usarServiciosSeparados}
+                      onChange={(e) => handleInputChange('usarServiciosSeparados', e.target.checked)}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-700">Seleccionar Internet y TV por separado</span>
+                  </label>
+                </div>
+              )}
 
-              {/* Detalles del plan seleccionado */}
-              {planSeleccionado && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-900 mb-2">{planSeleccionado.nombre}</h4>
-                  <div className="text-sm text-blue-700 space-y-1">
-                    <p><strong>Tipo:</strong> {planSeleccionado.tipo}</p>
-                    <p><strong>Precio:</strong> ${planSeleccionado.precio.toLocaleString()}</p>
-                    {planSeleccionado.velocidad_bajada && (
-                      <p><strong>Velocidad:</strong> {planSeleccionado.velocidad_bajada} Mbps</p>
-                    )}
-                    {planSeleccionado.canales_tv && (
-                      <p><strong>Canales:</strong> {planSeleccionado.canales_tv}</p>
-                    )}
+              {/* Selección tradicional (un solo plan) */}
+              {!formData.usarServiciosSeparados && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Plan de Servicio {!client && <span className="text-red-500">*</span>}
+                  </label>
+                  <select
+                    value={formData.plan_id}
+                    onChange={(e) => handleInputChange('plan_id', e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.plan_id ? 'border-red-300' : 'border-gray-300'}`}
+                    disabled={client && !permissions?.canEdit}
+                  >
+                    <option value="">Seleccionar plan</option>
+                    {planesDisponibles.map(plan => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.nombre} - ${plan.precio.toLocaleString()}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.plan_id && (
+                    <p className="mt-1 text-sm text-red-600">{errors.plan_id}</p>
+                  )}
+                </div>
+              )}
 
-                    {(() => {
-                      const estratoNum = parseInt(formData.estrato) || 4;
-                      let aplicaIva = false;
+              {/* Selección separada (Internet + TV) */}
+              {formData.usarServiciosSeparados && (
+                <div className="space-y-4">
+                  {/* Internet */}
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center mb-3">
+                      <Wifi className="w-5 h-5 text-blue-600 mr-2" />
+                      <h4 className="font-medium text-gray-900">Internet</h4>
+                    </div>
+                    <select
+                      value={formData.planInternetId}
+                      onChange={(e) => handleInputChange('planInternetId', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Sin internet</option>
+                      {planesInternet.map(plan => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.nombre} - ${plan.precio?.toLocaleString()}
+                          {plan.velocidad_bajada && ` (${plan.velocidad_bajada} Mbps)`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                      if (planSeleccionado.tipo === 'internet') {
-                        aplicaIva = estratoNum >= 4;  // ✅ CORRECTO: >= 4
-                      } else if (planSeleccionado.tipo === 'television') {
-                        aplicaIva = true;
-                      } else if (planSeleccionado.tipo === 'combo') {
-                        aplicaIva = estratoNum >= 4;  // ✅ CORRECTO: >= 4
-                      }
-
-                      // ✅ CONVERSIÓN CORRECTA A NÚMEROS
-                      const precioBase = parseFloat(formData.precio_personalizado) || parseFloat(planSeleccionado.precio) || 0;
-                      const valorIva = aplicaIva ? Math.round(precioBase * 0.19) : 0;
-                      const precioTotal = precioBase + valorIva;
-
-                      return (
-                        <div className="border-t border-blue-300 pt-2 mt-2">
-                          <div className="text-sm space-y-1">
-                            <div className="flex justify-between">
-                              <span>Precio base:</span>
-                              <span>${precioBase.toLocaleString('es-CO')}</span>
-                            </div>
-                            {aplicaIva ? (
-                              <div className="flex justify-between text-blue-600">
-                                <span>IVA (19%):</span>
-                                <span>${valorIva.toLocaleString('es-CO')}</span>
-                              </div>
-                            ) : (
-                              <div className="flex justify-between text-green-600">
-                                <span>IVA:</span>
-                                <span>Exento (Estrato {estratoNum})</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between font-bold text-lg border-t pt-1">
-                              <span>Total a pagar:</span>
-                              <span className="text-blue-700">${precioTotal.toLocaleString('es-CO')}</span>
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {aplicaIva
-                                ? `Estrato ${estratoNum}: Aplica IVA del 19%`
-                                : `Estrato ${estratoNum}: Internet sin IVA`
-                              }
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                  {/* Televisión */}
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center mb-3">
+                      <Tv className="w-5 h-5 text-purple-600 mr-2" />
+                      <h4 className="font-medium text-gray-900">Televisión</h4>
+                    </div>
+                    <select
+                      value={formData.planTelevisionId}
+                      onChange={(e) => handleInputChange('planTelevisionId', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Sin televisión</option>
+                      {planesTelevision.map(plan => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.nombre} - ${plan.precio?.toLocaleString()}
+                          {plan.canales_tv && ` (${plan.canales_tv} canales)`}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               )}

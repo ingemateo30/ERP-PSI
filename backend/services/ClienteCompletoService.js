@@ -1211,6 +1211,519 @@ class ClienteCompletoService {
     }
   }
 
+  static async crearClienteConServicios(datosCompletos, createdBy = null) {
+    return await Database.transaction(async (conexion) => {
+      console.log('🚀 Creando cliente con servicios agrupados por sede...');
+
+      // 1. CREAR CLIENTE UNA SOLA VEZ
+      const clienteId = await this.crearCliente(conexion, datosCompletos.cliente, createdBy);
+      console.log(`✅ Cliente creado con ID: ${clienteId}`);
+
+      const sedesCreadas = [];
+
+      // 2. PROCESAR CADA SEDE (cada sede = 1 contrato + 1 factura)
+      for (let i = 0; i < datosCompletos.servicios.length; i++) {
+        const sedeData = datosCompletos.servicios[i];
+        
+        console.log(`🏢 Procesando sede: ${sedeData.nombre_sede || `Sede ${i + 1}`}`);
+
+        // 2.1 Crear todos los servicios de esta sede
+        const serviciosDeLaSede = await this.crearServiciosDeSede(
+          conexion, 
+          clienteId, 
+          sedeData, 
+          createdBy
+        );
+
+        // 2.2 Crear UN SOLO contrato para todos los servicios de esta sede
+        const contratoId = await this.generarContratoParaSede(
+          conexion,
+          clienteId,
+          serviciosDeLaSede,
+          sedeData,
+          createdBy
+        );
+
+        // 2.3 Crear UNA SOLA factura para todos los servicios de esta sede
+        const facturaId = await this.generarFacturaParaSede(
+          conexion,
+          clienteId,
+          serviciosDeLaSede,
+          sedeData,
+          contratoId,
+          createdBy
+        );
+
+        sedesCreadas.push({
+          sede_nombre: sedeData.nombre_sede || `Sede ${i + 1}`,
+          direccion: sedeData.direccion_servicio,
+          servicios: serviciosDeLaSede,
+          contrato_id: contratoId,
+          factura_id: facturaId,
+          total_servicios: serviciosDeLaSede.length
+        });
+      }
+
+      console.log(`🎉 Cliente creado con ${sedesCreadas.length} sede(s) independiente(s)`);
+
+      return {
+        cliente_id: clienteId,
+        sedes_creadas: sedesCreadas,
+        resumen: {
+          total_sedes: sedesCreadas.length,
+          total_contratos: sedesCreadas.length, // 1 contrato por sede
+          total_facturas: sedesCreadas.length,  // 1 factura por sede
+          total_servicios: sedesCreadas.reduce((sum, sede) => sum + sede.total_servicios, 0)
+        }
+      };
+    });
+  }
+
+  /**
+   * Crear todos los servicios de UNA sede específica
+   */
+  static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
+  const serviciosCreados = [];
+
+  // Obtener el plan para verificar si es combo
+  const [planes] = await conexion.execute(
+    'SELECT * FROM planes_servicio WHERE id IN (?, ?)', 
+    [sedeData.planInternetId || 0, sedeData.planTelevisionId || 0]
+  );
+
+  // INTERNET en esta sede
+  if (sedeData.planInternetId) {
+    const planInternet = planes.find(p => p.id == sedeData.planInternetId);
+    
+    const servicioInternet = await this.crearServicioIndividual(
+      conexion,
+      clienteId,
+      {
+        plan_id: sedeData.planInternetId,
+        precio: sedeData.precioPersonalizado ? sedeData.precioInternetCustom : 
+               (planInternet.tipo === 'combo' ? planInternet.precio_internet : planInternet.precio),
+        sede_data: sedeData,
+        tipo: 'internet'
+      },
+      createdBy
+    );
+    serviciosCreados.push(servicioInternet);
+  }
+
+  // TELEVISION en esta sede
+  if (sedeData.planTelevisionId) {
+    const planTv = planes.find(p => p.id == sedeData.planTelevisionId);
+    
+    const servicioTv = await this.crearServicioIndividual(
+      conexion,
+      clienteId,
+      {
+        plan_id: sedeData.planTelevisionId,
+        precio: sedeData.precioPersonalizado ? sedeData.precioTelevisionCustom : 
+               (planTv.tipo === 'combo' ? planTv.precio_television : planTv.precio),
+        sede_data: sedeData,
+        tipo: 'television'
+      },
+      createdBy
+    );
+    serviciosCreados.push(servicioTv);
+  }
+
+  return serviciosCreados;
+}
+
+  /**
+   * Crear un servicio individual
+   */
+  static async crearServicioIndividual(conexion, clienteId, config, createdBy) {
+    // Obtener plan
+    const [planes] = await conexion.execute(
+      'SELECT * FROM planes_servicio WHERE id = ?', 
+      [config.plan_id]
+    );
+
+    if (planes.length === 0) {
+      throw new Error(`Plan ${config.plan_id} no encontrado`);
+    }
+
+    const plan = planes[0];
+    const precio = config.precio || plan.precio;
+
+    // Crear observaciones con info de la sede
+    const observaciones = JSON.stringify({
+      sede_nombre: config.sede_data.nombre_sede,
+      direccion_sede: config.sede_data.direccion_servicio,
+      contacto_sede: config.sede_data.contacto_sede,
+      telefono_sede: config.sede_data.telefono_sede,
+      tipo_servicio: config.tipo
+    });
+
+    const query = `
+      INSERT INTO servicios_cliente (
+        cliente_id, plan_id, fecha_activacion, precio_personalizado,
+        observaciones, estado, created_at
+      ) VALUES (?, ?, ?, ?, ?, 'activo', NOW())
+    `;
+
+    const [resultado] = await conexion.execute(query, [
+      clienteId,
+      config.plan_id,
+      config.sede_data.fechaActivacion || new Date().toISOString().split('T')[0],
+      precio,
+      observaciones
+    ]);
+
+    return {
+      id: resultado.insertId,
+      plan_id: config.plan_id,
+      plan_nombre: plan.nombre,
+      tipo: config.tipo,
+      precio: precio,
+      sede_info: config.sede_data
+    };
+  }
+
+  /**
+   * Generar UN contrato para TODA la sede (Internet + TV)
+   */
+  static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, createdBy) {
+    const numeroContrato = await this.generarNumeroContrato(conexion);
+
+    // Calcular costo total de instalación para todos los servicios de la sede
+    const costoInstalacionTotal = serviciosDeLaSede.length * 42016; // o lógica más compleja
+
+    // Determinar tipo de permanencia (aplica a todos los servicios de la sede)
+    const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
+    const mesesPermanencia = sedeData.mesesPermanencia || 0;
+
+    // Descripción de servicios incluidos
+    const serviciosDescripcion = serviciosDeLaSede.map(s => 
+      `${s.tipo.toUpperCase()}: ${s.plan_nombre} ($${s.precio.toLocaleString()})`
+    ).join(' + ');
+
+    const observacionesContrato = JSON.stringify({
+      sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+      direccion_sede: sedeData.direccion_servicio,
+      contacto_sede: sedeData.contacto_sede,
+      telefono_sede: sedeData.telefono_sede,
+      servicios_incluidos: serviciosDescripcion,
+      cantidad_servicios: serviciosDeLaSede.length,
+      observaciones_adicionales: sedeData.observaciones
+    });
+
+    const query = `
+      INSERT INTO contratos (
+        numero_contrato, cliente_id, tipo_contrato, tipo_permanencia, 
+        permanencia_meses, costo_instalacion, fecha_generacion, 
+        fecha_inicio, estado, observaciones, generado_automaticamente, created_by
+      ) VALUES (?, ?, 'servicio', ?, ?, ?, ?, ?, 'activo', ?, 1, ?)
+    `;
+
+    const [resultado] = await conexion.execute(query, [
+      numeroContrato,
+      clienteId,
+      tipoPermanencia,
+      mesesPermanencia,
+      costoInstalacionTotal,
+      new Date().toISOString().split('T')[0],
+      new Date().toISOString().split('T')[0],
+      observacionesContrato,
+      createdBy
+    ]);
+
+    const contratoId = resultado.insertId;
+
+    // Actualizar todos los servicios de la sede con el contrato_id
+    for (const servicio of serviciosDeLaSede) {
+      const observacionesActualizadas = JSON.stringify({
+        ...JSON.parse(servicio.sede_info || '{}'),
+        contrato_id: contratoId,
+        numero_contrato: numeroContrato
+      });
+
+      await conexion.execute(
+        'UPDATE servicios_cliente SET observaciones = ? WHERE id = ?',
+        [observacionesActualizadas, servicio.id]
+      );
+    }
+
+    console.log(`✅ Contrato ${numeroContrato} creado para ${serviciosDeLaSede.length} servicios de la sede`);
+
+    return contratoId;
+  }
+
+  /**
+   * Generar UNA factura para TODA la sede (Internet + TV)
+   */
+  static async generarFacturaParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, contratoId, createdBy) {
+    // Obtener datos del cliente
+    const [clientes] = await conexion.execute(
+      'SELECT * FROM clientes WHERE id = ?', 
+      [clienteId]
+    );
+
+    const cliente = clientes[0];
+    const estrato = parseInt(cliente.estrato) || 1;
+
+    // Generar número de factura
+    const numeroFactura = await this.generarNumeroFactura(conexion);
+
+    // Calcular totales UNIFICADOS de todos los servicios de la sede
+    let valorInternet = 0;
+    let valorTelevision = 0;
+    let valorIvaInternet = 0;
+    let valorIvaTelevision = 0;
+
+    for (const servicio of serviciosDeLaSede) {
+      const precio = parseFloat(servicio.precio || 0);
+      
+      if (servicio.tipo === 'internet') {
+        valorInternet += precio;
+        // IVA para internet: solo estratos 4, 5, 6
+        if (estrato >= 4) {
+          valorIvaInternet += precio * 0.19;
+        }
+      } else if (servicio.tipo === 'television') {
+        valorTelevision += precio;
+        // IVA para televisión: todos los estratos
+        valorIvaTelevision += precio * 0.19;
+      }
+    }
+
+    const subtotal = valorInternet + valorTelevision;
+    const totalIva = valorIvaInternet + valorIvaTelevision;
+    const total = subtotal + totalIva;
+
+    // Fechas
+    const fechaEmision = new Date();
+    const fechaVencimiento = new Date();
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + 15);
+    const fechaDesde = new Date(fechaEmision.getFullYear(), fechaEmision.getMonth(), 1);
+    const fechaHasta = new Date(fechaEmision.getFullYear(), fechaEmision.getMonth() + 1, 0);
+    const periodoFacturacion = `${fechaEmision.getFullYear()}-${(fechaEmision.getMonth() + 1).toString().padStart(2, '0')}`;
+
+    // Descripción de la factura
+    const sedeNombre = sedeData.nombre_sede || 'Sede Principal';
+    const serviciosFacturados = serviciosDeLaSede.map(s => s.tipo.toUpperCase()).join(' + ');
+    const observacionesFactura = `Servicios para ${sedeNombre}: ${serviciosFacturados}`;
+
+    // Insertar factura UNIFICADA
+    const queryFactura = `
+      INSERT INTO facturas (
+        numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
+        periodo_facturacion, fecha_emision, fecha_vencimiento, fecha_desde, fecha_hasta,
+        internet, television, saldo_anterior, interes, reconexion, descuento, varios, publicidad,
+        s_internet, s_television, s_interes, s_reconexion, s_descuento, s_varios, s_publicidad, s_iva,
+        subtotal, iva, total, estado, contrato_id, observaciones, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?, ?, 0, 0, 0, 0, 0, ?, ?, ?, ?, 'pendiente', ?, ?, ?)
+    `;
+
+    const [resultadoFactura] = await conexion.execute(queryFactura, [
+      numeroFactura, clienteId, cliente.identificacion, cliente.nombre,
+      periodoFacturacion, fechaEmision.toISOString().split('T')[0], 
+      fechaVencimiento.toISOString().split('T')[0],
+      fechaDesde.toISOString().split('T')[0], fechaHasta.toISOString().split('T')[0],
+      valorInternet, valorTelevision,
+      valorIvaInternet, valorIvaTelevision, totalIva,
+      subtotal, totalIva, total,
+      contratoId, observacionesFactura, createdBy
+    ]);
+
+    const facturaId = resultadoFactura.insertId;
+
+    // Crear detalle UNIFICADO con todos los servicios de la sede
+    for (const servicio of serviciosDeLaSede) {
+      const precio = parseFloat(servicio.precio || 0);
+      const iva = servicio.tipo === 'television' ? precio * 0.19 : 
+                  (servicio.tipo === 'internet' && estrato >= 4) ? precio * 0.19 : 0;
+      
+      await conexion.execute(`
+        INSERT INTO detalle_facturas (
+          factura_id, concepto_nombre, cantidad, precio_unitario, 
+          descuento, subtotal, iva, total, servicio_cliente_id
+        ) VALUES (?, ?, 1, ?, 0, ?, ?, ?, ?)
+      `, [
+        facturaId,
+        `${servicio.tipo.toUpperCase()}: ${servicio.plan_nombre} - ${sedeNombre}`,
+        precio, precio, iva, precio + iva, servicio.id
+      ]);
+    }
+
+    console.log(`✅ Factura UNIFICADA ${numeroFactura} creada para ${serviciosDeLaSede.length} servicios - Total: $${total.toLocaleString()}`);
+
+    return facturaId;
+  }
+
+  /**
+   * AGREGAR NUEVA SEDE a cliente existente
+   * (esto es para cuando el cliente regresa meses después)
+   */
+  static async agregarNuevaSedeACliente(clienteId, nuevaSedeData, createdBy = null) {
+    return await Database.transaction(async (conexion) => {
+      console.log(`🏢 Agregando nueva sede al cliente ${clienteId}`);
+
+      // Verificar que el cliente existe
+      const [clientes] = await conexion.execute(
+        'SELECT * FROM clientes WHERE id = ?', 
+        [clienteId]
+      );
+
+      if (clientes.length === 0) {
+        throw new Error('Cliente no encontrado');
+      }
+
+      // Crear servicios de la nueva sede
+      const serviciosDeLaNuevaSede = await this.crearServiciosDeSede(
+        conexion, 
+        clienteId, 
+        nuevaSedeData, 
+        createdBy
+      );
+
+      // Crear NUEVO contrato independiente
+      const nuevoContratoId = await this.generarContratoParaSede(
+        conexion,
+        clienteId,
+        serviciosDeLaNuevaSede,
+        nuevaSedeData,
+        createdBy
+      );
+
+      // Crear NUEVA factura independiente
+      const nuevaFacturaId = await this.generarFacturaParaSede(
+        conexion,
+        clienteId,
+        serviciosDeLaNuevaSede,
+        nuevaSedeData,
+        nuevoContratoId,
+        createdBy
+      );
+
+      console.log(`✅ Nueva sede agregada - Contrato: ${nuevoContratoId}, Factura: ${nuevaFacturaId}`);
+
+      return {
+        cliente_id: clienteId,
+        nueva_sede: {
+          nombre: nuevaSedeData.nombre_sede,
+          direccion: nuevaSedeData.direccion_servicio,
+          servicios: serviciosDeLaNuevaSede,
+          contrato_id: nuevoContratoId,
+          factura_id: nuevaFacturaId
+        }
+      };
+    });
+  }
+
+  /**
+   * Listar todas las sedes de un cliente con sus servicios
+   */
+  static async listarSedesCliente(clienteId) {
+    const conexion = await pool.getConnection();
+
+    try {
+      // Obtener todos los contratos del cliente con sus servicios
+      const query = `
+        SELECT 
+          c.id as contrato_id,
+          c.numero_contrato,
+          c.fecha_generacion,
+          c.tipo_permanencia,
+          c.estado as estado_contrato,
+          c.observaciones as contrato_observaciones,
+          sc.id as servicio_id,
+          sc.precio_personalizado,
+          sc.observaciones as servicio_observaciones,
+          ps.nombre as plan_nombre,
+          ps.tipo as tipo_servicio,
+          ps.precio as precio_plan,
+          f.id as factura_id,
+          f.numero_factura,
+          f.total as factura_total,
+          f.estado as estado_factura
+        FROM contratos c
+        LEFT JOIN servicios_cliente sc ON JSON_EXTRACT(sc.observaciones, '$.contrato_id') = c.id
+        LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+        LEFT JOIN facturas f ON f.contrato_id = c.id
+        WHERE c.cliente_id = ? AND c.estado = 'activo'
+        ORDER BY c.fecha_generacion DESC, sc.id
+      `;
+
+      const [resultados] = await conexion.execute(query, [clienteId]);
+
+      // Agrupar por contrato (sede)
+      const sedesAgrupadas = {};
+      
+      for (const row of resultados) {
+        const contratoId = row.contrato_id;
+        
+        if (!sedesAgrupadas[contratoId]) {
+          const contratoObs = JSON.parse(row.contrato_observaciones || '{}');
+          
+          sedesAgrupadas[contratoId] = {
+            contrato_id: contratoId,
+            numero_contrato: row.numero_contrato,
+            fecha_contrato: row.fecha_generacion,
+            tipo_permanencia: row.tipo_permanencia,
+            estado_contrato: row.estado_contrato,
+            sede_nombre: contratoObs.sede_nombre || 'Sede Principal',
+            direccion_sede: contratoObs.direccion_sede,
+            contacto_sede: contratoObs.contacto_sede,
+            telefono_sede: contratoObs.telefono_sede,
+            factura_id: row.factura_id,
+            numero_factura: row.numero_factura,
+            factura_total: row.factura_total,
+            estado_factura: row.estado_factura,
+            servicios: []
+          };
+        }
+        
+        if (row.servicio_id) {
+          sedesAgrupadas[contratoId].servicios.push({
+            servicio_id: row.servicio_id,
+            tipo: row.tipo_servicio,
+            plan_nombre: row.plan_nombre,
+            precio: row.precio_personalizado || row.precio_plan
+          });
+        }
+      }
+
+      return Object.values(sedesAgrupadas);
+
+    } finally {
+      conexion.release();
+    }
+  }
+
+  // Funciones auxiliares (mismas de antes)
+  static async generarNumeroContrato(conexion) {
+    const [ultimoContrato] = await conexion.execute(
+      'SELECT numero_contrato FROM contratos ORDER BY id DESC LIMIT 1'
+    );
+    
+    if (ultimoContrato.length > 0) {
+      const ultimoNumero = ultimoContrato[0].numero_contrato;
+      const año = new Date().getFullYear();
+      const numero = parseInt(ultimoNumero.split('-')[2]) + 1;
+      return `CONT-${año}-${numero.toString().padStart(6, '0')}`;
+    } else {
+      const año = new Date().getFullYear();
+      return `CONT-${año}-000001`;
+    }
+  }
+
+  static async generarNumeroFactura(conexion) {
+    const [ultimaFactura] = await conexion.execute(
+      'SELECT numero_factura FROM facturas ORDER BY id DESC LIMIT 1'
+    );
+    
+    if (ultimaFactura.length > 0) {
+      const ultimoNumero = ultimaFactura[0].numero_factura;
+      const numeroActual = parseInt(ultimoNumero.replace(/\D/g, '')) + 1;
+      return `FAC${numeroActual.toString().padStart(6, '0')}`;
+    } else {
+      return 'FAC000001';
+    }
+  }
   /**
    * Obtener resumen estadístico del sistema
    */

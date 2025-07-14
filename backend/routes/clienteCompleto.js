@@ -17,56 +17,58 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
  * @desc Crear cliente completo con servicio y documentos automáticos
  * @access Private (Administrador+)
  */
-router.post('/crear',
-  authenticateToken,
-  requireRole('administrador'),
-  async (req, res) => {
-    try {
-      console.log('🚀 Solicitud de creación completa de cliente:', req.body);
-
-      // Validar datos de entrada
-      const { cliente, servicio, opciones } = req.body;
-
-      if (!cliente) {
-        return res.status(400).json({
-          success: false,
-          message: 'Datos del cliente son requeridos'
-        });
-      }
-
-      if (!servicio) {
-        return res.status(400).json({
-          success: false,
-          message: 'Datos del servicio son requeridos'
-        });
-      }
-
-      // Procesar creación completa
-      const resultado = await ClienteCompletoService.crearClienteCompleto({
-        cliente,
-        servicio,
-        opciones: opciones || {}
-      });
-
-      console.log('✅ Cliente completo creado exitosamente:', resultado);
-
-      res.status(201).json({
-        success: true,
-        message: 'Cliente completo creado exitosamente',
-        data: resultado
-      });
-
-    } catch (error) {
-      console.error('❌ Error creando cliente completo:', error);
-      
-      res.status(500).json({
+router.post('/crear', async (req, res) => {
+  try {
+    console.log('🚀 Solicitud de creación completa de cliente:', req.body);
+    
+    const { cliente, servicios, opciones } = req.body;
+    
+    // CORREGIR: Validar servicios (plural, no servicio)
+    if (!cliente) {
+      return res.status(400).json({
         success: false,
-        message: error.message || 'Error interno del servidor',
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        message: 'Datos del cliente son requeridos'
       });
     }
+    
+    if (!servicios || !Array.isArray(servicios) || servicios.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar al menos una sede con servicios'
+      });
+    }
+
+    // Validar que cada sede tenga al menos un servicio
+    for (let i = 0; i < servicios.length; i++) {
+      const sede = servicios[i];
+      if (!sede.planInternetId && !sede.planTelevisionId) {
+        return res.status(400).json({
+          success: false,
+          message: `Sede ${i + 1}: Debe tener al menos Internet o Televisión`
+        });
+      }
+    }
+    
+    // Llamar al servicio correcto
+    const resultado = await ClienteCompletoService.crearClienteConServicios(
+      { cliente, servicios, opciones },
+      req.user?.id
+    );
+
+    res.json({
+      success: true,
+      message: 'Cliente creado exitosamente',
+      data: resultado
+    });
+
+  } catch (error) {
+    console.error('❌ Error en creación:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error interno del servidor'
+    });
   }
-);
+});
 
 /**
  * @route GET /api/v1/clientes-completo/:id
@@ -491,6 +493,52 @@ router.get('/facturas/:id',
  * ============================================
  */
 
+
+router.post('/:clienteId/agregar-sede', async (req, res) => {
+  try {
+    const { clienteId } = req.params;
+    const { sede } = req.body;
+    
+    const resultado = await ClienteCompletoServiceCorrecta.agregarNuevaSedeACliente(
+      clienteId, 
+      sede,
+      req.user?.id
+    );
+
+    res.json({
+      success: true,
+      message: 'Nueva sede agregada exitosamente',
+      data: resultado
+    });
+
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+router.get('/:clienteId/sedes', async (req, res) => {
+  try {
+    const { clienteId } = req.params;
+    
+    const sedes = await ClienteCompletoServiceCorrecta.listarSedesCliente(clienteId);
+
+    res.json({
+      success: true,
+      data: sedes
+    });
+
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
 /**
  * @route GET /api/v1/clientes-completo/contratos
  * @desc Obtener todos los contratos generados
