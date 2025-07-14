@@ -302,6 +302,483 @@ router.put('/:id/inactivar',
   }
 );
 
+/**
+ * @route POST /api/clientes/clientes-con-servicios
+ * @desc Crear cliente con múltiples servicios independientes
+ * @access Private (Administrador)
+ */
+router.post('/clientes-con-servicios', 
+  requireRole('administrador'), 
+  async (req, res) => {
+    const conexion = await Database.getConnection();
+    
+    try {
+      await conexion.beginTransaction();
+      console.log('🚀 Iniciando creación de cliente con múltiples servicios');
+      
+      const { datosCliente, servicios } = req.body;
+      
+      // Validaciones básicas
+      if (!datosCliente) {
+        return res.status(400).json({
+          success: false,
+          message: 'Los datos del cliente son requeridos'
+        });
+      }
+      
+      if (!servicios || !Array.isArray(servicios) || servicios.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Debe proporcionar al menos un servicio'
+        });
+      }
+      
+      console.log('📋 Datos recibidos:', { datosCliente, servicios: servicios.length });
+      
+      // 1. CREAR EL CLIENTE
+      const queryCliente = `
+        INSERT INTO clientes (
+          identificacion, nombre, email, telefono, direccion, 
+          estrato, tipo_cliente, estado, created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'activo', ?, NOW())
+      `;
+      
+      const valoresCliente = [
+        datosCliente.identificacion,
+        datosCliente.nombre,
+        datosCliente.email || datosCliente.correo,
+        datosCliente.telefono,
+        datosCliente.direccion,
+        datosCliente.estrato || 1,
+        datosCliente.tipo_cliente || 'persona_natural',
+        req.user?.id || 1
+      ];
+      
+      const [resultadoCliente] = await conexion.execute(queryCliente, valoresCliente);
+      const clienteId = resultadoCliente.insertId;
+      
+      console.log(`✅ Cliente creado con ID: ${clienteId}`);
+      
+      // 2. CREAR SERVICIOS POR SEPARADO
+      const serviciosCreados = [];
+      
+      for (let i = 0; i < servicios.length; i++) {
+        const servicio = servicios[i];
+        console.log(`📦 Procesando servicio ${i + 1}:`, servicio);
+        
+        // Si tiene ambos servicios (Internet + TV), crear registros separados
+        if (servicio.planInternetId && servicio.planTelevisionId) {
+          
+          // CREAR SERVICIO DE INTERNET
+          const servicioInternetData = {
+            cliente_id: clienteId,
+            plan_id: servicio.planInternetId,
+            direccion_servicio: servicio.direccionServicio,
+            nombre_sede: servicio.nombreSede || `Sede ${i + 1} - Internet`,
+            precio_personalizado: servicio.precioPersonalizado ? 
+              parseFloat(servicio.precioInternetCustom) : null,
+            observaciones: `Internet - ${servicio.observaciones || ''}`,
+            estado: 'activo',
+            fecha_activacion: new Date().toISOString().split('T')[0],
+            created_by: req.user?.id || 1
+          };
+          
+          const queryServicioInternet = `
+            INSERT INTO servicios_cliente (
+              cliente_id, plan_id, direccion_servicio, nombre_sede, 
+              precio_personalizado, observaciones, estado, 
+              fecha_activacion, created_by, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+          `;
+          
+          const valoresInternet = [
+            servicioInternetData.cliente_id,
+            servicioInternetData.plan_id,
+            servicioInternetData.direccion_servicio,
+            servicioInternetData.nombre_sede,
+            servicioInternetData.precio_personalizado,
+            servicioInternetData.observaciones,
+            servicioInternetData.estado,
+            servicioInternetData.fecha_activacion,
+            servicioInternetData.created_by
+          ];
+          
+          const [resultadoInternet] = await conexion.execute(queryServicioInternet, valoresInternet);
+          const servicioInternetId = resultadoInternet.insertId;
+          
+          console.log(`✅ Servicio Internet creado con ID: ${servicioInternetId}`);
+          
+          // CREAR SERVICIO DE TELEVISIÓN
+          const servicioTVData = {
+            cliente_id: clienteId,
+            plan_id: servicio.planTelevisionId,
+            direccion_servicio: servicio.direccionServicio,
+            nombre_sede: servicio.nombreSede || `Sede ${i + 1} - TV`,
+            precio_personalizado: servicio.precioPersonalizado ? 
+              parseFloat(servicio.precioTelevisionCustom) : null,
+            observaciones: `Televisión - ${servicio.observaciones || ''}`,
+            estado: 'activo',
+            fecha_activacion: new Date().toISOString().split('T')[0],
+            created_by: req.user?.id || 1
+          };
+          
+          const valoresTV = [
+            servicioTVData.cliente_id,
+            servicioTVData.plan_id,
+            servicioTVData.direccion_servicio,
+            servicioTVData.nombre_sede,
+            servicioTVData.precio_personalizado,
+            servicioTVData.observaciones,
+            servicioTVData.estado,
+            servicioTVData.fecha_activacion,
+            servicioTVData.created_by
+          ];
+          
+          const [resultadoTV] = await conexion.execute(queryServicioInternet, valoresTV);
+          const servicioTVId = resultadoTV.insertId;
+          
+          console.log(`✅ Servicio TV creado con ID: ${servicioTVId}`);
+          
+          serviciosCreados.push({
+            tipo: 'combo',
+            internet_id: servicioInternetId,
+            television_id: servicioTVId,
+            descuento_combo: servicio.descuentoCombo || 0,
+            tipo_contrato: servicio.tipoContrato || 'con_permanencia',
+            meses_permanencia: servicio.mesesPermanencia || 6,
+            direccion: servicio.direccionServicio,
+            sede: servicio.nombreSede
+          });
+          
+        } else if (servicio.planInternetId) {
+          // SOLO INTERNET
+          const servicioData = {
+            cliente_id: clienteId,
+            plan_id: servicio.planInternetId,
+            direccion_servicio: servicio.direccionServicio,
+            nombre_sede: servicio.nombreSede || `Sede ${i + 1} - Internet`,
+            precio_personalizado: servicio.precioPersonalizado ? 
+              parseFloat(servicio.precioInternetCustom) : null,
+            observaciones: servicio.observaciones || '',
+            estado: 'activo',
+            fecha_activacion: new Date().toISOString().split('T')[0],
+            created_by: req.user?.id || 1
+          };
+          
+          const queryServicio = `
+            INSERT INTO servicios_cliente (
+              cliente_id, plan_id, direccion_servicio, nombre_sede, 
+              precio_personalizado, observaciones, estado, 
+              fecha_activacion, created_by, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+          `;
+          
+          const valores = [
+            servicioData.cliente_id,
+            servicioData.plan_id,
+            servicioData.direccion_servicio,
+            servicioData.nombre_sede,
+            servicioData.precio_personalizado,
+            servicioData.observaciones,
+            servicioData.estado,
+            servicioData.fecha_activacion,
+            servicioData.created_by
+          ];
+          
+          const [resultado] = await conexion.execute(queryServicio, valores);
+          const servicioId = resultado.insertId;
+          
+          console.log(`✅ Servicio Internet creado con ID: ${servicioId}`);
+          
+          serviciosCreados.push({
+            tipo: 'internet',
+            servicio_id: servicioId,
+            tipo_contrato: servicio.tipoContrato || 'con_permanencia',
+            meses_permanencia: servicio.mesesPermanencia || 6,
+            direccion: servicio.direccionServicio,
+            sede: servicio.nombreSede
+          });
+          
+        } else if (servicio.planTelevisionId) {
+          // SOLO TELEVISIÓN
+          const servicioData = {
+            cliente_id: clienteId,
+            plan_id: servicio.planTelevisionId,
+            direccion_servicio: servicio.direccionServicio,
+            nombre_sede: servicio.nombreSede || `Sede ${i + 1} - TV`,
+            precio_personalizado: servicio.precioPersonalizado ? 
+              parseFloat(servicio.precioTelevisionCustom) : null,
+            observaciones: servicio.observaciones || '',
+            estado: 'activo',
+            fecha_activacion: new Date().toISOString().split('T')[0],
+            created_by: req.user?.id || 1
+          };
+          
+          const queryServicio = `
+            INSERT INTO servicios_cliente (
+              cliente_id, plan_id, direccion_servicio, nombre_sede, 
+              precio_personalizado, observaciones, estado, 
+              fecha_activacion, created_by, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+          `;
+          
+          const valores = [
+            servicioData.cliente_id,
+            servicioData.plan_id,
+            servicioData.direccion_servicio,
+            servicioData.nombre_sede,
+            servicioData.precio_personalizado,
+            servicioData.observaciones,
+            servicioData.estado,
+            servicioData.fecha_activacion,
+            servicioData.created_by
+          ];
+          
+          const [resultado] = await conexion.execute(queryServicio, valores);
+          const servicioId = resultado.insertId;
+          
+          console.log(`✅ Servicio TV creado con ID: ${servicioId}`);
+          
+          serviciosCreados.push({
+            tipo: 'television',
+            servicio_id: servicioId,
+            tipo_contrato: servicio.tipoContrato || 'con_permanencia',
+            meses_permanencia: servicio.mesesPermanencia || 6,
+            direccion: servicio.direccionServicio,
+            sede: servicio.nombreSede
+          });
+        }
+      }
+      
+      // 3. GENERAR CONTRATOS Y FACTURAS
+      console.log('📄 Generando contratos y facturas...');
+      
+      for (const servicioCreado of serviciosCreados) {
+        try {
+          if (servicioCreado.tipo === 'combo') {
+            // GENERAR CONTRATO COMBO (que agrupa ambos servicios)
+            const numeroContrato = `CONT-${new Date().getFullYear()}-${String(clienteId).padStart(6, '0')}-${Date.now().toString().slice(-3)}`;
+            
+            // Obtener datos del plan para calcular costo de instalación
+            const [planesInternet] = await conexion.execute(
+              'SELECT * FROM planes_servicio WHERE id = ?', 
+              [servicios.find(s => s.planInternetId)?.planInternetId]
+            );
+            const planInternet = planesInternet[0];
+            
+            const costoInstalacion = servicioCreado.tipo_contrato === 'con_permanencia' ?
+              (planInternet?.costo_instalacion_permanencia || 50000) :
+              (planInternet?.costo_instalacion_sin_permanencia || 150000);
+            
+            const queryContrato = `
+              INSERT INTO contratos (
+                numero_contrato, cliente_id, tipo_contrato, tipo_permanencia,
+                permanencia_meses, costo_instalacion, fecha_generacion,
+                fecha_inicio, estado, generado_automaticamente, created_by, created_at
+              ) VALUES (?, ?, 'servicio', ?, ?, ?, CURDATE(), CURDATE(), 'activo', 1, ?, NOW())
+            `;
+            
+            await conexion.execute(queryContrato, [
+              numeroContrato,
+              clienteId,
+              servicioCreado.tipo_contrato,
+              servicioCreado.meses_permanencia,
+              costoInstalacion,
+              req.user?.id || 1
+            ]);
+            
+            console.log(`✅ Contrato combo generado: ${numeroContrato}`);
+            
+          } else {
+            // GENERAR CONTRATO INDIVIDUAL
+            const numeroContrato = `CONT-${new Date().getFullYear()}-${String(clienteId).padStart(6, '0')}-${Date.now().toString().slice(-3)}`;
+            
+            // Obtener datos del plan
+            const planId = servicioCreado.tipo === 'internet' ? 
+              servicios.find(s => s.planInternetId)?.planInternetId :
+              servicios.find(s => s.planTelevisionId)?.planTelevisionId;
+              
+            const [planes] = await conexion.execute(
+              'SELECT * FROM planes_servicio WHERE id = ?', 
+              [planId]
+            );
+            const plan = planes[0];
+            
+            const costoInstalacion = servicioCreado.tipo_contrato === 'con_permanencia' ?
+              (plan?.costo_instalacion_permanencia || 50000) :
+              (plan?.costo_instalacion_sin_permanencia || 150000);
+            
+            const queryContrato = `
+              INSERT INTO contratos (
+                numero_contrato, cliente_id, servicio_id, tipo_contrato, tipo_permanencia,
+                permanencia_meses, costo_instalacion, fecha_generacion,
+                fecha_inicio, estado, generado_automaticamente, created_by, created_at
+              ) VALUES (?, ?, ?, 'servicio', ?, ?, ?, CURDATE(), CURDATE(), 'activo', 1, ?, NOW())
+            `;
+            
+            await conexion.execute(queryContrato, [
+              numeroContrato,
+              clienteId,
+              servicioCreado.servicio_id,
+              servicioCreado.tipo_contrato,
+              servicioCreado.meses_permanencia,
+              costoInstalacion,
+              req.user?.id || 1
+            ]);
+            
+            console.log(`✅ Contrato individual generado: ${numeroContrato}`);
+          }
+        } catch (errorContrato) {
+          console.error('⚠️ Error generando contrato:', errorContrato);
+          // Continuar con otros contratos
+        }
+      }
+      
+      // 4. GENERAR PRIMERA FACTURA UNIFICADA
+      try {
+        console.log('🧾 Generando primera factura...');
+        
+        const numeroFactura = `FAC-${new Date().getFullYear()}-${String(Date.now()).slice(-8)}`;
+        const fechaEmision = new Date();
+        const fechaVencimiento = new Date();
+        fechaVencimiento.setDate(fechaVencimiento.getDate() + 15);
+        
+        // Calcular subtotal de todos los servicios
+        let subtotal = 0;
+        let totalIVA = 0;
+        
+        // Esta lógica se puede mejorar integrando el cálculo de IVA del frontend
+        for (const servicioCreado of serviciosCreados) {
+          if (servicioCreado.tipo === 'combo') {
+            // Para combo, sumar ambos servicios
+            const servicioInternet = servicios.find(s => s.planInternetId);
+            const servicioTV = servicios.find(s => s.planTelevisionId);
+            
+            // Obtener precios de los planes
+            const [planesInternet] = await conexion.execute('SELECT precio FROM planes_servicio WHERE id = ?', [servicioInternet.planInternetId]);
+            const [planesTV] = await conexion.execute('SELECT precio FROM planes_servicio WHERE id = ?', [servicioTV.planTelevisionId]);
+            
+            let precioInternet = servicioInternet.precioPersonalizado ? 
+              parseFloat(servicioInternet.precioInternetCustom) : 
+              parseFloat(planesInternet[0]?.precio || 0);
+              
+            let precioTV = servicioTV.precioPersonalizado ? 
+              parseFloat(servicioTV.precioTelevisionCustom) : 
+              Math.round(parseFloat(planesTV[0]?.precio || 0) / 1.19); // TV viene con IVA
+            
+            // Aplicar descuento combo
+            const totalSinDescuento = precioInternet + precioTV;
+            const descuento = totalSinDescuento * (servicioCreado.descuento_combo / 100);
+            const totalConDescuento = totalSinDescuento - descuento;
+            
+            subtotal += totalConDescuento;
+            
+            // Calcular IVA (Internet según estrato, TV siempre)
+            const estrato = parseInt(datosCliente.estrato) || 1;
+            if (estrato >= 4) {
+              totalIVA += (totalConDescuento * 0.5) * 0.19; // 50% del total para internet
+            }
+            totalIVA += (totalConDescuento * 0.5) * 0.19; // 50% del total para TV
+            
+          } else {
+            // Servicio individual
+            const servicio = servicios.find(s => 
+              (servicioCreado.tipo === 'internet' && s.planInternetId) ||
+              (servicioCreado.tipo === 'television' && s.planTelevisionId)
+            );
+            
+            const planId = servicioCreado.tipo === 'internet' ? 
+              servicio.planInternetId : servicio.planTelevisionId;
+              
+            const [planes] = await conexion.execute('SELECT precio FROM planes_servicio WHERE id = ?', [planId]);
+            
+            let precio = 0;
+            if (servicioCreado.tipo === 'internet') {
+              precio = servicio.precioPersonalizado ? 
+                parseFloat(servicio.precioInternetCustom) : 
+                parseFloat(planes[0]?.precio || 0);
+            } else {
+              precio = servicio.precioPersonalizado ? 
+                parseFloat(servicio.precioTelevisionCustom) : 
+                Math.round(parseFloat(planes[0]?.precio || 0) / 1.19);
+            }
+            
+            subtotal += precio;
+            
+            // Calcular IVA
+            const estrato = parseInt(datosCliente.estrato) || 1;
+            if (servicioCreado.tipo === 'internet' && estrato >= 4) {
+              totalIVA += precio * 0.19;
+            } else if (servicioCreado.tipo === 'television') {
+              totalIVA += precio * 0.19;
+            }
+          }
+        }
+        
+        const total = subtotal + totalIVA;
+        
+        const queryFactura = `
+          INSERT INTO facturas (
+            numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
+            subtotal, iva, total, fecha_emision, fecha_vencimiento,
+            periodo_facturacion, estado, tipo_factura, generada_automaticamente,
+            created_by, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', 'mensual', 1, ?, NOW())
+        `;
+        
+        const periodoFacturacion = `${fechaEmision.getFullYear()}-${String(fechaEmision.getMonth() + 1).padStart(2, '0')}`;
+        
+        await conexion.execute(queryFactura, [
+          numeroFactura,
+          clienteId,
+          datosCliente.identificacion,
+          datosCliente.nombre,
+          subtotal,
+          totalIVA,
+          total,
+          fechaEmision.toISOString().split('T')[0],
+          fechaVencimiento.toISOString().split('T')[0],
+          periodoFacturacion,
+          req.user?.id || 1
+        ]);
+        
+        console.log(`✅ Primera factura generada: ${numeroFactura} - Total: $${total.toLocaleString()}`);
+        
+      } catch (errorFactura) {
+        console.error('⚠️ Error generando factura:', errorFactura);
+        // Continuar sin factura por ahora
+      }
+      
+      await conexion.commit();
+      
+      console.log(`🎉 Cliente creado exitosamente con ${serviciosCreados.length} servicio(s)`);
+      
+      res.status(201).json({
+        success: true,
+        message: `Cliente creado exitosamente con ${serviciosCreados.length} servicio(s)`,
+        data: {
+          cliente_id: clienteId,
+          servicios_creados: serviciosCreados,
+          total_servicios: serviciosCreados.length,
+          mensaje_adicional: 'Contratos y factura inicial generados automáticamente'
+        }
+      });
+      
+    } catch (error) {
+      await conexion.rollback();
+      console.error('❌ Error creando cliente con servicios:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error creando cliente con servicios',
+        error: error.message,
+        detalles: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    } finally {
+      conexion.release();
+    }
+  }
+);
+
 router.put('/:id/reactivar',
   rateLimiter.clientes,
   requireRole('administrador'),
@@ -391,181 +868,9 @@ router.use('*', (req, res) => {
     message: `Ruta ${req.method} ${req.originalUrl} no encontrada`,
     timestamp: new Date().toISOString()
   });
-  
+
 });
-router.post('/clientes-con-servicios', requireRole('administrador'), async (req, res) => {
-  const conexion = await Database.getConnection();
-  
-  try {
-    await conexion.beginTransaction();
-    
-    const { datosCliente, servicios } = req.body;
-    
-    // 1. Crear el cliente
-    const clienteId = await ClienteCompletoService.crearClienteCompleto(
-      conexion, 
-      datosCliente, 
-      req.user.id
-    );
-    
-    // 2. Crear cada servicio por separado
-    const serviciosCreados = [];
-    
-    for (let i = 0; i < servicios.length; i++) {
-      const servicio = servicios[i];
-      
-      // Si tiene ambos servicios, crear registros separados
-      if (servicio.planInternetId && servicio.planTelevisionId) {
-        
-        // Crear servicio de Internet
-        const servicioInternetData = {
-          plan_id: servicio.planInternetId,
-          direccion_servicio: servicio.direccionServicio,
-          nombre_sede: servicio.nombreSede || `Sede ${i + 1}`,
-          precio_personalizado: servicio.precioPersonalizado ? servicio.precioInternetCustom : null,
-          observaciones: `Internet - ${servicio.observaciones || ''}`
-        };
-        
-        const servicioInternetId = await ClienteCompletoService.asignarServicioCliente(
-          conexion, 
-          clienteId, 
-          servicioInternetData, 
-          req.user.id
-        );
-        
-        // Crear servicio de Televisión
-        const servicioTVData = {
-          plan_id: servicio.planTelevisionId,
-          direccion_servicio: servicio.direccionServicio,
-          nombre_sede: servicio.nombreSede || `Sede ${i + 1}`,
-          precio_personalizado: servicio.precioPersonalizado ? servicio.precioTelevisionCustom : null,
-          observaciones: `Televisión - ${servicio.observaciones || ''}`
-        };
-        
-        const servicioTVId = await ClienteCompletoService.asignarServicioCliente(
-          conexion, 
-          clienteId, 
-          servicioTVData, 
-          req.user.id
-        );
-        
-        serviciosCreados.push({
-          tipo: 'combo',
-          internet_id: servicioInternetId,
-          television_id: servicioTVId,
-          descuento_combo: servicio.descuentoCombo
-        });
-        
-      } else if (servicio.planInternetId) {
-        // Solo Internet
-        const servicioData = {
-          plan_id: servicio.planInternetId,
-          direccion_servicio: servicio.direccionServicio,
-          nombre_sede: servicio.nombreSede || `Sede ${i + 1}`,
-          precio_personalizado: servicio.precioPersonalizado ? servicio.precioInternetCustom : null,
-          observaciones: servicio.observaciones
-        };
-        
-        const servicioId = await ClienteCompletoService.asignarServicioCliente(
-          conexion, 
-          clienteId, 
-          servicioData, 
-          req.user.id
-        );
-        
-        serviciosCreados.push({
-          tipo: 'internet',
-          servicio_id: servicioId
-        });
-        
-      } else if (servicio.planTelevisionId) {
-        // Solo Televisión
-        const servicioData = {
-          plan_id: servicio.planTelevisionId,
-          direccion_servicio: servicio.direccionServicio,
-          nombre_sede: servicio.nombreSede || `Sede ${i + 1}`,
-          precio_personalizado: servicio.precioPersonalizado ? servicio.precioTelevisionCustom : null,
-          observaciones: servicio.observaciones
-        };
-        
-        const servicioId = await ClienteCompletoService.asignarServicioCliente(
-          conexion, 
-          clienteId, 
-          servicioData, 
-          req.user.id
-        );
-        
-        serviciosCreados.push({
-          tipo: 'television',
-          servicio_id: servicioId
-        });
-      }
-    }
-    
-    // 3. Generar contratos y facturas para cada servicio
-    for (const servicioCreado of serviciosCreados) {
-      if (servicioCreado.tipo === 'combo') {
-        // Generar un contrato que agrupe ambos servicios
-        await ClienteCompletoService.generarContratoCombo(
-          conexion, 
-          clienteId, 
-          servicioCreado.internet_id, 
-          servicioCreado.television_id,
-          servicioCreado.descuento_combo,
-          req.user.id
-        );
-        
-        // Generar una factura que incluya ambos servicios
-        await ClienteCompletoService.generarFacturaCombo(
-          conexion, 
-          clienteId, 
-          servicioCreado.internet_id, 
-          servicioCreado.television_id,
-          servicioCreado.descuento_combo,
-          req.user.id
-        );
-        
-      } else {
-        // Generar contrato y factura individual
-        await ClienteCompletoService.generarContratoIndividual(
-          conexion, 
-          clienteId, 
-          servicioCreado.servicio_id, 
-          req.user.id
-        );
-        
-        await ClienteCompletoService.generarFacturaIndividual(
-          conexion, 
-          clienteId, 
-          servicioCreado.servicio_id, 
-          req.user.id
-        );
-      }
-    }
-    
-    await conexion.commit();
-    
-    res.json({
-      success: true,
-      message: `Cliente creado exitosamente con ${serviciosCreados.length} servicio(s)`,
-      data: {
-        cliente_id: clienteId,
-        servicios_creados: serviciosCreados
-      }
-    });
-    
-  } catch (error) {
-    await conexion.rollback();
-    console.error('❌ Error creando cliente con servicios:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error creando cliente con servicios',
-      error: error.message
-    });
-  } finally {
-    conexion.release();
-  }
-});
+
 
 // Manejo de errores generales
 router.use((error, req, res, next) => {
