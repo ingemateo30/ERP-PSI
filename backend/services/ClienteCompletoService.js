@@ -279,10 +279,10 @@ class ClienteCompletoService {
       const queryFactura = `
   INSERT INTO facturas (
     numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
-    periodo_facturacion, fecha_emision, fecha_vencimiento,
+    periodo_facturacion, fecha_emision, fecha_vencimiento,fecha_desde, fecha_hasta,
     internet, television, s_internet, s_television, s_iva,
-    subtotal, iva, total, estado, activo, observaciones, created_by
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', '1', 'Primera factura automática', ?)
+    subtotal, iva, total, estado, activo, observaciones, created_by,resolucion
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', '1', 'factura automática', ?,?)
 `;
 
       const valoresFactura = [
@@ -292,7 +292,9 @@ class ClienteCompletoService {
         datos.nombre,                                       // nombre_cliente
         periodoFacturacion,                                 // periodo_facturacion
         fechaEmision.toISOString().split('T')[0],          // fecha_emision
-        fechaVencimiento.toISOString().split('T')[0],      // fecha_vencimiento
+        fechaVencimiento.toISOString().split('T')[0],   
+        fechaDesde.toISOString().split('T')[0],          
+        fechaHasta.toISOString().split('T')[0],             // fecha_vencimiento
         valorInternet,                                      // internet
         valorTelevision,                                    // television
         valorIvaInternet,                                   // s_internet
@@ -301,7 +303,8 @@ class ClienteCompletoService {
         subtotal,                                          // subtotal
         totalIva,                                          // iva
         total,                                             // total
-        parseInt(createdBy) || 1                           // created_by
+        parseInt(createdBy) || 1,
+        config.resolucion_facturacion || 'RESOLUCIÓN PENDIENTE'                        // created_by
       ];
 
 

@@ -47,7 +47,7 @@ class ClienteCompletoController {
         },
         servicio: {
           plan_id: req.body.servicio.plan_id,
-          tipo_permanencia: req.body.servicio.tipo_permanencia || 'sin_permanencia', // ⬅️ AGREGAR ESTA LÍNEA
+          tipo_permanencia: req.body.servicio.tipo_permanencia || 'sin_permanencia', 
           precio_personalizado: req.body.servicio.precio_personalizado,
           fecha_activacion: req.body.servicio.fecha_activacion || new Date().toISOString().split('T')[0],
           observaciones: req.body.servicio.observaciones
