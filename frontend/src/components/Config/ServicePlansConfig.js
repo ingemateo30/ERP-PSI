@@ -491,7 +491,7 @@ const ServicePlansConfig = () => {
               <option value="all">Todos los tipos</option>
               <option value="internet">Internet</option>
               <option value="television">Televisión</option>
-              <option value="combo">Combo</option>
+
             </select>
             <div>
               <select
@@ -525,8 +525,8 @@ const ServicePlansConfig = () => {
           <div
             key={plan.id}
             className={`rounded-lg shadow-sm border overflow-hidden transition-all duration-200 ${plan.activo
-                ? 'bg-white border-gray-200'
-                : 'bg-gray-50 border-gray-300 opacity-75'
+              ? 'bg-white border-gray-200'
+              : 'bg-gray-50 border-gray-300 opacity-75'
               }`}
           >
             {/* Header del plan */}
@@ -751,7 +751,7 @@ const ServicePlansConfig = () => {
                       >
                         <option value="internet">Internet</option>
                         <option value="television">Televisión</option>
-                        <option value="combo">Combo</option>
+
                       </select>
                     </div>
 
@@ -1009,60 +1009,18 @@ const ServicePlansConfig = () => {
                     </div>
                   </div>
 
-                  {/* Precios específicos por servicio */}
-                  {formData.tipo === 'combo' && (
-                    <div className="border border-blue-200 bg-blue-50 p-4 rounded-lg">
-                      <h4 className="text-md font-medium text-blue-900 mb-4">
-                        Precios Específicos (Combo)
-                      </h4>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-blue-700 mb-2">
-                            Precio Internet
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formData.precio_internet}
-                            onChange={(e) => handleInputChange('precio_internet', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="30000"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-blue-700 mb-2">
-                            Precio Televisión
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formData.precio_television}
-                            onChange={(e) => handleInputChange('precio_television', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="15000"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-blue-700 mb-2">
-                            Descuento Combo (%)
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formData.descuento_combo}
-                            onChange={(e) => handleInputChange('descuento_combo', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="10"
-                            min="0"
-                            max="100"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <select
+                    name="tipo"
+                    value={formData.tipo}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Seleccionar tipo</option>
+                    <option value="internet">Internet</option>
+                    <option value="television">Televisión</option>
+                    {/* ELIMINAR: <option value="combo">Combo</option> */}
+                  </select>
 
                   {/* Configuración promocional */}
                   <div className="border border-yellow-200 bg-yellow-50 p-4 rounded-lg">

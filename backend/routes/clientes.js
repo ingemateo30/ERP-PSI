@@ -392,6 +392,179 @@ router.use('*', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+router.post('/clientes-con-servicios', requireRole('administrador'), async (req, res) => {
+  const conexion = await Database.getConnection();
+  
+  try {
+    await conexion.beginTransaction();
+    
+    const { datosCliente, servicios } = req.body;
+    
+    // 1. Crear el cliente
+    const clienteId = await ClienteCompletoService.crearClienteCompleto(
+      conexion, 
+      datosCliente, 
+      req.user.id
+    );
+    
+    // 2. Crear cada servicio por separado
+    const serviciosCreados = [];
+    
+    for (let i = 0; i < servicios.length; i++) {
+      const servicio = servicios[i];
+      
+      // Si tiene ambos servicios, crear registros separados
+      if (servicio.planInternetId && servicio.planTelevisionId) {
+        
+        // Crear servicio de Internet
+        const servicioInternetData = {
+          plan_id: servicio.planInternetId,
+          direccion_servicio: servicio.direccionServicio,
+          nombre_sede: servicio.nombreSede || `Sede ${i + 1}`,
+          precio_personalizado: servicio.precioPersonalizado ? servicio.precioInternetCustom : null,
+          observaciones: `Internet - ${servicio.observaciones || ''}`
+        };
+        
+        const servicioInternetId = await ClienteCompletoService.asignarServicioCliente(
+          conexion, 
+          clienteId, 
+          servicioInternetData, 
+          req.user.id
+        );
+        
+        // Crear servicio de Televisión
+        const servicioTVData = {
+          plan_id: servicio.planTelevisionId,
+          direccion_servicio: servicio.direccionServicio,
+          nombre_sede: servicio.nombreSede || `Sede ${i + 1}`,
+          precio_personalizado: servicio.precioPersonalizado ? servicio.precioTelevisionCustom : null,
+          observaciones: `Televisión - ${servicio.observaciones || ''}`
+        };
+        
+        const servicioTVId = await ClienteCompletoService.asignarServicioCliente(
+          conexion, 
+          clienteId, 
+          servicioTVData, 
+          req.user.id
+        );
+        
+        serviciosCreados.push({
+          tipo: 'combo',
+          internet_id: servicioInternetId,
+          television_id: servicioTVId,
+          descuento_combo: servicio.descuentoCombo
+        });
+        
+      } else if (servicio.planInternetId) {
+        // Solo Internet
+        const servicioData = {
+          plan_id: servicio.planInternetId,
+          direccion_servicio: servicio.direccionServicio,
+          nombre_sede: servicio.nombreSede || `Sede ${i + 1}`,
+          precio_personalizado: servicio.precioPersonalizado ? servicio.precioInternetCustom : null,
+          observaciones: servicio.observaciones
+        };
+        
+        const servicioId = await ClienteCompletoService.asignarServicioCliente(
+          conexion, 
+          clienteId, 
+          servicioData, 
+          req.user.id
+        );
+        
+        serviciosCreados.push({
+          tipo: 'internet',
+          servicio_id: servicioId
+        });
+        
+      } else if (servicio.planTelevisionId) {
+        // Solo Televisión
+        const servicioData = {
+          plan_id: servicio.planTelevisionId,
+          direccion_servicio: servicio.direccionServicio,
+          nombre_sede: servicio.nombreSede || `Sede ${i + 1}`,
+          precio_personalizado: servicio.precioPersonalizado ? servicio.precioTelevisionCustom : null,
+          observaciones: servicio.observaciones
+        };
+        
+        const servicioId = await ClienteCompletoService.asignarServicioCliente(
+          conexion, 
+          clienteId, 
+          servicioData, 
+          req.user.id
+        );
+        
+        serviciosCreados.push({
+          tipo: 'television',
+          servicio_id: servicioId
+        });
+      }
+    }
+    
+    // 3. Generar contratos y facturas para cada servicio
+    for (const servicioCreado of serviciosCreados) {
+      if (servicioCreado.tipo === 'combo') {
+        // Generar un contrato que agrupe ambos servicios
+        await ClienteCompletoService.generarContratoCombo(
+          conexion, 
+          clienteId, 
+          servicioCreado.internet_id, 
+          servicioCreado.television_id,
+          servicioCreado.descuento_combo,
+          req.user.id
+        );
+        
+        // Generar una factura que incluya ambos servicios
+        await ClienteCompletoService.generarFacturaCombo(
+          conexion, 
+          clienteId, 
+          servicioCreado.internet_id, 
+          servicioCreado.television_id,
+          servicioCreado.descuento_combo,
+          req.user.id
+        );
+        
+      } else {
+        // Generar contrato y factura individual
+        await ClienteCompletoService.generarContratoIndividual(
+          conexion, 
+          clienteId, 
+          servicioCreado.servicio_id, 
+          req.user.id
+        );
+        
+        await ClienteCompletoService.generarFacturaIndividual(
+          conexion, 
+          clienteId, 
+          servicioCreado.servicio_id, 
+          req.user.id
+        );
+      }
+    }
+    
+    await conexion.commit();
+    
+    res.json({
+      success: true,
+      message: `Cliente creado exitosamente con ${serviciosCreados.length} servicio(s)`,
+      data: {
+        cliente_id: clienteId,
+        servicios_creados: serviciosCreados
+      }
+    });
+    
+  } catch (error) {
+    await conexion.rollback();
+    console.error('❌ Error creando cliente con servicios:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creando cliente con servicios',
+      error: error.message
+    });
+  } finally {
+    conexion.release();
+  }
+});
 
 // Manejo de errores generales
 router.use((error, req, res, next) => {
