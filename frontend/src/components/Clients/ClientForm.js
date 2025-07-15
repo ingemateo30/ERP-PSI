@@ -242,48 +242,61 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   };
 
   const validarFormulario = () => {
-    const nuevosErrores = {};
+  const nuevosErrores = {};
 
-    // Validaciones básicas
-    if (!formData.identificacion.trim()) {
-      nuevosErrores.identificacion = 'La identificación es requerida';
-    }
+  // Validaciones básicas del cliente
+  if (!formData.identificacion.trim()) {
+    nuevosErrores.identificacion = 'La identificación es requerida';
+  }
 
-    if (!formData.nombre.trim()) {
-      nuevosErrores.nombre = 'El nombre es requerido';
-    }
+  if (!formData.nombre.trim()) {
+    nuevosErrores.nombre = 'El nombre es requerido';
+  }
 
-    if (!formData.email.trim()) {
-      nuevosErrores.email = 'El email es requerido';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      nuevosErrores.email = 'El email no tiene un formato válido';
-    }
+  if (!formData.email.trim()) {
+    nuevosErrores.email = 'El email es requerido';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    nuevosErrores.email = 'El email no tiene un formato válido';
+  }
 
-    if (!formData.telefono.trim()) {
-      nuevosErrores.telefono = 'El teléfono es requerido';
-    }
+  if (!formData.telefono.trim()) {
+    nuevosErrores.telefono = 'El teléfono es requerido';
+  }
 
-    if (!formData.direccion.trim()) {
-      nuevosErrores.direccion = 'La dirección es requerida';
-    }
+  if (!formData.direccion.trim()) {
+    nuevosErrores.direccion = 'La dirección es requerida';
+  }
 
-    if (!formData.ciudad_id) {
-      nuevosErrores.ciudad_id = 'La ciudad es requerida';
-    }
+  if (!formData.ciudad_id) {
+    nuevosErrores.ciudad_id = 'La ciudad es requerida';
+  }
 
-    // Para cliente nuevo, validar plan
-    if (!client && !formData.plan_id) {
-      nuevosErrores.plan_id = 'Debe seleccionar un plan de servicio';
-    }
-    if (!client && formData.plan_id) {
-      const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
-      if (planSeleccionado?.aplica_permanencia && !formData.tipo_permanencia) {
-        nuevosErrores.tipo_permanencia = 'Debe seleccionar el tipo de permanencia';
+  // ✅ VALIDACIÓN DE SERVICIOS CORREGIDA
+  if (!client) {
+    if (formData.usarServiciosSeparados) {
+      // Si usa servicios separados, debe tener al menos uno seleccionado
+      if (!formData.planInternetId && !formData.planTelevisionId) {
+        nuevosErrores.servicios_separados = 'Debe seleccionar al menos un servicio (Internet o Televisión)';
+      }
+    } else {
+      // Si usa plan único, debe seleccionar un plan
+      if (!formData.plan_id) {
+        nuevosErrores.plan_id = 'Debe seleccionar un plan de servicio';
+      }
+      
+      // Validar permanencia si el plan la requiere
+      if (formData.plan_id) {
+        const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
+        if (planSeleccionado?.aplica_permanencia && !formData.tipo_permanencia) {
+          nuevosErrores.tipo_permanencia = 'Debe seleccionar el tipo de permanencia';
+        }
       }
     }
-    setErrors(nuevosErrores);
-    return Object.keys(nuevosErrores).length === 0;
-  };
+  }
+
+  setErrors(nuevosErrores);
+  return Object.keys(nuevosErrores).length === 0;
+};
 
  const handleSubmit = async (e) => {
   e.preventDefault();
@@ -315,10 +328,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 };
 
   const crearClienteConSede = async () => {
-  const calculos = recalcularPreciosEnTiempoReal();
-
-  // 1. PREPARAR DATOS DEL CLIENTE (igual que antes)
-  const datosCliente = {
+ const datosCliente = {
     identificacion: formData.identificacion,
     tipo_documento: formData.tipo_documento,
     nombre: formData.nombre,
@@ -334,13 +344,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     fecha_inicio_contrato: formData.fecha_activacion
   };
 
-  // 2. OBTENER EL PLAN SELECCIONADO
-  const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
-  if (!planSeleccionado) {
-    throw new Error('Plan seleccionado no encontrado');
-  }
-
-  // 3. PREPARAR SEDE INICIAL CON SERVICIOS
+  // 2. PREPARAR SEDE INICIAL CON SERVICIOS
   const sedeInicial = {
     id: Date.now(), // ID temporal único
     nombre_sede: 'Sede Principal',
@@ -349,7 +353,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     telefono_sede: formData.telefono,
     planInternetId: null,
     planTelevisionId: null,
-    precioPersonalizado: !!formData.precio_personalizado,
+    precioPersonalizado: false,
     precioInternetCustom: '',
     precioTelevisionCustom: '',
     tipoContrato: formData.tipo_permanencia || 'sin_permanencia',
@@ -358,36 +362,62 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     observaciones: formData.observaciones_servicio || ''
   };
 
-  // 4. ASIGNAR SERVICIOS SEGÚN EL TIPO DE PLAN
-  if (planSeleccionado.tipo === 'internet') {
-    // Solo Internet
-    sedeInicial.planInternetId = parseInt(formData.plan_id);
-    if (formData.precio_personalizado) {
-      sedeInicial.precioInternetCustom = calculos.precio_base.toString();
+  // 3. ✅ ASIGNAR SERVICIOS SEGÚN EL MODO SELECCIONADO
+  if (formData.usarServiciosSeparados) {
+    // MODO SERVICIOS SEPARADOS
+    if (formData.planInternetId) {
+      sedeInicial.planInternetId = parseInt(formData.planInternetId);
+      if (formData.precioInternetCustom) {
+        sedeInicial.precioPersonalizado = true;
+        sedeInicial.precioInternetCustom = formData.precioInternetCustom;
+      }
     }
-  } else if (planSeleccionado.tipo === 'television') {
-    // Solo Televisión
-    sedeInicial.planTelevisionId = parseInt(formData.plan_id);
-    if (formData.precio_personalizado) {
-      sedeInicial.precioTelevisionCustom = calculos.precio_base.toString();
+    
+    if (formData.planTelevisionId) {
+      sedeInicial.planTelevisionId = parseInt(formData.planTelevisionId);
+      if (formData.precioTelevisionCustom) {
+        sedeInicial.precioPersonalizado = true;
+        sedeInicial.precioTelevisionCustom = formData.precioTelevisionCustom;
+      }
     }
-  } else if (planSeleccionado.tipo === 'combo') {
-    // COMBO = Internet + TV (usar el mismo plan para ambos por ahora)
-    sedeInicial.planInternetId = parseInt(formData.plan_id);
-    sedeInicial.planTelevisionId = parseInt(formData.plan_id);
+  } else {
+    // MODO PLAN ÚNICO
+    const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
+    if (!planSeleccionado) {
+      throw new Error('Plan seleccionado no encontrado');
+    }
 
-    if (formData.precio_personalizado) {
-      // Dividir el precio personalizado entre Internet y TV
-      const precioBase = calculos.precio_base;
-      sedeInicial.precioInternetCustom = (precioBase * 0.6).toString(); // 60% Internet
-      sedeInicial.precioTelevisionCustom = (precioBase * 0.4).toString(); // 40% TV
+    const calculos = recalcularPreciosEnTiempoReal();
+
+    if (planSeleccionado.tipo === 'internet') {
+      sedeInicial.planInternetId = parseInt(formData.plan_id);
+      if (formData.precio_personalizado) {
+        sedeInicial.precioPersonalizado = true;
+        sedeInicial.precioInternetCustom = calculos.precio_base.toString();
+      }
+    } else if (planSeleccionado.tipo === 'television') {
+      sedeInicial.planTelevisionId = parseInt(formData.plan_id);
+      if (formData.precio_personalizado) {
+        sedeInicial.precioPersonalizado = true;
+        sedeInicial.precioTelevisionCustom = calculos.precio_base.toString();
+      }
+    } else if (planSeleccionado.tipo === 'combo') {
+      sedeInicial.planInternetId = parseInt(formData.plan_id);
+      sedeInicial.planTelevisionId = parseInt(formData.plan_id);
+      
+      if (formData.precio_personalizado) {
+        sedeInicial.precioPersonalizado = true;
+        const precioBase = calculos.precio_base;
+        sedeInicial.precioInternetCustom = (precioBase * 0.6).toString(); // 60% Internet
+        sedeInicial.precioTelevisionCustom = (precioBase * 0.4).toString(); // 40% TV
+      }
     }
   }
 
-  // 5. ESTRUCTURA FINAL DE DATOS (FORMATO CORRECTO PARA EL BACKEND)
+  // 4. ESTRUCTURA FINAL DE DATOS
   const datosCompletos = {
     cliente: datosCliente,
-    servicios: [sedeInicial], // ✅ Array con una sede inicial
+    servicios: [sedeInicial],
     opciones: {
       generar_documentos: formData.generar_documentos,
       enviar_bienvenida: formData.enviar_bienvenida,
@@ -397,13 +427,12 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
   console.log('🚀 Creando cliente con sede inicial:', datosCompletos);
 
-  // 6. LLAMAR AL SERVICIO CORRECTO
+  // 5. LLAMAR AL SERVICIO
   const response = await clienteCompletoService.createClienteCompleto(datosCompletos);
 
   if (response.success) {
     console.log('✅ Cliente creado exitosamente:', response.data);
 
-    // Mostrar mensaje de éxito
     const resumen = response.data.resumen || response.data;
     const mensaje = `Cliente creado exitosamente:
 • ${resumen.total_sedes || 1} sede(s)
@@ -417,7 +446,6 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       alert(mensaje);
     }
 
-    // Llamar callback de éxito
     onSave(response.data);
   }
 };
