@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const AlertasClienteService = require('../services/AlertasClienteService');
 
 // Importar controlador con manejo de errores
 let ClienteController;
@@ -75,6 +76,91 @@ try {
 // Aplicar autenticación a todas las rutas
 router.use(authenticateToken);
 
+
+/**
+ * @route GET /api/v1/clientes/verificar-existente
+ * @desc Verificar si un cliente ya existe por identificación
+ * @access Autenticado
+ */
+router.get('/verificar-existente',
+  async (req, res) => {
+    try {
+      const { identificacion, tipo_documento = 'cedula' } = req.query;
+
+      if (!identificacion) {
+        return res.status(400).json({
+          success: false,
+          message: 'Identificación es requerida'
+        });
+      }
+
+      const verificacion = await AlertasClienteService.verificarClienteExistente(
+        identificacion,
+        tipo_documento
+      );
+
+      res.json({
+        success: true,
+        data: verificacion,
+        message: verificacion.existe
+          ? 'Cliente encontrado en el sistema'
+          : 'Cliente no existe, puede proceder con el registro'
+      });
+
+    } catch (error) {
+      console.error('❌ Error verificando cliente existente:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error verificando cliente',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * @route POST /api/v1/clientes/:id/agregar-servicio
+ * @desc Agregar servicio adicional a cliente existente
+ * @access Administrador, Supervisor
+ */
+router.post('/:id/agregar-servicio',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const { id: clienteId } = req.params;
+      const datosServicio = req.body;
+      const { id: createdBy } = req.user;
+
+      if (!clienteId || isNaN(clienteId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID de cliente inválido'
+        });
+      }
+
+      const ClienteCompletoService = require('../services/ClienteCompletoService');
+      const resultado = await ClienteCompletoService.agregarServicioAClienteExistente(
+        parseInt(clienteId),
+        datosServicio,
+        createdBy
+      );
+
+      res.json({
+        success: true,
+        data: resultado,
+        message: 'Servicio agregado exitosamente al cliente'
+      });
+
+    } catch (error) {
+      console.error('❌ Error agregando servicio a cliente:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error agregando servicio al cliente',
+        error: error.message
+      });
+    }
+  }
+);
 // ==========================================
 // RUTAS DE CONSULTA
 // ==========================================
@@ -715,7 +801,7 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
 
     // 2. CONVERTIR serviciosCreados A ARRAY SI NO LO ES
     let serviciosArray = [];
-    
+
     if (Array.isArray(serviciosCreados)) {
       serviciosArray = serviciosCreados;
     } else if (serviciosCreados && typeof serviciosCreados === 'object') {
@@ -731,7 +817,7 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
         JOIN planes_servicio ps ON sc.plan_id = ps.id
         WHERE sc.cliente_id = ? AND sc.estado = 'activo'
       `, [clienteId]);
-      
+
       serviciosArray = serviciosDB.map(s => ({
         id: s.id,
         plan_id: s.plan_id,
@@ -752,7 +838,7 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
     const [ultimaFactura] = await conexion.execute(
       'SELECT numero_factura FROM facturas ORDER BY id DESC LIMIT 1'
     );
-    
+
     let numeroFactura;
     if (ultimaFactura.length > 0) {
       const ultimoNumero = ultimaFactura[0].numero_factura;
@@ -766,7 +852,7 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
     const [configFacturacion] = await conexion.execute(
       'SELECT parametro, valor FROM configuracion_facturacion WHERE activo = 1'
     );
-    
+
     const config = {};
     configFacturacion.forEach(item => {
       config[item.parametro] = item.valor;
@@ -776,10 +862,10 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
     const fechaEmision = new Date();
     const fechaVencimiento = new Date();
     fechaVencimiento.setDate(fechaVencimiento.getDate() + parseInt(config.DIAS_VENCIMIENTO_FACTURA || 15));
-    
+
     const fechaDesde = new Date(fechaEmision.getFullYear(), fechaEmision.getMonth(), 1);
     const fechaHasta = new Date(fechaEmision.getFullYear(), fechaEmision.getMonth() + 1, 0);
-    
+
     const periodoFacturacion = `${fechaEmision.getFullYear()}-${(fechaEmision.getMonth() + 1).toString().padStart(2, '0')}`;
 
     // 6. CALCULAR VALORES DE SERVICIOS
@@ -795,24 +881,24 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
     // Procesar cada servicio
     for (const servicio of serviciosArray) {
       const precio = parseFloat(servicio.precio || 0);
-      
+
       if (servicio.tipo === 'internet') {
         valorInternet += precio;
-        
+
         // IVA para internet: solo estratos 4, 5, 6
         if (estrato >= 4) {
           valorIvaInternet += precio * 0.19;
         }
       } else if (servicio.tipo === 'television') {
         valorTelevision += precio;
-        
+
         // IVA para televisión: todos los estratos
         valorIvaTelevision += precio * 0.19;
       } else if (servicio.tipo === 'combo') {
         // Para combos, dividir entre internet y TV
         valorInternet += precio * 0.6; // 60% internet
         valorTelevision += precio * 0.4; // 40% TV
-        
+
         if (estrato >= 4) {
           valorIvaInternet += (precio * 0.6) * 0.19;
         }
@@ -914,7 +1000,7 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
     const [resultadoFactura] = await conexion.execute(queryFactura, valoresFactura);
     const facturaId = resultadoFactura.insertId;
 
- 
+
 
     // 14. MARCAR VARIOS COMO FACTURADOS
     if (valorVarios > 0) {

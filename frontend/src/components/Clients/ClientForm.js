@@ -10,6 +10,8 @@ import {
 import { clientService } from '../../services/clientService';
 import configService, { ConfigService } from '../../services/configService';
 import clienteCompletoService from '../../services/clienteCompletoService';
+import AlertasClienteService from '../../services/alertasClienteService';
+import AlertaClienteExistente from './AlertaClienteExistente';
 
 const ClientForm = ({ client, onClose, onSave, permissions }) => {
   const [loading, setLoading] = useState(false);
@@ -18,7 +20,11 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   const [planesDisponibles, setPlanesDisponibles] = useState([]);
   const [sectores, setSectores] = useState([]);
   const [ciudades, setCiudades] = useState([]);
-  
+  const [verificandoCliente, setVerificandoCliente] = useState(false);
+  const [verificacionCliente, setVerificacionCliente] = useState(null);
+  const [modoAgregarServicio, setModoAgregarServicio] = useState(false);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+
   // Filtrar planes por tipo
   const planesInternet = planesDisponibles.filter(p => p.tipo === 'internet');
   const planesTelevision = planesDisponibles.filter(p => p.tipo === 'television');
@@ -63,164 +69,264 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
   // ✅ FUNCIÓN PARA CALCULAR COSTO EN TIEMPO REAL - CORREGIDA
   const calcularCostoInstalacion = useCallback(() => {
-  let serviciosCount = 0;
-  
-  if (formData.usarServiciosSeparados) {
-    if (formData.planInternetId) serviciosCount++;
-    if (formData.planTelevisionId) serviciosCount++;
-  } else if (formData.plan_id) {
-    serviciosCount = 1;
-  }
-  
-  if (serviciosCount === 0) return { costo: 0, servicios: 0 };
-  
-  // ✅ CORRECCIÓN: UNA SOLA INSTALACIÓN independientemente de la cantidad de servicios
-  const costoInstalacion = formData.tipo_permanencia === 'sin_permanencia' ? 150000 : 50000;
-  
-  return {
-    costo: costoInstalacion, // ✅ Siempre el mismo costo
-    servicios: serviciosCount,
-    costo_por_instalacion: costoInstalacion, // ✅ Cambio de nombre
-    incluye_iva: formData.tipo_permanencia === 'sin_permanencia',
-    es_instalacion_unica: true // ✅ Flag para mostrar en UI
-  };
-}, [formData.tipo_permanencia, formData.planInternetId, formData.planTelevisionId, formData.plan_id, formData.usarServiciosSeparados]);
+    let serviciosCount = 0;
 
-// ✅ COMPONENTE SELECTOR DE PERMANENCIA CORREGIDO
-const SelectorPermanenciaCompleto = () => {
-  const calculoCostos = calcularCostoInstalacion();
-  
-  return (
-    <div className="border-t border-gray-200 pt-6">
-      <h4 className="text-md font-medium text-gray-900 mb-4 flex items-center gap-2">
-        <FileText className="w-4 h-4" />
-        Tipo de Permanencia
-      </h4>
-      
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Seleccione el tipo de permanencia <span className="text-red-500">*</span>
-          </label>
-          <div className="grid grid-cols-1 gap-3">
-            {/* Opción SIN permanencia */}
-            <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${
-              formData.tipo_permanencia === 'sin_permanencia' 
-                ? 'border-blue-500 bg-blue-50' 
-                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-            }`}>
-              <input
-                type="radio"
-                name="tipo_permanencia"
-                value="sin_permanencia"
-                checked={formData.tipo_permanencia === 'sin_permanencia'}
-                onChange={(e) => handleInputChange('tipo_permanencia', e.target.value)}
-                className="mt-1 mr-3 text-blue-600"
-              />
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <div className="font-semibold text-blue-700">Sin Permanencia</div>
-                  <div className="text-lg font-bold text-blue-700">$150,000</div>
-                </div>
-                <div className="text-sm text-blue-600 mb-1">Una sola instalación - IVA incluido</div>
-                <div className="text-xs text-gray-600">
-                  ✓ Sin compromisos de tiempo<br/>
-                  ✓ Puede cancelar cuando desee<br/>
-                  ✓ Una instalación para todos los servicios
-                </div>
-              </div>
+    if (formData.usarServiciosSeparados) {
+      if (formData.planInternetId) serviciosCount++;
+      if (formData.planTelevisionId) serviciosCount++;
+    } else if (formData.plan_id) {
+      serviciosCount = 1;
+    }
+
+    if (serviciosCount === 0) return { costo: 0, servicios: 0 };
+
+    // ✅ CORRECCIÓN: UNA SOLA INSTALACIÓN independientemente de la cantidad de servicios
+    const costoInstalacion = formData.tipo_permanencia === 'sin_permanencia' ? 150000 : 50000;
+
+    return {
+      costo: costoInstalacion, // ✅ Siempre el mismo costo
+      servicios: serviciosCount,
+      costo_por_instalacion: costoInstalacion, // ✅ Cambio de nombre
+      incluye_iva: formData.tipo_permanencia === 'sin_permanencia',
+      es_instalacion_unica: true // ✅ Flag para mostrar en UI
+    };
+  }, [formData.tipo_permanencia, formData.planInternetId, formData.planTelevisionId, formData.plan_id, formData.usarServiciosSeparados]);
+
+  // ✅ COMPONENTE SELECTOR DE PERMANENCIA CORREGIDO
+  const SelectorPermanenciaCompleto = () => {
+    const calculoCostos = calcularCostoInstalacion();
+
+    return (
+      <div className="border-t border-gray-200 pt-6">
+        <h4 className="text-md font-medium text-gray-900 mb-4 flex items-center gap-2">
+          <FileText className="w-4 h-4" />
+          Tipo de Permanencia
+        </h4>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Seleccione el tipo de permanencia <span className="text-red-500">*</span>
             </label>
-            
-            {/* Opción CON permanencia */}
-            <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${
-              formData.tipo_permanencia === 'con_permanencia' 
-                ? 'border-green-500 bg-green-50' 
+            <div className="grid grid-cols-1 gap-3">
+              {/* Opción SIN permanencia */}
+              <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${formData.tipo_permanencia === 'sin_permanencia'
+                ? 'border-blue-500 bg-blue-50'
                 : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-            }`}>
-              <input
-                type="radio"
-                name="tipo_permanencia"
-                value="con_permanencia"
-                checked={formData.tipo_permanencia === 'con_permanencia'}
-                onChange={(e) => handleInputChange('tipo_permanencia', e.target.value)}
-                className="mt-1 mr-3 text-green-600"
-              />
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <div className="font-semibold text-green-700">Con Permanencia (6 meses)</div>
-                  <div className="text-lg font-bold text-green-700">$50,000</div>
+                }`}>
+                <input
+                  type="radio"
+                  name="tipo_permanencia"
+                  value="sin_permanencia"
+                  checked={formData.tipo_permanencia === 'sin_permanencia'}
+                  onChange={(e) => handleInputChange('tipo_permanencia', e.target.value)}
+                  className="mt-1 mr-3 text-blue-600"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold text-blue-700">Sin Permanencia</div>
+                    <div className="text-lg font-bold text-blue-700">$150,000</div>
+                  </div>
+                  <div className="text-sm text-blue-600 mb-1">Una sola instalación - IVA incluido</div>
+                  <div className="text-xs text-gray-600">
+                    ✓ Sin compromisos de tiempo<br />
+                    ✓ Puede cancelar cuando desee<br />
+                    ✓ Una instalación para todos los servicios
+                  </div>
                 </div>
-                <div className="text-sm text-green-600 mb-1">Una sola instalación - Ahorra $100,000</div>
-                <div className="text-xs text-gray-600">
-                  ✓ Compromiso mínimo de 6 meses<br/>
-                  ✓ Precio de instalación reducido<br/>
-                  ✓ Una instalación para todos los servicios
-                </div>
-              </div>
-            </label>
-          </div>
-          {errors.tipo_permanencia && (
-            <p className="mt-2 text-sm text-red-600">{errors.tipo_permanencia}</p>
-          )}
-        </div>
+              </label>
 
-        {/* Calculadora de costo CORREGIDA */}
-        {calculoCostos.servicios > 0 && (
-          <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-lg border border-blue-200">
-            <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-              <DollarSign className="w-4 h-4" />
-              Resumen de Costos de Instalación
-            </h5>
-            
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Servicios a instalar:</span>
-                <span className="font-medium">{calculoCostos.servicios}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Tipo de instalación:</span>
-                <span className="font-medium text-green-600">✓ Instalación única</span>
-              </div>
-              <div className="border-t border-gray-300 pt-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-gray-800">COSTO TOTAL INSTALACIÓN:</span>
-                  <span className="text-xl font-bold text-green-600">
-                    ${calculoCostos.costo.toLocaleString()}
-                  </span>
+              {/* Opción CON permanencia */}
+              <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${formData.tipo_permanencia === 'con_permanencia'
+                ? 'border-green-500 bg-green-50'
+                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                }`}>
+                <input
+                  type="radio"
+                  name="tipo_permanencia"
+                  value="con_permanencia"
+                  checked={formData.tipo_permanencia === 'con_permanencia'}
+                  onChange={(e) => handleInputChange('tipo_permanencia', e.target.value)}
+                  className="mt-1 mr-3 text-green-600"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold text-green-700">Con Permanencia (6 meses)</div>
+                    <div className="text-lg font-bold text-green-700">$50,000</div>
+                  </div>
+                  <div className="text-sm text-green-600 mb-1">Una sola instalación - Ahorra $100,000</div>
+                  <div className="text-xs text-gray-600">
+                    ✓ Compromiso mínimo de 6 meses<br />
+                    ✓ Precio de instalación reducido<br />
+                    ✓ Una instalación para todos los servicios
+                  </div>
                 </div>
-              </div>
-              
-              <div className="text-xs text-gray-500 mt-2">
-                ✓ {calculoCostos.incluye_iva && 'IVA incluido'}<br/>
-                ✓ Una sola visita de instalación<br/>
-                {formData.tipo_permanencia === 'con_permanencia' && '✓ Permanencia mínima de 6 meses'}
-              </div>
+              </label>
             </div>
-
-            {/* Info adicional */}
-            <div className="mt-3 p-2 bg-blue-100 rounded border border-blue-300">
-              <div className="text-xs text-blue-700 font-medium">
-                💡 {calculoCostos.servicios > 1 
-                  ? `Internet y TV se instalan en la misma visita por $${calculoCostos.costo.toLocaleString()}` 
-                  : `Una instalación de $${calculoCostos.costo.toLocaleString()}`
-                }
-              </div>
-            </div>
-
-            {/* Comparación de ahorro */}
-            {formData.tipo_permanencia === 'con_permanencia' && (
-              <div className="mt-2 p-2 bg-green-100 rounded border border-green-300">
-                <div className="text-xs text-green-700 font-medium">
-                  💰 Ahorro total: $100,000 vs sin permanencia
-                </div>
-              </div>
+            {errors.tipo_permanencia && (
+              <p className="mt-2 text-sm text-red-600">{errors.tipo_permanencia}</p>
             )}
           </div>
-        )}
+
+          {/* Calculadora de costo CORREGIDA */}
+          {calculoCostos.servicios > 0 && (
+            <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-lg border border-blue-200">
+              <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Resumen de Costos de Instalación
+              </h5>
+
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Servicios a instalar:</span>
+                  <span className="font-medium">{calculoCostos.servicios}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tipo de instalación:</span>
+                  <span className="font-medium text-green-600">✓ Instalación única</span>
+                </div>
+                <div className="border-t border-gray-300 pt-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-gray-800">COSTO TOTAL INSTALACIÓN:</span>
+                    <span className="text-xl font-bold text-green-600">
+                      ${calculoCostos.costo.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-xs text-gray-500 mt-2">
+                  ✓ {calculoCostos.incluye_iva && 'IVA incluido'}<br />
+                  ✓ Una sola visita de instalación<br />
+                  {formData.tipo_permanencia === 'con_permanencia' && '✓ Permanencia mínima de 6 meses'}
+                </div>
+              </div>
+
+              {/* Info adicional */}
+              <div className="mt-3 p-2 bg-blue-100 rounded border border-blue-300">
+                <div className="text-xs text-blue-700 font-medium">
+                  💡 {calculoCostos.servicios > 1
+                    ? `Internet y TV se instalan en la misma visita por $${calculoCostos.costo.toLocaleString()}`
+                    : `Una instalación de $${calculoCostos.costo.toLocaleString()}`
+                  }
+                </div>
+              </div>
+
+              {/* Comparación de ahorro */}
+              {formData.tipo_permanencia === 'con_permanencia' && (
+                <div className="mt-2 p-2 bg-green-100 rounded border border-green-300">
+                  <div className="text-xs text-green-700 font-medium">
+                    💰 Ahorro total: $100,000 vs sin permanencia
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
+  useEffect(() => {
+    const verificarClienteExistente = async () => {
+      if (formData.identificacion.length >= 6 && !client) { // Solo para clientes nuevos
+        try {
+          setVerificandoCliente(true);
+
+          const response = await AlertasClienteService.verificarClienteExistente(
+            formData.identificacion,
+            formData.tipo_documento
+          );
+
+          setVerificacionCliente(response.data);
+        } catch (error) {
+          console.error('Error verificando cliente:', error);
+          setVerificacionCliente(null);
+        } finally {
+          setVerificandoCliente(false);
+        }
+      } else {
+        setVerificacionCliente(null);
+      }
+    };
+
+    // Debounce para evitar muchas consultas
+    const timeout = setTimeout(verificarClienteExistente, 800);
+    return () => clearTimeout(timeout);
+  }, [formData.identificacion, formData.tipo_documento, client]);
+
+  // 4. AGREGAR estas funciones después de las funciones existentes:
+  const manejarContinuarConClienteExistente = (cliente) => {
+    setModoAgregarServicio(true);
+    setClienteSeleccionado(cliente);
+
+    // Pre-llenar algunos campos del cliente existente
+    setFormData(prev => ({
+      ...prev,
+      identificacion: cliente.identificacion,
+      tipo_documento: cliente.tipo_documento,
+      nombre: cliente.nombre,
+      email: cliente.correo || '',
+      telefono: cliente.telefono || '',
+      telefono_fijo: cliente.telefono_2 || '',
+      direccion: cliente.direccion || '',
+      barrio: cliente.barrio || '',
+      estrato: cliente.estrato || '3',
+      ciudad_id: cliente.ciudad_id || '',
+      sector_id: cliente.sector_id || '',
+      observaciones: cliente.observaciones || '',
+      // Limpiar datos de servicio para nuevo servicio
+      plan_id: '',
+      precio_personalizado: '',
+      planInternetId: '',
+      planTelevisionId: '',
+      precioInternetCustom: '',
+      precioTelevisionCustom: '',
+      // En modo agregar servicio, no generar documentos completos
+      generar_documentos: false,
+      enviar_bienvenida: false,
+      programar_instalacion: true
+    }));
+  };
+
+  const manejarVerHistorial = (cliente) => {
+    // Aquí podrías abrir un modal con el historial o navegar a otra página
+    console.log('Ver historial de cliente:', cliente);
+    alert(`Ver historial de ${cliente.nombre} - Funcionalidad por implementar`);
+  };
+
+  const manejarCrearNuevo = () => {
+    setVerificacionCliente(null);
+    setModoAgregarServicio(false);
+    setClienteSeleccionado(null);
+  };
+
+  const agregarServicioAClienteExistente = async () => {
+    // Preparar datos del nuevo servicio
+    const nuevoServicio = {
+      plan_id: formData.plan_id,
+      precio_personalizado: formData.precio_personalizado,
+      fecha_activacion: formData.fecha_activacion,
+      observaciones: formData.observaciones_servicio,
+      tipo_permanencia: formData.tipo_permanencia,
+      meses_permanencia: formData.meses_permanencia,
+      generar_contrato: true,
+      generar_factura: true,
+      programar_instalacion: formData.programar_instalacion
+    };
+
+    const response = await AlertasClienteService.agregarServicioAClienteExistente(
+      clienteSeleccionado.id,
+      nuevoServicio
+    );
+
+    if (response.success) {
+      if (window.showNotification) {
+        window.showNotification('success', `Servicio agregado exitosamente al cliente ${clienteSeleccionado.nombre}`);
+      } else {
+        alert(`Servicio agregado exitosamente al cliente ${clienteSeleccionado.nombre}`);
+      }
+      onSave({ tipo: 'servicio_agregado', cliente: clienteSeleccionado, servicio: response.data });
+    }
+  };
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -448,7 +554,7 @@ const SelectorPermanenciaCompleto = () => {
           nuevosErrores.plan_id = 'Debe seleccionar un plan de servicio';
         }
       }
-      
+
       // ✅ SIEMPRE VALIDAR TIPO DE PERMANENCIA
       if (!formData.tipo_permanencia) {
         nuevosErrores.tipo_permanencia = 'Debe seleccionar el tipo de permanencia';
@@ -466,166 +572,167 @@ const SelectorPermanenciaCompleto = () => {
       return;
     }
 
-    try {
-      setSaving(true);
-      setErrors({});
+    setSaving(true);
 
+    try {
       if (client) {
-        // MODO EDICIÓN
+        // Modo edición (mantener lógica original)
         await actualizarCliente();
+      } else if (modoAgregarServicio && clienteSeleccionado) {
+        // NUEVO: Agregar servicio a cliente existente
+        await agregarServicioAClienteExistente();
       } else {
-        // MODO CREACIÓN
+        // Crear cliente nuevo (lógica original)
         await crearClienteConSede();
       }
-
     } catch (error) {
-      console.error('❌ Error en formulario:', error);
+      console.error('Error en submit:', error);
       setErrors({
-        general: error.message || 'Error al procesar la información'
+        general: error.message || 'Error procesando la solicitud'
       });
     } finally {
       setSaving(false);
     }
   };
 
- // ============================================================
-// CORRECCIÓN DEL ERROR: ClientForm.js - crearClienteConSede
-// ============================================================
+  // ============================================================
+  // CORRECCIÓN DEL ERROR: ClientForm.js - crearClienteConSede
+  // ============================================================
 
-// FUNCIÓN CORREGIDA - crearClienteConSede en ClientForm.js
-const crearClienteConSede = async () => {
-  const datosCliente = {
-    identificacion: formData.identificacion,
-    tipo_documento: formData.tipo_documento,
-    nombre: formData.nombre,
-    email: formData.email,
-    telefono: formData.telefono,
-    telefono_fijo: formData.telefono_fijo,
-    direccion: formData.direccion,
-    barrio: formData.barrio,
-    estrato: parseInt(formData.estrato),
-    ciudad_id: parseInt(formData.ciudad_id),
-    sector_id: formData.sector_id ? parseInt(formData.sector_id) : null,
-    observaciones: formData.observaciones,
-    fecha_inicio_contrato: formData.fecha_activacion
-  };
+  // FUNCIÓN CORREGIDA - crearClienteConSede en ClientForm.js
+  const crearClienteConSede = async () => {
+    const datosCliente = {
+      identificacion: formData.identificacion,
+      tipo_documento: formData.tipo_documento,
+      nombre: formData.nombre,
+      email: formData.email,
+      telefono: formData.telefono,
+      telefono_fijo: formData.telefono_fijo,
+      direccion: formData.direccion,
+      barrio: formData.barrio,
+      estrato: parseInt(formData.estrato),
+      ciudad_id: parseInt(formData.ciudad_id),
+      sector_id: formData.sector_id ? parseInt(formData.sector_id) : null,
+      observaciones: formData.observaciones,
+      fecha_inicio_contrato: formData.fecha_activacion
+    };
 
-  // ✅ PREPARAR SEDE INICIAL CON SERVICIOS Y PERMANENCIA CORREGIDA
-  const sedeInicial = {
-    id: Date.now(), // ID temporal único
-    nombre_sede: 'Sede Principal',
-    direccion_servicio: formData.direccion, // ✅ CAMPO REQUERIDO
-    contacto_sede: formData.nombre,
-    telefono_sede: formData.telefono,
-    planInternetId: null,
-    planTelevisionId: null,
-    precioPersonalizado: false,
-    precioInternetCustom: '',
-    precioTelevisionCustom: '',
-    tipoContrato: formData.tipo_permanencia || 'sin_permanencia',
-    mesesPermanencia: formData.tipo_permanencia === 'con_permanencia' ? 6 : 0,
-    fechaActivacion: formData.fecha_activacion,
-    observaciones: formData.observaciones_servicio || ''
-  };
+    // ✅ PREPARAR SEDE INICIAL CON SERVICIOS Y PERMANENCIA CORREGIDA
+    const sedeInicial = {
+      id: Date.now(), // ID temporal único
+      nombre_sede: 'Sede Principal',
+      direccion_servicio: formData.direccion, // ✅ CAMPO REQUERIDO
+      contacto_sede: formData.nombre,
+      telefono_sede: formData.telefono,
+      planInternetId: null,
+      planTelevisionId: null,
+      precioPersonalizado: false,
+      precioInternetCustom: '',
+      precioTelevisionCustom: '',
+      tipoContrato: formData.tipo_permanencia || 'sin_permanencia',
+      mesesPermanencia: formData.tipo_permanencia === 'con_permanencia' ? 6 : 0,
+      fechaActivacion: formData.fecha_activacion,
+      observaciones: formData.observaciones_servicio || ''
+    };
 
-  // ✅ ASIGNAR SERVICIOS SEGÚN EL MODO SELECCIONADO
-  if (formData.usarServiciosSeparados) {
-    // MODO SERVICIOS SEPARADOS
-    if (formData.planInternetId) {
-      sedeInicial.planInternetId = parseInt(formData.planInternetId);
-      if (formData.precioInternetCustom) {
-        sedeInicial.precioPersonalizado = true;
-        sedeInicial.precioInternetCustom = formData.precioInternetCustom;
+    // ✅ ASIGNAR SERVICIOS SEGÚN EL MODO SELECCIONADO
+    if (formData.usarServiciosSeparados) {
+      // MODO SERVICIOS SEPARADOS
+      if (formData.planInternetId) {
+        sedeInicial.planInternetId = parseInt(formData.planInternetId);
+        if (formData.precioInternetCustom) {
+          sedeInicial.precioPersonalizado = true;
+          sedeInicial.precioInternetCustom = formData.precioInternetCustom;
+        }
+      }
+
+      if (formData.planTelevisionId) {
+        sedeInicial.planTelevisionId = parseInt(formData.planTelevisionId);
+        if (formData.precioTelevisionCustom) {
+          sedeInicial.precioPersonalizado = true;
+          sedeInicial.precioTelevisionCustom = formData.precioTelevisionCustom;
+        }
+      }
+    } else {
+      // MODO PLAN ÚNICO
+      const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
+      if (!planSeleccionado) {
+        throw new Error('Plan seleccionado no encontrado');
+      }
+
+      const calculos = recalcularPreciosEnTiempoReal();
+
+      if (planSeleccionado.tipo === 'internet') {
+        sedeInicial.planInternetId = parseInt(formData.plan_id);
+        if (formData.precio_personalizado) {
+          sedeInicial.precioPersonalizado = true;
+          sedeInicial.precioInternetCustom = calculos?.precio_base?.toString() || formData.precio_personalizado;
+        }
+      } else if (planSeleccionado.tipo === 'television') {
+        sedeInicial.planTelevisionId = parseInt(formData.plan_id);
+        if (formData.precio_personalizado) {
+          sedeInicial.precioPersonalizado = true;
+          sedeInicial.precioTelevisionCustom = calculos?.precio_base?.toString() || formData.precio_personalizado;
+        }
+      } else if (planSeleccionado.tipo === 'combo') {
+        sedeInicial.planInternetId = parseInt(formData.plan_id);
+        sedeInicial.planTelevisionId = parseInt(formData.plan_id);
+
+        if (formData.precio_personalizado) {
+          sedeInicial.precioPersonalizado = true;
+          const precioBase = calculos?.precio_base || parseFloat(formData.precio_personalizado);
+          sedeInicial.precioInternetCustom = (precioBase * 0.6).toString(); // 60% Internet
+          sedeInicial.precioTelevisionCustom = (precioBase * 0.4).toString(); // 40% TV
+        }
       }
     }
-    
-    if (formData.planTelevisionId) {
-      sedeInicial.planTelevisionId = parseInt(formData.planTelevisionId);
-      if (formData.precioTelevisionCustom) {
-        sedeInicial.precioPersonalizado = true;
-        sedeInicial.precioTelevisionCustom = formData.precioTelevisionCustom;
-      }
-    }
-  } else {
-    // MODO PLAN ÚNICO
-    const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
-    if (!planSeleccionado) {
-      throw new Error('Plan seleccionado no encontrado');
+
+    // ✅ VALIDAR QUE LA SEDE TENGA AL MENOS UN SERVICIO
+    if (!sedeInicial.planInternetId && !sedeInicial.planTelevisionId) {
+      throw new Error('Debe seleccionar al menos un servicio (Internet o Televisión)');
     }
 
-    const calculos = recalcularPreciosEnTiempoReal();
-
-    if (planSeleccionado.tipo === 'internet') {
-      sedeInicial.planInternetId = parseInt(formData.plan_id);
-      if (formData.precio_personalizado) {
-        sedeInicial.precioPersonalizado = true;
-        sedeInicial.precioInternetCustom = calculos?.precio_base?.toString() || formData.precio_personalizado;
+    // ✅ ESTRUCTURA FINAL DE DATOS - USAR 'servicios' NO 'sedes'
+    const datosCompletos = {
+      cliente: datosCliente,
+      servicios: [sedeInicial], // ✅ CORRECCIÓN: Usar 'servicios' como espera el backend
+      opciones: {
+        generar_documentos: formData.generar_documentos,
+        enviar_bienvenida: formData.enviar_bienvenida,
+        programar_instalacion: formData.programar_instalacion
       }
-    } else if (planSeleccionado.tipo === 'television') {
-      sedeInicial.planTelevisionId = parseInt(formData.plan_id);
-      if (formData.precio_personalizado) {
-        sedeInicial.precioPersonalizado = true;
-        sedeInicial.precioTelevisionCustom = calculos?.precio_base?.toString() || formData.precio_personalizado;
-      }
-    } else if (planSeleccionado.tipo === 'combo') {
-      sedeInicial.planInternetId = parseInt(formData.plan_id);
-      sedeInicial.planTelevisionId = parseInt(formData.plan_id);
-      
-      if (formData.precio_personalizado) {
-        sedeInicial.precioPersonalizado = true;
-        const precioBase = calculos?.precio_base || parseFloat(formData.precio_personalizado);
-        sedeInicial.precioInternetCustom = (precioBase * 0.6).toString(); // 60% Internet
-        sedeInicial.precioTelevisionCustom = (precioBase * 0.4).toString(); // 40% TV
-      }
-    }
-  }
+    };
 
-  // ✅ VALIDAR QUE LA SEDE TENGA AL MENOS UN SERVICIO
-  if (!sedeInicial.planInternetId && !sedeInicial.planTelevisionId) {
-    throw new Error('Debe seleccionar al menos un servicio (Internet o Televisión)');
-  }
+    console.log('🚀 Datos enviados al servidor:', datosCompletos);
+    console.log('📍 Verificación de sede:', {
+      direccion_servicio: sedeInicial.direccion_servicio,
+      internet: !!sedeInicial.planInternetId,
+      television: !!sedeInicial.planTelevisionId,
+      tipo_contrato: sedeInicial.tipoContrato
+    });
 
-  // ✅ ESTRUCTURA FINAL DE DATOS - USAR 'servicios' NO 'sedes'
-  const datosCompletos = {
-    cliente: datosCliente,
-    servicios: [sedeInicial], // ✅ CORRECCIÓN: Usar 'servicios' como espera el backend
-    opciones: {
-      generar_documentos: formData.generar_documentos,
-      enviar_bienvenida: formData.enviar_bienvenida,
-      programar_instalacion: formData.programar_instalacion
-    }
-  };
+    // LLAMAR AL SERVICIO
+    const response = await clienteCompletoService.createClienteCompleto(datosCompletos);
 
-  console.log('🚀 Datos enviados al servidor:', datosCompletos);
-  console.log('📍 Verificación de sede:', {
-    direccion_servicio: sedeInicial.direccion_servicio,
-    internet: !!sedeInicial.planInternetId,
-    television: !!sedeInicial.planTelevisionId,
-    tipo_contrato: sedeInicial.tipoContrato
-  });
+    if (response.success) {
+      console.log('✅ Cliente creado exitosamente:', response.data);
 
-  // LLAMAR AL SERVICIO
-  const response = await clienteCompletoService.createClienteCompleto(datosCompletos);
-
-  if (response.success) {
-    console.log('✅ Cliente creado exitosamente:', response.data);
-
-    const resumen = response.data.resumen || response.data;
-    const mensaje = `Cliente creado exitosamente:
+      const resumen = response.data.resumen || response.data;
+      const mensaje = `Cliente creado exitosamente:
 • ${resumen.total_sedes || 1} sede(s)
 • ${resumen.total_contratos || 1} contrato(s)
 • ${resumen.total_facturas || 1} factura(s)
 • ${resumen.total_servicios || 1} servicio(s)`;
 
-    if (window.showNotification) {
-      window.showNotification('success', mensaje);
-    } else {
-      alert(mensaje);
-    }
+      if (window.showNotification) {
+        window.showNotification('success', mensaje);
+      } else {
+        alert(mensaje);
+      }
 
-    onSave(response.data);
-  }
-};
+      onSave(response.data);
+    }
+  };
 
   const actualizarCliente = async () => {
     const datosActualizacion = {
@@ -659,8 +766,8 @@ const crearClienteConSede = async () => {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white p-6 rounded-lg">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p>Cargando formulario...</p>
+          <Loader2 className="w-4 h-4 animate-spin" />
+          {client ? 'Actualizando...' : modoAgregarServicio ? 'Agregando...' : 'Creando...'}
         </div>
       </div>
     );
@@ -678,10 +785,12 @@ const crearClienteConSede = async () => {
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
-                {client ? 'Editar Cliente' : 'Nuevo Cliente'}
+                {client ? 'Editar Cliente' : modoAgregarServicio ? 'Agregar Servicio' : 'Nuevo Cliente'}
               </h2>
               <p className="text-sm text-gray-500">
-                {client ? 'Actualizar información del cliente' : 'Crear cliente con servicio automático'}
+                {client ? 'Actualizar información del cliente' :
+                  modoAgregarServicio ? `Agregar nuevo servicio a ${clienteSeleccionado?.nombre}` :
+                    'Crear cliente con servicio automático'}
               </p>
             </div>
           </div>
@@ -723,7 +832,8 @@ const crearClienteConSede = async () => {
                   <select
                     value={formData.tipo_documento}
                     onChange={(e) => handleInputChange('tipo_documento', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={modoAgregarServicio}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   >
                     <option value="cedula">Cédula</option>
                     <option value="nit">NIT</option>
@@ -739,7 +849,8 @@ const crearClienteConSede = async () => {
                     type="text"
                     value={formData.identificacion}
                     onChange={(e) => handleInputChange('identificacion', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.identificacion ? 'border-red-300' : 'border-gray-300'
+                    disabled={modoAgregarServicio}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${errors.identificacion ? 'border-red-500' : 'border-gray-300'
                       }`}
                     placeholder="1234567890"
                   />
@@ -747,6 +858,33 @@ const crearClienteConSede = async () => {
                     <p className="mt-1 text-sm text-red-600">{errors.identificacion}</p>
                   )}
                 </div>
+                {verificacionCliente && !client && (
+                  <AlertaClienteExistente
+                    verificacion={verificacionCliente}
+                    onContinuarConCliente={manejarContinuarConClienteExistente}
+                    onCrearNuevo={manejarCrearNuevo}
+                    onVerHistorial={manejarVerHistorial}
+                  />
+                )}
+
+                {modoAgregarServicio && clienteSeleccionado && (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <User className="h-5 w-5 text-blue-600" />
+                      <h4 className="font-medium text-blue-900">Cliente seleccionado</h4>
+                    </div>
+                    <p className="text-sm text-blue-800">
+                      Se agregará el nuevo servicio a: <span className="font-medium">{clienteSeleccionado.nombre}</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={manejarCrearNuevo}
+                      className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Cambiar a crear cliente nuevo
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Nombre completo */}
@@ -758,7 +896,8 @@ const crearClienteConSede = async () => {
                   type="text"
                   value={formData.nombre}
                   onChange={(e) => handleInputChange('nombre', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.nombre ? 'border-red-300' : 'border-gray-300'
+                  disabled={modoAgregarServicio}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100${errors.nombre ? 'border-red-300' : 'border-gray-300 '
                     }`}
                   placeholder="Juan Pérez López"
                 />
@@ -777,7 +916,8 @@ const crearClienteConSede = async () => {
                     type="email"
                     value={formData.email}
                     onChange={(e) => handleInputChange('email', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-300' : 'border-gray-300'
+                    disabled={modoAgregarServicio}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${errors.email ? 'border-red-300' : 'border-gray-300 '
                       }`}
                     placeholder="cliente@email.com"
                   />
@@ -793,7 +933,8 @@ const crearClienteConSede = async () => {
                     type="tel"
                     value={formData.telefono}
                     onChange={(e) => handleInputChange('telefono', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.telefono ? 'border-red-300' : 'border-gray-300'
+                    disabled={modoAgregarServicio}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${errors.telefono ? 'border-red-300' : 'border-gray-300'
                       }`}
                     placeholder="3001234567"
                   />
@@ -811,7 +952,8 @@ const crearClienteConSede = async () => {
                   type="tel"
                   value={formData.telefono_fijo}
                   onChange={(e) => handleInputChange('telefono_fijo', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={modoAgregarServicio}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   placeholder="6012345678"
                 />
               </div>
@@ -832,7 +974,8 @@ const crearClienteConSede = async () => {
                       type="text"
                       value={formData.direccion}
                       onChange={(e) => handleInputChange('direccion', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.direccion ? 'border-red-300' : 'border-gray-300'
+                      disabled={modoAgregarServicio}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${errors.direccion ? 'border-red-500' : 'border-gray-300'
                         }`}
                       placeholder="Calle 123 # 45-67"
                     />
@@ -850,7 +993,8 @@ const crearClienteConSede = async () => {
                         type="text"
                         value={formData.barrio}
                         onChange={(e) => handleInputChange('barrio', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={modoAgregarServicio}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                         placeholder="Centro"
                       />
                     </div>
@@ -861,7 +1005,8 @@ const crearClienteConSede = async () => {
                       <select
                         value={formData.estrato}
                         onChange={(e) => handleInputChange('estrato', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={modoAgregarServicio}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       >
                         <option value="1">Estrato 1</option>
                         <option value="2">Estrato 2</option>
@@ -881,7 +1026,8 @@ const crearClienteConSede = async () => {
                       <select
                         value={formData.ciudad_id}
                         onChange={(e) => handleInputChange('ciudad_id', e.target.value)}
-                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.ciudad_id ? 'border-red-300' : 'border-gray-300'
+                        disabled={modoAgregarServicio}
+                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${errors.ciudad_id ? 'border-red-500' : 'border-gray-300'
                           }`}
                       >
                         <option value="">Seleccionar ciudad</option>
@@ -902,7 +1048,8 @@ const crearClienteConSede = async () => {
                       <select
                         value={formData.sector_id}
                         onChange={(e) => handleInputChange('sector_id', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={modoAgregarServicio}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       >
                         <option value="">Seleccionar sector</option>
                         {sectores.map(sector => (
@@ -1014,7 +1161,7 @@ const crearClienteConSede = async () => {
                       ))}
                     </select>
                   </div>
-                  
+
                   {errors.servicios_separados && (
                     <p className="mt-1 text-sm text-red-600">{errors.servicios_separados}</p>
                   )}
@@ -1071,8 +1218,9 @@ const crearClienteConSede = async () => {
                 <textarea
                   value={formData.observaciones_servicio}
                   onChange={(e) => handleInputChange('observaciones_servicio', e.target.value)}
+                  disabled={modoAgregarServicio}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   placeholder="Observaciones especiales sobre el servicio..."
                 />
               </div>
@@ -1171,7 +1319,9 @@ const crearClienteConSede = async () => {
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  {client ? 'Actualizar Cliente' : 'Crear Cliente Completo'}
+                  {client ? 'Actualizar Cliente' :
+                    modoAgregarServicio ? 'Agregar Servicio' :
+                      'Crear Cliente Completo'}
                 </>
               )}
             </button>
