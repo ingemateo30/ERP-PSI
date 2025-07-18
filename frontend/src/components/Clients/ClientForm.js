@@ -1,11 +1,11 @@
 // frontend/src/components/Clients/ClientForm.js
-// Formulario mejorado de cliente con asignación de servicios
+// Formulario completo corregido con selector de permanencia
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, Save, Loader2, User, MapPin, Phone, Mail,
-  CreditCard, Building, Wifi, Tv, AlertCircle, Check, // ← Agregar Tv aquí
-  Calendar, DollarSign, Settings, Clock
+  CreditCard, Building, Wifi, Tv, AlertCircle, Check,
+  Calendar, DollarSign, Settings, Clock, FileText
 } from 'lucide-react';
 import { clientService } from '../../services/clientService';
 import configService, { ConfigService } from '../../services/configService';
@@ -18,10 +18,12 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   const [planesDisponibles, setPlanesDisponibles] = useState([]);
   const [sectores, setSectores] = useState([]);
   const [ciudades, setCiudades] = useState([]);
-   const planesInternet = planesDisponibles.filter(p => p.tipo === 'internet');
-    const planesTelevision = planesDisponibles.filter(p => p.tipo === 'television');
+  
+  // Filtrar planes por tipo
+  const planesInternet = planesDisponibles.filter(p => p.tipo === 'internet');
+  const planesTelevision = planesDisponibles.filter(p => p.tipo === 'television');
 
-  // Estado del formulario
+  // ✅ Estado del formulario CORREGIDO
   const [formData, setFormData] = useState({
     // Datos básicos del cliente
     identificacion: '',
@@ -39,7 +41,6 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
     // Datos del servicio a asignar
     plan_id: '',
-    tipo_permanencia: 'sin_permanencia',
     precio_personalizado: '',
     fecha_activacion: new Date().toISOString().split('T')[0],
     observaciones_servicio: '',
@@ -49,16 +50,181 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     precioTelevisionCustom: '',
     usarServiciosSeparados: false,
 
+    // ✅ CORRECCIÓN PROBLEMA 3: Campos de permanencia
+    tipo_permanencia: 'sin_permanencia', // REQUERIDO
+    meses_permanencia: 6, // REQUERIDO
+    mostrar_detalle_costos: true, // MOSTRAR CALCULADORA
+
     // Configuración adicional
     generar_documentos: true,
     enviar_bienvenida: true,
     programar_instalacion: true
   });
 
+  // ✅ FUNCIÓN PARA CALCULAR COSTO EN TIEMPO REAL - CORREGIDA
+  const calcularCostoInstalacion = useCallback(() => {
+  let serviciosCount = 0;
+  
+  if (formData.usarServiciosSeparados) {
+    if (formData.planInternetId) serviciosCount++;
+    if (formData.planTelevisionId) serviciosCount++;
+  } else if (formData.plan_id) {
+    serviciosCount = 1;
+  }
+  
+  if (serviciosCount === 0) return { costo: 0, servicios: 0 };
+  
+  // ✅ CORRECCIÓN: UNA SOLA INSTALACIÓN independientemente de la cantidad de servicios
+  const costoInstalacion = formData.tipo_permanencia === 'sin_permanencia' ? 150000 : 50000;
+  
+  return {
+    costo: costoInstalacion, // ✅ Siempre el mismo costo
+    servicios: serviciosCount,
+    costo_por_instalacion: costoInstalacion, // ✅ Cambio de nombre
+    incluye_iva: formData.tipo_permanencia === 'sin_permanencia',
+    es_instalacion_unica: true // ✅ Flag para mostrar en UI
+  };
+}, [formData.tipo_permanencia, formData.planInternetId, formData.planTelevisionId, formData.plan_id, formData.usarServiciosSeparados]);
+
+// ✅ COMPONENTE SELECTOR DE PERMANENCIA CORREGIDO
+const SelectorPermanenciaCompleto = () => {
+  const calculoCostos = calcularCostoInstalacion();
+  
+  return (
+    <div className="border-t border-gray-200 pt-6">
+      <h4 className="text-md font-medium text-gray-900 mb-4 flex items-center gap-2">
+        <FileText className="w-4 h-4" />
+        Tipo de Permanencia
+      </h4>
+      
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Seleccione el tipo de permanencia <span className="text-red-500">*</span>
+          </label>
+          <div className="grid grid-cols-1 gap-3">
+            {/* Opción SIN permanencia */}
+            <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              formData.tipo_permanencia === 'sin_permanencia' 
+                ? 'border-blue-500 bg-blue-50' 
+                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+            }`}>
+              <input
+                type="radio"
+                name="tipo_permanencia"
+                value="sin_permanencia"
+                checked={formData.tipo_permanencia === 'sin_permanencia'}
+                onChange={(e) => handleInputChange('tipo_permanencia', e.target.value)}
+                className="mt-1 mr-3 text-blue-600"
+              />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-blue-700">Sin Permanencia</div>
+                  <div className="text-lg font-bold text-blue-700">$150,000</div>
+                </div>
+                <div className="text-sm text-blue-600 mb-1">Una sola instalación - IVA incluido</div>
+                <div className="text-xs text-gray-600">
+                  ✓ Sin compromisos de tiempo<br/>
+                  ✓ Puede cancelar cuando desee<br/>
+                  ✓ Una instalación para todos los servicios
+                </div>
+              </div>
+            </label>
+            
+            {/* Opción CON permanencia */}
+            <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              formData.tipo_permanencia === 'con_permanencia' 
+                ? 'border-green-500 bg-green-50' 
+                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+            }`}>
+              <input
+                type="radio"
+                name="tipo_permanencia"
+                value="con_permanencia"
+                checked={formData.tipo_permanencia === 'con_permanencia'}
+                onChange={(e) => handleInputChange('tipo_permanencia', e.target.value)}
+                className="mt-1 mr-3 text-green-600"
+              />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-green-700">Con Permanencia (6 meses)</div>
+                  <div className="text-lg font-bold text-green-700">$50,000</div>
+                </div>
+                <div className="text-sm text-green-600 mb-1">Una sola instalación - Ahorra $100,000</div>
+                <div className="text-xs text-gray-600">
+                  ✓ Compromiso mínimo de 6 meses<br/>
+                  ✓ Precio de instalación reducido<br/>
+                  ✓ Una instalación para todos los servicios
+                </div>
+              </div>
+            </label>
+          </div>
+          {errors.tipo_permanencia && (
+            <p className="mt-2 text-sm text-red-600">{errors.tipo_permanencia}</p>
+          )}
+        </div>
+
+        {/* Calculadora de costo CORREGIDA */}
+        {calculoCostos.servicios > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-lg border border-blue-200">
+            <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <DollarSign className="w-4 h-4" />
+              Resumen de Costos de Instalación
+            </h5>
+            
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Servicios a instalar:</span>
+                <span className="font-medium">{calculoCostos.servicios}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Tipo de instalación:</span>
+                <span className="font-medium text-green-600">✓ Instalación única</span>
+              </div>
+              <div className="border-t border-gray-300 pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-gray-800">COSTO TOTAL INSTALACIÓN:</span>
+                  <span className="text-xl font-bold text-green-600">
+                    ${calculoCostos.costo.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="text-xs text-gray-500 mt-2">
+                ✓ {calculoCostos.incluye_iva && 'IVA incluido'}<br/>
+                ✓ Una sola visita de instalación<br/>
+                {formData.tipo_permanencia === 'con_permanencia' && '✓ Permanencia mínima de 6 meses'}
+              </div>
+            </div>
+
+            {/* Info adicional */}
+            <div className="mt-3 p-2 bg-blue-100 rounded border border-blue-300">
+              <div className="text-xs text-blue-700 font-medium">
+                💡 {calculoCostos.servicios > 1 
+                  ? `Internet y TV se instalan en la misma visita por $${calculoCostos.costo.toLocaleString()}` 
+                  : `Una instalación de $${calculoCostos.costo.toLocaleString()}`
+                }
+              </div>
+            </div>
+
+            {/* Comparación de ahorro */}
+            {formData.tipo_permanencia === 'con_permanencia' && (
+              <div className="mt-2 p-2 bg-green-100 rounded border border-green-300">
+                <div className="text-xs text-green-700 font-medium">
+                  💰 Ahorro total: $100,000 vs sin permanencia
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
   // Cargar datos iniciales
   useEffect(() => {
     cargarDatosIniciales();
-
     if (client) {
       cargarDatosCliente();
     }
@@ -76,11 +242,11 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
     // Determinar si aplica IVA según tipo y estrato
     if (planSeleccionado.tipo === 'internet') {
-      aplicaIva = estratoNum >= 4;  // ✅ CORRECTO
+      aplicaIva = estratoNum >= 4;
     } else if (planSeleccionado.tipo === 'television') {
       aplicaIva = true;
     } else if (planSeleccionado.tipo === 'combo') {
-      aplicaIva = estratoNum >= 4;  // ✅ CORRECTO
+      aplicaIva = estratoNum >= 4;
     }
 
     if (aplicaIva) {
@@ -131,7 +297,6 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     cargarSectoresPorCiudad();
   }, [formData.ciudad_id]);
 
-
   const calcularFechaVencimiento = (fechaInicio, meses) => {
     if (!fechaInicio || !meses) return '';
 
@@ -144,6 +309,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       day: 'numeric'
     });
   };
+
   const cargarDatosIniciales = async () => {
     try {
       setLoading(true);
@@ -162,11 +328,8 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
       // Manejar la respuesta de planes
       const planesSinCombos = (planesResponse?.data || []).filter(plan => plan.tipo !== 'combo');
-
       const sectores = sectoresResponse?.data || [];
       const ciudades = ciudadesResponse?.data || [];
-
-
 
       setPlanesDisponibles(planesSinCombos);
       setSectores(sectores);
@@ -241,94 +404,97 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     }
   };
 
+  // ✅ VALIDACIÓN DEL FORMULARIO CORREGIDA
   const validarFormulario = () => {
-  const nuevosErrores = {};
+    const nuevosErrores = {};
 
-  // Validaciones básicas del cliente
-  if (!formData.identificacion.trim()) {
-    nuevosErrores.identificacion = 'La identificación es requerida';
-  }
+    // Validaciones básicas del cliente
+    if (!formData.identificacion.trim()) {
+      nuevosErrores.identificacion = 'La identificación es requerida';
+    }
 
-  if (!formData.nombre.trim()) {
-    nuevosErrores.nombre = 'El nombre es requerido';
-  }
+    if (!formData.nombre.trim()) {
+      nuevosErrores.nombre = 'El nombre es requerido';
+    }
 
-  if (!formData.email.trim()) {
-    nuevosErrores.email = 'El email es requerido';
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-    nuevosErrores.email = 'El email no tiene un formato válido';
-  }
+    if (!formData.email.trim()) {
+      nuevosErrores.email = 'El email es requerido';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      nuevosErrores.email = 'El email no tiene un formato válido';
+    }
 
-  if (!formData.telefono.trim()) {
-    nuevosErrores.telefono = 'El teléfono es requerido';
-  }
+    if (!formData.telefono.trim()) {
+      nuevosErrores.telefono = 'El teléfono es requerido';
+    }
 
-  if (!formData.direccion.trim()) {
-    nuevosErrores.direccion = 'La dirección es requerida';
-  }
+    if (!formData.direccion.trim()) {
+      nuevosErrores.direccion = 'La dirección es requerida';
+    }
 
-  if (!formData.ciudad_id) {
-    nuevosErrores.ciudad_id = 'La ciudad es requerida';
-  }
+    if (!formData.ciudad_id) {
+      nuevosErrores.ciudad_id = 'La ciudad es requerida';
+    }
 
-  // ✅ VALIDACIÓN DE SERVICIOS CORREGIDA
-  if (!client) {
-    if (formData.usarServiciosSeparados) {
-      // Si usa servicios separados, debe tener al menos uno seleccionado
-      if (!formData.planInternetId && !formData.planTelevisionId) {
-        nuevosErrores.servicios_separados = 'Debe seleccionar al menos un servicio (Internet o Televisión)';
-      }
-    } else {
-      // Si usa plan único, debe seleccionar un plan
-      if (!formData.plan_id) {
-        nuevosErrores.plan_id = 'Debe seleccionar un plan de servicio';
-      }
-      
-      // Validar permanencia si el plan la requiere
-      if (formData.plan_id) {
-        const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
-        if (planSeleccionado?.aplica_permanencia && !formData.tipo_permanencia) {
-          nuevosErrores.tipo_permanencia = 'Debe seleccionar el tipo de permanencia';
+    // ✅ VALIDACIÓN DE SERVICIOS Y PERMANENCIA CORREGIDA
+    if (!client) {
+      if (formData.usarServiciosSeparados) {
+        // Si usa servicios separados, debe tener al menos uno seleccionado
+        if (!formData.planInternetId && !formData.planTelevisionId) {
+          nuevosErrores.servicios_separados = 'Debe seleccionar al menos un servicio (Internet o Televisión)';
+        }
+      } else {
+        // Si usa plan único, debe seleccionar un plan
+        if (!formData.plan_id) {
+          nuevosErrores.plan_id = 'Debe seleccionar un plan de servicio';
         }
       }
-    }
-  }
-
-  setErrors(nuevosErrores);
-  return Object.keys(nuevosErrores).length === 0;
-};
-
- const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  if (!validarFormulario()) {
-    return;
-  }
-
-  try {
-    setSaving(true);
-    setErrors({});
-
-    if (client) {
-      // MODO EDICIÓN (mantener igual)
-      await actualizarCliente();
-    } else {
-      // MODO CREACIÓN - CORREGIR AQUÍ: Usar crearClienteConSede (no crearClienteCompleto)
-      await crearClienteConSede(); // ✅ Esta función ya existe y está bien
+      
+      // ✅ SIEMPRE VALIDAR TIPO DE PERMANENCIA
+      if (!formData.tipo_permanencia) {
+        nuevosErrores.tipo_permanencia = 'Debe seleccionar el tipo de permanencia';
+      }
     }
 
-  } catch (error) {
-    console.error('❌ Error en formulario:', error);
-    setErrors({
-      general: error.message || 'Error al procesar la información'
-    });
-  } finally {
-    setSaving(false);
-  }
-};
+    setErrors(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
+  };
 
-  const crearClienteConSede = async () => {
- const datosCliente = {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validarFormulario()) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setErrors({});
+
+      if (client) {
+        // MODO EDICIÓN
+        await actualizarCliente();
+      } else {
+        // MODO CREACIÓN
+        await crearClienteConSede();
+      }
+
+    } catch (error) {
+      console.error('❌ Error en formulario:', error);
+      setErrors({
+        general: error.message || 'Error al procesar la información'
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+ // ============================================================
+// CORRECCIÓN DEL ERROR: ClientForm.js - crearClienteConSede
+// ============================================================
+
+// FUNCIÓN CORREGIDA - crearClienteConSede en ClientForm.js
+const crearClienteConSede = async () => {
+  const datosCliente = {
     identificacion: formData.identificacion,
     tipo_documento: formData.tipo_documento,
     nombre: formData.nombre,
@@ -344,11 +510,11 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     fecha_inicio_contrato: formData.fecha_activacion
   };
 
-  // 2. PREPARAR SEDE INICIAL CON SERVICIOS
+  // ✅ PREPARAR SEDE INICIAL CON SERVICIOS Y PERMANENCIA CORREGIDA
   const sedeInicial = {
     id: Date.now(), // ID temporal único
     nombre_sede: 'Sede Principal',
-    direccion_servicio: formData.direccion,
+    direccion_servicio: formData.direccion, // ✅ CAMPO REQUERIDO
     contacto_sede: formData.nombre,
     telefono_sede: formData.telefono,
     planInternetId: null,
@@ -362,7 +528,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     observaciones: formData.observaciones_servicio || ''
   };
 
-  // 3. ✅ ASIGNAR SERVICIOS SEGÚN EL MODO SELECCIONADO
+  // ✅ ASIGNAR SERVICIOS SEGÚN EL MODO SELECCIONADO
   if (formData.usarServiciosSeparados) {
     // MODO SERVICIOS SEPARADOS
     if (formData.planInternetId) {
@@ -393,13 +559,13 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       sedeInicial.planInternetId = parseInt(formData.plan_id);
       if (formData.precio_personalizado) {
         sedeInicial.precioPersonalizado = true;
-        sedeInicial.precioInternetCustom = calculos.precio_base.toString();
+        sedeInicial.precioInternetCustom = calculos?.precio_base?.toString() || formData.precio_personalizado;
       }
     } else if (planSeleccionado.tipo === 'television') {
       sedeInicial.planTelevisionId = parseInt(formData.plan_id);
       if (formData.precio_personalizado) {
         sedeInicial.precioPersonalizado = true;
-        sedeInicial.precioTelevisionCustom = calculos.precio_base.toString();
+        sedeInicial.precioTelevisionCustom = calculos?.precio_base?.toString() || formData.precio_personalizado;
       }
     } else if (planSeleccionado.tipo === 'combo') {
       sedeInicial.planInternetId = parseInt(formData.plan_id);
@@ -407,17 +573,22 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       
       if (formData.precio_personalizado) {
         sedeInicial.precioPersonalizado = true;
-        const precioBase = calculos.precio_base;
+        const precioBase = calculos?.precio_base || parseFloat(formData.precio_personalizado);
         sedeInicial.precioInternetCustom = (precioBase * 0.6).toString(); // 60% Internet
         sedeInicial.precioTelevisionCustom = (precioBase * 0.4).toString(); // 40% TV
       }
     }
   }
 
-  // 4. ESTRUCTURA FINAL DE DATOS
+  // ✅ VALIDAR QUE LA SEDE TENGA AL MENOS UN SERVICIO
+  if (!sedeInicial.planInternetId && !sedeInicial.planTelevisionId) {
+    throw new Error('Debe seleccionar al menos un servicio (Internet o Televisión)');
+  }
+
+  // ✅ ESTRUCTURA FINAL DE DATOS - USAR 'servicios' NO 'sedes'
   const datosCompletos = {
     cliente: datosCliente,
-    servicios: [sedeInicial],
+    servicios: [sedeInicial], // ✅ CORRECCIÓN: Usar 'servicios' como espera el backend
     opciones: {
       generar_documentos: formData.generar_documentos,
       enviar_bienvenida: formData.enviar_bienvenida,
@@ -425,9 +596,15 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     }
   };
 
-  console.log('🚀 Creando cliente con sede inicial:', datosCompletos);
+  console.log('🚀 Datos enviados al servidor:', datosCompletos);
+  console.log('📍 Verificación de sede:', {
+    direccion_servicio: sedeInicial.direccion_servicio,
+    internet: !!sedeInicial.planInternetId,
+    television: !!sedeInicial.planTelevisionId,
+    tipo_contrato: sedeInicial.tipoContrato
+  });
 
-  // 5. LLAMAR AL SERVICIO
+  // LLAMAR AL SERVICIO
   const response = await clienteCompletoService.createClienteCompleto(datosCompletos);
 
   if (response.success) {
@@ -449,48 +626,6 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     onSave(response.data);
   }
 };
-  const crearClienteCompleto = async () => {
-    const calculos = recalcularPreciosEnTiempoReal();
-    // Preparar datos para crear cliente completo
-    const datosCompletos = {
-      cliente: {
-        identificacion: formData.identificacion,
-        tipo_documento: formData.tipo_documento,
-        nombre: formData.nombre,
-        email: formData.email,
-        telefono: formData.telefono,
-        telefono_fijo: formData.telefono_fijo,
-        direccion: formData.direccion,
-        barrio: formData.barrio,
-        estrato: formData.estrato,
-        ciudad_id: formData.ciudad_id,
-        sector_id: formData.sector_id,
-        observaciones: formData.observaciones,
-        fecha_inicio_contrato: formData.fecha_activacion
-      },
-      servicio: {
-        plan_id: parseInt(formData.plan_id),
-        precio_personalizado: calculos.precio_final,  // ✅ Precio CON IVA incluido
-        precio_sin_iva: calculos.precio_base,         // ✅ Precio base sin IVA
-        valor_iva: calculos.valor_iva,                // ✅ Valor del IVA
-        aplica_iva: calculos.aplica_iva,              // ✅ Si aplica IVA
-        fecha_activacion: formData.fecha_activacion,
-        observaciones: formData.observaciones_servicio
-      },
-      opciones: {
-        generar_documentos: formData.generar_documentos,
-        enviar_bienvenida: formData.enviar_bienvenida,
-        programar_instalacion: formData.programar_instalacion
-      }
-    };
-
-    const response = await clienteCompletoService.createClienteCompleto(datosCompletos);
-
-    // Mostrar resumen de lo que se generó
-    if (response.documentos_generados) {
-      mostrarResumenCreacion(response);
-    }
-  };
 
   const actualizarCliente = async () => {
     const datosActualizacion = {
@@ -518,122 +653,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     }
   };
 
-  const actualizarServicioCliente = async () => {
-    const datosServicio = {
-      plan_id: formData.plan_id,
-      precio_personalizado: formData.precio_personalizado || null,
-      observaciones: formData.observaciones_servicio
-    };
-
-    await clientService.updateClientService(client.id, datosServicio);
-  };
-
-  const verificarCalculosIVA = (estrato, tipoServicio, precioBase) => {
-    console.log('🔍 Verificando cálculo IVA:');
-    console.log(`  - Estrato: ${estrato}`);
-    console.log(`  - Tipo: ${tipoServicio}`);
-    console.log(`  - Precio base: ${precioBase}`);
-
-    let aplicaIva = false;
-
-    if (tipoServicio === 'internet' || tipoServicio === 'combo') {
-      aplicaIva = parseInt(estrato) >= 4;
-    } else if (tipoServicio === 'television') {
-      aplicaIva = true;
-    }
-
-    const valorIva = aplicaIva ? Math.round(precioBase * 0.19) : 0;
-    const precioFinal = precioBase + valorIva;
-
-    console.log(`  - Aplica IVA: ${aplicaIva}`);
-    console.log(`  - Valor IVA: ${valorIva}`);
-    console.log(`  - Precio final: ${precioFinal}`);
-
-    return { aplicaIva, valorIva, precioFinal };
-  };
-  const mostrarResumenCreacion = (response) => {
-    const documentos = response.documentos_generados;
-    let mensaje = `Cliente creado exitosamente.\n\n`;
-
-    if (documentos.contrato) {
-      mensaje += `✅ Contrato generado: ${documentos.contrato.numero}\n`;
-    }
-
-    if (documentos.orden_instalacion) {
-      mensaje += `✅ Orden de instalación: ${documentos.orden_instalacion.numero}\n`;
-    }
-
-    if (documentos.factura) {
-      mensaje += `✅ Primera factura: ${documentos.factura.numero_factura}\n`;
-      mensaje += `   Total: $${documentos.factura.total.toLocaleString()}\n`;
-    }
-
-    if (response.email_enviado) {
-      mensaje += `✅ Email de bienvenida enviado\n`;
-    }
-
-    alert(mensaje);
-  };
-  
-
   const planSeleccionado = planesDisponibles.find(p => p.id == formData.plan_id);
-
-  const verificarRequierePermanencia = () => {
-  if (formData.usarServiciosSeparados) {
-    // Verificar si alguno de los planes seleccionados requiere permanencia
-    const planInternet = formData.planInternetId ? 
-      planesDisponibles.find(p => p.id === parseInt(formData.planInternetId)) : null;
-    const planTV = formData.planTelevisionId ? 
-      planesDisponibles.find(p => p.id === parseInt(formData.planTelevisionId)) : null;
-    
-    return (planInternet?.aplica_permanencia) || (planTV?.aplica_permanencia);
-  } else {
-    // Verificar el plan único
-    const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
-    return planSeleccionado?.aplica_permanencia;
-  }
-};
-
-const obtenerCostoInstalacion = () => {
-  let costoConPermanencia = 50000;
-  let costoSinPermanencia = 150000;
-
-  if (formData.usarServiciosSeparados) {
-    // Para servicios separados, usar el costo del plan más restrictivo
-    const planInternet = formData.planInternetId ? 
-      planesDisponibles.find(p => p.id === parseInt(formData.planInternetId)) : null;
-    const planTV = formData.planTelevisionId ? 
-      planesDisponibles.find(p => p.id === parseInt(formData.planTelevisionId)) : null;
-    
-    // Tomar el costo más alto si hay diferencias entre planes
-    if (planInternet?.costo_instalacion_permanencia) {
-      costoConPermanencia = Math.max(costoConPermanencia, planInternet.costo_instalacion_permanencia);
-    }
-    if (planTV?.costo_instalacion_permanencia) {
-      costoConPermanencia = Math.max(costoConPermanencia, planTV.costo_instalacion_permanencia);
-    }
-    if (planInternet?.costo_instalacion_sin_permanencia) {
-      costoSinPermanencia = Math.max(costoSinPermanencia, planInternet.costo_instalacion_sin_permanencia);
-    }
-    if (planTV?.costo_instalacion_sin_permanencia) {
-      costoSinPermanencia = Math.max(costoSinPermanencia, planTV.costo_instalacion_sin_permanencia);
-    }
-  } else {
-    // Para plan único
-    const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
-    if (planSeleccionado) {
-      costoConPermanencia = planSeleccionado.costo_instalacion_permanencia || 50000;
-      costoSinPermanencia = planSeleccionado.costo_instalacion_sin_permanencia || 150000;
-    }
-  }
-
-  return {
-    con_permanencia: costoConPermanencia,
-    sin_permanencia: costoSinPermanencia
-  };
-};
-
-
 
   if (loading) {
     return (
@@ -994,73 +1014,15 @@ const obtenerCostoInstalacion = () => {
                       ))}
                     </select>
                   </div>
+                  
+                  {errors.servicios_separados && (
+                    <p className="mt-1 text-sm text-red-600">{errors.servicios_separados}</p>
+                  )}
                 </div>
               )}
-              {formData.plan_id && planesDisponibles.find(p => p.id === parseInt(formData.plan_id))?.aplica_permanencia && (
-                <div className="border border-orange-200 bg-orange-50 p-4 rounded-lg">
-                  <h4 className="text-md font-medium text-gray-900 flex items-center gap-2 mb-4">
-                    <Clock className="w-4 h-4" />
-                    Tipo de Permanencia
-                  </h4>
 
-                  <div className="space-y-3">
-                    <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="tipo_permanencia"
-                        value="con_permanencia"
-                        checked={formData.tipo_permanencia === 'con_permanencia'}
-                        onChange={(e) => handleInputChange('tipo_permanencia', e.target.value)}
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium text-green-700">Con Permanencia (6 meses)</div>
-                        <div className="text-sm text-green-600">
-                          Instalación: $50,000 - Ahorra $100,000
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          El cliente se compromete a mantener el servicio por 6 meses mínimo
-                        </div>
-                      </div>
-                    </label>
-
-                    <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="tipo_permanencia"
-                        value="sin_permanencia"
-                        checked={formData.tipo_permanencia === 'sin_permanencia'}
-                        onChange={(e) => handleInputChange('tipo_permanencia', e.target.value)}
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium text-blue-700">Sin Permanencia</div>
-                        <div className="text-sm text-blue-600">
-                          Instalación: $150,000 - Sin compromisos
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          El cliente puede cancelar el servicio en cualquier momento
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* Mostrar cálculo del costo total */}
-                  <div className="mt-4 p-3 bg-white border border-gray-200 rounded-lg">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">Costo de instalación:</span>
-                      <span className="text-lg font-bold text-green-600">
-                        ${formData.tipo_permanencia === 'con_permanencia' ? '50,000' : '150,000'}
-                      </span>
-                    </div>
-                    {formData.tipo_permanencia === 'con_permanencia' && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        Vencimiento permanencia: {calcularFechaVencimiento(formData.fecha_activacion, 6)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* ✅ SELECTOR DE PERMANENCIA - SIEMPRE VISIBLE PARA NUEVOS CLIENTES */}
+              {!client && <SelectorPermanenciaCompleto />}
 
               {/* Precio personalizado */}
               <div>
@@ -1115,7 +1077,6 @@ const obtenerCostoInstalacion = () => {
                 />
               </div>
 
-
               {/* Opciones de creación automática (solo para cliente nuevo) */}
               {!client && (
                 <div className="border-t border-gray-200 pt-6">
@@ -1165,7 +1126,7 @@ const obtenerCostoInstalacion = () => {
                   <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-sm text-yellow-800">
                       <strong>Importante:</strong> Al crear el cliente se generará automáticamente la primera factura
-                      con el cargo de instalación ($42,016 + IVA) y el primer período de servicio según las reglas de facturación.
+                      con el costo de instalación calculado según el tipo de permanencia seleccionado.
                     </p>
                   </div>
                 </div>

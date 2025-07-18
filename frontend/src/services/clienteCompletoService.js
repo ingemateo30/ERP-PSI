@@ -256,60 +256,85 @@ class ClienteCompletoService {
   /**
    * Validar datos completos antes de enviar - MEJORADO
    */
-  validarDatosCompletos(datos) {
-    const errores = [];
+ validarDatosCompletos(datos) {
+  const errores = [];
 
-    // Validar cliente
-    if (!datos.cliente) {
-      errores.push('Datos del cliente son requeridos');
-    } else {
-      if (!datos.cliente.identificacion || !datos.cliente.identificacion.trim()) {
-        errores.push('Identificación es requerida');
-      }
-      if (!datos.cliente.nombre || !datos.cliente.nombre.trim()) {
-        errores.push('Nombre es requerido');
-      }
-      if (!datos.cliente.email || !datos.cliente.email.trim()) {
-        errores.push('Email es requerido');
-      }
-      if (!datos.cliente.telefono || !datos.cliente.telefono.trim()) {
-        errores.push('Teléfono es requerido');
-      }
+  console.log('🔍 Validando datos completos:', datos);
+
+  // Validar cliente
+  if (!datos.cliente) {
+    errores.push('Datos del cliente son requeridos');
+  } else {
+    if (!datos.cliente.identificacion || !datos.cliente.identificacion.trim()) {
+      errores.push('Identificación es requerida');
     }
-
-    // Validar servicios/sedes
-    if (!datos.servicios || !Array.isArray(datos.servicios) || datos.servicios.length === 0) {
-      errores.push('Debe agregar al menos una sede con servicios');
-    } else {
-      datos.servicios.forEach((sede, index) => {
-        const direccion = sede.direccion_servicio || sede.direccionServicio;
-        if (!direccion || !direccion.trim()) {
-          errores.push(`Sede ${index + 1}: Dirección es requerida`);
-        }
-        
-        if (!sede.planInternetId && !sede.planTelevisionId) {
-          errores.push(`Sede ${index + 1}: Debe tener al menos Internet o Televisión`);
-        }
-
-        // Validar precios personalizados si están habilitados
-        if (sede.precioPersonalizado) {
-          if (sede.planInternetId && (!sede.precioInternetCustom || isNaN(parseFloat(sede.precioInternetCustom)))) {
-            errores.push(`Sede ${index + 1}: Precio personalizado de Internet es inválido`);
-          }
-          if (sede.planTelevisionId && (!sede.precioTelevisionCustom || isNaN(parseFloat(sede.precioTelevisionCustom)))) {
-            errores.push(`Sede ${index + 1}: Precio personalizado de Televisión es inválido`);
-          }
-        }
-      });
+    if (!datos.cliente.nombre || !datos.cliente.nombre.trim()) {
+      errores.push('Nombre es requerido');
     }
-
-    if (errores.length > 0) {
-      console.error('❌ Errores de validación:', errores);
-      throw new Error(`Errores de validación:\n${errores.join('\n')}`);
+    if (!datos.cliente.email || !datos.cliente.email.trim()) {
+      errores.push('Email es requerido');
     }
-
-    console.log('✅ Datos validados correctamente');
+    if (!datos.cliente.telefono || !datos.cliente.telefono.trim()) {
+      errores.push('Teléfono es requerido');
+    }
+    if (!datos.cliente.direccion || !datos.cliente.direccion.trim()) {
+      errores.push('Dirección es requerida');
+    }
   }
+
+  // ✅ CORRECCIÓN: Validar servicios (puede venir como 'servicios' o 'sedes')
+  const servicios = datos.servicios || datos.sedes || [];
+  
+  if (!Array.isArray(servicios) || servicios.length === 0) {
+    errores.push('Debe agregar al menos una sede con servicios');
+  } else {
+    servicios.forEach((sede, index) => {
+      // Validar dirección de servicio
+      const direccion = sede.direccion_servicio || sede.direccionServicio || sede.direccion;
+      if (!direccion || !direccion.trim()) {
+        errores.push(`Sede ${index + 1}: Dirección de servicio es requerida`);
+      }
+      
+      // Validar que tenga al menos un servicio
+      if (!sede.planInternetId && !sede.planTelevisionId) {
+        errores.push(`Sede ${index + 1}: Debe tener al menos Internet o Televisión`);
+      }
+
+      // Validar IDs de planes son números
+      if (sede.planInternetId && isNaN(parseInt(sede.planInternetId))) {
+        errores.push(`Sede ${index + 1}: ID de plan de Internet debe ser un número`);
+      }
+      
+      if (sede.planTelevisionId && isNaN(parseInt(sede.planTelevisionId))) {
+        errores.push(`Sede ${index + 1}: ID de plan de Televisión debe ser un número`);
+      }
+
+      // Validar precios personalizados si están habilitados
+      if (sede.precioPersonalizado) {
+        if (sede.planInternetId && (!sede.precioInternetCustom || isNaN(parseFloat(sede.precioInternetCustom)))) {
+          errores.push(`Sede ${index + 1}: Precio personalizado de Internet es inválido`);
+        }
+        if (sede.planTelevisionId && (!sede.precioTelevisionCustom || isNaN(parseFloat(sede.precioTelevisionCustom)))) {
+          errores.push(`Sede ${index + 1}: Precio personalizado de Televisión es inválido`);
+        }
+      }
+
+      // Validar tipo de contrato
+      if (!sede.tipoContrato) {
+        errores.push(`Sede ${index + 1}: Tipo de contrato es requerido`);
+      } else if (!['con_permanencia', 'sin_permanencia'].includes(sede.tipoContrato)) {
+        errores.push(`Sede ${index + 1}: Tipo de contrato debe ser 'con_permanencia' o 'sin_permanencia'`);
+      }
+    });
+  }
+
+  if (errores.length > 0) {
+    console.error('❌ Errores de validación:', errores);
+    throw new Error(`Errores de validación: ${errores.join(', ')}`);
+  }
+
+  console.log('✅ Datos validados correctamente');
+}
 }
 
 export default new ClienteCompletoService();

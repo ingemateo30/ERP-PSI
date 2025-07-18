@@ -41,14 +41,14 @@ class ClienteCompletoService {
         console.log(`✅ Contrato generado: ${documentos.contrato.numero}`);
 
         // Generar orden de instalación
-         const instalacion = await this.generarOrdenInstalacionParaSede(
-        conexion, 
-        clienteId, 
-        serviciosDeLaSede, 
-        sedeData, 
-        contratoId, 
-        createdBy
-      );
+        const instalacion = await this.generarOrdenInstalacionParaSede(
+          conexion,
+          clienteId,
+          serviciosDeLaSede,
+          sedeData,
+          contratoId,
+          createdBy
+        );
         console.log(`✅ Orden de instalación generada: ${documentos.orden_instalacion.numero}`);
       }
 
@@ -163,28 +163,6 @@ class ClienteCompletoService {
   static async asignarServicioCliente(conexion, clienteId, datosServicio, createdBy = null) {
     console.log('🔌 Asignando servicio al cliente:', datosServicio);
 
-    const query = `
-      INSERT INTO servicios_cliente (
-        cliente_id, plan_id, fecha_activacion, precio_personalizado,
-        observaciones, estado, created_at
-      ) VALUES (?, ?, ?, ?, ?, 'activo', NOW())
-    `;
-
-    const valores = [
-      parseInt(clienteId),
-      parseInt(datosServicio.plan_id),
-      datosServicio.fecha_activacion || new Date().toISOString().split('T')[0],
-      datosServicio.precio_personalizado ? parseFloat(datosServicio.precio_personalizado) : null,
-      datosServicio.observaciones || null,
-    ];
-
-    console.log('🔍 Query servicio:', query);
-    console.log('🔍 Valores servicio:', valores);
-
-    const [resultado] = await conexion.execute(query, valores);
-
-    console.log('✅ Servicio asignado con ID:', resultado.insertId);
-    return resultado.insertId;
   }
 
   /**
@@ -390,46 +368,46 @@ class ClienteCompletoService {
 
 
   static async generarOrdenInstalacionParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, contratoId, createdBy) {
-  try {
-    console.log('🔧 Generando orden de instalación para múltiples servicios con trazabilidad completa...');
+    try {
+      console.log('🔧 Generando orden de instalación para múltiples servicios con trazabilidad completa...');
 
-    const numeroOrden = await this.generarNumeroOrden(conexion);
+      const numeroOrden = await this.generarNumeroOrden(conexion);
 
-    // ✅ CORRECCIÓN: Calcular costo de instalación según tipo de contrato
-    const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
-    let costoInstalacionTotal = 0;
+      // ✅ CORRECCIÓN: Calcular costo de instalación según tipo de contrato
+      const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
+      let costoInstalacionTotal = 0;
 
-    if (tipoPermanencia === 'sin_permanencia') {
-      // Sin permanencia = 150,000 IVA incluido por cada servicio
-      costoInstalacionTotal = serviciosDeLaSede.length * 150000;
-    } else {
-      // Con permanencia = 50,000 por cada servicio
-      costoInstalacionTotal = serviciosDeLaSede.length * 50000;
-    }
+      if (tipoPermanencia === 'sin_permanencia') {
+        // Sin permanencia = 150,000 IVA incluido por cada servicio
+        costoInstalacionTotal = serviciosDeLaSede.length * 150000;
+      } else {
+        // Con permanencia = 50,000 por cada servicio
+        costoInstalacionTotal = serviciosDeLaSede.length * 50000;
+      }
 
-    // ✅ CORRECCIÓN: Crear array de IDs de servicios para asociación múltiple
-    const serviciosIds = serviciosDeLaSede.map(s => s.id);
-    const serviciosDescripcion = serviciosDeLaSede.map(s => 
-      `${s.tipo.toUpperCase()}: ${s.plan_nombre} - $${s.precio.toLocaleString()}`
-    ).join(' | ');
+      // ✅ CORRECCIÓN: Crear array de IDs de servicios para asociación múltiple
+      const serviciosIds = serviciosDeLaSede.map(s => s.id);
+      const serviciosDescripcion = serviciosDeLaSede.map(s =>
+        `${s.tipo.toUpperCase()}: ${s.plan_nombre} - $${s.precio.toLocaleString()}`
+      ).join(' | ');
 
-    const observacionesInstalacion = JSON.stringify({
-      sede_nombre: sedeData.nombre_sede || 'Sede Principal',
-      direccion_instalacion: sedeData.direccion_servicio,
-      contacto_sede: sedeData.contacto_sede,
-      telefono_sede: sedeData.telefono_sede,
-      servicios_descripcion: serviciosDescripcion,
-      cantidad_servicios: serviciosDeLaSede.length,
-      servicios_cliente_ids: serviciosIds, // ✅ Array de IDs para múltiples servicios
-      tipo_instalacion: 'nueva_sede_completa',
-      generada_automaticamente: true,
-      contrato_relacionado: contratoId,
-      tipo_permanencia: tipoPermanencia,
-      costo_por_servicio: costoInstalacionTotal / serviciosDeLaSede.length
-    });
+      const observacionesInstalacion = JSON.stringify({
+        sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+        direccion_instalacion: sedeData.direccion_servicio,
+        contacto_sede: sedeData.contacto_sede,
+        telefono_sede: sedeData.telefono_sede,
+        servicios_descripcion: serviciosDescripcion,
+        cantidad_servicios: serviciosDeLaSede.length,
+        servicios_cliente_ids: serviciosIds, // ✅ Array de IDs para múltiples servicios
+        tipo_instalacion: 'nueva_sede_completa',
+        generada_automaticamente: true,
+        contrato_relacionado: contratoId,
+        tipo_permanencia: tipoPermanencia,
+        costo_por_servicio: costoInstalacionTotal / serviciosDeLaSede.length
+      });
 
-    // ✅ CORRECCIÓN: Usar servicio_cliente_id como JSON array para múltiples servicios
-    const query = `
+      // ✅ CORRECCIÓN: Usar servicio_cliente_id como JSON array para múltiples servicios
+      const query = `
       INSERT INTO instalaciones (
         numero_orden, cliente_id, contrato_id, servicio_cliente_id,
         fecha_programada, hora_programada, direccion_instalacion, 
@@ -438,81 +416,81 @@ class ClienteCompletoService {
       ) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 2 DAY), '09:00:00', ?, ?, ?, ?, 'nueva', 'programada', ?, ?, ?, NOW())
     `;
 
-    const [resultado] = await conexion.execute(query, [
-      numeroOrden,
-      clienteId,
-      contratoId,
-      JSON.stringify(serviciosIds), // ✅ SOLUCIÓN: Guardar como JSON array para múltiples servicios
-      sedeData.direccion_servicio,
-      sedeData.barrio || 'No especificado',
-      sedeData.telefono_sede,
-      sedeData.contacto_sede,
-      costoInstalacionTotal,
-      observacionesInstalacion,
-      createdBy || 1
-    ]);
+      const [resultado] = await conexion.execute(query, [
+        numeroOrden,
+        clienteId,
+        contratoId,
+        JSON.stringify(serviciosIds), // ✅ SOLUCIÓN: Guardar como JSON array para múltiples servicios
+        sedeData.direccion_servicio,
+        sedeData.barrio || 'No especificado',
+        sedeData.telefono_sede,
+        sedeData.contacto_sede,
+        costoInstalacionTotal,
+        observacionesInstalacion,
+        createdBy || 1
+      ]);
 
-    const instalacionId = resultado.insertId;
+      const instalacionId = resultado.insertId;
 
-    console.log(`✅ Orden de instalación ${numeroOrden} creada:`, {
-      instalacion_id: instalacionId,
-      contrato_id: contratoId,
-      servicios_incluidos: serviciosDeLaSede.length,
-      servicios_ids: serviciosIds,
-      costo_total: costoInstalacionTotal,
-      tipo_permanencia: tipoPermanencia,
-      created_by: createdBy
-    });
+      console.log(`✅ Orden de instalación ${numeroOrden} creada:`, {
+        instalacion_id: instalacionId,
+        contrato_id: contratoId,
+        servicios_incluidos: serviciosDeLaSede.length,
+        servicios_ids: serviciosIds,
+        costo_total: costoInstalacionTotal,
+        tipo_permanencia: tipoPermanencia,
+        created_by: createdBy
+      });
 
-    return {
-      id: instalacionId,
-      numero: numeroOrden,
-      contrato_id: contratoId,
-      servicios_cliente_ids: serviciosIds,
-      estado: 'programada',
-      servicios_incluidos: serviciosDeLaSede.length,
-      costo_total: costoInstalacionTotal
-    };
+      return {
+        id: instalacionId,
+        numero: numeroOrden,
+        contrato_id: contratoId,
+        servicios_cliente_ids: serviciosIds,
+        estado: 'programada',
+        servicios_incluidos: serviciosDeLaSede.length,
+        costo_total: costoInstalacionTotal
+      };
 
-  } catch (error) {
-    console.error('❌ Error generando orden de instalación:', error);
-    throw error;
+    } catch (error) {
+      console.error('❌ Error generando orden de instalación:', error);
+      throw error;
+    }
   }
-}
   /**
    * Generar orden de instalación interna COMPLETA
    */
   static async generarOrdenInstalacionInterno(conexion, clienteId, servicioId, datosServicio, createdBy = null) {
-   try {
-    console.log('🔧 Generando orden de instalación usando contrato_id para trazabilidad...');
+    try {
+      console.log('🔧 Generando orden de instalación usando contrato_id para trazabilidad...');
 
-    // Generar número de orden
-    const numeroOrden = await this.generarNumeroOrden(conexion);
+      // Generar número de orden
+      const numeroOrden = await this.generarNumeroOrden(conexion);
 
-    // Calcular costo total de instalación
-    const costoInstalacionTotal = serviciosDeLaSede.length * 42016;
+      // Calcular costo total de instalación
+      const costoInstalacionTotal = serviciosDeLaSede.length * 42016;
 
-    // Crear descripción detallada de servicios a instalar
-    const serviciosDescripcion = serviciosDeLaSede.map(s => 
-      `${s.tipo.toUpperCase()}: ${s.plan_nombre} - $${s.precio.toLocaleString()}`
-    ).join(' | ');
+      // Crear descripción detallada de servicios a instalar
+      const serviciosDescripcion = serviciosDeLaSede.map(s =>
+        `${s.tipo.toUpperCase()}: ${s.plan_nombre} - $${s.precio.toLocaleString()}`
+      ).join(' | ');
 
-    // Observaciones con información completa de la sede y servicios
-    const observacionesInstalacion = JSON.stringify({
-      sede_nombre: sedeData.nombre_sede || 'Sede Principal',
-      direccion_instalacion: sedeData.direccion_servicio,
-      contacto_sede: sedeData.contacto_sede,
-      telefono_sede: sedeData.telefono_sede,
-      servicios_descripcion: serviciosDescripcion,
-      cantidad_servicios: serviciosDeLaSede.length,
-      servicios_ids: serviciosDeLaSede.map(s => s.id), // IDs para referencia
-      tipo_instalacion: 'nueva_sede_completa',
-      generada_automaticamente: true,
-      contrato_relacionado: contratoId
-    });
+      // Observaciones con información completa de la sede y servicios
+      const observacionesInstalacion = JSON.stringify({
+        sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+        direccion_instalacion: sedeData.direccion_servicio,
+        contacto_sede: sedeData.contacto_sede,
+        telefono_sede: sedeData.telefono_sede,
+        servicios_descripcion: serviciosDescripcion,
+        cantidad_servicios: serviciosDeLaSede.length,
+        servicios_ids: serviciosDeLaSede.map(s => s.id), // IDs para referencia
+        tipo_instalacion: 'nueva_sede_completa',
+        generada_automaticamente: true,
+        contrato_relacionado: contratoId
+      });
 
-    // ✅ INSERTAR instalación con contrato_id para trazabilidad completa
-    const query = `
+      // ✅ INSERTAR instalación con contrato_id para trazabilidad completa
+      const query = `
       INSERT INTO instalaciones (
         numero_orden, cliente_id, contrato_id, fecha_programada, 
         hora_programada, direccion_instalacion, barrio, telefono_contacto,
@@ -521,41 +499,41 @@ class ClienteCompletoService {
       ) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 2 DAY), '09:00:00', ?, ?, ?, ?, 'nueva', 'programada', ?, ?, ?, NOW())
     `;
 
-    const [resultado] = await conexion.execute(query, [
-      numeroOrden,                              // numero_orden
-      clienteId,                               // cliente_id
-      contratoId,                              // ✅ contrato_id (clave de trazabilidad)
-      sedeData.direccion_servicio,             // direccion_instalacion
-      sedeData.barrio || 'No especificado',   // barrio
-      sedeData.telefono_sede,                  // telefono_contacto
-      sedeData.contacto_sede,                  // persona_recibe
-      costoInstalacionTotal,                   // costo_instalacion
-      observacionesInstalacion,                // observaciones (JSON con todos los servicios)
-      createdBy || 1                          // created_by
-    ]);
+      const [resultado] = await conexion.execute(query, [
+        numeroOrden,                              // numero_orden
+        clienteId,                               // cliente_id
+        contratoId,                              // ✅ contrato_id (clave de trazabilidad)
+        sedeData.direccion_servicio,             // direccion_instalacion
+        sedeData.barrio || 'No especificado',   // barrio
+        sedeData.telefono_sede,                  // telefono_contacto
+        sedeData.contacto_sede,                  // persona_recibe
+        costoInstalacionTotal,                   // costo_instalacion
+        observacionesInstalacion,                // observaciones (JSON con todos los servicios)
+        createdBy || 1                          // created_by
+      ]);
 
-    const instalacionId = resultado.insertId;
+      const instalacionId = resultado.insertId;
 
-    console.log(`✅ Orden de instalación ${numeroOrden} creada:`, {
-      instalacion_id: instalacionId,
-      contrato_id: contratoId,
-      servicios_incluidos: serviciosDeLaSede.length,
-      costo_total: costoInstalacionTotal
-    });
+      console.log(`✅ Orden de instalación ${numeroOrden} creada:`, {
+        instalacion_id: instalacionId,
+        contrato_id: contratoId,
+        servicios_incluidos: serviciosDeLaSede.length,
+        costo_total: costoInstalacionTotal
+      });
 
-    return {
-      id: instalacionId,
-      numero: numeroOrden,
-      contrato_id: contratoId,                 // ✅ Retornar para trazabilidad
-      estado: 'programada',
-      servicios_incluidos: serviciosDeLaSede.length,
-      costo_total: costoInstalacionTotal
-    };
+      return {
+        id: instalacionId,
+        numero: numeroOrden,
+        contrato_id: contratoId,                 // ✅ Retornar para trazabilidad
+        estado: 'programada',
+        servicios_incluidos: serviciosDeLaSede.length,
+        costo_total: costoInstalacionTotal
+      };
 
-  } catch (error) {
-    console.error('❌ Error generando orden de instalación con contrato_id:', error);
-    throw error;
-  }
+    } catch (error) {
+      console.error('❌ Error generando orden de instalación con contrato_id:', error);
+      throw error;
+    }
   }
 
 
@@ -682,12 +660,12 @@ class ClienteCompletoService {
   /**
    * Generar número de contrato usando procedimiento almacenado
    */
-static async generarNumeroContrato(conexion) {
-  try {
-    console.log('🔢 Generando número de contrato...');
+  static async generarNumeroContrato(conexion) {
+    try {
+      console.log('🔢 Generando número de contrato...');
 
-    // PASO 1: Obtener configuración actual con los nombres correctos de columnas
-    const [configActual] = await conexion.execute(`
+      // PASO 1: Obtener configuración actual con los nombres correctos de columnas
+      const [configActual] = await conexion.execute(`
       SELECT 
         prefijo_contrato,
         consecutivo_contrato
@@ -695,68 +673,68 @@ static async generarNumeroContrato(conexion) {
       WHERE id = 1
     `);
 
-    if (!configActual[0]) {
-      throw new Error('Configuración de empresa no encontrada');
-    }
+      if (!configActual[0]) {
+        throw new Error('Configuración de empresa no encontrada');
+      }
 
-    const { prefijo_contrato, consecutivo_contrato } = configActual[0];
-    
-    console.log(`📊 Configuración obtenida:`, {
-      prefijo: prefijo_contrato,
-      consecutivo: consecutivo_contrato
-    });
-    
-    // PASO 2: Generar número con el formato correcto
-    // Basado en tu BD: prefijo = "CON", consecutivo = 15
-    // Resultado esperado: CON-2025-000015
-    const numeroContrato = `${prefijo_contrato}-${new Date().getFullYear()}-${String(consecutivo_contrato).padStart(6, '0')}`;
-    
-    console.log(`📋 Número de contrato generado: ${numeroContrato}`);
-    
-    // PASO 3: Verificar que no existe (por seguridad)
-    const [existe] = await conexion.execute(`
+      const { prefijo_contrato, consecutivo_contrato } = configActual[0];
+
+      console.log(`📊 Configuración obtenida:`, {
+        prefijo: prefijo_contrato,
+        consecutivo: consecutivo_contrato
+      });
+
+      // PASO 2: Generar número con el formato correcto
+      // Basado en tu BD: prefijo = "CON", consecutivo = 15
+      // Resultado esperado: CON-2025-000015
+      const numeroContrato = `${prefijo_contrato}-${new Date().getFullYear()}-${String(consecutivo_contrato).padStart(6, '0')}`;
+
+      console.log(`📋 Número de contrato generado: ${numeroContrato}`);
+
+      // PASO 3: Verificar que no existe (por seguridad)
+      const [existe] = await conexion.execute(`
       SELECT COUNT(*) as count 
       FROM contratos 
       WHERE numero_contrato = ?
     `, [numeroContrato]);
 
-    if (existe[0].count > 0) {
-      console.warn(`⚠️ El número ${numeroContrato} ya existe! Incrementando consecutivo...`);
-      
-      // Incrementar e intentar de nuevo
-      await conexion.execute(`
+      if (existe[0].count > 0) {
+        console.warn(`⚠️ El número ${numeroContrato} ya existe! Incrementando consecutivo...`);
+
+        // Incrementar e intentar de nuevo
+        await conexion.execute(`
         UPDATE configuracion_empresa 
         SET consecutivo_contrato = consecutivo_contrato + 1 
         WHERE id = 1
       `);
-      
-      // Recursión para generar el siguiente número
-      return await this.generarNumeroContrato(conexion);
-    }
-    
-    // PASO 4: Incrementar el consecutivo DESPUÉS de verificar que está disponible
-    await conexion.execute(`
+
+        // Recursión para generar el siguiente número
+        return await this.generarNumeroContrato(conexion);
+      }
+
+      // PASO 4: Incrementar el consecutivo DESPUÉS de verificar que está disponible
+      await conexion.execute(`
       UPDATE configuracion_empresa 
       SET consecutivo_contrato = consecutivo_contrato + 1 
       WHERE id = 1
     `);
 
-    console.log(`✅ Consecutivo actualizado de ${consecutivo_contrato} a ${consecutivo_contrato + 1}`);
-    console.log(`✅ Número de contrato final: ${numeroContrato}`);
+      console.log(`✅ Consecutivo actualizado de ${consecutivo_contrato} a ${consecutivo_contrato + 1}`);
+      console.log(`✅ Número de contrato final: ${numeroContrato}`);
 
-    return numeroContrato;
+      return numeroContrato;
 
-  } catch (error) {
-    console.error('❌ Error generando número de contrato:', error);
-    
-    // FALLBACK: Generar número único con timestamp
-    const timestamp = Date.now().toString().slice(-8);
-    const numeroFallback = `CON-${new Date().getFullYear()}-${timestamp}`;
-    
-    console.log(`🔄 Usando número fallback: ${numeroFallback}`);
-    return numeroFallback;
+    } catch (error) {
+      console.error('❌ Error generando número de contrato:', error);
+
+      // FALLBACK: Generar número único con timestamp
+      const timestamp = Date.now().toString().slice(-8);
+      const numeroFallback = `CON-${new Date().getFullYear()}-${timestamp}`;
+
+      console.log(`🔄 Usando número fallback: ${numeroFallback}`);
+      return numeroFallback;
+    }
   }
-}
 
 
   /**
@@ -1559,110 +1537,133 @@ static async generarNumeroContrato(conexion) {
   /**
    * Generar UN contrato para TODA la sede (Internet + TV)
    */
-static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, createdBy) {
-  console.log('📄 Generando contrato para sede con created_by:', createdBy);
+  static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, createdBy) {
+    console.log('📄 Generando contrato para sede - Corrección instalación única:', {
+      cantidad_servicios: serviciosDeLaSede.length,
+      tipo_contrato: sedeData.tipoContrato,
+      servicios: serviciosDeLaSede.map(s => ({ id: s.id, tipo: s.tipo, plan: s.plan_nombre }))
+    });
 
-  const numeroContrato = await this.generarNumeroContrato(conexion);
+    const numeroContrato = await this.generarNumeroContrato(conexion);
 
-  // ✅ CORRECCIÓN: Calcular costo de instalación basado en tipo de permanencia
-  const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
-  let costoInstalacionTotal = 0;
+    // ✅ CORRECCIÓN CRÍTICA: UNA SOLA INSTALACIÓN independientemente de la cantidad de servicios
+    const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
+    let costoInstalacionTotal = 0;
 
-  if (tipoPermanencia === 'sin_permanencia') {
-    // ✅ CORRECCIÓN: Sin permanencia = 150,000 IVA incluido por cada servicio
-    costoInstalacionTotal = serviciosDeLaSede.length * 150000;
-  } else {
-    // Con permanencia = 50,000 por cada servicio
-    costoInstalacionTotal = serviciosDeLaSede.length * 50000;
-  }
+    // ✅ CÁLCULO CORRECTO: UNA SOLA INSTALACIÓN POR CLIENTE (no por servicio)
+    if (tipoPermanencia === 'sin_permanencia') {
+      // Sin permanencia: 150,000 IVA incluido - UNA SOLA VEZ
+      costoInstalacionTotal = 150000;
+    } else {
+      // Con permanencia: 50,000 - UNA SOLA VEZ
+      costoInstalacionTotal = 50000;
+    }
 
-  let mesesPermanencia = 0;
-  if (tipoPermanencia === 'con_permanencia') {
-    mesesPermanencia = 6;
-  }
+    console.log(`💰 Cálculo CORREGIDO de instalación: UNA sola instalación de $${costoInstalacionTotal.toLocaleString()} para ${serviciosDeLaSede.length} servicio(s)`);
 
-  let fechaVencimientoPermanencia = null;
-  if (tipoPermanencia === 'con_permanencia' && mesesPermanencia > 0) {
-    const fechaInicio = new Date();
-    fechaVencimientoPermanencia = new Date(fechaInicio.setMonth(fechaInicio.getMonth() + mesesPermanencia))
-      .toISOString().split('T')[0];
-  }
+    let mesesPermanencia = 0;
+    if (tipoPermanencia === 'con_permanencia') {
+      mesesPermanencia = parseInt(sedeData.mesesPermanencia) || 6;
+    }
 
-  const serviciosDescripcion = serviciosDeLaSede.map(s => 
-    `${s.tipo.toUpperCase()}: ${s.plan_nombre} ($${s.precio.toLocaleString()})`
-  ).join(' + ');
+    let fechaVencimientoPermanencia = null;
+    if (tipoPermanencia === 'con_permanencia' && mesesPermanencia > 0) {
+      const fechaInicio = new Date();
+      fechaVencimientoPermanencia = new Date(fechaInicio.setMonth(fechaInicio.getMonth() + mesesPermanencia))
+        .toISOString().split('T')[0];
+    }
 
-  const observacionesContrato = JSON.stringify({
-    sede_nombre: sedeData.nombre_sede || 'Sede Principal',
-    direccion_sede: sedeData.direccion_servicio,
-    contacto_sede: sedeData.contacto_sede,
-    telefono_sede: sedeData.telefono_sede,
-    servicios_incluidos: serviciosDescripcion,
-    cantidad_servicios: serviciosDeLaSede.length,
-    observaciones_adicionales: sedeData.observaciones,
-    tipo_permanencia: tipoPermanencia,
-    meses_permanencia: mesesPermanencia,
-    costo_instalacion_calculado: costoInstalacionTotal
-  });
+    const serviciosDescripcion = serviciosDeLaSede.map(s =>
+      `${s.tipo.toUpperCase()}: ${s.plan_nombre} ($${s.precio.toLocaleString()})`
+    ).join(' + ');
 
-  const query = `
+    const observacionesContrato = JSON.stringify({
+      sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+      direccion_sede: sedeData.direccion_servicio,
+      contacto_sede: sedeData.contacto_sede,
+      telefono_sede: sedeData.telefono_sede,
+      servicios_incluidos: serviciosDescripcion,
+      cantidad_servicios: serviciosDeLaSede.length,
+      observaciones_adicionales: sedeData.observaciones,
+      tipo_permanencia: tipoPermanencia,
+      meses_permanencia: mesesPermanencia,
+      costo_instalacion_calculado: costoInstalacionTotal,
+      detalle_calculo: {
+        servicios_count: serviciosDeLaSede.length,
+        costo_instalacion_unica: costoInstalacionTotal,
+        formula: `Una instalación única de $${costoInstalacionTotal.toLocaleString()} para todos los servicios`
+      }
+    });
+
+    // ✅ CORRECCIÓN: Usar JSON array para múltiples servicios en servicio_id
+    const serviciosIds = serviciosDeLaSede.map(s => s.id);
+    const servicioIdValue = serviciosIds.length === 1 ? serviciosIds[0] : JSON.stringify(serviciosIds);
+
+    const query = `
     INSERT INTO contratos (
-      numero_contrato, cliente_id, tipo_contrato, tipo_permanencia, 
+      numero_contrato, cliente_id, servicio_id, tipo_contrato, tipo_permanencia, 
       permanencia_meses, costo_instalacion, fecha_generacion, 
       fecha_inicio, fecha_vencimiento_permanencia, estado, 
       generado_automaticamente, observaciones, created_by
-    ) VALUES (?, ?, 'servicio', ?, ?, ?, NOW(), NOW(), ?, 'activo', 1, ?, ?)
+    ) VALUES (?, ?, ?, 'servicio', ?, ?, ?, NOW(), NOW(), ?, 'activo', 1, ?, ?)
   `;
 
-  const [resultado] = await conexion.execute(query, [
-    numeroContrato,
-    clienteId,
-    tipoPermanencia,
-    mesesPermanencia,
-    costoInstalacionTotal, // ✅ Costo corregido
-    fechaVencimientoPermanencia,
-    observacionesContrato,
-    createdBy || 1 // ✅ Ahora se incluye created_by
-  ]);
+    const [resultado] = await conexion.execute(query, [
+      numeroContrato,
+      clienteId,
+      servicioIdValue,
+      tipoPermanencia,
+      mesesPermanencia,
+      costoInstalacionTotal, // ✅ UNA SOLA INSTALACIÓN
+      fechaVencimientoPermanencia,
+      observacionesContrato,
+      createdBy || 1
+    ]);
 
-  const contratoId = resultado.insertId;
+    const contratoId = resultado.insertId;
 
-  // Actualizar servicios con el número de contrato
-  for (const servicio of serviciosDeLaSede) {
-    try {
-      const observacionesServicio = servicio.observaciones 
-        ? JSON.parse(servicio.observaciones) 
-        : {};
-      
-      const observacionesActualizadas = JSON.stringify({
-        ...observacionesServicio,
-        numero_contrato: numeroContrato,
-        contrato_id: contratoId,
-        costo_instalacion_asignado: costoInstalacionTotal / serviciosDeLaSede.length
-      });
+    // Actualizar servicios con información del contrato
+    for (const servicio of serviciosDeLaSede) {
+      try {
+        const observacionesServicio = servicio.observaciones
+          ? JSON.parse(servicio.observaciones)
+          : {};
 
-      await conexion.execute(
-        'UPDATE servicios_cliente SET observaciones = ? WHERE id = ?',
-        [observacionesActualizadas, servicio.id]
-      );
-    } catch (updateError) {
-      console.error(`❌ Error actualizando servicio ${servicio.id}:`, updateError);
+        const observacionesActualizadas = JSON.stringify({
+          ...observacionesServicio,
+          numero_contrato: numeroContrato,
+          contrato_id: contratoId,
+          costo_instalacion_compartido: costoInstalacionTotal, // ✅ Mismo costo para todos
+          parte_instalacion: `Instalación única de $${costoInstalacionTotal.toLocaleString()} compartida entre ${serviciosDeLaSede.length} servicio(s)`
+        });
+
+        await conexion.execute(
+          'UPDATE servicios_cliente SET observaciones = ? WHERE id = ?',
+          [observacionesActualizadas, servicio.id]
+        );
+      } catch (updateError) {
+        console.error(`❌ Error actualizando servicio ${servicio.id}:`, updateError);
+      }
     }
+
+    console.log(`✅ Contrato ${numeroContrato} creado con instalación ÚNICA:`, {
+      servicios_ids: serviciosIds,
+      costo_instalacion_unica: costoInstalacionTotal,
+      tipo_permanencia: tipoPermanencia,
+      meses: mesesPermanencia
+    });
+
+    return contratoId;
   }
-
-  console.log(`✅ Contrato ${numeroContrato} creado con costo instalación: $${costoInstalacionTotal.toLocaleString()}, created_by: ${createdBy}`);
-
-  return contratoId;
-}
   /**
    * Generar UNA factura para TODA la sede (Internet + TV)
    */
   static async generarFacturaParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, contratoId, createdBy) {
-  try {
-    console.log('🧾 Generando factura para sede con todos los campos requeridos...');
+    try {
+      console.log('🧾 Generando factura para sede con todos los campos requeridos...');
 
-    // 1. OBTENER CONFIGURACIÓN DE EMPRESA (resolución, prefijos, etc.)
-    const [configEmpresa] = await conexion.execute(`
+      // 1. OBTENER CONFIGURACIÓN DE EMPRESA (resolución, prefijos, etc.)
+      const [configEmpresa] = await conexion.execute(`
       SELECT 
         resolucion_facturacion, 
         prefijo_factura, 
@@ -1675,65 +1676,65 @@ static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sed
       WHERE id = 1
     `);
 
-    const config = configEmpresa[0];
-    if (!config) {
-      throw new Error('Configuración de empresa no encontrada');
-    }
-
-    // 2. OBTENER DATOS COMPLETOS DEL CLIENTE
-    const [clientes] = await conexion.execute(
-      'SELECT * FROM clientes WHERE id = ?', 
-      [clienteId]
-    );
-
-    if (clientes.length === 0) {
-      throw new Error('Cliente no encontrado');
-    }
-
-    const cliente = clientes[0];
-    const estrato = parseInt(cliente.estrato) || 1;
-
-    // 3. GENERAR NÚMERO DE FACTURA CON PREFIJO
-    const numeroFactura = await this.generarNumeroFactura(conexion);
-
-    // 4. CALCULAR FECHAS DEL PERÍODO SEGÚN REGLAS DE FACTURACIÓN
-    const fechasFacturacion = this.calcularFechasFacturacion();
-
-    // 5. CALCULAR TOTALES UNIFICADOS DE TODOS LOS SERVICIOS DE LA SEDE
-    let valorInternet = 0;
-    let valorTelevision = 0;
-    let valorIvaInternet = 0;
-    let valorIvaTelevision = 0;
-
-    for (const servicio of serviciosDeLaSede) {
-      const precio = parseFloat(servicio.precio || 0);
-      
-      if (servicio.tipo === 'internet') {
-        valorInternet += precio;
-        // IVA para internet: solo estratos 4, 5, 6
-        if (estrato >= 4) {
-          valorIvaInternet += precio * (parseFloat(config.porcentaje_iva) / 100);
-        }
-      } else if (servicio.tipo === 'television') {
-        valorTelevision += precio;
-        // IVA para televisión: todos los estratos
-        valorIvaTelevision += precio * (parseFloat(config.porcentaje_iva) / 100);
+      const config = configEmpresa[0];
+      if (!config) {
+        throw new Error('Configuración de empresa no encontrada');
       }
-    }
 
-    const subtotal = valorInternet + valorTelevision;
-    const totalIva = valorIvaInternet + valorIvaTelevision;
-    const total = subtotal + totalIva;
+      // 2. OBTENER DATOS COMPLETOS DEL CLIENTE
+      const [clientes] = await conexion.execute(
+        'SELECT * FROM clientes WHERE id = ?',
+        [clienteId]
+      );
 
-    // 6. CREAR DESCRIPCIÓN DE SERVICIOS PARA OBSERVACIONES
-    const sedeNombre = sedeData.nombre_sede || 'Sede Principal';
-    const serviciosFacturados = serviciosDeLaSede.map(s => 
-      `${s.tipo.toUpperCase()}: ${s.plan_nombre} ($${s.precio.toLocaleString()})`
-    ).join(' + ');
-    const observacionesFactura = `Servicios para ${sedeNombre}: ${serviciosFacturados}`;
+      if (clientes.length === 0) {
+        throw new Error('Cliente no encontrado');
+      }
 
-    // 7. INSERTAR FACTURA COMPLETA CON TODOS LOS CAMPOS
-    const queryFactura = `
+      const cliente = clientes[0];
+      const estrato = parseInt(cliente.estrato) || 1;
+
+      // 3. GENERAR NÚMERO DE FACTURA CON PREFIJO
+      const numeroFactura = await this.generarNumeroFactura(conexion);
+
+      // 4. CALCULAR FECHAS DEL PERÍODO SEGÚN REGLAS DE FACTURACIÓN
+      const fechasFacturacion = this.calcularFechasFacturacion();
+
+      // 5. CALCULAR TOTALES UNIFICADOS DE TODOS LOS SERVICIOS DE LA SEDE
+      let valorInternet = 0;
+      let valorTelevision = 0;
+      let valorIvaInternet = 0;
+      let valorIvaTelevision = 0;
+
+      for (const servicio of serviciosDeLaSede) {
+        const precio = parseFloat(servicio.precio || 0);
+
+        if (servicio.tipo === 'internet') {
+          valorInternet += precio;
+          // IVA para internet: solo estratos 4, 5, 6
+          if (estrato >= 4) {
+            valorIvaInternet += precio * (parseFloat(config.porcentaje_iva) / 100);
+          }
+        } else if (servicio.tipo === 'television') {
+          valorTelevision += precio;
+          // IVA para televisión: todos los estratos
+          valorIvaTelevision += precio * (parseFloat(config.porcentaje_iva) / 100);
+        }
+      }
+
+      const subtotal = valorInternet + valorTelevision;
+      const totalIva = valorIvaInternet + valorIvaTelevision;
+      const total = subtotal + totalIva;
+
+      // 6. CREAR DESCRIPCIÓN DE SERVICIOS PARA OBSERVACIONES
+      const sedeNombre = sedeData.nombre_sede || 'Sede Principal';
+      const serviciosFacturados = serviciosDeLaSede.map(s =>
+        `${s.tipo.toUpperCase()}: ${s.plan_nombre} ($${s.precio.toLocaleString()})`
+      ).join(' + ');
+      const observacionesFactura = `Servicios para ${sedeNombre}: ${serviciosFacturados}`;
+
+      // 7. INSERTAR FACTURA COMPLETA CON TODOS LOS CAMPOS
+      const queryFactura = `
       INSERT INTO facturas (
         numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
         periodo_facturacion, fecha_emision, fecha_vencimiento, 
@@ -1748,94 +1749,94 @@ static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sed
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, NOW())
     `;
 
-    const valoresFactura = [
-      numeroFactura,                              // numero_factura
-      clienteId,                                  // cliente_id
-      cliente.identificacion,                     // identificacion_cliente
-      cliente.nombre,                             // nombre_cliente
-      fechasFacturacion.periodoFacturacion,       // periodo_facturacion (YYYY-MM)
-      fechasFacturacion.fechaEmision,             // fecha_emision
-      fechasFacturacion.fechaVencimiento,         // fecha_vencimiento
-      fechasFacturacion.fechaDesde,               // fecha_desde
-      fechasFacturacion.fechaHasta,               // fecha_hasta
-      valorInternet,                              // internet
-      valorTelevision,                            // television
-      0,                                          // saldo_anterior
-      0,                                          // interes
-      0,                                          // reconexion
-      0,                                          // descuento
-      0,                                          // varios
-      0,                                          // publicidad
-      valorInternet,                              // s_internet (subtotal internet)
-      valorTelevision,                            // s_television (subtotal tv)
-      0,                                          // s_interes
-      0,                                          // s_reconexion
-      0,                                          // s_descuento
-      0,                                          // s_varios
-      0,                                          // s_publicidad
-      totalIva,                                   // s_iva
-      subtotal,                                   // subtotal
-      totalIva,                                   // iva
-      total,                                      // total
-      contratoId,                                 // contrato_id
-      observacionesFactura,                       // observaciones
-      cliente.identificacion,                     // referencia_pago (misma cédula/identificación)
-      config.resolucion_facturacion || 'DIAN-2024-001', // resolucion_facturacion
-      createdBy || 1                              // created_by
-    ];
+      const valoresFactura = [
+        numeroFactura,                              // numero_factura
+        clienteId,                                  // cliente_id
+        cliente.identificacion,                     // identificacion_cliente
+        cliente.nombre,                             // nombre_cliente
+        fechasFacturacion.periodoFacturacion,       // periodo_facturacion (YYYY-MM)
+        fechasFacturacion.fechaEmision,             // fecha_emision
+        fechasFacturacion.fechaVencimiento,         // fecha_vencimiento
+        fechasFacturacion.fechaDesde,               // fecha_desde
+        fechasFacturacion.fechaHasta,               // fecha_hasta
+        valorInternet,                              // internet
+        valorTelevision,                            // television
+        0,                                          // saldo_anterior
+        0,                                          // interes
+        0,                                          // reconexion
+        0,                                          // descuento
+        0,                                          // varios
+        0,                                          // publicidad
+        valorInternet,                              // s_internet (subtotal internet)
+        valorTelevision,                            // s_television (subtotal tv)
+        0,                                          // s_interes
+        0,                                          // s_reconexion
+        0,                                          // s_descuento
+        0,                                          // s_varios
+        0,                                          // s_publicidad
+        totalIva,                                   // s_iva
+        subtotal,                                   // subtotal
+        totalIva,                                   // iva
+        total,                                      // total
+        contratoId,                                 // contrato_id
+        observacionesFactura,                       // observaciones
+        cliente.identificacion,                     // referencia_pago (misma cédula/identificación)
+        config.resolucion_facturacion || 'DIAN-2024-001', // resolucion_facturacion
+        createdBy || 1                              // created_by
+      ];
 
-    console.log('🔍 Query factura:', queryFactura);
-    console.log('🔍 Valores factura:', valoresFactura);
+      console.log('🔍 Query factura:', queryFactura);
+      console.log('🔍 Valores factura:', valoresFactura);
 
-    const [resultado] = await conexion.execute(queryFactura, valoresFactura);
-    const facturaId = resultado.insertId;
+      const [resultado] = await conexion.execute(queryFactura, valoresFactura);
+      const facturaId = resultado.insertId;
 
-    // 8. ACTUALIZAR CONSECUTIVO DE FACTURA EN CONFIGURACIÓN
-    await conexion.execute(
-      'UPDATE configuracion_empresa SET consecutivo_factura = consecutivo_factura + 1 WHERE id = 1'
-    );
+      // 8. ACTUALIZAR CONSECUTIVO DE FACTURA EN CONFIGURACIÓN
+      await conexion.execute(
+        'UPDATE configuracion_empresa SET consecutivo_factura = consecutivo_factura + 1 WHERE id = 1'
+      );
 
-    console.log(`✅ Factura ${numeroFactura} creada exitosamente - Total: $${total.toLocaleString()}`);
+      console.log(`✅ Factura ${numeroFactura} creada exitosamente - Total: $${total.toLocaleString()}`);
 
-    return facturaId;
+      return facturaId;
 
-  } catch (error) {
-    console.error('❌ Error generando factura para sede:', error);
-    throw error;
+    } catch (error) {
+      console.error('❌ Error generando factura para sede:', error);
+      throw error;
+    }
   }
-}
 
-/**
- * MÉTODO AUXILIAR: Calcular fechas de facturación según reglas de negocio
- */
-static calcularFechasFacturacion() {
-  const fechaActual = new Date();
-  
-  // FECHA DE EMISIÓN: Hoy
-  const fechaEmision = fechaActual.toISOString().split('T')[0];
-  
-  // FECHA DE VENCIMIENTO: 5 días después de la generación (como se solicita)
-  const fechaVencimiento = new Date(fechaActual);
-  fechaVencimiento.setDate(fechaVencimiento.getDate() + 5);
-  
-  // PERÍODO DE FACTURACIÓN: Si se crea el 14 de julio, el primer ciclo va hasta el 13 de agosto
-  const fechaDesde = fechaActual.toISOString().split('T')[0]; // Desde hoy
-  
-  const fechaHasta = new Date(fechaActual);
-  fechaHasta.setMonth(fechaHasta.getMonth() + 1); // Un mes después
-  fechaHasta.setDate(fechaHasta.getDate() - 1);   // Un día antes (13 de agosto si se crea el 14 de julio)
-  
-  // PERÍODO FORMATO YYYY-MM
-  const periodoFacturacion = `${fechaActual.getFullYear()}-${String(fechaActual.getMonth() + 1).padStart(2, '0')}`;
-  
-  return {
-    fechaEmision: fechaEmision,
-    fechaVencimiento: fechaVencimiento.toISOString().split('T')[0],
-    fechaDesde: fechaDesde,
-    fechaHasta: fechaHasta.toISOString().split('T')[0],
-    periodoFacturacion: periodoFacturacion
-  };
-}
+  /**
+   * MÉTODO AUXILIAR: Calcular fechas de facturación según reglas de negocio
+   */
+  static calcularFechasFacturacion() {
+    const fechaActual = new Date();
+
+    // FECHA DE EMISIÓN: Hoy
+    const fechaEmision = fechaActual.toISOString().split('T')[0];
+
+    // FECHA DE VENCIMIENTO: 5 días después de la generación (como se solicita)
+    const fechaVencimiento = new Date(fechaActual);
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + 5);
+
+    // PERÍODO DE FACTURACIÓN: Si se crea el 14 de julio, el primer ciclo va hasta el 13 de agosto
+    const fechaDesde = fechaActual.toISOString().split('T')[0]; // Desde hoy
+
+    const fechaHasta = new Date(fechaActual);
+    fechaHasta.setMonth(fechaHasta.getMonth() + 1); // Un mes después
+    fechaHasta.setDate(fechaHasta.getDate() - 1);   // Un día antes (13 de agosto si se crea el 14 de julio)
+
+    // PERÍODO FORMATO YYYY-MM
+    const periodoFacturacion = `${fechaActual.getFullYear()}-${String(fechaActual.getMonth() + 1).padStart(2, '0')}`;
+
+    return {
+      fechaEmision: fechaEmision,
+      fechaVencimiento: fechaVencimiento.toISOString().split('T')[0],
+      fechaDesde: fechaDesde,
+      fechaHasta: fechaHasta.toISOString().split('T')[0],
+      periodoFacturacion: periodoFacturacion
+    };
+  }
 
 
   /**
@@ -1979,17 +1980,17 @@ static calcularFechasFacturacion() {
   }
 
   // Funciones auxiliares (mismas de antes)
- // FIX DEFINITIVO: Reemplazar el método generarNumeroContrato que usa el procedimiento defectuoso
+  // FIX DEFINITIVO: Reemplazar el método generarNumeroContrato que usa el procedimiento defectuoso
 
-/**
- * MÉTODO CORREGIDO: NO usar procedimiento almacenado, generar directamente
- */
-static async generarNumeroContrato(conexion) {
-  try {
-    console.log('🔢 Generando número de contrato (MÉTODO CORREGIDO)...');
+  /**
+   * MÉTODO CORREGIDO: NO usar procedimiento almacenado, generar directamente
+   */
+  static async generarNumeroContrato(conexion) {
+    try {
+      console.log('🔢 Generando número de contrato (MÉTODO CORREGIDO)...');
 
-    // PASO 1: Obtener configuración actual DIRECTAMENTE (no procedimiento)
-    const [configActual] = await conexion.execute(`
+      // PASO 1: Obtener configuración actual DIRECTAMENTE (no procedimiento)
+      const [configActual] = await conexion.execute(`
       SELECT 
         prefijo_contrato,
         consecutivo_contrato
@@ -1997,69 +1998,69 @@ static async generarNumeroContrato(conexion) {
       WHERE id = 1
     `);
 
-    if (!configActual[0]) {
-      throw new Error('Configuración de empresa no encontrada');
-    }
+      if (!configActual[0]) {
+        throw new Error('Configuración de empresa no encontrada');
+      }
 
-    const { prefijo_contrato, consecutivo_contrato } = configActual[0];
-    
-    console.log('📊 Configuración actual:', {
-      prefijo: prefijo_contrato,
-      consecutivo: consecutivo_contrato
-    });
+      const { prefijo_contrato, consecutivo_contrato } = configActual[0];
 
-    // PASO 2: Generar número usando los valores actuales
-    // Con tu BD: prefijo = "CON", consecutivo = 15
-    // Resultado: CON-2025-000015
-    const year = new Date().getFullYear();
-    const numeroContrato = `${prefijo_contrato}-${year}-${String(consecutivo_contrato).padStart(6, '0')}`;
-    
-    console.log(`📋 Número de contrato generado: ${numeroContrato}`);
-    
-    // PASO 3: Verificar que no existe (seguridad adicional)
-    const [existe] = await conexion.execute(`
+      console.log('📊 Configuración actual:', {
+        prefijo: prefijo_contrato,
+        consecutivo: consecutivo_contrato
+      });
+
+      // PASO 2: Generar número usando los valores actuales
+      // Con tu BD: prefijo = "CON", consecutivo = 15
+      // Resultado: CON-2025-000015
+      const year = new Date().getFullYear();
+      const numeroContrato = `${prefijo_contrato}-${year}-${String(consecutivo_contrato).padStart(6, '0')}`;
+
+      console.log(`📋 Número de contrato generado: ${numeroContrato}`);
+
+      // PASO 3: Verificar que no existe (seguridad adicional)
+      const [existe] = await conexion.execute(`
       SELECT COUNT(*) as count 
       FROM contratos 
       WHERE numero_contrato = ?
     `, [numeroContrato]);
 
-    if (existe[0].count > 0) {
-      console.warn(`⚠️ El número ${numeroContrato} YA EXISTE. Forzando incremento...`);
-      
-      // Si existe, incrementar el consecutivo y generar nuevamente
-      await conexion.execute(`
+      if (existe[0].count > 0) {
+        console.warn(`⚠️ El número ${numeroContrato} YA EXISTE. Forzando incremento...`);
+
+        // Si existe, incrementar el consecutivo y generar nuevamente
+        await conexion.execute(`
         UPDATE configuracion_empresa 
         SET consecutivo_contrato = consecutivo_contrato + 1 
         WHERE id = 1
       `);
-      
-      // Llamada recursiva para generar el siguiente
-      return await this.generarNumeroContrato(conexion);
-    }
-    
-    // PASO 4: Incrementar consecutivo DESPUÉS de verificar disponibilidad
-    await conexion.execute(`
+
+        // Llamada recursiva para generar el siguiente
+        return await this.generarNumeroContrato(conexion);
+      }
+
+      // PASO 4: Incrementar consecutivo DESPUÉS de verificar disponibilidad
+      await conexion.execute(`
       UPDATE configuracion_empresa 
       SET consecutivo_contrato = consecutivo_contrato + 1 
       WHERE id = 1
     `);
 
-    console.log(`✅ Consecutivo actualizado de ${consecutivo_contrato} a ${consecutivo_contrato + 1}`);
-    console.log(`✅ Número de contrato FINAL: ${numeroContrato}`);
+      console.log(`✅ Consecutivo actualizado de ${consecutivo_contrato} a ${consecutivo_contrato + 1}`);
+      console.log(`✅ Número de contrato FINAL: ${numeroContrato}`);
 
-    return numeroContrato;
+      return numeroContrato;
 
-  } catch (error) {
-    console.error('❌ Error generando número de contrato:', error);
-    
-    // FALLBACK: Usar timestamp único si todo falla
-    const timestamp = Date.now().toString().slice(-8);
-    const numeroFallback = `CON-${new Date().getFullYear()}-${timestamp}`;
-    
-    console.log(`🔄 Usando número de emergencia: ${numeroFallback}`);
-    return numeroFallback;
+    } catch (error) {
+      console.error('❌ Error generando número de contrato:', error);
+
+      // FALLBACK: Usar timestamp único si todo falla
+      const timestamp = Date.now().toString().slice(-8);
+      const numeroFallback = `CON-${new Date().getFullYear()}-${timestamp}`;
+
+      console.log(`🔄 Usando número de emergencia: ${numeroFallback}`);
+      return numeroFallback;
+    }
   }
-}
 
   static async generarNumeroFactura(conexion) {
     const [ultimaFactura] = await conexion.execute(

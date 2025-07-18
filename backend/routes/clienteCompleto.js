@@ -17,55 +17,78 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
  * @desc Crear cliente completo con servicio y documentos automáticos
  * @access Private (Administrador+)
  */
-router.post('/crear', async (req, res) => {
+router.post('/crear',  async (req, res) => {
   try {
-    console.log('🚀 Solicitud de creación completa de cliente:', req.body);
+    console.log('📨 Datos recibidos en el servidor:', JSON.stringify(req.body, null, 2));
     
-    const { cliente, servicios, opciones } = req.body;
+    const datosCompletos = req.body;
+    const createdBy = req.user?.id || datosCompletos.created_by || 1;
     
-    // CORREGIR: Validar servicios (plural, no servicio)
-    if (!cliente) {
+    // Validar datos básicos
+    if (!datosCompletos.cliente) {
       return res.status(400).json({
         success: false,
-        message: 'Datos del cliente son requeridos'
-      });
-    }
-    
-    if (!servicios || !Array.isArray(servicios) || servicios.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Debe proporcionar al menos una sede con servicios'
+        message: 'Los datos del cliente son obligatorios'
       });
     }
 
-    // Validar que cada sede tenga al menos un servicio
-    for (let i = 0; i < servicios.length; i++) {
-      const sede = servicios[i];
-      if (!sede.planInternetId && !sede.planTelevisionId) {
-        return res.status(400).json({
-          success: false,
-          message: `Sede ${i + 1}: Debe tener al menos Internet o Televisión`
-        });
-      }
-    }
+    // ✅ CORRECCIÓN: Aceptar tanto 'servicios' como 'sedes'
+    const servicios = datosCompletos.servicios || datosCompletos.sedes || [];
     
-    // Llamar al servicio correcto
-    const resultado = await ClienteCompletoService.crearClienteConServicios(
-      { cliente, servicios, opciones },
-      req.user?.id
+    if (!Array.isArray(servicios) || servicios.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe incluir al menos una sede con servicios'
+      });
+    }
+
+    // ✅ Normalizar estructura: usar 'sedes' internamente
+    const datosNormalizados = {
+      ...datosCompletos,
+      sedes: servicios
+    };
+
+    console.log('🔄 Procesando con datos normalizados:', {
+      cliente: datosNormalizados.cliente.identificacion,
+      sedes_count: datosNormalizados.sedes.length,
+      created_by: createdBy
+    });
+
+    // Procesar con created_by
+    const resultado = await ClienteCompletoService.crearClienteCompleto(
+      datosNormalizados, 
+      createdBy
     );
 
-    res.json({
+    // Preparar respuesta con resumen detallado
+    const resumen = {
+      cliente_id: resultado.cliente.id,
+      cliente_nombre: resultado.cliente.nombre_completo,
+      sedes_procesadas: resultado.sedes_procesadas,
+      total_servicios: resultado.total_servicios,
+      created_by: createdBy,
+      detalles: resultado.resultados_por_sede.map(sede => ({
+        sede_nombre: sede.sede,
+        servicios_creados: sede.servicios.length,
+        contrato_generado: sede.contrato_id,
+        instalacion_programada: sede.instalacion?.numero,
+        factura_generada: sede.factura_id,
+        costo_instalacion: sede.instalacion?.costo_total || 0
+      }))
+    };
+
+    res.status(201).json({
       success: true,
-      message: 'Cliente creado exitosamente',
-      data: resultado
+      data: resumen,
+      message: `Cliente completo creado exitosamente con ${resultado.total_servicios} servicios en ${resultado.sedes_procesadas} sede(s)`
     });
 
   } catch (error) {
-    console.error('❌ Error en creación:', error);
+    console.error('❌ Error creando cliente completo:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Error interno del servidor'
+      message: error.message || 'Error interno del servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
