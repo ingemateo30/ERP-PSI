@@ -17,14 +17,19 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
  * @desc Crear cliente completo con servicio y documentos automáticos
  * @access Private (Administrador+)
  */
-router.post('/crear',  async (req, res) => {
+/**
+ * ✅ RUTA PRINCIPAL CORREGIDA
+ * @route POST /api/v1/clientes-completo/crear
+ * @desc Crear cliente completo - maneja estructura real del frontend
+ */
+router.post('/crear', async (req, res) => {
   try {
     console.log('📨 Datos recibidos en el servidor:', JSON.stringify(req.body, null, 2));
-    
+
     const datosCompletos = req.body;
     const createdBy = req.user?.id || datosCompletos.created_by || 1;
-    
-    // Validar datos básicos
+
+    // ✅ VALIDACIÓN BÁSICA
     if (!datosCompletos.cliente) {
       return res.status(400).json({
         success: false,
@@ -32,63 +37,87 @@ router.post('/crear',  async (req, res) => {
       });
     }
 
-    // ✅ CORRECCIÓN: Aceptar tanto 'servicios' como 'sedes'
-    const servicios = datosCompletos.servicios || datosCompletos.sedes || [];
-    
+    // ✅ CORRECCIÓN: El frontend envía 'servicios' array, necesitamos extraer datos
+    const servicios = datosCompletos.servicios || [];
+
     if (!Array.isArray(servicios) || servicios.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Debe incluir al menos una sede con servicios'
+        message: 'Debe incluir al menos un servicio'
       });
     }
 
-    // ✅ Normalizar estructura: usar 'sedes' internamente
-    const datosNormalizados = {
-      ...datosCompletos,
-      sedes: servicios
-    };
+    // ✅ VALIDAR DATOS BÁSICOS DEL CLIENTE
+    const cliente = datosCompletos.cliente;
+    if (!cliente.identificacion || !cliente.nombre || !cliente.email || !cliente.telefono) {
+      return res.status(400).json({
+        success: false,
+        message: 'Datos básicos del cliente incompletos (identificación, nombre, email, teléfono son requeridos)'
+      });
+    }
 
-    console.log('🔄 Procesando con datos normalizados:', {
-      cliente: datosNormalizados.cliente.identificacion,
-      sedes_count: datosNormalizados.sedes.length,
+    // ✅ VALIDAR PRIMER SERVICIO
+    const primerServicio = servicios[0];
+    if (!primerServicio.planInternetId && !primerServicio.planTelevisionId && !primerServicio.plan_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'El servicio debe tener al menos un plan de Internet, Televisión o un plan único'
+      });
+    }
+
+    console.log('🔄 Procesando datos validados:', {
+      cliente: cliente.identificacion,
+      servicios_count: servicios.length,
+      primer_servicio: {
+        internet: primerServicio.planInternetId,
+        television: primerServicio.planTelevisionId,
+        plan_unico: primerServicio.plan_id
+      },
       created_by: createdBy
     });
 
-    // Procesar con created_by
+    // ✅ LLAMAR AL SERVICIO CON DATOS CORRECTOS
     const resultado = await ClienteCompletoService.crearClienteCompleto(
-      datosNormalizados, 
+      datosCompletos,
       createdBy
     );
 
-    // Preparar respuesta con resumen detallado
-    const resumen = {
-      cliente_id: resultado.cliente.id,
-      cliente_nombre: resultado.cliente.nombre_completo,
-      sedes_procesadas: resultado.sedes_procesadas,
-      total_servicios: resultado.total_servicios,
-      created_by: createdBy,
-      detalles: resultado.resultados_por_sede.map(sede => ({
-        sede_nombre: sede.sede,
-        servicios_creados: sede.servicios.length,
-        contrato_generado: sede.contrato_id,
-        instalacion_programada: sede.instalacion?.numero,
-        factura_generada: sede.factura_id,
-        costo_instalacion: sede.instalacion?.costo_total || 0
-      }))
-    };
-
+    // ✅ RESPUESTA EXITOSA
     res.status(201).json({
       success: true,
-      data: resumen,
-      message: `Cliente completo creado exitosamente con ${resultado.total_servicios} servicios en ${resultado.sedes_procesadas} sede(s)`
+      message: 'Cliente creado exitosamente con todos los servicios',
+      data: resultado
     });
 
   } catch (error) {
     console.error('❌ Error creando cliente completo:', error);
+
+    // Manejo de errores específicos
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        success: false,
+        message: 'Ya existe un cliente con esta identificación'
+      });
+    }
+
+    if (error.message.includes('undefined')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Error en los datos enviados: algunos campos contienen valores no válidos',
+        details: error.message
+      });
+    }
+
+    if (error.message.includes('Plan de servicio no encontrado')) {
+      return res.status(400).json({
+        success: false,
+        message: 'El plan de servicio seleccionado no existe o está inactivo'
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: error.message || 'Error interno del servidor',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: error.message || 'Error interno del servidor'
     });
   }
 });
@@ -127,7 +156,7 @@ router.get('/:id',
 
     } catch (error) {
       console.error('❌ Error obteniendo cliente completo:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error interno del servidor'
@@ -156,7 +185,7 @@ router.post('/:id/generar-contrato',
       const { tipo_contrato } = req.body;
 
       const contrato = await ClienteCompletoService.generarContrato(
-        id, 
+        id,
         tipo_contrato || 'servicio'
       );
 
@@ -168,7 +197,7 @@ router.post('/:id/generar-contrato',
 
     } catch (error) {
       console.error('❌ Error generando contrato:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error generando contrato'
@@ -191,7 +220,7 @@ router.post('/:id/generar-orden-instalacion',
       const { fecha_instalacion } = req.body;
 
       const ordenInstalacion = await ClienteCompletoService.generarOrdenInstalacion(
-        id, 
+        id,
         fecha_instalacion
       );
 
@@ -203,7 +232,7 @@ router.post('/:id/generar-orden-instalacion',
 
     } catch (error) {
       console.error('❌ Error generando orden de instalación:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error generando orden de instalación'
@@ -226,7 +255,7 @@ router.post('/:id/generar-factura',
       const { conceptos_adicionales } = req.body;
 
       const factura = await ClienteCompletoService.generarFacturaInmediata(
-        id, 
+        id,
         conceptos_adicionales || []
       );
 
@@ -238,7 +267,7 @@ router.post('/:id/generar-factura',
 
     } catch (error) {
       console.error('❌ Error generando factura:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error generando factura'
@@ -273,7 +302,7 @@ router.get('/:id/servicios',
 
     } catch (error) {
       console.error('❌ Error obteniendo servicios:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error obteniendo servicios'
@@ -317,7 +346,7 @@ router.put('/:id/cambiar-plan',
 
     } catch (error) {
       console.error('❌ Error cambiando plan:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error cambiando plan'
@@ -352,7 +381,7 @@ router.put('/:id/suspender',
 
     } catch (error) {
       console.error('❌ Error suspendiendo servicio:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error suspendiendo servicio'
@@ -387,7 +416,7 @@ router.put('/:id/reactivar',
 
     } catch (error) {
       console.error('❌ Error reactivando servicio:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error reactivando servicio'
@@ -425,7 +454,7 @@ router.post('/previsualizar-factura',
 
     } catch (error) {
       console.error('❌ Error en previsualización:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error en previsualización'
@@ -465,7 +494,7 @@ router.get('/facturas',
 
     } catch (error) {
       console.error('❌ Error obteniendo facturas:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error obteniendo facturas'
@@ -501,7 +530,7 @@ router.get('/facturas/:id',
 
     } catch (error) {
       console.error('❌ Error obteniendo factura:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error obteniendo factura'
@@ -521,9 +550,9 @@ router.post('/:clienteId/agregar-sede', async (req, res) => {
   try {
     const { clienteId } = req.params;
     const { sede } = req.body;
-    
+
     const resultado = await ClienteCompletoServiceCorrecta.agregarNuevaSedeACliente(
-      clienteId, 
+      clienteId,
       sede,
       req.user?.id
     );
@@ -546,7 +575,7 @@ router.post('/:clienteId/agregar-sede', async (req, res) => {
 router.get('/:clienteId/sedes', async (req, res) => {
   try {
     const { clienteId } = req.params;
-    
+
     const sedes = await ClienteCompletoServiceCorrecta.listarSedesCliente(clienteId);
 
     res.json({
@@ -587,7 +616,7 @@ router.get('/contratos',
 
     } catch (error) {
       console.error('❌ Error obteniendo contratos:', error);
-      
+
       res.status(500).json({
         success: false,
         message: error.message || 'Error obteniendo contratos'
