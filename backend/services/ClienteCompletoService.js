@@ -433,96 +433,110 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
   }
 
 
-  static async generarOrdenInstalacionParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, contratoId, createdBy) {
-    try {
-      console.log('🔧 Generando orden de instalación para múltiples servicios con trazabilidad completa...');
+ static async generarOrdenInstalacionParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, contratoId, createdBy) {
+  try {
+    console.log('🔧 Generando orden de instalación para múltiples servicios con trazabilidad completa...');
 
-      const numeroOrden = await this.generarNumeroOrden(conexion);
+    const numeroOrden = await this.generarNumeroOrden(conexion);
 
-      // ✅ CORRECCIÓN: Calcular costo de instalación según tipo de contrato
-      const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
-      let costoInstalacionTotal = 0;
+    // ✅ CORRECCIÓN 1: Calcular costo CORRECTO según tipo de contrato
+    const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
+    let costoInstalacionTotal = 0;
 
-      if (tipoPermanencia === 'sin_permanencia') {
-        // Sin permanencia = 150,000 IVA incluido por cada servicio
-        costoInstalacionTotal = serviciosDeLaSede.length * 150000;
-      } else {
-        // Con permanencia = 50,000 por cada servicio
-        costoInstalacionTotal = serviciosDeLaSede.length * 50000;
-      }
+    // ✅ COSTO CORREGIDO: UNA sola instalación independiente de cantidad de servicios
+    if (tipoPermanencia === 'sin_permanencia') {
+      costoInstalacionTotal = 150000; // ✅ Una sola instalación de 150,000
+    } else {
+      costoInstalacionTotal = 50000;  // ✅ Una sola instalación de 50,000
+    }
 
-      // ✅ CORRECCIÓN: Crear array de IDs de servicios para asociación múltiple
-      const serviciosIds = serviciosDeLaSede.map(s => s.id);
-      const serviciosDescripcion = serviciosDeLaSede.map(s =>
-        `${s.tipo.toUpperCase()}: ${s.plan_nombre} - $${s.precio.toLocaleString()}`
-      ).join(' | ');
+    // ✅ CORRECCIÓN 2: Crear JSON con IDs de servicios para servicio_cliente_id
+    const serviciosIds = serviciosDeLaSede.map(s => s.id);
+    const serviciosDescripcion = serviciosDeLaSede.map(s =>
+      `${s.tipo.toUpperCase()}: ${s.plan_nombre} - $${s.precio.toLocaleString()}`
+    ).join(' + ');
 
-      const observacionesInstalacion = JSON.stringify({
-        sede_nombre: sedeData.nombre_sede || 'Sede Principal',
-        direccion_instalacion: sedeData.direccion_servicio,
-        contacto_sede: sedeData.contacto_sede,
-        telefono_sede: sedeData.telefono_sede,
-        servicios_descripcion: serviciosDescripcion,
-        cantidad_servicios: serviciosDeLaSede.length,
-        servicios_cliente_ids: serviciosIds, // ✅ Array de IDs para múltiples servicios
-        tipo_instalacion: 'nueva_sede_completa',
-        generada_automaticamente: true,
-        contrato_relacionado: contratoId,
-        tipo_permanencia: tipoPermanencia,
-        costo_por_servicio: costoInstalacionTotal / serviciosDeLaSede.length
-      });
+    // Preparar observaciones
+    const observacionesInstalacion = JSON.stringify({
+      servicios_a_instalar: serviciosDeLaSede.map(s => ({
+        id: s.id,
+        tipo: s.tipo,
+        plan: s.plan_nombre,
+        precio: s.precio
+      })),
+      sede: sedeData.nombre_sede || 'Sede Principal',
+      direccion: sedeData.direccion_servicio,
+      tipo_contrato: tipoPermanencia,
+      cantidad_servicios: serviciosDeLaSede.length,
+      servicios_descripcion: serviciosDescripcion,
+      notas_adicionales: sedeData.observaciones || ''
+    });
 
-      // ✅ CORRECCIÓN: Usar servicio_cliente_id como JSON array para múltiples servicios
-      const query = `
+    // Obtener datos del cliente para completar campos
+    const [clienteData] = await conexion.execute(
+      'SELECT nombre, direccion, barrio, telefono FROM clientes WHERE id = ?',
+      [clienteId]
+    );
+
+    const cliente = clienteData[0] || {};
+
+    const query = `
       INSERT INTO instalaciones (
-        numero_orden, cliente_id, contrato_id, servicio_cliente_id,
-        fecha_programada, hora_programada, direccion_instalacion, 
-        barrio, telefono_contacto, persona_recibe, tipo_instalacion, 
-        estado, costo_instalacion, observaciones, created_by, created_at
-      ) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 2 DAY), '09:00:00', ?, ?, ?, ?, 'nueva', 'programada', ?, ?, ?, NOW())
+        cliente_id, servicio_cliente_id, contrato_id, numero_orden,
+        direccion_instalacion, barrio, telefono_contacto, persona_recibe,
+        fecha_programada, hora_programada, tipo_instalacion,
+        costo_instalacion, estado, observaciones, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'programada', ?, ?)
     `;
 
-      const [resultado] = await conexion.execute(query, [
-        numeroOrden,
-        clienteId,
-        contratoId,
-        JSON.stringify(serviciosIds), // ✅ SOLUCIÓN: Guardar como JSON array para múltiples servicios
-        sedeData.direccion_servicio,
-        sedeData.barrio || 'No especificado',
-        sedeData.telefono_sede,
-        sedeData.contacto_sede,
-        costoInstalacionTotal,
-        observacionesInstalacion,
-        createdBy || 1
-      ]);
+    // Programar para mañana
+    const fechaProgramada = new Date();
+    fechaProgramada.setDate(fechaProgramada.getDate() + 1);
 
-      const instalacionId = resultado.insertId;
+    const parametros = [
+      clienteId,
+      JSON.stringify(serviciosIds), // ✅ CORRECCIÓN 2: JSON con todos los servicios
+      contratoId, // ✅ CORRECCIÓN 3: ID del contrato guardado correctamente
+      numeroOrden,
+      sedeData.direccion_servicio || cliente.direccion,
+      cliente.barrio || sedeData.barrio || 'No especificado',
+      sedeData.telefono_sede || cliente.telefono,
+      sedeData.contacto_sede || cliente.nombre,
+      fechaProgramada.toISOString().split('T')[0],
+      '09:00:00',
+      'nueva',
+      costoInstalacionTotal, // ✅ CORRECCIÓN 1: Costo correcto
+      observacionesInstalacion,
+      createdBy || 1
+    ];
 
-      console.log(`✅ Orden de instalación ${numeroOrden} creada:`, {
-        instalacion_id: instalacionId,
-        contrato_id: contratoId,
-        servicios_incluidos: serviciosDeLaSede.length,
-        servicios_ids: serviciosIds,
-        costo_total: costoInstalacionTotal,
-        tipo_permanencia: tipoPermanencia,
-        created_by: createdBy
-      });
+    const [resultado] = await conexion.execute(query, parametros);
+    const instalacionId = resultado.insertId;
 
-      return {
-        id: instalacionId,
-        numero: numeroOrden,
-        contrato_id: contratoId,
-        servicios_cliente_ids: serviciosIds,
-        estado: 'programada',
-        servicios_incluidos: serviciosDeLaSede.length,
-        costo_total: costoInstalacionTotal
-      };
+    console.log(`✅ Orden de instalación ${numeroOrden} creada CORREGIDA:`, {
+      instalacion_id: instalacionId,
+      contrato_id: contratoId, // ✅ Confirmado que se guarda
+      servicios_ids: serviciosIds, // ✅ Confirmado JSON con todos los servicios
+      costo_correcto: costoInstalacionTotal, // ✅ Confirmado costo correcto
+      servicios_incluidos: serviciosDeLaSede.length,
+      tipo_permanencia: tipoPermanencia
+    });
 
-    } catch (error) {
-      console.error('❌ Error generando orden de instalación:', error);
-      throw error;
-    }
+    return {
+      id: instalacionId,
+      numero: numeroOrden,
+      contrato_id: contratoId,
+      servicios_cliente_ids: serviciosIds,
+      estado: 'programada',
+      servicios_incluidos: serviciosDeLaSede.length,
+      costo_total: costoInstalacionTotal
+    };
+
+  } catch (error) {
+    console.error('❌ Error generando orden de instalación:', error);
+    throw error;
   }
+}
   /**
    * Generar orden de instalación interna COMPLETA
    */
