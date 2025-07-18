@@ -6,6 +6,8 @@ const { Database } = require('../models/Database');
 const pool = require('../config/database');
 
 class ClienteCompletoService {
+
+  
   /**
    * Crear cliente completo con servicio y documentos automáticos
    */
@@ -160,10 +162,61 @@ class ClienteCompletoService {
   /**
    * Asignar servicio al cliente con created_by
    */
-  static async asignarServicioCliente(conexion, clienteId, datosServicio, createdBy = null) {
-    console.log('🔌 Asignando servicio al cliente:', datosServicio);
+static async asignarServicioCliente(conexion, clienteId, datosServicio, createdBy = null) {
+  console.log('🔌 Asignando servicio al cliente:', datosServicio);
 
+  if (!datosServicio || !datosServicio.plan_id) {
+    throw new Error('Datos del servicio son requeridos y deben incluir plan_id');
   }
+
+  // Obtener información del plan
+  const [planes] = await conexion.execute(
+    'SELECT * FROM planes_servicio WHERE id = ? AND activo = 1',
+    [datosServicio.plan_id]
+  );
+
+  if (planes.length === 0) {
+    throw new Error(`Plan con ID ${datosServicio.plan_id} no encontrado o inactivo`);
+  }
+
+  const plan = planes[0];
+  
+  // Calcular precio (personalizado o del plan)
+  const precio = datosServicio.precio_personalizado || plan.precio;
+  
+  // Crear observaciones
+  const observaciones = JSON.stringify({
+    plan_original: plan.nombre,
+    precio_plan: plan.precio,
+    precio_aplicado: precio,
+    tipo_permanencia: datosServicio.tipo_permanencia || 'sin_permanencia',
+    fecha_creacion: new Date().toISOString(),
+    created_by: createdBy
+  });
+
+  const query = `
+    INSERT INTO servicios_cliente (
+      cliente_id, plan_id, fecha_activacion, precio_personalizado,
+      observaciones, estado, created_at
+    ) VALUES (?, ?, ?, ?, ?, 'activo', NOW())
+  `;
+
+  const valores = [
+    clienteId,
+    datosServicio.plan_id,
+    datosServicio.fecha_activacion || new Date().toISOString().split('T')[0],
+    precio,
+    observaciones
+  ];
+
+  console.log('🔍 Query servicio:', query);
+  console.log('🔍 Valores servicio:', valores);
+
+  const [resultado] = await conexion.execute(query, valores);
+
+  console.log('✅ Servicio asignado con ID:', resultado.insertId);
+  return resultado.insertId;
+}
 
   /**
    * Generar primera factura interna COMPLETA con todos los campos
