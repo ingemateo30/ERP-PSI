@@ -134,50 +134,67 @@ const InstalacionModal = ({
     }
   };
 
-  const cargarDatosInstalacion = (instalacion) => {
-    console.log('📝 Cargando datos de instalación:', instalacion);
+ const cargarDatosInstalacion = (instalacion) => {
+  console.log('📋 Cargando datos de instalación:', instalacion);
+  
+  // ✅ Manejar servicio_cliente_id múltiple
+  let servicioClienteId = instalacion.servicio_cliente_id;
+  
+  // Si es un JSON array, tomar el primer elemento para compatibilidad
+  if (typeof servicioClienteId === 'string' && servicioClienteId.startsWith('[')) {
+    try {
+      const serviciosArray = JSON.parse(servicioClienteId);
+      servicioClienteId = serviciosArray[0] || '';
+    } catch (error) {
+      console.warn('Error parseando servicios múltiples:', error);
+      servicioClienteId = '';
+    }
+  }
 
-    // Cargar datos básicos
-    setFormData({
-      cliente_id: instalacion.cliente_id || '',
-      servicio_cliente_id: instalacion.servicio_cliente_id || '',
-      instalador_id: instalacion.instalador_id || '',
-      fecha_programada: instalacion.fecha_programada ? 
-        new Date(instalacion.fecha_programada).toISOString().split('T')[0] : '',
-      hora_programada: instalacion.hora_programada || '',
-      direccion_instalacion: instalacion.direccion_instalacion || '',
-      barrio: instalacion.barrio || '',
-      telefono_contacto: instalacion.telefono_contacto || '',
-      persona_recibe: instalacion.persona_recibe || '',
-      tipo_instalacion: instalacion.tipo_instalacion || 'nueva',
-      observaciones: instalacion.observaciones || '',
-      equipos_instalados: instalacion.equipos_instalados ? 
-        (typeof instalacion.equipos_instalados === 'string' ? 
-          JSON.parse(instalacion.equipos_instalados) : instalacion.equipos_instalados) : [],
-      costo_instalacion: instalacion.costo_instalacion || 0,
-      coordenadas_lat: instalacion.coordenadas_lat || '',
-      coordenadas_lng: instalacion.coordenadas_lng || ''
+  setFormData({
+    cliente_id: instalacion.cliente_id || '',
+    servicio_cliente_id: servicioClienteId,
+    fecha_programada: instalacion.fecha_programada || '',
+    hora_programada: instalacion.hora_programada || '09:00',
+    direccion_instalacion: instalacion.direccion_instalacion || '',
+    barrio: instalacion.barrio || '',
+    telefono_contacto: instalacion.telefono_contacto || '',
+    persona_recibe: instalacion.persona_recibe || '',
+    tipo_instalacion: instalacion.tipo_instalacion || 'nueva',
+    estado: instalacion.estado || 'programada',
+    equipos_requeridos: Array.isArray(instalacion.equipos_requeridos) ? 
+      instalacion.equipos_requeridos : 
+      (typeof instalacion.equipos_requeridos === 'string' ? 
+        JSON.parse(instalacion.equipos_requeridos || '[]') : []),
+    observaciones: instalacion.observaciones || '',
+    // ✅ CORRECCIÓN: Usar costo calculado correctamente
+    costo_instalacion: instalacion.costo_instalacion || 0,
+    coordenadas_lat: instalacion.coordenadas_lat || '',
+    coordenadas_lng: instalacion.coordenadas_lng || ''
+  });
+
+  // Mostrar información de múltiples servicios si existe
+  if (instalacion.observaciones) {
+    try {
+      const obs = JSON.parse(instalacion.observaciones);
+      if (obs.cantidad_servicios > 1) {
+        console.log(`📊 Instalación para ${obs.cantidad_servicios} servicios:`, obs.servicios_descripcion);
+      }
+    } catch (error) {
+      console.warn('Error parseando observaciones:', error);
+    }
+  }
+
+  // Si hay información del cliente, cargarla
+  if (instalacion.cliente_nombre) {
+    setClienteSeleccionado({
+      id: instalacion.cliente_id,
+      nombre_completo: instalacion.cliente_nombre,
+      identificacion: instalacion.cliente_identificacion,
+      telefono: instalacion.cliente_telefono
     });
-
-    // Si hay información del cliente, cargarla
-    if (instalacion.cliente_nombre) {
-      setClienteSeleccionado({
-        id: instalacion.cliente_id,
-        nombre_completo: instalacion.cliente_nombre,
-        identificacion: instalacion.cliente_identificacion,
-        telefono: instalacion.cliente_telefono
-      });
-    }
-
-    // Para modo completar, cargar datos adicionales
-    if (modo === 'completar') {
-      setDatosCompletacion(prev => ({
-        ...prev,
-        hora_inicio: instalacion.hora_inicio || '',
-        equipos_finales: instalacion.equipos_instalados || []
-      }));
-    }
-  };
+  }
+};
 
   const cargarServiciosCliente = async (clienteId) => {
     try {

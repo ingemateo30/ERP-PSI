@@ -10,17 +10,27 @@ class ClienteCompletoService {
   async createClienteCompleto(datosCompletos) {
     try {
       console.log('🚀 Enviando datos completos por sede:', datosCompletos);
+
+       const user = JSON.parse(localStorage.getItem('user'));
+      const createdBy = user?.id || 1;
       
       // Validar estructura de datos antes de enviar
       this.validarDatosCompletos(datosCompletos);
+
+    
       
       // SOLUCIÓN: Asegurar que los datos estén en el formato correcto
       const datosLimpios = this.limpiarDatosParaEnvio(datosCompletos);
       
       console.log('📦 Datos limpios para envío:', datosLimpios);
+
+         const datosConCreatedBy = {
+        ...datosLimpios,
+        created_by: createdBy
+      };
       
       // Enviar al endpoint correcto
-      const response = await apiService.post('/clientes-completo/crear', datosLimpios);
+      const response = await apiService.post('/clientes-completo/crear', datosConCreatedBy);
       
       console.log('✅ Cliente completo creado:', response);
       return response;
