@@ -77,7 +77,7 @@ router.post('/crear', async (req, res) => {
     });
 
     // ✅ LLAMAR AL SERVICIO CON DATOS CORRECTOS
-    const resultado = await ClienteCompletoService.crearClienteCompleto(
+    const resultado = await ClienteCompletoService.crearClienteConServicios(
       datosCompletos,
       createdBy
     );

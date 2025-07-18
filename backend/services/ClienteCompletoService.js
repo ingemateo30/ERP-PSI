@@ -1488,54 +1488,93 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
    * Crear todos los servicios de UNA sede específica
    */
   static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
-    const serviciosCreados = [];
+  const serviciosCreados = [];
+  
+  // ✅ CORRECCIÓN: Procesar TODOS los servicios seleccionados
+  const serviciosParaCrear = [];
+  
+  // Verificar si hay servicio de internet
+  if (sedeData.planInternetId) {
+    serviciosParaCrear.push({
+      tipo: 'internet',
+      plan_id: sedeData.planInternetId,
+      precio: sedeData.precioInternetCustom || null
+    });
+  }
+  
+  // Verificar si hay servicio de televisión
+  if (sedeData.planTelevisionId) {
+    serviciosParaCrear.push({
+      tipo: 'television',
+      plan_id: sedeData.planTelevisionId,
+      precio: sedeData.precioTelevisionCustom || null
+    });
+  }
+  
+  // Si no hay servicios separados, usar plan único
+  if (serviciosParaCrear.length === 0 && sedeData.plan_id) {
+    serviciosParaCrear.push({
+      tipo: 'combo',
+      plan_id: sedeData.plan_id,
+      precio: sedeData.precio_personalizado || null
+    });
+  }
 
-    // Obtener el plan para verificar si es combo
-    const [planes] = await conexion.execute(
-      'SELECT * FROM planes_servicio WHERE id IN (?, ?)',
-      [sedeData.planInternetId || 0, sedeData.planTelevisionId || 0]
+  // ✅ CORRECCIÓN: Crear CADA servicio por separado
+  for (const servicioData of serviciosParaCrear) {
+    // Obtener información del plan
+    const [planInfo] = await conexion.execute(
+      'SELECT nombre, precio, tipo FROM planes_servicio WHERE id = ?',
+      [servicioData.plan_id]
     );
 
-    // INTERNET en esta sede
-    if (sedeData.planInternetId) {
-      const planInternet = planes.find(p => p.id == sedeData.planInternetId);
-
-      const servicioInternet = await this.crearServicioIndividual(
-        conexion,
-        clienteId,
-        {
-          plan_id: sedeData.planInternetId,
-          precio: sedeData.precioPersonalizado ? sedeData.precioInternetCustom :
-            (planInternet.tipo === 'combo' ? planInternet.precio_internet : planInternet.precio),
-          sede_data: sedeData,
-          tipo: 'internet'
-        },
-        createdBy
-      );
-      serviciosCreados.push(servicioInternet);
+    if (planInfo.length === 0) {
+      throw new Error(`Plan ${servicioData.plan_id} no encontrado`);
     }
 
-    // TELEVISION en esta sede
-    if (sedeData.planTelevisionId) {
-      const planTv = planes.find(p => p.id == sedeData.planTelevisionId);
+    const plan = planInfo[0];
+    const precioFinal = servicioData.precio || plan.precio;
 
-      const servicioTv = await this.crearServicioIndividual(
-        conexion,
-        clienteId,
-        {
-          plan_id: sedeData.planTelevisionId,
-          precio: sedeData.precioPersonalizado ? sedeData.precioTelevisionCustom :
-            (planTv.tipo === 'combo' ? planTv.precio_television : planTv.precio),
-          sede_data: sedeData,
-          tipo: 'television'
-        },
-        createdBy
-      );
-      serviciosCreados.push(servicioTv);
-    }
+    // ✅ CORRECCIÓN: Incluir observaciones en cada servicio
+    const observacionesServicio = JSON.stringify({
+      sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+      direccion_sede: sedeData.direccion_servicio || '',
+      tipo_contrato: sedeData.tipoContrato || 'sin_permanencia',
+      observaciones_adicionales: sedeData.observaciones || '', // ✅ OBSERVACIONES guardadas
+      fecha_creacion: new Date().toISOString(),
+      creado_desde_sede: true
+    });
 
-    return serviciosCreados;
+    const queryServicio = `
+      INSERT INTO servicios_cliente (
+        cliente_id, plan_id, precio_personalizado, fecha_activacion,
+        estado, observaciones
+      ) VALUES (?, ?, ?, ?, 'activo', ?)
+    `;
+
+    const [resultado] = await conexion.execute(queryServicio, [
+      clienteId,
+      servicioData.plan_id,
+      precioFinal,
+      sedeData.fecha_activacion || new Date().toISOString().split('T')[0],
+      observacionesServicio, // ✅ OBSERVACIONES incluidas
+     
+    ]);
+
+    serviciosCreados.push({
+      id: resultado.insertId,
+      plan_id: servicioData.plan_id,
+      plan_nombre: plan.nombre,
+      tipo: plan.tipo,
+      precio: precioFinal,
+      observaciones: observacionesServicio
+    });
+
+    console.log(`✅ Servicio ${plan.tipo} creado: ${plan.nombre} - $${precioFinal}`);
   }
+
+  return serviciosCreados;
+}
 
   /**
    * Crear un servicio individual
@@ -1651,7 +1690,7 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
 
     // ✅ CORRECCIÓN: Usar JSON array para múltiples servicios en servicio_id
     const serviciosIds = serviciosDeLaSede.map(s => s.id);
-    const servicioIdValue = serviciosIds.length === 1 ? serviciosIds[0] : JSON.stringify(serviciosIds);
+    const servicioIdValue = JSON.stringify(serviciosIds);
 
     const query = `
     INSERT INTO contratos (
