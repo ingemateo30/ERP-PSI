@@ -574,8 +574,66 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
     alert(mensaje);
   };
+  
 
   const planSeleccionado = planesDisponibles.find(p => p.id == formData.plan_id);
+
+  const verificarRequierePermanencia = () => {
+  if (formData.usarServiciosSeparados) {
+    // Verificar si alguno de los planes seleccionados requiere permanencia
+    const planInternet = formData.planInternetId ? 
+      planesDisponibles.find(p => p.id === parseInt(formData.planInternetId)) : null;
+    const planTV = formData.planTelevisionId ? 
+      planesDisponibles.find(p => p.id === parseInt(formData.planTelevisionId)) : null;
+    
+    return (planInternet?.aplica_permanencia) || (planTV?.aplica_permanencia);
+  } else {
+    // Verificar el plan único
+    const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
+    return planSeleccionado?.aplica_permanencia;
+  }
+};
+
+const obtenerCostoInstalacion = () => {
+  let costoConPermanencia = 50000;
+  let costoSinPermanencia = 150000;
+
+  if (formData.usarServiciosSeparados) {
+    // Para servicios separados, usar el costo del plan más restrictivo
+    const planInternet = formData.planInternetId ? 
+      planesDisponibles.find(p => p.id === parseInt(formData.planInternetId)) : null;
+    const planTV = formData.planTelevisionId ? 
+      planesDisponibles.find(p => p.id === parseInt(formData.planTelevisionId)) : null;
+    
+    // Tomar el costo más alto si hay diferencias entre planes
+    if (planInternet?.costo_instalacion_permanencia) {
+      costoConPermanencia = Math.max(costoConPermanencia, planInternet.costo_instalacion_permanencia);
+    }
+    if (planTV?.costo_instalacion_permanencia) {
+      costoConPermanencia = Math.max(costoConPermanencia, planTV.costo_instalacion_permanencia);
+    }
+    if (planInternet?.costo_instalacion_sin_permanencia) {
+      costoSinPermanencia = Math.max(costoSinPermanencia, planInternet.costo_instalacion_sin_permanencia);
+    }
+    if (planTV?.costo_instalacion_sin_permanencia) {
+      costoSinPermanencia = Math.max(costoSinPermanencia, planTV.costo_instalacion_sin_permanencia);
+    }
+  } else {
+    // Para plan único
+    const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
+    if (planSeleccionado) {
+      costoConPermanencia = planSeleccionado.costo_instalacion_permanencia || 50000;
+      costoSinPermanencia = planSeleccionado.costo_instalacion_sin_permanencia || 150000;
+    }
+  }
+
+  return {
+    con_permanencia: costoConPermanencia,
+    sin_permanencia: costoSinPermanencia
+  };
+};
+
+
 
   if (loading) {
     return (
