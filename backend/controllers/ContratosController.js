@@ -152,6 +152,9 @@ class ContratosController {
 
     static async generarPDF(req, res) {
         try {
+
+            res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+            res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
             const { id } = req.params;
             console.log(`📄 Generando PDF para contrato ID: ${id}`);
 
@@ -352,6 +355,250 @@ class ContratosController {
                 message: 'Error interno del servidor',
                 error: error.message
             });
+        }
+    }
+
+    static async abrirParaFirma(req, res) {
+        try {
+            const { id } = req.params;
+
+            console.log(`📋 Abriendo contrato ${id} para firma digital`);
+
+            if (!id || isNaN(id)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID de contrato inválido'
+                });
+            }
+
+            const contratos = await Database.query(`
+    SELECT * FROM contratos WHERE id = ?
+`, [id]);
+
+            if (!contratos) {
+                console.log(`❌ Contrato ${id} no encontrado en la base de datos`);
+                return res.status(404).json({
+                    success: false,
+                    message: `Contrato con ID ${id} no encontrado`
+                });
+            }
+
+            const contrato = contratos[0];
+
+            console.log('🔍 DEBUG - contrato completo:', contrato);
+            console.log('🔍 DEBUG - contrato.cliente_id:', contrato.cliente_id);
+            console.log('🔍 DEBUG - tipo cliente_id:', typeof contrato.cliente_id);
+            // Ahora obtener datos del cliente por separado
+            const clientesResult = await Database.query(`
+            SELECT * FROM clientes WHERE id = ?
+        `, [contrato.cliente_id]);
+
+            if (clientesResult.length === 0) {
+
+                return res.status(404).json({
+                    success: false,
+                    message: `Cliente asociado al contrato no encontrado`
+                });
+            }
+
+            const cliente = clientesResult[0];
+            console.log(`✅ Cliente encontrado: ${cliente.nombre}`);
+
+            // Verificar si ya está firmado
+            const yaFirmado = Boolean(contrato.firmado_cliente) || Boolean(contrato.fecha_firma);
+            console.log(`🔍 Estado de firma: firmado_cliente=${contrato.firmado_cliente}, fecha_firma=${contrato.fecha_firma}, yaFirmado=${yaFirmado}`);
+
+            // Estructura de datos para VisorFirmaPDF
+            const datosVisor = {
+                id: contrato.id,
+                numero_contrato: contrato.numero_contrato,
+                fecha_inicio: contrato.fecha_inicio,
+                tipo_permanencia: contrato.tipo_permanencia,
+                permanencia_meses: contrato.permanencia_meses || 0,
+                costo_instalacion: parseFloat(contrato.costo_instalacion) || 0,
+                estado: contrato.estado,
+                cliente_nombre: cliente.nombre,
+                cliente_identificacion: cliente.identificacion,
+                cliente_telefono: cliente.telefono,
+                cliente_email: cliente.correo,
+                firmado: yaFirmado,
+                fecha_firma: contrato.fecha_firma,
+                puede_firmar: !yaFirmado && contrato.estado === 'activo',
+                mensaje_estado: yaFirmado ? 'Este contrato ya ha sido firmado' : 'Listo para firma digital'
+            };
+
+            res.json({
+                success: true,
+                message: yaFirmado ? 'Contrato ya firmado' : 'Contrato listo para firma',
+                data: datosVisor
+            });
+
+        } catch (error) {
+            console.error('❌ Error abriendo contrato para firma:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error interno del servidor',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    }
+
+    /**
+     * @route POST /api/v1/contratos/:id/procesar-firma
+     * @desc Procesar firma desde VisorFirmaPDF (campos REALES de la BD)
+     */
+    /**
+     * @route POST /api/v1/contratos/:id/procesar-firma
+     * @desc Procesar firma desde VisorFirmaPDF (campos REALES de la BD)
+     */
+    static async procesarFirmaDigital(req, res) {
+        let conexion;
+
+        try {
+            conexion = await db.getConnection();
+            await conexion.beginTransaction();
+
+            const { id } = req.params;
+            const {
+                signature_base64,
+                firmado_por,
+                cedula_firmante,
+                tipo_firma = 'digital',
+                observaciones = ''
+            } = req.body;
+
+            console.log(`🖊️ Procesando firma digital del contrato ${id}`);
+
+            // Validaciones
+            if (!id || isNaN(id)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID de contrato inválido'
+                });
+            }
+
+            if (!signature_base64 || !firmado_por || !cedula_firmante) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Datos de firma incompletos: signature_base64, firmado_por y cedula_firmante son requeridos'
+                });
+            }
+
+            // Obtener contrato actual con campos REALES
+            const [contratos] = await conexion.execute(`
+        SELECT * FROM contratos WHERE id = ?
+      `, [id]);
+
+            if (contratos.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Contrato no encontrado'
+                });
+            }
+
+            const contrato = contratos[0];
+
+            // Verificar si ya está firmado
+            if (contrato.firmado_cliente || contrato.fecha_firma) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Este contrato ya ha sido firmado'
+                });
+            }
+
+            // Verificar estado del contrato
+            if (contrato.estado !== 'activo') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Solo se pueden firmar contratos en estado activo'
+                });
+            }
+
+            // Crear directorio para PDFs si no existe
+            const uploadsDir = path.join(process.cwd(), 'uploads', 'contratos');
+            if (!fs.existsSync(uploadsDir)) {
+                fs.mkdirSync(uploadsDir, { recursive: true });
+            }
+
+            // Generar nombre del archivo PDF firmado
+            const nombrePDFFirmado = `contrato_${contrato.numero_contrato}_firmado_${Date.now()}.pdf`;
+            const rutaPDFFirmado = path.join(uploadsDir, nombrePDFFirmado);
+
+            // Por ahora, guardamos la firma como imagen en JSON hasta implementar PDF
+            const datosFirma = {
+                signature_base64: signature_base64,
+                firmado_por: firmado_por,
+                cedula_firmante: cedula_firmante,
+                tipo_firma: tipo_firma,
+                fecha_firma: new Date().toISOString(),
+                observaciones_firma: observaciones
+            };
+
+            // Actualizar el contrato con los campos REALES de la BD
+            const observacionesActualizadas = `${contrato.observaciones || ''}\n[FIRMA DIGITAL] Firmado por: ${firmado_por} - Cédula: ${cedula_firmante} - Fecha: ${new Date().toLocaleString()} - Tipo: ${tipo_firma}${observaciones ? ` - Obs: ${observaciones}` : ''}`;
+
+            await conexion.execute(`
+        UPDATE contratos SET
+          firmado_cliente = 1,
+          fecha_firma = CURDATE(),
+          observaciones = ?,
+          documento_pdf_path = ?,
+          updated_at = NOW()
+        WHERE id = ?
+      `, [
+                observacionesActualizadas,
+                rutaPDFFirmado, // Ruta donde se guardará el PDF firmado
+                id
+            ]);
+
+            // Guardar datos de la firma temporalmente en JSON hasta implementar PDF
+            const datosTemporales = {
+                contrato_id: id,
+                datos_firma: datosFirma,
+                fecha_procesamiento: new Date().toISOString()
+            };
+
+            fs.writeFileSync(
+                path.join(uploadsDir, `firma_${contrato.numero_contrato}_${Date.now()}.json`),
+                JSON.stringify(datosTemporales, null, 2)
+            );
+
+            await conexion.commit();
+
+            console.log(`✅ Contrato ${contrato.numero_contrato} firmado exitosamente`);
+
+            // Respuesta para VisorFirmaPDF
+            const respuesta = {
+                success: true,
+                contrato_id: parseInt(id),
+                numero_contrato: contrato.numero_contrato,
+                firmado_por: firmado_por,
+                cedula_firmante: cedula_firmante,
+                fecha_firma: new Date().toISOString(),
+                documento_pdf_path: rutaPDFFirmado,
+                mensaje: 'Contrato firmado digitalmente y guardado exitosamente'
+            };
+
+            res.json({
+                success: true,
+                message: 'Firma procesada exitosamente',
+                data: respuesta
+            });
+
+        } catch (error) {
+            if (conexion) {
+                await conexion.rollback();
+            }
+            console.error('❌ Error procesando firma digital:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error procesando la firma',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        } finally {
+            if (conexion) {
+                conexion.release();
+            }
         }
     }
 }

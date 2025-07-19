@@ -339,6 +339,15 @@ class ContratosService {
         }
     }
 
+    async obtenerUrlPDF(id) {
+    try {
+        // Retornar URL con token para autenticación
+        const token = localStorage.getItem('token');
+        return `${API_BASE}/${id}/pdf?t=${Date.now()}&authorization=${token}`;
+    } catch (error) {
+        throw this.handleError(error);
+    }
+}
     /**
      * Procesar firma digital con canvas/imagen y guardar PDF
      */
