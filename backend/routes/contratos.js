@@ -59,6 +59,18 @@ router.put('/:id/estado',
   ContratosController.actualizarEstado
 );
 
+/**
+ * @route GET /api/v1/contratos/:id/abrir-firma
+ * @desc Obtener contrato para proceso de firma
+ */
+router.get('/:id/abrir-firma', ContratosController.abrirParaFirma);
+
+/**
+ * @route POST /api/v1/contratos/:id/procesar-firma
+ * @desc Procesar firma digital y guardar PDF
+ */
+router.post('/:id/procesar-firma', ContratosController.procesarFirmaDigital);
+
 console.log('✅ Rutas de contratos cargadas correctamente');
 
 module.exports = router;

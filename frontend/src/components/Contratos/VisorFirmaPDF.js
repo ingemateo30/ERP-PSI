@@ -36,32 +36,37 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
   }, [contratoId]);
 
   const cargarContratoParaFirma = async () => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
+    
+    console.log('📋 Cargando contrato para firma usando servicio...');
+    
+    // CORRECCIÓN: Usar el servicio
+    const contratosService = await import('../../services/contratosService');
+    const service = contratosService.default;
+    
+    const response = await service.cargarContratoParaFirma(contratoId);
+    
+    if (response.success && response.data) {
+      setContratoData(response.data);
+      setPdfUrl(`http://localhost:3000/api/v1/contratos/${contratoId}/pdf?t=${Date.now()}`);
       
-      const response = await fetch(`/api/v1/contratos/${contratoId}/abrir-firma`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setContratoData(data.data);
-        setPdfUrl(`/api/v1/contratos/${contratoId}/pdf?t=${Date.now()}`);
-        
-        // Pre-llenar con datos del cliente si existen
-        setDatosSignature(prev => ({
-          ...prev,
-          firmado_por: data.data.cliente_nombre || '',
-          cedula_firmante: data.data.cliente_identificacion || ''
-        }));
-      } else {
-        setError(data.message || 'Error cargando contrato');
-      }
-    } catch (error) {
-      console.error('Error cargando contrato:', error);
-      setError('Error de comunicación con el servidor');
-    } finally {
-      setLoading(false);
+      // Pre-llenar con datos del cliente si existen
+      setDatosSignature(prev => ({
+        ...prev,
+        firmado_por: response.data.cliente_nombre || '',
+        cedula_firmante: response.data.cliente_identificacion || ''
+      }));
+    } else {
+      throw new Error(response.message || 'Error cargando contrato');
     }
-  };
+  } catch (error) {
+    console.error('❌ Error cargando contrato desde servicio:', error);
+    setError('Error cargando contrato: ' + error.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const limpiarFirma = () => {
     if (sigCanvas.current) {
@@ -90,70 +95,71 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
     }
   };
 
-  const procesarFirma = async () => {
-    try {
-      // Validaciones
-      if (!datosSignature.firmado_por.trim()) {
-        setError('Debe especificar el nombre del firmante');
-        return;
-      }
-
-      if (!datosSignature.cedula_firmante.trim()) {
-        setError('Debe especificar la cédula del firmante');
-        return;
-      }
-
-      let signatureBase64 = datosSignature.signature_base64;
-
-      // Capturar firma digital si es necesario
-      if (modoFirma === 'digital') {
-        if (sigCanvas.current && sigCanvas.current.isEmpty()) {
-          setError('Debe firmar en el área designada');
-          return;
-        }
-        signatureBase64 = sigCanvas.current.getTrimmedCanvas().toDataURL();
-      }
-
-      if (!signatureBase64) {
-        setError('Debe proporcionar una firma');
-        return;
-      }
-
-      setProcesandoFirma(true);
-      setError('');
-
-      const response = await fetch(`/api/v1/contratos/${contratoId}/procesar-firma`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ...datosSignature,
-          signature_base64: signatureBase64,
-          tipo_firma: modoFirma
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setSuccess('Contrato firmado exitosamente');
-        setTimeout(() => {
-          if (onFirmaCompleta) {
-            onFirmaCompleta(result.data);
-          }
-        }, 2000);
-      } else {
-        setError(result.message || 'Error procesando la firma');
-      }
-
-    } catch (error) {
-      console.error('Error procesando firma:', error);
-      setError('Error de comunicación con el servidor');
-    } finally {
-      setProcesandoFirma(false);
+const procesarFirma = async () => {
+  try {
+    // Validaciones
+    if (!datosSignature.firmado_por.trim()) {
+      setError('Debe especificar el nombre del firmante');
+      return;
     }
-  };
+
+    if (!datosSignature.cedula_firmante.trim()) {
+      setError('Debe especificar la cédula del firmante');
+      return;
+    }
+
+    let signatureBase64 = datosSignature.signature_base64;
+
+    // Capturar firma digital si es necesario
+    if (modoFirma === 'digital') {
+      if (sigCanvas.current && sigCanvas.current.isEmpty()) {
+        setError('Debe firmar en el área designada');
+        return;
+      }
+      signatureBase64 = sigCanvas.current.getTrimmedCanvas().toDataURL();
+    }
+
+    if (!signatureBase64) {
+      setError('Debe proporcionar una firma');
+      return;
+    }
+
+    setProcesandoFirma(true);
+    setError('');
+
+    console.log('🖊️ Procesando firma digital usando servicio...');
+
+    // CORRECCIÓN: Usar el servicio
+    const contratosService = await import('../../services/contratosService');
+    const service = contratosService.default;
+
+    const datosParaEnviar = {
+      ...datosSignature,
+      signature_base64: signatureBase64,
+      tipo_firma: modoFirma
+    };
+
+    const response = await service.procesarFirmaDigital(contratoId, datosParaEnviar);
+
+    if (response.success) {
+      setSuccess('¡Contrato firmado digitalmente y guardado exitosamente!');
+      
+      setTimeout(() => {
+        if (onFirmaCompleta) {
+          onFirmaCompleta(response.data);
+        }
+      }, 1500);
+    } else {
+      throw new Error(response.message || 'Error procesando la firma');
+    }
+
+  } catch (error) {
+    console.error('❌ Error procesando firma:', error);
+    setError('Error procesando firma: ' + error.message);
+  } finally {
+    setProcesandoFirma(false);
+  }
+};
 
   if (loading) {
     return (

@@ -193,6 +193,95 @@ class ContratosService {
     }
 
     /**
+ * Obtener contratos para firma (con filtros específicos)
+ */
+    async obtenerContratosParaFirma(params = {}) {
+        try {
+            console.log('✍️ Obteniendo contratos para firma:', params);
+
+            // Construir parámetros específicos para firma
+            const filtros = {
+                limit: 50,
+                estado: 'activo',
+                ...params
+            };
+
+            // Manejo de filtros específicos de firma
+            if (params.filtroEstado === 'pendiente') {
+                filtros.firmado = 'false';
+            } else if (params.filtroEstado === 'firmado') {
+                filtros.firmado = 'true';
+            } else if (params.filtroEstado !== 'todos' && params.filtroEstado) {
+                filtros.estado = params.filtroEstado;
+            }
+
+            // Limpiar filtroEstado ya que no es un parámetro del backend
+            delete filtros.filtroEstado;
+
+            const response = await apiService.get(API_BASE, filtros);
+
+            console.log('✅ Contratos para firma obtenidos exitosamente');
+            return response;
+        } catch (error) {
+            console.error('❌ Error obteniendo contratos para firma:', error);
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Buscar contratos para firma
+     */
+    async buscarContratosParaFirma(termino, filtroEstado = 'todos') {
+        try {
+            console.log('🔍 Buscando contratos para firma:', { termino, filtroEstado });
+
+            if (!termino || termino.length < 2) {
+                return await this.obtenerContratosParaFirma({ filtroEstado });
+            }
+
+            const filtros = {
+                search: termino,
+                limit: 20,
+                filtroEstado
+            };
+
+            return await this.obtenerContratosParaFirma(filtros);
+        } catch (error) {
+            console.error('❌ Error buscando contratos para firma:', error);
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Procesar firma de contrato
+     */
+    async procesarFirmaContrato(id, datosF, irma) {
+        try {
+            console.log(`✍️ Procesando firma del contrato ID: ${id}`);
+
+            if (!id || isNaN(id)) {
+                throw new Error('ID de contrato inválido');
+            }
+
+            const datos = {
+                estado: 'activo',
+                fecha_firma: datosF.irma.fecha_firma || new Date().toISOString().split('T')[0],
+                observaciones: datosF.irma.observaciones || 'Contrato firmado por el cliente',
+                lugar_firma: datosF.irma.lugar_firma || '',
+                firmado_por: datosF.irma.firmado_por || ''
+            };
+
+            const response = await apiService.put(`${API_BASE}/${id}/estado`, datos);
+
+            console.log('✅ Firma procesada exitosamente');
+            return response;
+        } catch (error) {
+            console.error('❌ Error procesando firma:', error);
+            throw this.handleError(error);
+        }
+    }
+
+    /**
      * Filtrar contratos por estado
      */
     async filtrarPorEstado(estado, params = {}) {
@@ -228,6 +317,50 @@ class ContratosService {
             return await this.obtenerTodos(params);
         } catch (error) {
             console.error('❌ Error obteniendo contratos próximos a vencer:', error);
+            throw this.handleError(error);
+        }
+    }
+
+    async cargarContratoParaFirma(id) {
+        try {
+            console.log(`📋 Cargando contrato para firma ID: ${id}`);
+
+            if (!id || isNaN(id)) {
+                throw new Error('ID de contrato inválido');
+            }
+
+            const response = await apiService.get(`${API_BASE}/${id}/abrir-firma`);
+
+            console.log('✅ Contrato para firma cargado exitosamente');
+            return response;
+        } catch (error) {
+            console.error('❌ Error cargando contrato para firma:', error);
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Procesar firma digital con canvas/imagen y guardar PDF
+     */
+    async procesarFirmaDigital(id, datosSignature) {
+        try {
+            console.log(`🖊️ Procesando firma digital del contrato ID: ${id}`);
+
+            if (!id || isNaN(id)) {
+                throw new Error('ID de contrato inválido');
+            }
+
+            // Este endpoint debe:
+            // 1. Procesar la firma digital
+            // 2. Generar PDF firmado
+            // 3. Guardar PDF en servidor
+            // 4. Actualizar campos: documento_pdf_path, firmado_cliente, fecha_firma
+            const response = await apiService.post(`${API_BASE}/${id}/procesar-firma`, datosSignature);
+
+            console.log('✅ Firma digital procesada y PDF guardado exitosamente');
+            return response;
+        } catch (error) {
+            console.error('❌ Error procesando firma digital:', error);
             throw this.handleError(error);
         }
     }
