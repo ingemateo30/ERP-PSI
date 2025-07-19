@@ -157,7 +157,134 @@ export const facturacionManualService = {
       throw this.handleError(error);
     }
   },
-
+/**
+ * Obtener historial completo de facturación de un cliente
+ * Endpoint: GET /api/v1/facturas/historial-cliente
+ */
+/**
+ * Obtener historial completo de facturación de un cliente
+ * Endpoint: GET /api/v1/facturas/historial-cliente
+ */
+async obtenerHistorialCliente(params = {}) {
+  try {
+    console.log('📋 Obteniendo historial de cliente con params:', params);
+    
+    if (!params.cliente_id) {
+      throw new Error('cliente_id es requerido');
+    }
+    
+    // DEBUGGING: Verificar el cliente_id específicamente
+    console.log('🔍 Cliente ID recibido:', params.cliente_id, 'Tipo:', typeof params.cliente_id);
+    
+    // CORRECCIÓN: Asegurar que cliente_id sea string/number válido
+    const clienteId = parseInt(params.cliente_id);
+    if (isNaN(clienteId) || clienteId <= 0) {
+      throw new Error(`cliente_id inválido: ${params.cliente_id}`);
+    }
+    
+    const queryParams = new URLSearchParams({
+      cliente_id: clienteId.toString(),
+      page: (params.page || 1).toString(),
+      limit: (params.limit || 50).toString()
+    });
+    
+    // Agregar filtros opcionales solo si tienen valor
+    if (params.estado && params.estado !== 'todas') {
+      queryParams.append('estado', params.estado);
+    }
+    
+    if (params.fecha_desde) {
+      queryParams.append('fecha_desde', params.fecha_desde);
+    }
+    
+    if (params.fecha_hasta) {
+      queryParams.append('fecha_hasta', params.fecha_hasta);
+    }
+    
+    const baseURL = 'http://localhost:3000/api/v1';
+    const url = `${baseURL}/facturas/historial-cliente?${queryParams.toString()}`;
+    
+    console.log('🔍 URL final construida:', url);
+    console.log('🔍 Query params construidos:', Object.fromEntries(queryParams.entries()));
+    
+    // Obtener token
+    const authService = await import('./authService');
+    const token = authService.default.getToken();
+    
+    if (!token) {
+      throw new Error('No hay token de autenticación disponible');
+    }
+    
+    console.log('🔑 Token presente:', !!token);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include'
+    });
+    
+    console.log(`📡 Response status: ${response.status} ${response.statusText}`);
+    console.log(`📡 Response headers:`, Object.fromEntries(response.headers.entries()));
+    
+    // DEBUGGING: Leer el cuerpo de la respuesta para ver el error específico
+    const responseText = await response.text();
+    console.log('📝 Respuesta completa del servidor:', responseText);
+    
+    if (response.status === 400) {
+      // Intentar parsear el mensaje de error del backend
+      try {
+        const errorData = JSON.parse(responseText);
+        const errorMessage = errorData.message || errorData.error || 'Bad Request sin mensaje';
+        console.error('❌ Error 400 del backend:', errorMessage);
+        throw new Error(`Error del servidor: ${errorMessage}`);
+      } catch (parseError) {
+        console.error('❌ Error 400 - Respuesta no es JSON:', responseText);
+        throw new Error(`Error 400 del servidor: ${responseText.substring(0, 200)}`);
+      }
+    }
+    
+    if (response.status === 401) {
+      throw new Error('Token de autenticación inválido o expirado');
+    }
+    
+    if (!response.ok) {
+      try {
+        const errorData = JSON.parse(responseText);
+        throw new Error(`HTTP ${response.status}: ${errorData.message || response.statusText}`);
+      } catch (parseError) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    }
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      throw new Error(`Respuesta no es JSON válido: ${parseError.message}`);
+    }
+    
+    console.log('📊 Datos parseados exitosamente:', data);
+    
+    // Manejar la estructura de respuesta del backend
+    if (data?.success && data?.data) {
+      return {
+        facturas: data.data.facturas || [],
+        estadisticas: data.data.estadisticas || {},
+        pagination: data.data.pagination || {}
+      };
+    } else {
+      throw new Error(data?.message || 'Estructura de respuesta no válida');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error completo en obtenerHistorialCliente:', error);
+    throw error;
+  }
+},
   // ==========================================
   // GESTIÓN DE PAGOS
   // ==========================================

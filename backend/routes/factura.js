@@ -75,6 +75,135 @@ router.get('/validate/:numero', FacturasController.validarNumeroFactura);
 router.get('/numero/:numero', FacturasController.obtenerPorNumero);
 
 /**
+ * @route GET /api/v1/facturas/historial-cliente
+ * @desc Obtener historial completo de facturación de un cliente
+ * @access Autenticado
+ */
+router.get('/historial-cliente', async (req, res) => {
+  try {
+    const { 
+      cliente_id, 
+      estado, 
+      fecha_desde, 
+      fecha_hasta, 
+      numero_factura,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    if (!cliente_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de cliente es requerido'
+      });
+    }
+
+    const { Database } = require('../models/Database');
+    const offset = (page - 1) * limit;
+    let whereClause = 'WHERE f.cliente_id = ?';
+    let params = [cliente_id];
+
+    // Aplicar filtros
+    if (estado) {
+      whereClause += ' AND f.estado = ?';
+      params.push(estado);
+    }
+
+    if (fecha_desde) {
+      whereClause += ' AND f.fecha_emision >= ?';
+      params.push(fecha_desde);
+    }
+
+    if (fecha_hasta) {
+      whereClause += ' AND f.fecha_emision <= ?';
+      params.push(fecha_hasta);
+    }
+
+    if (numero_factura) {
+      whereClause += ' AND f.numero_factura LIKE ?';
+      params.push(`%${numero_factura}%`);
+    }
+
+    // Obtener facturas
+    const facturas = await Database.query(`
+      SELECT 
+        f.*,
+        c.nombre as cliente_nombre,
+        c.identificacion as cliente_identificacion
+      FROM facturas f
+      INNER JOIN clientes c ON f.cliente_id = c.id
+      ${whereClause}
+      ORDER BY f.fecha_emision DESC, f.id DESC
+      LIMIT ? OFFSET ?
+    `, [...params, parseInt(limit), offset]);
+
+    // Obtener detalles de cada factura (pagos, etc.)
+    for (let factura of facturas) {
+      try {
+        // Obtener pagos de la factura
+        const pagos = await Database.query(`
+          SELECT * FROM pagos 
+          WHERE factura_id = ?
+          ORDER BY fecha_pago DESC
+        `, [factura.id]);
+        
+        factura.pagos = pagos;
+
+        // Obtener detalles de conceptos si es necesario
+        const detalles = await Database.query(`
+          SELECT df.*, cf.nombre as concepto_nombre
+          FROM detalle_facturas df
+          LEFT JOIN conceptos_facturacion cf ON df.concepto_id = cf.id
+          WHERE df.factura_id = ?
+        `, [factura.id]);
+        
+        factura.detalles = detalles;
+      } catch (detailError) {
+        console.log('⚠️ Error obteniendo detalles para factura', factura.id, detailError.message);
+        factura.pagos = [];
+        factura.detalles = [];
+      }
+    }
+
+    // Obtener estadísticas del cliente
+    const estadisticas = await Database.query(`
+      SELECT 
+        COUNT(*) as total_facturas,
+        SUM(total) as valor_total,
+        SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
+        SUM(CASE WHEN estado = 'pagada' THEN 1 ELSE 0 END) as pagadas,
+        SUM(CASE WHEN estado = 'vencida' THEN 1 ELSE 0 END) as vencidas,
+        SUM(CASE WHEN estado = 'pendiente' THEN total ELSE 0 END) as valor_pendiente,
+        SUM(CASE WHEN estado = 'pagada' THEN total ELSE 0 END) as valor_pagado,
+        AVG(total) as promedio_factura
+      FROM facturas 
+      WHERE cliente_id = ? AND estado != 'anulada'
+    `, [cliente_id]);
+
+    res.json({
+      success: true,
+      data: {
+        facturas,
+        estadisticas: estadisticas[0] || {},
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: facturas.length
+        }
+      },
+      message: 'Historial de facturación obtenido exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo historial de facturación:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error obteniendo historial de facturación',
+      error: error.message
+    });
+  }
+});
+/**
  * @route GET /api/v1/facturas/:id/pdf
  * @desc Descargar PDF de factura
  * @access Autenticado
@@ -241,130 +370,7 @@ router.post('/automatica/cliente/:clienteId',
   }
 );
 
-/**
- * @route GET /api/v1/facturas/historial-cliente
- * @desc Obtener historial completo de facturación de un cliente
- * @access Autenticado
- */
-router.get('/historial-cliente',
-  async (req, res) => {
-    try {
-      const { 
-        cliente_id, 
-        estado, 
-        fecha_desde, 
-        fecha_hasta, 
-        numero_factura,
-        page = 1,
-        limit = 50
-      } = req.query;
 
-      if (!cliente_id) {
-        return res.status(400).json({
-          success: false,
-          message: 'ID de cliente es requerido'
-        });
-      }
-
-      const offset = (page - 1) * limit;
-      let whereClause = 'WHERE f.cliente_id = ?';
-      let params = [cliente_id];
-
-      // Aplicar filtros
-      if (estado) {
-        whereClause += ' AND f.estado = ?';
-        params.push(estado);
-      }
-
-      if (fecha_desde) {
-        whereClause += ' AND f.fecha_emision >= ?';
-        params.push(fecha_desde);
-      }
-
-      if (fecha_hasta) {
-        whereClause += ' AND f.fecha_emision <= ?';
-        params.push(fecha_hasta);
-      }
-
-      if (numero_factura) {
-        whereClause += ' AND f.numero_factura LIKE ?';
-        params.push(`%${numero_factura}%`);
-      }
-
-      // Obtener facturas
-      const [facturas] = await Database.query(`
-        SELECT 
-          f.*,
-          c.nombre as cliente_nombre,
-          c.identificacion as cliente_identificacion
-        FROM facturas f
-        INNER JOIN clientes c ON f.cliente_id = c.id
-        ${whereClause}
-        ORDER BY f.fecha_emision DESC, f.id DESC
-        LIMIT ? OFFSET ?
-      `, [...params, parseInt(limit), offset]);
-
-      // Obtener detalles de cada factura (pagos, etc.)
-      for (let factura of facturas) {
-        // Obtener pagos de la factura
-        const [pagos] = await Database.query(`
-          SELECT * FROM pagos 
-          WHERE factura_id = ?
-          ORDER BY fecha_pago DESC
-        `, [factura.id]);
-        
-        factura.pagos = pagos;
-
-        // Obtener detalles de conceptos si es necesario
-        const [detalles] = await Database.query(`
-          SELECT df.*, cf.nombre as concepto_nombre
-          FROM detalle_facturas df
-          LEFT JOIN conceptos_facturacion cf ON df.concepto_id = cf.id
-          WHERE df.factura_id = ?
-        `, [factura.id]);
-        
-        factura.detalles = detalles;
-      }
-
-      // Obtener estadísticas del cliente
-      const [estadisticas] = await Database.query(`
-        SELECT 
-          COUNT(*) as total_facturas,
-          SUM(total) as valor_total,
-          SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
-          SUM(CASE WHEN estado = 'pagada' THEN 1 ELSE 0 END) as pagadas,
-          SUM(CASE WHEN estado = 'vencida' THEN 1 ELSE 0 END) as vencidas,
-          SUM(CASE WHEN estado = 'pendiente' THEN total ELSE 0 END) as valor_pendiente,
-          SUM(CASE WHEN estado = 'pagada' THEN total ELSE 0 END) as valor_pagado,
-          AVG(total) as promedio_factura
-        FROM facturas 
-        WHERE cliente_id = ? AND estado != 'anulada'
-      `, [cliente_id]);
-
-      res.json({
-        success: true,
-        data: {
-          facturas,
-          estadisticas: estadisticas[0] || {},
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total: facturas.length
-          }
-        },
-        message: 'Historial de facturación obtenido exitosamente'
-      });
-
-    } catch (error) {
-      console.error('❌ Error obteniendo historial de facturación:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error obteniendo historial de facturación',
-        error: error.message
-      });
-    }
-  }
-);
 /**
  * @route POST /api/v1/facturas/automatica/procesar-saldos
  * @desc Procesar saldos e intereses de facturas vencidas
