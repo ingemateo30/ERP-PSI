@@ -138,14 +138,7 @@ const HistorialFacturacionCliente = ({ clienteId, clienteNombre }) => {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <RefreshCw className="animate-spin h-8 w-8 text-blue-600" />
-        <span className="ml-2 text-gray-600">Cargando historial de facturación...</span>
-      </div>
-    );
-  }
+
 
   return (
     <div className="space-y-6">

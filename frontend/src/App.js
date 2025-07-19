@@ -35,6 +35,10 @@ const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig')
 const InstalacionesManagement = lazy(() => import('./components/Instalaciones/InstalacionesManagement'));
 const FacturacionAutomatica = lazy(() => import('./components/Facturas/FacturacionAutomatica'));
 const ContratosList = lazy(() => import('./components/Contratos/ContratosList'));
+const HistorialFacturacionCliente = lazy(() => import('./components/Facturas/HistorialFacturacionCliente'));
+const VisorFirmaPDF = lazy(() => import('./components/Contratos/VisorFirmaPDF'));
+const FirmaContratosWrapper = lazy(() => import('./components/Contratos/FirmaContratosWrapper'));
+const HistorialFacturacionWrapper = lazy(() => import('./components/Facturas/HistorialFacturacionWrapper'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -338,12 +342,32 @@ function App() {
                   </ ProtectedRoute>
                 }
               />
+               <Route
+                path="/historial-facturas"
+                element={
+                  <ProtectedRoute requiredRole="administrador" >
+                    <MainLayout title="Historial Facturacion cliente" subtitle="">
+                      <HistorialFacturacionWrapper />
+                    </MainLayout>
+                  </ ProtectedRoute>
+                }
+              />
               <Route
                 path="/contratos"
                 element={
                   <ProtectedRoute requiredRole="administrador">
                     <MainLayout title="Contratos" subtitle="Gestión de contratos de servicio">
                       <ContratosList />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+                <Route
+                path="/firma-contratos"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Firma de Contratos" subtitle="Gestión de firma de contratos">
+                      <FirmaContratosWrapper />
                     </MainLayout>
                   </ProtectedRoute>
                 }
