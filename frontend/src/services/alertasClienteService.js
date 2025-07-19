@@ -7,7 +7,7 @@ class AlertasClienteService {
   
   static async verificarClienteExistente(identificacion, tipoDocumento = 'cedula') {
     try {
-      const response = await apiService.get('/clientes/verificar-existente', {
+      const response = await apiService.get('/clients/verificar-existente', {
         identificacion,
         tipo_documento: tipoDocumento
       });
