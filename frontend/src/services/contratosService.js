@@ -57,16 +57,28 @@ class ContratosService {
             // Usar el endpoint específico para abrir firma
             const response = await apiService.get(`${API_BASE}/${id}/abrir-firma`);
 
-            // Si la respuesta es exitosa, agregar la URL del PDF
+            // Si la respuesta es exitosa, generar el PDF directamente con apiService
             if (response.success && response.data) {
-                // Generar URL del PDF SIN token en query (se enviará en header)
-                const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1';
-                const urlPDF = `${apiUrl}/contratos/${id}/pdf?t=${Date.now()}`;
-                
-                // Agregar la URL del PDF a los datos
-                response.data.pdf_url = urlPDF;
-                
-                console.log('🔗 URL del PDF generada:', urlPDF);
+                // CORREGIDO: Usar apiService como en facturas, no URL externa
+                try {
+                    const pdfResponse = await apiService.get(`${API_BASE}/${id}/pdf`, {
+                        responseType: 'blob'
+                    });
+
+                    // Crear URL del blob para el visor
+                    const blob = new Blob([pdfResponse], { type: 'application/pdf' });
+                    const urlPDF = URL.createObjectURL(blob);
+
+                    // Agregar la URL del PDF a los datos
+                    response.data.pdf_url = urlPDF;
+                    response.data.pdf_blob = blob;
+
+                    console.log('🔗 PDF blob generado exitosamente');
+                } catch (pdfError) {
+                    console.error('❌ Error generando PDF:', pdfError);
+                    // No fallar si el PDF no se puede generar inicialmente
+                    response.data.pdf_url = null;
+                }
             }
 
             console.log('✅ Contrato para firma cargado exitosamente');
@@ -94,12 +106,12 @@ class ContratosService {
 
             // Construir URL base de la API
             const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1';
-            
+
             // CORRECCIÓN: URL con parámetros de autenticación correctos
             const pdfUrl = `${apiUrl}/contratos/${id}/pdf?token=${encodeURIComponent(token)}&t=${Date.now()}`;
-            
+
             console.log('🔗 URL del PDF generada:', pdfUrl);
-            
+
             return pdfUrl;
         } catch (error) {
             console.error('❌ Error generando URL del PDF:', error);
@@ -121,7 +133,7 @@ class ContratosService {
             const response = await apiService.request(`${API_BASE}/${id}/pdf`, {
                 method: 'GET',
                 responseType: 'blob',
-                headers: { 
+                headers: {
                     'Accept': 'application/pdf',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -376,7 +388,7 @@ class ContratosService {
 
             // Obtener token del localStorage
             const token = localStorage.getItem('token');
-            
+
             // Hacer solicitud HEAD con token en header Authorization
             const response = await fetch(urlPDF, {
                 method: 'HEAD',
@@ -440,9 +452,9 @@ class ContratosService {
             // Error de respuesta del servidor
             const message = error.response.data?.message || error.response.statusText || 'Error del servidor';
             const status = error.response.status;
-            
+
             console.error(`❌ Error ${status}:`, message);
-            
+
             return new Error(`Error ${status}: ${message}`);
         } else if (error.request) {
             // Error de red

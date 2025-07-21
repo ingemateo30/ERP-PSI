@@ -170,7 +170,7 @@ class ContratosController {
             }
 
             // CORRECCIÓN: Obtener datos del contrato con JOIN
-            const conexion = await db.getConnection();
+            const conexion = await Database.query();
 
             const [contratos] = await conexion.execute(`
                 SELECT 
@@ -283,10 +283,11 @@ class ContratosController {
                 fs.writeFileSync(rutaPDF, pdfBuffer);
 
                 // Actualizar ruta en base de datos
-                const conexionUpdate = await db.getConnection();
+                const conexionUpdate = await Database.query();
                 await conexionUpdate.execute(`
                     UPDATE contratos SET documento_pdf_path = ? WHERE id = ?
                 `, [rutaPDF, id]);
+
                 conexionUpdate.release();
 
                 console.log('💾 PDF guardado en:', rutaPDF);
@@ -538,7 +539,7 @@ class ContratosController {
                 });
             }
 
-            const conexion = await db.getConnection();
+            const conexion = await Database.query();
 
             const [contratos] = await conexion.execute(`
                 SELECT documento_pdf_path, numero_contrato, firmado_cliente
