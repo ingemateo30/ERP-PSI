@@ -463,20 +463,13 @@ router.patch('/:id/cancelar',
 router.patch('/:id/asignar-instalador',
     requireRole('administrador', 'supervisor'),
     validarObtenerPorId,
-    [
-        body('instalador_id')
-            .notEmpty()
-            .withMessage('El ID del instalador es requerido')
-            .isInt({ min: 1 })
-            .withMessage('El ID del instalador debe ser un número válido')
-    ],
     handleValidationErrors,
     InstalacionesController.asignarInstalador
 );
 
 /**
  * @route GET /api/v1/instalaciones/exportar
- * @desc Exportar instalaciones (CORREGIR RUTA)
+ * @desc Exportar instalaciones
  */
 router.get('/exportar',
     requireRole('administrador', 'supervisor'),
