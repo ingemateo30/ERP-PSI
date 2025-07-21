@@ -9,86 +9,151 @@ class FirmaPDFService {
   /**
    * Abrir contrato PDF para firma - CONSULTA SQL DEFINITIVA CORRECTA
    */
-  static async abrirContratoParaFirma(contratoId) {
-    try {
-      
-      
-      console.log(`📋 Abriendo contrato ${contratoId} para firma...`);
-      
-      // CONSULTA SQL CORRECTA con estructura REAL de la base de datos
-      const [contratos] = await Database.query(`
-        SELECT 
-          c.*,
-          cl.nombre as cliente_nombre,
-          cl.identificacion as cliente_identificacion,
-          cl.telefono as cliente_telefono,
-          cl.correo as cliente_email,
-          cl.direccion as cliente_direccion,
-          cl.barrio as cliente_barrio,
-          ps.nombre as servicio_nombre,
-          ps.descripcion as servicio_descripcion,
-          ps.precio as servicio_precio,
-          ps.tipo as servicio_tipo,
-          sc.precio_personalizado as precio_personalizado,
-          sc.fecha_activacion as fecha_activacion_servicio
-        FROM contratos c
-        INNER JOIN clientes cl ON c.cliente_id = cl.id
-        LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
-        LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-        WHERE c.id = ?
-      `, [contratoId]);
+// En FirmaPDFService.js, reemplaza el método abrirContratoParaFirma con esta versión:
 
-      if (contratos.length === 0) {
-        throw new Error('Contrato no encontrado');
-      }
+static async abrirContratoParaFirma(contratoId) {
+  try {
+    console.log(`📋 Abriendo contrato ${contratoId} para firma...`);
+    
+    // PASO 1: Obtener datos básicos del contrato y cliente
+    const [contratosBase] = await Database.query(`
+      SELECT 
+        c.*,
+        cl.nombre as cliente_nombre,
+        cl.identificacion as cliente_identificacion,
+        cl.telefono as cliente_telefono,
+        cl.correo as cliente_email,
+        cl.direccion as cliente_direccion,
+        cl.barrio as cliente_barrio
+      FROM contratos c
+      INNER JOIN clientes cl ON c.cliente_id = cl.id
+      WHERE c.id = ? AND c.estado = 'activo'
+    `, [contratoId]);
 
-      const contrato = contratos[0];
-      
-      // Verificar si ya tiene PDF generado
-      let rutaPDF = contrato.documento_pdf_path;
-      let pdfExiste = false;
-      
-      if (rutaPDF && fs.existsSync(rutaPDF)) {
-        pdfExiste = true;
-        console.log('📁 PDF existente encontrado:', rutaPDF);
-      } else {
-        console.log('📄 PDF no existe, se generará cuando sea necesario');
-      }
-
-      // Preparar datos para el visor de firma con campos REALES
-      const datosVisor = {
-        contrato_id: parseInt(contratoId),
-        numero_contrato: contrato.numero_contrato,
-        cliente_nombre: contrato.cliente_nombre,
-        cliente_identificacion: contrato.cliente_identificacion,
-        cliente_telefono: contrato.cliente_telefono,
-        cliente_email: contrato.cliente_email,
-        cliente_direccion: contrato.cliente_direccion,
-        cliente_barrio: contrato.cliente_barrio,
-        servicio_nombre: contrato.servicio_nombre,
-        servicio_tipo: contrato.servicio_tipo,
-        servicio_precio: contrato.precio_personalizado || contrato.servicio_precio,
-        fecha_activacion_servicio: contrato.fecha_activacion_servicio,
-        fecha_inicio: contrato.fecha_inicio,
-        fecha_fin: contrato.fecha_fin,
-        tipo_permanencia: contrato.tipo_permanencia,
-        permanencia_meses: contrato.permanencia_meses,
-        costo_instalacion: contrato.costo_instalacion,
-        estado: contrato.estado,
-        ruta_pdf: rutaPDF,
-        pdf_existe: pdfExiste,
-        firmado: Boolean(contrato.firmado_cliente),
-        fecha_firma: contrato.fecha_firma,
-        observaciones: contrato.observaciones
-      };
-      console.log('✅ Contrato abierto para firma exitosamente');
-      return datosVisor;
-
-    } catch (error) {
-      console.error('❌ Error abriendo contrato para firma:', error);
-      throw error;
+    if (contratosBase.length === 0) {
+      throw new Error('Contrato no encontrado o inactivo');
     }
+
+    const contratoData = contratosBase[0];
+
+    // PASO 2: Obtener TODOS los servicios del cliente (Internet + TV)
+    const serviciosCliente = await Database.query(`
+      SELECT 
+        sc.*,
+        ps.nombre as plan_nombre,
+        ps.tipo as plan_tipo,
+        ps.precio as plan_precio,
+        ps.descripcion as plan_descripcion,
+        ps.velocidad_bajada,
+        ps.velocidad_subida,
+        ps.canales_tv,
+        COALESCE(sc.precio_personalizado, ps.precio) as precio_final
+      FROM servicios_cliente sc
+      INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
+      WHERE sc.cliente_id = ? AND sc.estado = 'activo'
+      ORDER BY ps.tipo
+    `, [contratoData.cliente_id]);
+
+    // PASO 3: Construir descripción completa de servicios
+    let descripcionServicios = '';
+    let precioTotal = 0;
+
+    if (serviciosCliente.length > 0) {
+      const serviciosTexto = serviciosCliente.map(servicio => {
+        const precio = parseFloat(servicio.precio_final) || 0;
+        precioTotal += precio;
+        
+        // CORRECCIÓN: Validar que plan_tipo existe antes de usar toUpperCase
+        const tipoServicio = servicio.plan_tipo ? servicio.plan_tipo.toUpperCase() : 'SERVICIO';
+        let descripcion = `${servicio.plan_nombre || 'Plan'} (${tipoServicio})`;
+        
+        if (servicio.plan_tipo === 'internet' && servicio.velocidad_bajada) {
+          descripcion += ` - ${servicio.velocidad_bajada}MB`;
+        }
+        
+        if (servicio.plan_tipo === 'television' && servicio.canales_tv) {
+          descripcion += ` - ${servicio.canales_tv} canales`;
+        }
+        
+        descripcion += ` - ${precio.toLocaleString()}`;
+        
+        return descripcion;
+      }).join(' + ');
+
+      descripcionServicios = serviciosTexto;
+    } else {
+      // Fallback: usar el servicio vinculado directamente al contrato
+      if (contratoData.servicio_id) {
+        const [servicioContrato] = await Database.query(`
+          SELECT 
+            sc.*,
+            ps.nombre as plan_nombre,
+            ps.tipo as plan_tipo,
+            ps.precio as plan_precio,
+            COALESCE(sc.precio_personalizado, ps.precio) as precio_final
+          FROM servicios_cliente sc
+          INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
+          WHERE sc.id = ?
+        `, [contratoData.servicio_id]);
+
+        if (servicioContrato) {
+          const tipoServicio = servicioContrato.plan_tipo ? servicioContrato.plan_tipo.toUpperCase() : 'SERVICIO';
+          descripcionServicios = `${servicioContrato.plan_nombre || 'Plan'} (${tipoServicio})`;
+          precioTotal = parseFloat(servicioContrato.precio_final) || 0;
+        }
+      }
+    }
+
+    // PASO 4: Verificar PDF existente
+    let pdfExiste = false;
+    if (contratoData.documento_pdf_path && fs.existsSync(contratoData.documento_pdf_path)) {
+      pdfExiste = true;
+      console.log('📁 PDF existente encontrado:', contratoData.documento_pdf_path);
+    } else {
+      console.log('📄 PDF no existe, se generará cuando sea necesario');
+    }
+
+    // PASO 5: Preparar datos completos para el visor
+    const datosVisor = {
+      contrato_id: parseInt(contratoId),
+      numero_contrato: contratoData.numero_contrato,
+      cliente_nombre: contratoData.cliente_nombre,
+      cliente_identificacion: contratoData.cliente_identificacion,
+      cliente_telefono: contratoData.cliente_telefono,
+      cliente_email: contratoData.cliente_email,
+      cliente_direccion: contratoData.cliente_direccion,
+      cliente_barrio: contratoData.cliente_barrio,
+      
+      // INFORMACIÓN DE SERVICIOS COMPLETA
+      servicios_descripcion: descripcionServicios || 'Plan de Servicio',
+      precio_total_mensual: precioTotal,
+      servicios_detalle: serviciosCliente, // Array con todos los servicios
+      
+      fecha_activacion_servicio: contratoData.fecha_activacion_servicio,
+      fecha_inicio: contratoData.fecha_inicio,
+      fecha_fin: contratoData.fecha_fin,
+      tipo_permanencia: contratoData.tipo_permanencia,
+      permanencia_meses: contratoData.permanencia_meses,
+      costo_instalacion: contratoData.costo_instalacion,
+      estado: contratoData.estado,
+      ruta_pdf: contratoData.documento_pdf_path,
+      pdf_existe: pdfExiste,
+      firmado: Boolean(contratoData.firmado_cliente),
+      fecha_firma: contratoData.fecha_firma,
+      observaciones: contratoData.observaciones
+    };
+
+    console.log('✅ Contrato abierto para firma exitosamente');
+    console.log('📋 Servicios encontrados:', serviciosCliente.length);
+    console.log('💰 Precio total mensual:', precioTotal);
+    
+    return datosVisor;
+
+  } catch (error) {
+    console.error('❌ Error abriendo contrato para firma:', error);
+    throw error;
   }
+}
 
   /**
    * Procesar firma digital/tablet y guardar PDF firmado

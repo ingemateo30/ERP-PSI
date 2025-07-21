@@ -165,7 +165,7 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     setError('Debe firmar en el área designada');
                     return;
                 }
-                signatureBase64 = sigCanvas.current.getTrimmedCanvas().toDataURL();
+                signatureBase64 = signatureBase64 = sigCanvas.current.toDataURL();
             }
 
             if (!signatureBase64) {
