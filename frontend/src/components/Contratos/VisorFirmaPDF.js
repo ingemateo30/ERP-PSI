@@ -65,9 +65,7 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 if (urlPDF) {
                     console.log('🔗 URL del PDF recibida:', urlPDF);
                     setPdfUrl(urlPDF);
-                    
-                    // Verificar que el PDF se puede cargar
-                    await verificarPDF(urlPDF);
+                    setPdfCargado(true);
                 } else {
                     throw new Error('No se pudo generar la URL del PDF');
                 }

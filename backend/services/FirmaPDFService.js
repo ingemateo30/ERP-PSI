@@ -11,12 +11,12 @@ class FirmaPDFService {
    */
   static async abrirContratoParaFirma(contratoId) {
     try {
-      const conexion = await Database.getConnection();
+      
       
       console.log(`📋 Abriendo contrato ${contratoId} para firma...`);
       
       // CONSULTA SQL CORRECTA con estructura REAL de la base de datos
-      const [contratos] = await conexion.execute(`
+      const [contratos] = await Database.query(`
         SELECT 
           c.*,
           cl.nombre as cliente_nombre,
@@ -81,8 +81,6 @@ class FirmaPDFService {
         fecha_firma: contrato.fecha_firma,
         observaciones: contrato.observaciones
       };
-
-      conexion.release();
       console.log('✅ Contrato abierto para firma exitosamente');
       return datosVisor;
 

@@ -3,6 +3,9 @@ const { Database } = require('../models/Database');
 const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator');
 const puppeteer = require('puppeteer');
 const FirmaPDFService = require('../services/FirmaPDFService');
+const fs = require('fs');
+const path = require('path');
+
 
 class ContratosController {
 
@@ -158,7 +161,6 @@ class ContratosController {
     static async generarPDF(req, res) {
         try {
             const { id } = req.params;
-            const { token } = req.query;
 
             console.log(`📄 Generando PDF del contrato ID: ${id}`);
 
@@ -169,10 +171,8 @@ class ContratosController {
                 });
             }
 
-            // CORRECCIÓN: Obtener datos del contrato con JOIN
-            const conexion = await Database.query();
-
-            const [contratos] = await conexion.execute(`
+            // CORRECCIÓN: Usar Database.query directamente con campos correctos
+            const contratos = await Database.query(`
                 SELECT 
                     c.*,
                     cl.nombre as cliente_nombre,
@@ -180,17 +180,25 @@ class ContratosController {
                     cl.telefono as cliente_telefono,
                     cl.correo as cliente_email,
                     cl.direccion as cliente_direccion,
-                    s.nombre as servicio_nombre,
-                    s.descripcion as servicio_descripcion,
-                    s.precio as servicio_precio
+                    cl.barrio as cliente_barrio,
+                    cl.estrato as cliente_estrato,
+                    sc.plan_id,
+                    ps.nombre as servicio_nombre,
+                    ps.tipo as servicio_tipo,
+                    ps.precio as servicio_precio,
+                    ps.descripcion as servicio_descripcion,
+                    ps.velocidad_bajada,
+                    ps.velocidad_subida,
+                    ps.canales_tv
                 FROM contratos c
                 INNER JOIN clientes cl ON c.cliente_id = cl.id
-                LEFT JOIN servicios s ON c.servicio_id = s.id
-                WHERE c.id = ? AND c.activo = 1
+                LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
+                LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+                WHERE c.id = ? AND c.estado = 'activo'
+                LIMIT 1
             `, [id]);
 
-            if (contratos.length === 0) {
-                conexion.release();
+            if (!contratos || contratos.length === 0) {
                 return res.status(404).json({
                     success: false,
                     message: 'Contrato no encontrado'
@@ -198,67 +206,46 @@ class ContratosController {
             }
 
             const contratoData = contratos[0];
+            console.log(`✅ Contrato encontrado: ${contratoData.numero_contrato}`);
 
-            // CORRECCIÓN: Obtener datos de la empresa
-            const [empresaResult] = await conexion.execute(`
-                SELECT * FROM configuracion_empresa WHERE id = 1
-            `);
-
-            conexion.release();
-
-            const empresaData = empresaResult.length > 0 ? empresaResult[0] : {
-                empresa_nombre: 'PROVEEDOR DE TELECOMUNICACIONES SAS.',
-                empresa_nit: '901.582.657-3',
-                empresa_direccion: 'VIA 40 #36-135',
-                empresa_ciudad: 'San Gil',
-                empresa_departamento: 'SANTANDER',
-                empresa_telefono: '3184550936',
-                empresa_email: 'facturacion@psi.net.co'
-            };
-
-            console.log('📄 Generando HTML del contrato...');
-
-            // CORRECCIÓN: Verificar si ya existe PDF generado
             let pdfBuffer;
-            const rutaPDFExistente = contratoData.documento_pdf_path;
 
-            if (rutaPDFExistente && fs.existsSync(rutaPDFExistente)) {
-                console.log('📁 Usando PDF existente:', rutaPDFExistente);
-                pdfBuffer = fs.readFileSync(rutaPDFExistente);
+            // Verificar si ya existe PDF generado
+            if (contratoData.documento_pdf_path && fs.existsSync(contratoData.documento_pdf_path)) {
+                console.log('📁 Usando PDF existente:', contratoData.documento_pdf_path);
+                pdfBuffer = fs.readFileSync(contratoData.documento_pdf_path);
             } else {
                 console.log('🔨 Generando nuevo PDF...');
 
-                // Generar HTML usando ContratoPDFGenerator
-                const htmlContent = ContratoPDFGenerator.generarHTML(contratoData, empresaData);
+                // CORRECCIÓN: Obtener configuración de empresa
+                const empresaConfig = await Database.query(`
+                    SELECT * FROM configuracion_empresa LIMIT 1
+                `);
 
-                console.log('🖨️ Iniciando conversión a PDF...');
+                if (!empresaConfig || empresaConfig.length === 0) {
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Configuración de empresa no encontrada'
+                    });
+                }
 
-                // CORRECCIÓN: Configurar Puppeteer para servidor
+                const empresa = empresaConfig[0];
+
+                // Generar HTML del contrato
+                const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator');
+                const htmlContent = ContratoPDFGenerator.generarHTML(contratoData, empresa);
+
+                // Generar PDF con Puppeteer
                 const browser = await puppeteer.launch({
                     headless: true,
-                    args: [
-                        '--no-sandbox',
-                        '--disable-setuid-sandbox',
-                        '--disable-dev-shm-usage',
-                        '--disable-web-security',
-                        '--disable-features=VizDisplayCompositor',
-                        '--disable-gpu',
-                        '--disable-software-rasterizer'
-                    ]
+                    args: ['--no-sandbox', '--disable-setuid-sandbox']
                 });
 
                 const page = await browser.newPage();
+                await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
-                // Configurar el contenido HTML
-                await page.setContent(htmlContent, {
-                    waitUntil: 'networkidle0',
-                    timeout: 30000
-                });
-
-                // Generar PDF
                 pdfBuffer = await page.pdf({
-                    format: 'Letter',
-                    printBackground: true,
+                    format: 'A4',
                     margin: {
                         top: '10mm',
                         right: '10mm',
@@ -271,6 +258,46 @@ class ContratosController {
 
                 await browser.close();
 
+                try {
+                    console.log('📁 Creando directorio de uploads...');
+                    console.log('🔍 Directorio actual:', process.cwd());
+
+                    // Usar __dirname para una ruta más confiable
+                    const uploadsDir = path.join(__dirname, '..', 'uploads', 'contratos');
+                    console.log('🔍 Directorio de uploads:', uploadsDir);
+
+                    // Crear directorio si no existe
+                    if (!fs.existsSync(uploadsDir)) {
+                        console.log('📂 Creando directorio:', uploadsDir);
+                        fs.mkdirSync(uploadsDir, { recursive: true });
+                        console.log('✅ Directorio creado exitosamente');
+                    } else {
+                        console.log('📂 Directorio ya existe');
+                    }
+
+                    const nombrePDF = `contrato_${contratoData.numero_contrato}_original.pdf`;
+                    const rutaPDF = path.join(uploadsDir, nombrePDF);
+
+                    console.log('💾 Guardando PDF en:', rutaPDF);
+
+                    // Guardar archivo PDF
+                    fs.writeFileSync(rutaPDF, pdfBuffer);
+                    console.log('✅ PDF guardado exitosamente');
+
+                    // Actualizar ruta en base de datos usando Database.query
+                    await Database.query(`
+        UPDATE contratos SET documento_pdf_path = ? WHERE id = ?
+    `, [rutaPDF, id]);
+
+                    console.log('💾 Ruta actualizada en base de datos');
+
+                } catch (dirError) {
+                    console.error('❌ Error creando directorio o guardando archivo:', dirError);
+
+                    // Si falla, continuar sin guardar el archivo pero sí servir el PDF
+                    console.log('⚠️ Continuando sin guardar archivo físico...');
+                }
+
                 // CORRECCIÓN: Guardar PDF generado para uso futuro
                 const uploadsDir = path.join(process.cwd(), 'uploads', 'contratos');
                 if (!fs.existsSync(uploadsDir)) {
@@ -282,13 +309,10 @@ class ContratosController {
 
                 fs.writeFileSync(rutaPDF, pdfBuffer);
 
-                // Actualizar ruta en base de datos
-                const conexionUpdate = await Database.query();
-                await conexionUpdate.execute(`
+                // Actualizar ruta en base de datos usando Database.query
+                await Database.query(`
                     UPDATE contratos SET documento_pdf_path = ? WHERE id = ?
                 `, [rutaPDF, id]);
-
-                conexionUpdate.release();
 
                 console.log('💾 PDF guardado en:', rutaPDF);
             }
@@ -322,6 +346,7 @@ class ContratosController {
             }
         }
     }
+
 
     static async actualizarEstado(req, res) {
         try {

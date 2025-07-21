@@ -46,48 +46,84 @@ class ContratosService {
     /**
      * Cargar contrato específicamente para el proceso de firma - CORREGIDO
      */
-    async cargarContratoParaFirma(id) {
-        try {
-            console.log(`📋 Cargando contrato para firma ID: ${id}`);
+   async cargarContratoParaFirma(id) {
+    try {
+        console.log(`📋 Cargando contrato para firma ID: ${id}`);
 
-            if (!id || isNaN(id)) {
-                throw new Error('ID de contrato inválido');
-            }
-
-            // Usar el endpoint específico para abrir firma
-            const response = await apiService.get(`${API_BASE}/${id}/abrir-firma`);
-
-            // Si la respuesta es exitosa, generar el PDF directamente con apiService
-            if (response.success && response.data) {
-                // CORREGIDO: Usar apiService como en facturas, no URL externa
-                try {
-                    const pdfResponse = await apiService.get(`${API_BASE}/${id}/pdf`, {
-                        responseType: 'blob'
-                    });
-
-                    // Crear URL del blob para el visor
-                    const blob = new Blob([pdfResponse], { type: 'application/pdf' });
-                    const urlPDF = URL.createObjectURL(blob);
-
-                    // Agregar la URL del PDF a los datos
-                    response.data.pdf_url = urlPDF;
-                    response.data.pdf_blob = blob;
-
-                    console.log('🔗 PDF blob generado exitosamente');
-                } catch (pdfError) {
-                    console.error('❌ Error generando PDF:', pdfError);
-                    // No fallar si el PDF no se puede generar inicialmente
-                    response.data.pdf_url = null;
-                }
-            }
-
-            console.log('✅ Contrato para firma cargado exitosamente');
-            return response;
-        } catch (error) {
-            console.error('❌ Error cargando contrato para firma:', error);
-            throw this.handleError(error);
+        if (!id || isNaN(id)) {
+            throw new Error('ID de contrato inválido');
         }
+
+        // Usar el endpoint específico para abrir firma
+        const response = await apiService.get(`${API_BASE}/${id}/abrir-firma`);
+
+        // Si la respuesta es exitosa, generar el PDF directamente con apiService
+        if (response.success && response.data) {
+            try {
+                console.log('📄 Descargando PDF del contrato...');
+
+                // CORRECCIÓN: Usar fetch directo para manejar mejor las respuestas blob
+                const token = localStorage.getItem('token');
+                const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1';
+                const pdfUrl = `${apiUrl}/contratos/${id}/pdf`;
+
+                const pdfResponse = await fetch(pdfUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/pdf',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                console.log('📦 PDF Response status:', pdfResponse.status);
+                console.log('📦 PDF Response ok:', pdfResponse.ok);
+
+                if (!pdfResponse.ok) {
+                    const errorText = await pdfResponse.text();
+                    throw new Error(`Error ${pdfResponse.status}: ${errorText}`);
+                }
+
+                // Convertir a blob
+                const blob = await pdfResponse.blob();
+                
+                console.log('📄 Blob creado - tamaño:', blob.size, 'tipo:', blob.type);
+
+                // Verificar que el blob no esté vacío
+                if (blob.size === 0) {
+                    throw new Error('El PDF descargado está vacío');
+                }
+
+                // Crear URL del blob para el visor
+                const urlPDF = URL.createObjectURL(blob);
+
+                // Agregar la URL del PDF a los datos
+                response.data.pdf_url = urlPDF;
+                response.data.pdf_blob = blob;
+
+                console.log('🔗 PDF blob generado exitosamente - URL:', urlPDF);
+
+            } catch (pdfError) {
+                console.error('❌ Error generando PDF:', pdfError);
+                // CORRECCIÓN: Usar URL directa como fallback
+                const token = localStorage.getItem('token');
+                const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1';
+                const urlPDF = `${apiUrl}/contratos/${id}/pdf?token=${encodeURIComponent(token)}&t=${Date.now()}`;
+                
+                response.data.pdf_url = urlPDF;
+                response.data.error_pdf = pdfError.message;
+                
+                console.log('🔗 Usando URL directa como fallback:', urlPDF);
+            }
+        }
+
+        console.log('✅ Contrato para firma cargado exitosamente');
+        return response;
+        
+    } catch (error) {
+        console.error('❌ Error cargando contrato para firma:', error);
+        throw this.handleError(error);
     }
+}
 
     /**
      * CORRECCIÓN: Método mejorado para obtener URL del PDF
@@ -108,7 +144,7 @@ class ContratosService {
             const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1';
 
             // CORRECCIÓN: URL con parámetros de autenticación correctos
-            const pdfUrl = `${apiUrl}/contratos/${id}/pdf?token=${encodeURIComponent(token)}&t=${Date.now()}`;
+            const pdfUrl = `${apiUrl}/contratos/${id}/pdf?token=${encodeURIComponent(token)}}`;
 
             console.log('🔗 URL del PDF generada:', pdfUrl);
 
@@ -374,6 +410,8 @@ class ContratosService {
     /**
      * Verificar disponibilidad de PDF
      */
+    // Mantén tu método verificarPDF con la ruta original, solo cambia fetch por apiService:
+
     async verificarPDF(id) {
         try {
             if (!id || isNaN(id)) {
@@ -382,31 +420,24 @@ class ContratosService {
 
             console.log(`🔍 Verificando disponibilidad del PDF para contrato ID: ${id}`);
 
-            // Generar URL del PDF SIN token en query
-            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1';
-            const urlPDF = `${apiUrl}/contratos/${id}/pdf?t=${Date.now()}`;
-
-            // Obtener token del localStorage
-            const token = localStorage.getItem('token');
-
-            // Hacer solicitud HEAD con token en header Authorization
-            const response = await fetch(urlPDF, {
-                method: 'HEAD',
-                headers: {
-                    'Accept': 'application/pdf',
-                    'Authorization': `Bearer ${token}`
-                }
+            // CORRECCIÓN: Usar apiService con tu ruta original en lugar de fetch directo
+            const response = await apiService.request(`${API_BASE}/${id}/pdf`, {
+                method: 'HEAD'
             });
 
             console.log('✅ PDF verificado exitosamente');
+
+            // Mantener la misma estructura de respuesta que tenías
             return {
-                disponible: response.ok,
-                contentType: response.headers.get('content-type') || '',
-                size: response.headers.get('content-length') || 0,
-                url: urlPDF
+                disponible: true, // Si llegó aquí, el PDF está disponible
+                contentType: 'application/pdf',
+                size: 0, // HEAD no retorna size en apiService
+                url: `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1'}/contratos/${id}/pdf`
             };
         } catch (error) {
             console.error('❌ Error verificando PDF:', error);
+
+            // Mantener la misma estructura de error que tenías
             return {
                 disponible: false,
                 error: error.message

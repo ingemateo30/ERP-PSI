@@ -15,93 +15,112 @@ class ApiService {
     const token = authService.getToken();
     
     const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      credentials: 'include', // Para cookies httpOnly
-      ...options,
+        headers: {
+            ...options.headers,
+        },
+        credentials: 'include',
+        ...options,
     };
+
+    // CORRECCIÓN: Solo agregar Content-Type para JSON, no para blobs/PDFs
+    if (!config.headers['Accept'] || config.headers['Accept'] !== 'application/pdf') {
+        config.headers['Content-Type'] = 'application/json';
+    }
 
     // Agregar token de autorización si existe
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+        config.headers.Authorization = `Bearer ${token}`;
     }
 
     try {
-      const response = await fetch(url, config);
-      
-      // Si es 401, intentar refrescar token una vez
-      if (response.status === 401 && token && !options._isRetry) {
-        try {
-          await authService.refreshToken();
-          // Reintentar la petición original
-          return this.request(endpoint, { ...options, _isRetry: true });
-        } catch (refreshError) {
-          // Si falla el refresh, redirigir al login
-          authService.removeToken();
-          window.location.href = '/login';
-          throw new Error('Sesión expirada');
+        console.log('🔗 ApiService - Haciendo petición a:', url);
+        console.log('🔑 ApiService - Token presente:', !!token);
+        console.log('📋 ApiService - Headers:', config.headers);
+        console.log('🎯 ApiService - ResponseType:', options.responseType);
+
+        const response = await fetch(url, config);
+        
+        console.log('📡 ApiService - Response status:', response.status);
+        console.log('📡 ApiService - Response headers:', Object.fromEntries(response.headers.entries()));
+
+        // Si es 401, intentar refrescar token una vez
+        if (response.status === 401 && token && !options._isRetry) {
+            console.log('🔄 ApiService - Token expirado, intentando refrescar...');
+            try {
+                await authService.refreshToken();
+                return this.request(endpoint, { ...options, _isRetry: true });
+            } catch (refreshError) {
+                console.error('❌ ApiService - Error refrescando token:', refreshError);
+                authService.removeToken();
+                window.location.href = '/login';
+                throw new Error('Sesión expirada');
+            }
         }
-      }
 
-      // CORREGIDO: Verificar si la respuesta es binaria (PDF, imágenes, etc.)
-      const contentType = response.headers.get('Content-Type') || '';
-      const isBlob = contentType.includes('application/pdf') || 
-                    contentType.includes('application/octet-stream') ||
-                    contentType.includes('image/') ||
-                    contentType.includes('video/') ||
-                    contentType.includes('audio/') ||
-                    options.responseType === 'blob';
+        // CORRECCIÓN CRÍTICA: Verificar si es respuesta binaria ANTES de verificar response.ok
+        const contentType = response.headers.get('content-type') || '';
+        const isBinaryResponse = contentType.includes('application/pdf') || 
+                              contentType.includes('image/') || 
+                              contentType.includes('application/octet-stream') ||
+                              options.responseType === 'blob';
 
-      let data;
-      
-      if (isBlob) {
-        // Para respuestas binarias, usar blob()
-        data = await response.blob();
-      } else {
+        if (isBinaryResponse) {
+            console.log('📄 ApiService - Respuesta binaria detectada:', contentType);
+            
+            if (!response.ok) {
+                // Para respuestas binarias con error, intentar leer como texto
+                const errorText = await response.text();
+                console.error('❌ ApiService - Error en respuesta binaria:', errorText);
+                throw new Error(errorText || `Error ${response.status}: ${response.statusText}`);
+            }
+            
+            // CORRECCIÓN: Retornar blob para respuestas binarias
+            const blob = await response.blob();
+            console.log('✅ ApiService - Blob recibido, tamaño:', blob.size, 'tipo:', blob.type);
+            
+            // VALIDACIÓN: Verificar que el blob no esté vacío
+            if (blob.size < 100) { // Un PDF válido debe tener al menos 100 bytes
+                console.error('❌ ApiService - Blob demasiado pequeño:', blob.size);
+                throw new Error('El archivo descargado está vacío o es inválido');
+            }
+            
+            return blob;
+        }
+
         // Para respuestas JSON normales
-        data = await response.json();
-      }
-
-      if (!response.ok) {
-        // Si es un blob con error, intentar convertir a JSON para obtener el mensaje
-        if (isBlob && data.type === 'application/json') {
-          try {
-            const errorText = await data.text();
-            const errorData = JSON.parse(errorText);
-            throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
-          } catch (parseError) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-          }
+        if (!response.ok) {
+            let errorMessage;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.message || `Error ${response.status}: ${response.statusText}`;
+            } catch (parseError) {
+                const errorText = await response.text();
+                errorMessage = errorText || `Error ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
         }
-        
-        // Mejor manejo de errores de validación para respuestas JSON
-        if (!isBlob && data.validationErrors) {
-          const error = new Error(data.message || 'Error de validación');
-          error.validationErrors = data.validationErrors;
-          throw error;
+
+        // Intentar parsear como JSON
+        try {
+            const data = await response.json();
+            console.log('✅ ApiService - Respuesta JSON exitosa');
+            return data;
+        } catch (parseError) {
+            console.warn('⚠️ ApiService - No se pudo parsear JSON, retornando texto');
+            return await response.text();
         }
-        
-        throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
-      }
 
-      // CORREGIDO: Para respuestas blob, devolver un objeto con información útil
-      if (isBlob) {
-        return {
-          data: data,
-          headers: response.headers,
-          status: response.status,
-          type: contentType
-        };
-      }
-
-      return data;
     } catch (error) {
-      console.error('Error en petición API:', error);
-      throw error;
+        console.error('❌ ApiService - Error en petición:', error);
+        
+        // Si es error de red, dar mensaje más específico
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            throw new Error('Error de conexión. Verifique su conexión a internet.');
+        }
+        
+        throw error;
     }
-  }
+}
 
   // Métodos HTTP específicos
   async get(endpoint, params = {}) {
