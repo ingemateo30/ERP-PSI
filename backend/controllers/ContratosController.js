@@ -2,6 +2,7 @@
 const { Database } = require('../models/Database');
 const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator');
 const puppeteer = require('puppeteer');
+const FirmaPDFService = require('../services/FirmaPDFService');
 
 class ContratosController {
 
@@ -150,13 +151,16 @@ class ContratosController {
 
 
 
+    /**
+     * @route GET /api/v1/contratos/:id/pdf
+     * @desc Generar y servir PDF del contrato - CORREGIDO
+     */
     static async generarPDF(req, res) {
         try {
-
-            res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-            res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
             const { id } = req.params;
-            console.log(`📄 Generando PDF para contrato ID: ${id}`);
+            const { token } = req.query;
+
+            console.log(`📄 Generando PDF del contrato ID: ${id}`);
 
             if (!id || isNaN(id)) {
                 return res.status(400).json({
@@ -165,51 +169,28 @@ class ContratosController {
                 });
             }
 
-            // Obtener datos del contrato
-            const query = `
-        SELECT 
-          c.*,
-          cl.identificacion,
-          cl.tipo_documento,
-          cl.nombre as cliente_nombre,
-          cl.direccion as cliente_direccion,
-          cl.estrato as cliente_estrato,
-          cl.barrio,
-          cl.telefono as cliente_telefono,
-          cl.telefono_2,
-          cl.correo as cliente_email,
-          cl.mac_address,
-          cl.ip_asignada,
-          cl.tap,
-          cl.poste,
-          cl.ruta,
-          ci.nombre as ciudad_nombre,
-          d.nombre as departamento_nombre,
-          s.nombre as sector_nombre,
-          s.codigo as sector_codigo,
-          sc.plan_id,
-          sc.fecha_activacion,
-          sc.fecha_suspension,
-          sc.estado as servicio_estado,
-          p.nombre as plan_nombre,
-          p.descripcion as plan_descripcion,
-          p.velocidad_bajada,
-          p.velocidad_subida,
-          p.precio as plan_precio,
-          p.canales_tv
-        FROM contratos c
-        LEFT JOIN clientes cl ON c.cliente_id = cl.id
-        LEFT JOIN ciudades ci ON cl.ciudad_id = ci.id
-        LEFT JOIN departamentos d ON ci.departamento_id = d.id
-        LEFT JOIN sectores s ON cl.sector_id = s.id
-        LEFT JOIN servicios_cliente sc ON cl.id = sc.cliente_id
-        LEFT JOIN planes_servicio p ON sc.plan_id = p.id
-        WHERE c.id = ?
-      `;
+            // CORRECCIÓN: Obtener datos del contrato con JOIN
+            const conexion = await db.getConnection();
 
-            const contratos = await Database.query(query, [id]);
+            const [contratos] = await conexion.execute(`
+                SELECT 
+                    c.*,
+                    cl.nombre as cliente_nombre,
+                    cl.identificacion as cliente_identificacion,
+                    cl.telefono as cliente_telefono,
+                    cl.correo as cliente_email,
+                    cl.direccion as cliente_direccion,
+                    s.nombre as servicio_nombre,
+                    s.descripcion as servicio_descripcion,
+                    s.precio as servicio_precio
+                FROM contratos c
+                INNER JOIN clientes cl ON c.cliente_id = cl.id
+                LEFT JOIN servicios s ON c.servicio_id = s.id
+                WHERE c.id = ? AND c.activo = 1
+            `, [id]);
 
             if (contratos.length === 0) {
+                conexion.release();
                 return res.status(404).json({
                     success: false,
                     message: 'Contrato no encontrado'
@@ -217,11 +198,13 @@ class ContratosController {
             }
 
             const contratoData = contratos[0];
-            console.log(`📋 Contrato encontrado: ${contratoData.numero_contrato}`);
 
-            // Obtener configuración de empresa
-            const empresaQuery = 'SELECT * FROM configuracion_empresa LIMIT 1';
-            const empresaResult = await Database.query(empresaQuery);
+            // CORRECCIÓN: Obtener datos de la empresa
+            const [empresaResult] = await conexion.execute(`
+                SELECT * FROM configuracion_empresa WHERE id = 1
+            `);
+
+            conexion.release();
 
             const empresaData = empresaResult.length > 0 ? empresaResult[0] : {
                 empresa_nombre: 'PROVEEDOR DE TELECOMUNICACIONES SAS.',
@@ -235,73 +218,107 @@ class ContratosController {
 
             console.log('📄 Generando HTML del contrato...');
 
-            // Generar HTML usando ContratoPDFGenerator
-            const htmlContent = ContratoPDFGenerator.generarHTML(contratoData, empresaData);
+            // CORRECCIÓN: Verificar si ya existe PDF generado
+            let pdfBuffer;
+            const rutaPDFExistente = contratoData.documento_pdf_path;
 
-            console.log('🖨️ Iniciando conversión a PDF...');
+            if (rutaPDFExistente && fs.existsSync(rutaPDFExistente)) {
+                console.log('📁 Usando PDF existente:', rutaPDFExistente);
+                pdfBuffer = fs.readFileSync(rutaPDFExistente);
+            } else {
+                console.log('🔨 Generando nuevo PDF...');
 
-            // Configurar Puppeteer
-            const browser = await puppeteer.launch({
-                headless: true,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor'
-                ]
-            });
+                // Generar HTML usando ContratoPDFGenerator
+                const htmlContent = ContratoPDFGenerator.generarHTML(contratoData, empresaData);
 
-            const page = await browser.newPage();
+                console.log('🖨️ Iniciando conversión a PDF...');
 
-            // Configurar el contenido HTML
-            await page.setContent(htmlContent, {
-                waitUntil: 'networkidle0',
-                timeout: 30000
-            });
+                // CORRECCIÓN: Configurar Puppeteer para servidor
+                const browser = await puppeteer.launch({
+                    headless: true,
+                    args: [
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-web-security',
+                        '--disable-features=VizDisplayCompositor',
+                        '--disable-gpu',
+                        '--disable-software-rasterizer'
+                    ]
+                });
 
-            // Generar PDF
-            const pdfBuffer = await page.pdf({
-                format: 'Letter',
-                printBackground: true,
-                margin: {
-                    top: '10mm',
-                    right: '10mm',
-                    bottom: '10mm',
-                    left: '10mm'
-                },
-                preferCSSPageSize: true,
-                displayHeaderFooter: false
-            });
+                const page = await browser.newPage();
 
-            await browser.close();
+                // Configurar el contenido HTML
+                await page.setContent(htmlContent, {
+                    waitUntil: 'networkidle0',
+                    timeout: 30000
+                });
+
+                // Generar PDF
+                pdfBuffer = await page.pdf({
+                    format: 'Letter',
+                    printBackground: true,
+                    margin: {
+                        top: '10mm',
+                        right: '10mm',
+                        bottom: '10mm',
+                        left: '10mm'
+                    },
+                    preferCSSPageSize: true,
+                    displayHeaderFooter: false
+                });
+
+                await browser.close();
+
+                // CORRECCIÓN: Guardar PDF generado para uso futuro
+                const uploadsDir = path.join(process.cwd(), 'uploads', 'contratos');
+                if (!fs.existsSync(uploadsDir)) {
+                    fs.mkdirSync(uploadsDir, { recursive: true });
+                }
+
+                const nombrePDF = `contrato_${contratoData.numero_contrato}_original.pdf`;
+                const rutaPDF = path.join(uploadsDir, nombrePDF);
+
+                fs.writeFileSync(rutaPDF, pdfBuffer);
+
+                // Actualizar ruta en base de datos
+                const conexionUpdate = await db.getConnection();
+                await conexionUpdate.execute(`
+                    UPDATE contratos SET documento_pdf_path = ? WHERE id = ?
+                `, [rutaPDF, id]);
+                conexionUpdate.release();
+
+                console.log('💾 PDF guardado en:', rutaPDF);
+            }
 
             console.log(`✅ PDF generado exitosamente (${pdfBuffer.length} bytes)`);
 
-            // CORREGIDO: Headers específicos para PDF
+            // CORRECCIÓN: Headers específicos para PDF
             const filename = `contrato_${contratoData.numero_contrato || id}.pdf`;
 
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
             res.setHeader('Content-Length', pdfBuffer.length);
+            res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache por 1 hora
             res.setHeader('Accept-Ranges', 'bytes');
-            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-            res.setHeader('Pragma', 'no-cache');
-            res.setHeader('Expires', '0');
 
-            // IMPORTANTE: Enviar directamente el buffer sin conversiones
+            // IMPORTANTE: Enviar directamente el buffer
             res.end(pdfBuffer, 'binary');
 
-            console.log(`📎 PDF del contrato enviado: ${filename}`);
+            console.log(`📎 PDF del contrato servido: ${filename}`);
 
         } catch (error) {
             console.error('❌ Error generando PDF del contrato:', error);
 
-            res.status(500).json({
-                success: false,
-                message: 'Error generando PDF del contrato',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
+            // CORRECCIÓN: No enviar JSON si headers ya están enviados
+            if (!res.headersSent) {
+                res.status(500).json({
+                    success: false,
+                    message: 'Error generando PDF del contrato',
+                    error: process.env.NODE_ENV === 'development' ? error.message : undefined
+                });
+            }
         }
     }
 
@@ -358,11 +375,16 @@ class ContratosController {
         }
     }
 
+
+    /**
+     * @route GET /api/v1/contratos/:id/abrir-firma
+     * @desc Obtener contrato para proceso de firma - CORREGIDO
+     */
     static async abrirParaFirma(req, res) {
         try {
             const { id } = req.params;
 
-            console.log(`📋 Abriendo contrato ${id} para firma digital`);
+            console.log(`📋 Abriendo contrato ${id} para firma`);
 
             if (!id || isNaN(id)) {
                 return res.status(400).json({
@@ -371,61 +393,11 @@ class ContratosController {
                 });
             }
 
-            const contratos = await Database.query(`
-    SELECT * FROM contratos WHERE id = ?
-`, [id]);
+            // CORRECCIÓN: Usar el servicio especializado
+            const datosVisor = await FirmaPDFService.abrirContratoParaFirma(id);
 
-            if (!contratos) {
-                console.log(`❌ Contrato ${id} no encontrado en la base de datos`);
-                return res.status(404).json({
-                    success: false,
-                    message: `Contrato con ID ${id} no encontrado`
-                });
-            }
-
-            const contrato = contratos[0];
-
-            console.log('🔍 DEBUG - contrato completo:', contrato);
-            console.log('🔍 DEBUG - contrato.cliente_id:', contrato.cliente_id);
-            console.log('🔍 DEBUG - tipo cliente_id:', typeof contrato.cliente_id);
-            // Ahora obtener datos del cliente por separado
-            const clientesResult = await Database.query(`
-            SELECT * FROM clientes WHERE id = ?
-        `, [contrato.cliente_id]);
-
-            if (clientesResult.length === 0) {
-
-                return res.status(404).json({
-                    success: false,
-                    message: `Cliente asociado al contrato no encontrado`
-                });
-            }
-
-            const cliente = clientesResult[0];
-            console.log(`✅ Cliente encontrado: ${cliente.nombre}`);
-
-            // Verificar si ya está firmado
-            const yaFirmado = Boolean(contrato.firmado_cliente) || Boolean(contrato.fecha_firma);
-            console.log(`🔍 Estado de firma: firmado_cliente=${contrato.firmado_cliente}, fecha_firma=${contrato.fecha_firma}, yaFirmado=${yaFirmado}`);
-
-            // Estructura de datos para VisorFirmaPDF
-            const datosVisor = {
-                id: contrato.id,
-                numero_contrato: contrato.numero_contrato,
-                fecha_inicio: contrato.fecha_inicio,
-                tipo_permanencia: contrato.tipo_permanencia,
-                permanencia_meses: contrato.permanencia_meses || 0,
-                costo_instalacion: parseFloat(contrato.costo_instalacion) || 0,
-                estado: contrato.estado,
-                cliente_nombre: cliente.nombre,
-                cliente_identificacion: cliente.identificacion,
-                cliente_telefono: cliente.telefono,
-                cliente_email: cliente.correo,
-                firmado: yaFirmado,
-                fecha_firma: contrato.fecha_firma,
-                puede_firmar: !yaFirmado && contrato.estado === 'activo',
-                mensaje_estado: yaFirmado ? 'Este contrato ya ha sido firmado' : 'Listo para firma digital'
-            };
+            const yaFirmado = Boolean(datosVisor.firmado);
+            datosVisor.estado_firma = yaFirmado ? 'Este contrato ya ha sido firmado' : 'Listo para firma digital';
 
             res.json({
                 success: true,
@@ -451,31 +423,32 @@ class ContratosController {
      * @route POST /api/v1/contratos/:id/procesar-firma
      * @desc Procesar firma desde VisorFirmaPDF (campos REALES de la BD)
      */
+    /**
+       * @route POST /api/v1/contratos/:id/procesar-firma
+       * @desc Procesar firma digital y guardar PDF firmado - CORREGIDO
+       */
     static async procesarFirmaDigital(req, res) {
-        let conexion;
-
         try {
-            conexion = await db.getConnection();
-            await conexion.beginTransaction();
-
             const { id } = req.params;
-            const {
-                signature_base64,
-                firmado_por,
-                cedula_firmante,
-                tipo_firma = 'digital',
-                observaciones = ''
-            } = req.body;
+            const datosSignature = req.body;
 
             console.log(`🖊️ Procesando firma digital del contrato ${id}`);
 
-            // Validaciones
             if (!id || isNaN(id)) {
                 return res.status(400).json({
                     success: false,
                     message: 'ID de contrato inválido'
                 });
             }
+
+            // Validar datos de firma
+            const {
+                signature_base64,
+                firmado_por,
+                cedula_firmante,
+                tipo_firma = 'digital',
+                observaciones = ''
+            } = datosSignature;
 
             if (!signature_base64 || !firmado_por || !cedula_firmante) {
                 return res.status(400).json({
@@ -484,10 +457,95 @@ class ContratosController {
                 });
             }
 
-            // Obtener contrato actual con campos REALES
+            // CORRECCIÓN: Usar el servicio especializado
+            const resultado = await FirmaPDFService.procesarFirmaYGuardarPDF(id, datosSignature);
+
+            console.log(`✅ Contrato ${id} firmado exitosamente`);
+
+            res.json({
+                success: true,
+                message: 'Firma procesada exitosamente',
+                data: resultado
+            });
+
+        } catch (error) {
+            console.error('❌ Error procesando firma digital:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error procesando la firma',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    }
+    /**
+    * @route GET /api/v1/contratos/:id/descargar-pdf
+    * @desc Descargar PDF firmado del contrato
+    */
+    static async descargarPDF(req, res) {
+        try {
+            const { id } = req.params;
+
+            console.log(`⬇️ Descargando PDF del contrato ${id}`);
+
+            if (!id || isNaN(id)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID de contrato inválido'
+                });
+            }
+
+            const datosDescarga = await FirmaPDFService.obtenerURLDescargaPDF(id);
+
+            if (!fs.existsSync(datosDescarga.ruta_archivo)) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Archivo PDF no encontrado'
+                });
+            }
+
+            const pdfBuffer = fs.readFileSync(datosDescarga.ruta_archivo);
+            const filename = `contrato_${datosDescarga.numero_contrato}${datosDescarga.firmado ? '_firmado' : ''}.pdf`;
+
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Length', pdfBuffer.length);
+
+            res.end(pdfBuffer, 'binary');
+
+            console.log(`✅ PDF descargado: ${filename}`);
+
+        } catch (error) {
+            console.error('❌ Error descargando PDF:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error descargando PDF',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    }
+    /**
+    * @route GET /api/v1/contratos/:id/verificar-pdf
+    * @desc Verificar disponibilidad del PDF
+    */
+    static async verificarPDF(req, res) {
+        try {
+            const { id } = req.params;
+
+            if (!id || isNaN(id)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID de contrato inválido'
+                });
+            }
+
+            const conexion = await db.getConnection();
+
             const [contratos] = await conexion.execute(`
-        SELECT * FROM contratos WHERE id = ?
-      `, [id]);
+                SELECT documento_pdf_path, numero_contrato, firmado_cliente
+                FROM contratos WHERE id = ? AND activo = 1
+            `, [id]);
+
+            conexion.release();
 
             if (contratos.length === 0) {
                 return res.status(404).json({
@@ -497,108 +555,33 @@ class ContratosController {
             }
 
             const contrato = contratos[0];
+            const pdfExiste = contrato.documento_pdf_path && fs.existsSync(contrato.documento_pdf_path);
 
-            // Verificar si ya está firmado
-            if (contrato.firmado_cliente || contrato.fecha_firma) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Este contrato ya ha sido firmado'
-                });
+            let tamanoArchivo = 0;
+            if (pdfExiste) {
+                const stats = fs.statSync(contrato.documento_pdf_path);
+                tamanoArchivo = stats.size;
             }
-
-            // Verificar estado del contrato
-            if (contrato.estado !== 'activo') {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Solo se pueden firmar contratos en estado activo'
-                });
-            }
-
-            // Crear directorio para PDFs si no existe
-            const uploadsDir = path.join(process.cwd(), 'uploads', 'contratos');
-            if (!fs.existsSync(uploadsDir)) {
-                fs.mkdirSync(uploadsDir, { recursive: true });
-            }
-
-            // Generar nombre del archivo PDF firmado
-            const nombrePDFFirmado = `contrato_${contrato.numero_contrato}_firmado_${Date.now()}.pdf`;
-            const rutaPDFFirmado = path.join(uploadsDir, nombrePDFFirmado);
-
-            // Por ahora, guardamos la firma como imagen en JSON hasta implementar PDF
-            const datosFirma = {
-                signature_base64: signature_base64,
-                firmado_por: firmado_por,
-                cedula_firmante: cedula_firmante,
-                tipo_firma: tipo_firma,
-                fecha_firma: new Date().toISOString(),
-                observaciones_firma: observaciones
-            };
-
-            // Actualizar el contrato con los campos REALES de la BD
-            const observacionesActualizadas = `${contrato.observaciones || ''}\n[FIRMA DIGITAL] Firmado por: ${firmado_por} - Cédula: ${cedula_firmante} - Fecha: ${new Date().toLocaleString()} - Tipo: ${tipo_firma}${observaciones ? ` - Obs: ${observaciones}` : ''}`;
-
-            await conexion.execute(`
-        UPDATE contratos SET
-          firmado_cliente = 1,
-          fecha_firma = CURDATE(),
-          observaciones = ?,
-          documento_pdf_path = ?,
-          updated_at = NOW()
-        WHERE id = ?
-      `, [
-                observacionesActualizadas,
-                rutaPDFFirmado, // Ruta donde se guardará el PDF firmado
-                id
-            ]);
-
-            // Guardar datos de la firma temporalmente en JSON hasta implementar PDF
-            const datosTemporales = {
-                contrato_id: id,
-                datos_firma: datosFirma,
-                fecha_procesamiento: new Date().toISOString()
-            };
-
-            fs.writeFileSync(
-                path.join(uploadsDir, `firma_${contrato.numero_contrato}_${Date.now()}.json`),
-                JSON.stringify(datosTemporales, null, 2)
-            );
-
-            await conexion.commit();
-
-            console.log(`✅ Contrato ${contrato.numero_contrato} firmado exitosamente`);
-
-            // Respuesta para VisorFirmaPDF
-            const respuesta = {
-                success: true,
-                contrato_id: parseInt(id),
-                numero_contrato: contrato.numero_contrato,
-                firmado_por: firmado_por,
-                cedula_firmante: cedula_firmante,
-                fecha_firma: new Date().toISOString(),
-                documento_pdf_path: rutaPDFFirmado,
-                mensaje: 'Contrato firmado digitalmente y guardado exitosamente'
-            };
 
             res.json({
                 success: true,
-                message: 'Firma procesada exitosamente',
-                data: respuesta
+                data: {
+                    pdf_disponible: pdfExiste,
+                    numero_contrato: contrato.numero_contrato,
+                    firmado: Boolean(contrato.firmado_cliente),
+                    ruta_archivo: contrato.documento_pdf_path,
+                    tamano_bytes: tamanoArchivo,
+                    tamano_mb: (tamanoArchivo / (1024 * 1024)).toFixed(2)
+                }
             });
 
         } catch (error) {
-            if (conexion) {
-                await conexion.rollback();
-            }
-            console.error('❌ Error procesando firma digital:', error);
+            console.error('❌ Error verificando PDF:', error);
             res.status(500).json({
                 success: false,
-                message: 'Error procesando la firma',
+                message: 'Error verificando PDF',
                 error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
-        } finally {
-            if (conexion) {
-                conexion.release();
-            }
         }
     }
 }

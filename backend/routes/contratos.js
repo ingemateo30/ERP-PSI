@@ -48,6 +48,16 @@ router.get('/:id/pdf',
   ContratosController.generarPDF
 );
 
+router.get('/:id/verificar-pdf',
+  authenticateToken,
+  ContratosController.verificarPDF
+);
+
+router.get('/:id/descargar-pdf',
+  authenticateToken,
+  ContratosController.descargarPDF
+);
+
 /**
  * @route PUT /api/v1/contratos/:id/estado
  * @desc Actualizar estado del contrato
@@ -70,6 +80,37 @@ router.get('/:id/abrir-firma', ContratosController.abrirParaFirma);
  * @desc Procesar firma digital y guardar PDF
  */
 router.post('/:id/procesar-firma', ContratosController.procesarFirmaDigital);
+
+const authenticateFlexible = (req, res, next) => {
+  // Intentar autenticación por header primero
+  const authHeader = req.headers['authorization'];
+  let token = authHeader && authHeader.split(' ')[1];
+  
+  // Si no hay token en header, buscar en query params
+  if (!token && req.query.token) {
+    token = req.query.token;
+  }
+  
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: 'Token de acceso requerido'
+    });
+  }
+
+  try {
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error('❌ Error de autenticación:', error.message);
+    return res.status(403).json({
+      success: false,
+      message: 'Token inválido'
+    });
+  }
+};
 
 console.log('✅ Rutas de contratos cargadas correctamente');
 

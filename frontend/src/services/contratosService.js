@@ -44,7 +44,71 @@ class ContratosService {
     }
 
     /**
-     * Generar PDF del contrato
+     * Cargar contrato específicamente para el proceso de firma - CORREGIDO
+     */
+    async cargarContratoParaFirma(id) {
+        try {
+            console.log(`📋 Cargando contrato para firma ID: ${id}`);
+
+            if (!id || isNaN(id)) {
+                throw new Error('ID de contrato inválido');
+            }
+
+            // Usar el endpoint específico para abrir firma
+            const response = await apiService.get(`${API_BASE}/${id}/abrir-firma`);
+
+            // Si la respuesta es exitosa, agregar la URL del PDF
+            if (response.success && response.data) {
+                // Generar URL del PDF SIN token en query (se enviará en header)
+                const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1';
+                const urlPDF = `${apiUrl}/contratos/${id}/pdf?t=${Date.now()}`;
+                
+                // Agregar la URL del PDF a los datos
+                response.data.pdf_url = urlPDF;
+                
+                console.log('🔗 URL del PDF generada:', urlPDF);
+            }
+
+            console.log('✅ Contrato para firma cargado exitosamente');
+            return response;
+        } catch (error) {
+            console.error('❌ Error cargando contrato para firma:', error);
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * CORRECCIÓN: Método mejorado para obtener URL del PDF
+     */
+    async obtenerUrlPDF(id) {
+        try {
+            if (!id || isNaN(id)) {
+                throw new Error('ID de contrato inválido');
+            }
+
+            // Obtener token de autenticación
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error('Token de autenticación no encontrado');
+            }
+
+            // Construir URL base de la API
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1';
+            
+            // CORRECCIÓN: URL con parámetros de autenticación correctos
+            const pdfUrl = `${apiUrl}/contratos/${id}/pdf?token=${encodeURIComponent(token)}&t=${Date.now()}`;
+            
+            console.log('🔗 URL del PDF generada:', pdfUrl);
+            
+            return pdfUrl;
+        } catch (error) {
+            console.error('❌ Error generando URL del PDF:', error);
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Generar PDF del contrato para descarga
      */
     async generarPDF(id, download = true) {
         try {
@@ -57,17 +121,26 @@ class ContratosService {
             const response = await apiService.request(`${API_BASE}/${id}/pdf`, {
                 method: 'GET',
                 responseType: 'blob',
-                headers: { 'Accept': 'application/pdf' }
+                headers: { 
+                    'Accept': 'application/pdf',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
             });
 
             // Validación del blob
-            if (!(response.data instanceof Blob)) {
-                throw new Error('Respuesta inválida del servidor');
+            if (!response.data || response.data.size === 0) {
+                throw new Error('El PDF generado está vacío');
             }
 
-            if (download && response.data) {
-                // Crear enlace de descarga
-                const url = window.URL.createObjectURL(new Blob([response.data]));
+            // Verificar que es realmente un PDF
+            const contentType = response.headers?.['content-type'] || '';
+            if (!contentType.includes('application/pdf')) {
+                console.warn('⚠️ Tipo de contenido inesperado:', contentType);
+            }
+
+            if (download) {
+                // Crear enlace de descarga automática
+                const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
                 const link = document.createElement('a');
                 link.href = url;
                 link.setAttribute('download', `contrato_${id}.pdf`);
@@ -77,148 +150,58 @@ class ContratosService {
                 window.URL.revokeObjectURL(url);
             }
 
-            console.log('✅ PDF del contrato generado exitosamente');
+            console.log('✅ PDF generado exitosamente');
             return response;
         } catch (error) {
-            console.error('❌ Error generando PDF del contrato:', error);
+            console.error('❌ Error generando PDF:', error);
             throw this.handleError(error);
         }
     }
 
     /**
-     * Actualizar estado del contrato
+     * Procesar firma digital con canvas/imagen y guardar PDF
      */
-    async actualizarEstado(id, datos) {
+    async procesarFirmaDigital(id, datosSignature) {
         try {
+            console.log(`🖊️ Procesando firma digital del contrato ID: ${id}`);
+
             if (!id || isNaN(id)) {
                 throw new Error('ID de contrato inválido');
             }
 
-            console.log(`🔄 Actualizando estado del contrato ID: ${id}`, datos);
-
-            const response = await apiService.put(`${API_BASE}/${id}/estado`, datos);
-
-            console.log('✅ Estado del contrato actualizado exitosamente');
-            return response;
-        } catch (error) {
-            console.error('❌ Error actualizando estado del contrato:', error);
-            throw this.handleError(error);
-        }
-    }
-
-    /**
-     * Obtener estadísticas de contratos
-     */
-    async obtenerEstadisticas() {
-        try {
-            console.log('📊 Obteniendo estadísticas de contratos');
-
-            const response = await apiService.get(`${API_BASE}/stats`);
-
-            console.log('✅ Estadísticas obtenidas exitosamente');
-            return response;
-        } catch (error) {
-            console.error('❌ Error obteniendo estadísticas:', error);
-            throw this.handleError(error);
-        }
-    }
-
-    /**
-     * Firmar contrato (marcar como firmado)
-     */
-    async firmarContrato(id, fechaFirma = null) {
-        try {
-            const datos = {
-                estado: 'activo',
-                fecha_firma: fechaFirma || new Date().toISOString().split('T')[0],
-                observaciones: 'Contrato firmado por el cliente'
-            };
-
-            return await this.actualizarEstado(id, datos);
-        } catch (error) {
-            console.error('❌ Error firmando contrato:', error);
-            throw this.handleError(error);
-        }
-    }
-
-    /**
-     * Anular contrato
-     */
-    async anularContrato(id, motivo = '') {
-        try {
-            const datos = {
-                estado: 'anulado',
-                observaciones: motivo || 'Contrato anulado'
-            };
-
-            return await this.actualizarEstado(id, datos);
-        } catch (error) {
-            console.error('❌ Error anulando contrato:', error);
-            throw this.handleError(error);
-        }
-    }
-
-    /**
-     * Terminar contrato
-     */
-    async terminarContrato(id, motivo = '') {
-        try {
-            const datos = {
-                estado: 'terminado',
-                observaciones: motivo || 'Contrato terminado'
-            };
-
-            return await this.actualizarEstado(id, datos);
-        } catch (error) {
-            console.error('❌ Error terminando contrato:', error);
-            throw this.handleError(error);
-        }
-    }
-
-    /**
-     * Buscar contratos por cliente
-     */
-    async buscarPorCliente(clienteId, params = {}) {
-        try {
-            const filtros = {
-                ...params,
-                cliente_id: clienteId
-            };
-
-            return await this.obtenerTodos(filtros);
-        } catch (error) {
-            console.error('❌ Error buscando contratos por cliente:', error);
-            throw this.handleError(error);
-        }
-    }
-
-    /**
- * Obtener contratos para firma (con filtros específicos)
- */
-    async obtenerContratosParaFirma(params = {}) {
-        try {
-            console.log('✍️ Obteniendo contratos para firma:', params);
-
-            // Construir parámetros específicos para firma
-            const filtros = {
-                limit: 50,
-                estado: 'activo',
-                ...params
-            };
-
-            // Manejo de filtros específicos de firma
-            if (params.filtroEstado === 'pendiente') {
-                filtros.firmado = 'false';
-            } else if (params.filtroEstado === 'firmado') {
-                filtros.firmado = 'true';
-            } else if (params.filtroEstado !== 'todos' && params.filtroEstado) {
-                filtros.estado = params.filtroEstado;
+            // Validar datos requeridos
+            if (!datosSignature.signature_base64) {
+                throw new Error('Firma digital requerida');
             }
 
-            // Limpiar filtroEstado ya que no es un parámetro del backend
-            delete filtros.filtroEstado;
+            if (!datosSignature.firmado_por || !datosSignature.cedula_firmante) {
+                throw new Error('Datos del firmante incompletos');
+            }
 
-            const response = await apiService.get(API_BASE, filtros);
+            // CORRECCIÓN: Usar el endpoint específico para procesar firma
+            const response = await apiService.post(`${API_BASE}/${id}/procesar-firma`, datosSignature);
+
+            console.log('✅ Firma digital procesada exitosamente');
+            return response;
+        } catch (error) {
+            console.error('❌ Error procesando firma digital:', error);
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Obtener contratos para el proceso de firma
+     */
+    async obtenerContratosParaFirma(filtros = {}) {
+        try {
+            console.log('📋 Obteniendo contratos para firma:', filtros);
+
+            const params = {
+                ...filtros,
+                para_firma: true
+            };
+
+            const response = await apiService.get(API_BASE, params);
 
             console.log('✅ Contratos para firma obtenidos exitosamente');
             return response;
@@ -229,23 +212,22 @@ class ContratosService {
     }
 
     /**
-     * Buscar contratos para firma
+     * Buscar contratos específicamente para firma
      */
-    async buscarContratosParaFirma(termino, filtroEstado = 'todos') {
+    async buscarContratosParaFirma(termino, estado = 'pendiente') {
         try {
-            console.log('🔍 Buscando contratos para firma:', { termino, filtroEstado });
+            console.log('🔍 Buscando contratos para firma:', { termino, estado });
 
-            if (!termino || termino.length < 2) {
-                return await this.obtenerContratosParaFirma({ filtroEstado });
-            }
-
-            const filtros = {
-                search: termino,
-                limit: 20,
-                filtroEstado
+            const params = {
+                buscar: termino,
+                estado: estado,
+                para_firma: true
             };
 
-            return await this.obtenerContratosParaFirma(filtros);
+            const response = await apiService.get(API_BASE, params);
+
+            console.log('✅ Búsqueda de contratos para firma completada');
+            return response;
         } catch (error) {
             console.error('❌ Error buscando contratos para firma:', error);
             throw this.handleError(error);
@@ -253,47 +235,103 @@ class ContratosService {
     }
 
     /**
-     * Procesar firma de contrato
+     * Crear nuevo contrato
      */
-    async procesarFirmaContrato(id, datosF, irma) {
+    async crear(datosContrato) {
         try {
-            console.log(`✍️ Procesando firma del contrato ID: ${id}`);
+            console.log('📝 Creando nuevo contrato');
 
-            if (!id || isNaN(id)) {
-                throw new Error('ID de contrato inválido');
-            }
+            const response = await apiService.post(API_BASE, datosContrato);
 
-            const datos = {
-                estado: 'activo',
-                fecha_firma: datosF.irma.fecha_firma || new Date().toISOString().split('T')[0],
-                observaciones: datosF.irma.observaciones || 'Contrato firmado por el cliente',
-                lugar_firma: datosF.irma.lugar_firma || '',
-                firmado_por: datosF.irma.firmado_por || ''
-            };
-
-            const response = await apiService.put(`${API_BASE}/${id}/estado`, datos);
-
-            console.log('✅ Firma procesada exitosamente');
+            console.log('✅ Contrato creado exitosamente');
             return response;
         } catch (error) {
-            console.error('❌ Error procesando firma:', error);
+            console.error('❌ Error creando contrato:', error);
             throw this.handleError(error);
         }
     }
 
     /**
-     * Filtrar contratos por estado
+     * Actualizar contrato existente
      */
-    async filtrarPorEstado(estado, params = {}) {
+    async actualizar(id, datosContrato) {
         try {
-            const filtros = {
-                ...params,
-                estado: estado
-            };
+            if (!id || isNaN(id)) {
+                throw new Error('ID de contrato inválido');
+            }
 
-            return await this.obtenerTodos(filtros);
+            console.log(`📝 Actualizando contrato ID: ${id}`);
+
+            const response = await apiService.put(`${API_BASE}/${id}`, datosContrato);
+
+            console.log('✅ Contrato actualizado exitosamente');
+            return response;
         } catch (error) {
-            console.error('❌ Error filtrando contratos por estado:', error);
+            console.error('❌ Error actualizando contrato:', error);
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Cambiar estado del contrato
+     */
+    async cambiarEstado(id, nuevoEstado, observaciones = '') {
+        try {
+            if (!id || isNaN(id)) {
+                throw new Error('ID de contrato inválido');
+            }
+
+            console.log(`🔄 Cambiando estado del contrato ID: ${id} a ${nuevoEstado}`);
+
+            const response = await apiService.put(`${API_BASE}/${id}/estado`, {
+                estado: nuevoEstado,
+                observaciones
+            });
+
+            console.log('✅ Estado del contrato actualizado exitosamente');
+            return response;
+        } catch (error) {
+            console.error('❌ Error cambiando estado del contrato:', error);
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Eliminar/anular contrato
+     */
+    async eliminar(id, motivo = '') {
+        try {
+            if (!id || isNaN(id)) {
+                throw new Error('ID de contrato inválido');
+            }
+
+            console.log(`🗑️ Eliminando contrato ID: ${id}`);
+
+            const response = await apiService.delete(`${API_BASE}/${id}`, {
+                data: { motivo }
+            });
+
+            console.log('✅ Contrato eliminado exitosamente');
+            return response;
+        } catch (error) {
+            console.error('❌ Error eliminando contrato:', error);
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Obtener estadísticas de contratos
+     */
+    async obtenerEstadisticas(filtros = {}) {
+        try {
+            console.log('📊 Obteniendo estadísticas de contratos');
+
+            const response = await apiService.get(`${API_BASE}/stats`, filtros);
+
+            console.log('✅ Estadísticas obtenidas exitosamente');
+            return response;
+        } catch (error) {
+            console.error('❌ Error obteniendo estadísticas:', error);
             throw this.handleError(error);
         }
     }
@@ -321,150 +359,102 @@ class ContratosService {
         }
     }
 
-    async cargarContratoParaFirma(id) {
-        try {
-            console.log(`📋 Cargando contrato para firma ID: ${id}`);
-
-            if (!id || isNaN(id)) {
-                throw new Error('ID de contrato inválido');
-            }
-
-            const response = await apiService.get(`${API_BASE}/${id}/abrir-firma`);
-
-            console.log('✅ Contrato para firma cargado exitosamente');
-            return response;
-        } catch (error) {
-            console.error('❌ Error cargando contrato para firma:', error);
-            throw this.handleError(error);
-        }
-    }
-
-    async obtenerUrlPDF(id) {
-    try {
-        // Retornar URL con token para autenticación
-        const token = localStorage.getItem('token');
-        return `${API_BASE}/${id}/pdf?t=${Date.now()}&authorization=${token}`;
-    } catch (error) {
-        throw this.handleError(error);
-    }
-}
     /**
-     * Procesar firma digital con canvas/imagen y guardar PDF
+     * Verificar disponibilidad de PDF
      */
-    async procesarFirmaDigital(id, datosSignature) {
+    async verificarPDF(id) {
         try {
-            console.log(`🖊️ Procesando firma digital del contrato ID: ${id}`);
-
             if (!id || isNaN(id)) {
                 throw new Error('ID de contrato inválido');
             }
 
-            // Este endpoint debe:
-            // 1. Procesar la firma digital
-            // 2. Generar PDF firmado
-            // 3. Guardar PDF en servidor
-            // 4. Actualizar campos: documento_pdf_path, firmado_cliente, fecha_firma
-            const response = await apiService.post(`${API_BASE}/${id}/procesar-firma`, datosSignature);
+            console.log(`🔍 Verificando disponibilidad del PDF para contrato ID: ${id}`);
 
-            console.log('✅ Firma digital procesada y PDF guardado exitosamente');
+            // Generar URL del PDF SIN token en query
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1';
+            const urlPDF = `${apiUrl}/contratos/${id}/pdf?t=${Date.now()}`;
+
+            // Obtener token del localStorage
+            const token = localStorage.getItem('token');
+            
+            // Hacer solicitud HEAD con token en header Authorization
+            const response = await fetch(urlPDF, {
+                method: 'HEAD',
+                headers: {
+                    'Accept': 'application/pdf',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            console.log('✅ PDF verificado exitosamente');
+            return {
+                disponible: response.ok,
+                contentType: response.headers.get('content-type') || '',
+                size: response.headers.get('content-length') || 0,
+                url: urlPDF
+            };
+        } catch (error) {
+            console.error('❌ Error verificando PDF:', error);
+            return {
+                disponible: false,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Exportar contratos a Excel
+     */
+    async exportarExcel(filtros = {}) {
+        try {
+            console.log('📊 Exportando contratos a Excel');
+
+            const response = await apiService.get(`${API_BASE}/exportar`, {
+                params: filtros,
+                responseType: 'blob'
+            });
+
+            // Crear descarga automática
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `contratos_${new Date().toISOString().split('T')[0]}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+
+            console.log('✅ Contratos exportados exitosamente');
             return response;
         } catch (error) {
-            console.error('❌ Error procesando firma digital:', error);
+            console.error('❌ Error exportando contratos:', error);
             throw this.handleError(error);
         }
     }
 
     /**
-     * Manejar errores de la API
+     * Manejo centralizado de errores
      */
     handleError(error) {
         if (error.response) {
-            // Error del servidor
-            const message = error.response.data?.message || 'Error del servidor';
+            // Error de respuesta del servidor
+            const message = error.response.data?.message || error.response.statusText || 'Error del servidor';
             const status = error.response.status;
-
-            if (status === 401) {
-                // Token expirado, redirigir al login
-                window.location.href = '/login';
-                return new Error('Sesión expirada');
-            }
-
-            return new Error(`${message} (${status})`);
+            
+            console.error(`❌ Error ${status}:`, message);
+            
+            return new Error(`Error ${status}: ${message}`);
         } else if (error.request) {
             // Error de red
-            return new Error('Error de conexión');
+            console.error('❌ Error de red:', error.request);
+            return new Error('Error de conexión con el servidor');
         } else {
-            // Error interno
-            return new Error(error.message || 'Error interno');
+            // Error de configuración
+            console.error('❌ Error de configuración:', error.message);
+            return new Error(error.message || 'Error desconocido');
         }
-    }
-
-    /**
-     * Validar datos del contrato
-     */
-    validarDatos(datos) {
-        const errores = [];
-
-        if (!datos.cliente_id) {
-            errores.push('ID del cliente es requerido');
-        }
-
-        if (!datos.servicio_id) {
-            errores.push('ID del servicio es requerido');
-        }
-
-        if (datos.permanencia_meses && datos.permanencia_meses < 0) {
-            errores.push('Los meses de permanencia no pueden ser negativos');
-        }
-
-        if (datos.costo_instalacion && datos.costo_instalacion < 0) {
-            errores.push('El costo de instalación no puede ser negativo');
-        }
-
-        return errores;
-    }
-
-    /**
-     * Formatear datos para mostrar
-     */
-    formatearContrato(contrato) {
-        return {
-            ...contrato,
-            fecha_generacion_formatted: contrato.fecha_generacion
-                ? new Date(contrato.fecha_generacion).toLocaleDateString('es-CO')
-                : 'N/A',
-            fecha_inicio_formatted: contrato.fecha_inicio
-                ? new Date(contrato.fecha_inicio).toLocaleDateString('es-CO')
-                : 'N/A',
-            fecha_vencimiento_permanencia_formatted: contrato.fecha_vencimiento_permanencia
-                ? new Date(contrato.fecha_vencimiento_permanencia).toLocaleDateString('es-CO')
-                : 'N/A',
-            costo_instalacion_formatted: contrato.costo_instalacion
-                ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(contrato.costo_instalacion)
-                : 'N/A',
-            plan_precio_formatted: contrato.plan_precio
-                ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(contrato.plan_precio)
-                : 'N/A',
-            estado_badge: this.obtenerBadgeEstado(contrato.estado),
-            tipo_permanencia_label: contrato.tipo_permanencia === 'con_permanencia'
-                ? `Con permanencia (${contrato.permanencia_meses || 0} meses)`
-                : 'Sin permanencia'
-        };
-    }
-
-    /**
-     * Obtener badge de estado para UI
-     */
-    obtenerBadgeEstado(estado) {
-        const badges = {
-            'activo': { color: 'green', text: 'Activo' },
-            'vencido': { color: 'orange', text: 'Vencido' },
-            'terminado': { color: 'gray', text: 'Terminado' },
-            'anulado': { color: 'red', text: 'Anulado' }
-        };
-
-        return badges[estado] || { color: 'gray', text: 'Desconocido' };
     }
 }
 
+// Exportar instancia única del servicio
 export default new ContratosService();
