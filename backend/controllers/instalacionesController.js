@@ -786,75 +786,76 @@ class InstalacionesController {
     }
 
     // Eliminar instalación
-    static async eliminar(req, res) {
-        const connection = await Database.getConnection();
+   static async eliminar(req, res) {
+    const connection = await Database.getConnection();
+    
+    try {
+        await connection.beginTransaction();
+        
+        const { id } = req.params;
+        console.log('🗑️ Eliminando instalación ID:', id);
 
-        try {
-            await connection.beginTransaction();
+        // Verificar que la instalación existe
+        const [instalacion] = await connection.query(
+            'SELECT * FROM instalaciones WHERE id = ?',
+            [id]
+        );
 
-            const { id } = req.params;
-            console.log('🗑️ Eliminando instalación ID:', id);
-
-            // Obtener instalación
-            const [instalacion] = await connection.query(
-                'SELECT * FROM instalaciones WHERE id = ?',
-                [id]
-            );
-
-            if (!instalacion) {
-                throw new Error('Instalación no encontrada');
-            }
-
-            // Solo permitir eliminar si está en estado programada o cancelada
-            if (!['programada', 'cancelada'].includes(instalacion.estado)) {
-                throw new Error('Solo se pueden eliminar instalaciones programadas o canceladas');
-            }
-
-            // Liberar equipos si los hay
-            if (instalacion.equipos_instalados) {
-                try {
-                    const equipos = JSON.parse(instalacion.equipos_instalados);
-                    for (const equipo of equipos) {
-                        if (equipo.equipo_id) {
-                            await connection.query(
-                                `UPDATE inventario_equipos 
-                 SET estado = 'disponible', instalador_id = NULL, fecha_devolucion = NOW()
-                 WHERE id = ?`,
-                                [equipo.equipo_id]
-                            );
-                        }
-                    }
-                } catch (e) {
-                    console.warn('Error liberando equipos:', e);
-                }
-            }
-
-            // Eliminar instalación
-            await connection.query('DELETE FROM instalaciones WHERE id = ?', [id]);
-
-            // Registrar en logs
-
-
-            await connection.commit();
-
-            res.json({
-                success: true,
-                message: 'Instalación eliminada exitosamente'
-            });
-
-        } catch (error) {
-            await connection.rollback();
-            console.error('❌ Error eliminando instalación:', error);
-
-            res.status(400).json({
+        if (!instalacion) {
+            return res.status(404).json({
                 success: false,
-                message: error.message || 'Error al eliminar la instalación',
-                error: error.message
+                message: 'Instalación no encontrada'
             });
-        } finally {
-            connection.release();
         }
+
+        // Solo permitir eliminar si está en estado programada o cancelada
+        if (!['programada', 'cancelada'].includes(instalacion.estado)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Solo se pueden eliminar instalaciones programadas o canceladas'
+            });
+        }
+
+        // Liberar equipos si los hay
+        if (instalacion.equipos_instalados) {
+            try {
+                const equipos = JSON.parse(instalacion.equipos_instalados);
+                for (const equipo of equipos) {
+                    if (equipo.equipo_id) {
+                        await connection.query(
+                            `UPDATE inventario_equipos 
+                            SET estado = 'disponible', instalador_id = NULL, fecha_devolucion = NOW()
+                            WHERE id = ?`,
+                            [equipo.equipo_id]
+                        );
+                    }
+                }
+            } catch (e) {
+                console.warn('Error liberando equipos:', e);
+            }
+        }
+
+        // Eliminar instalación
+        await connection.query('DELETE FROM instalaciones WHERE id = ?', [id]);
+        
+        await connection.commit();
+        
+        res.json({
+            success: true,
+            message: 'Instalación eliminada exitosamente'
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('❌ Error eliminando instalación:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error eliminando instalación'
+        });
+    } finally {
+        connection.release();
     }
+}
 
     // Obtener estadísticas de instalaciones
     static async obtenerEstadisticas(req, res) {
@@ -1090,213 +1091,277 @@ class InstalacionesController {
         }
     }
 
-    static async asignarInstalador(instalacionId, instaladorId) {
-        const connection = await Database.getConnection();
+    static async asignarInstalador(req, res) {
+    const connection = await Database.getConnection();
+    
+    try {
+        await connection.beginTransaction();
+        
+        const { id } = req.params;
+        const { instalador_id } = req.body;
 
-        try {
-            await connection.beginTransaction();
-
-            console.log('👷 Asignando instalador ID:', instaladorId, 'a instalación ID:', instalacionId);
-
-            // Verificar que la instalación existe
-            const [instalacion] = await connection.query(
-                'SELECT * FROM instalaciones WHERE id = ?',
-                [instalacionId]
-            );
-
-            if (!instalacion) {
-                throw new Error('Instalación no encontrada');
-            }
-
-            // Verificar que el instalador existe y es válido
-            const [instalador] = await connection.query(
-                'SELECT * FROM sistema_usuarios WHERE id = ? AND rol = "instalador" AND activo = 1',
-                [instaladorId]
-            );
-
-            if (!instalador) {
-                throw new Error('Instalador no encontrado o no está activo');
-            }
-
-            // Verificar que la instalación puede ser asignada
-            if (instalacion.estado === 'completada') {
-                throw new Error('No se puede asignar instalador a una instalación completada');
-            }
-
-            if (instalacion.estado === 'cancelada') {
-                throw new Error('No se puede asignar instalador a una instalación cancelada');
-            }
-
-            // Actualizar la instalación
-            await connection.query(
-                `UPDATE instalaciones 
-       SET instalador_id = ?, updated_at = NOW() 
-       WHERE id = ?`,
-                [instaladorId, instalacionId]
-            );
-
-            await connection.commit();
-
-            // Obtener instalación actualizada
-            const instalacionActualizada = await this.obtenerInstalacionCompleta(instalacionId);
-
-            return instalacionActualizada;
-
-        } catch (error) {
-            await connection.rollback();
-            console.error('❌ Error asignando instalador:', error);
-            throw error;
-        } finally {
-            connection.release();
+        if (!instalador_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'El ID del instalador es requerido'
+            });
         }
+
+        console.log(`👷‍♂️ Asignando instalador ${instalador_id} a instalación ${id}`);
+
+        // Verificar que la instalación existe
+        const [instalacion] = await connection.query(
+            'SELECT * FROM instalaciones WHERE id = ?',
+            [id]
+        );
+
+        if (!instalacion) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instalación no encontrada'
+            });
+        }
+
+        // Verificar que el instalador existe
+        const [instalador] = await connection.query(
+            'SELECT * FROM usuarios WHERE id = ? AND rol = "instalador" AND activo = 1',
+            [instalador_id]
+        );
+
+        if (!instalador) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instalador no encontrado o inactivo'
+            });
+        }
+
+        // Actualizar la instalación
+        await connection.query(
+            `UPDATE instalaciones 
+            SET 
+                instalador_id = ?,
+                updated_at = NOW()
+            WHERE id = ?`,
+            [instalador_id, id]
+        );
+
+        await connection.commit();
+
+        // Obtener instalación actualizada
+        const instalacionActualizada = await this.obtenerInstalacionCompleta(id);
+
+        res.json({
+            success: true,
+            message: 'Instalador asignado exitosamente',
+            data: instalacionActualizada
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('❌ Error asignando instalador:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error asignando instalador'
+        });
+    } finally {
+        connection.release();
     }
+}
 
     /**
      * Reagendar una instalación
      */
-    static async reagendarInstalacion(instalacionId, nuevaFecha, nuevaHora, observaciones = '') {
-        const connection = await Database.getConnection();
+    static async reagendarInstalacion(req, res) {
+    const connection = await Database.getConnection();
+    
+    try {
+        await connection.beginTransaction();
+        
+        const { id } = req.params;
+        const { fecha_programada, hora_programada, observaciones } = req.body;
 
-        try {
-            await connection.beginTransaction();
+        console.log(`📅 Reagendando instalación ${id} para ${fecha_programada} ${hora_programada}`);
 
-            console.log('📅 Reagendando instalación ID:', instalacionId);
+        // Verificar que la instalación existe
+        const [instalacion] = await connection.query(
+            'SELECT * FROM instalaciones WHERE id = ?',
+            [id]
+        );
 
-            // Verificar que la instalación existe
-            const [instalacion] = await connection.query(
-                'SELECT * FROM instalaciones WHERE id = ?',
-                [instalacionId]
-            );
-
-            if (!instalacion) {
-                throw new Error('Instalación no encontrada');
-            }
-
-            // Verificar que puede ser reagendada
-            if (instalacion.estado === 'completada') {
-                throw new Error('No se puede reagendar una instalación completada');
-            }
-
-            if (instalacion.estado === 'cancelada') {
-                throw new Error('No se puede reagendar una instalación cancelada');
-            }
-
-            // Validar nueva fecha
-            const fechaNueva = new Date(nuevaFecha);
-            const hoy = new Date();
-            hoy.setHours(0, 0, 0, 0);
-
-            if (fechaNueva < hoy) {
-                throw new Error('La nueva fecha no puede ser anterior a hoy');
-            }
-
-            // Actualizar la instalación
-            const observacionesCompletas = observaciones ||
-                `Reagendada desde ${instalacion.fecha_programada} ${instalacion.hora_programada || ''}`;
-
-            await connection.query(
-                `UPDATE instalaciones 
-       SET 
-         fecha_programada = ?, 
-         hora_programada = ?,
-         estado = 'reagendada',
-         observaciones = ?,
-         updated_at = NOW()
-       WHERE id = ?`,
-                [nuevaFecha, nuevaHora, observacionesCompletas, instalacionId]
-            );
-
-            await connection.commit();
-
-            // Obtener instalación actualizada
-            const instalacionActualizada = await this.obtenerInstalacionCompleta(instalacionId);
-
-            return instalacionActualizada;
-
-        } catch (error) {
-            await connection.rollback();
-            console.error('❌ Error reagendando instalación:', error);
-            throw error;
-        } finally {
-            connection.release();
+        if (!instalacion) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instalación no encontrada'
+            });
         }
+
+        // Verificar que puede ser reagendada
+        if (instalacion.estado === 'completada') {
+            return res.status(400).json({
+                success: false,
+                message: 'No se puede reagendar una instalación completada'
+            });
+        }
+
+        if (instalacion.estado === 'cancelada') {
+            return res.status(400).json({
+                success: false,
+                message: 'No se puede reagendar una instalación cancelada'
+            });
+        }
+
+        // Validar nueva fecha
+        const fechaNueva = new Date(fecha_programada);
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+
+        if (fechaNueva < hoy) {
+            return res.status(400).json({
+                success: false,
+                message: 'La nueva fecha no puede ser anterior a hoy'
+            });
+        }
+
+        // Actualizar la instalación
+        const observacionesCompletas = observaciones ||
+            `Reagendada desde ${instalacion.fecha_programada} ${instalacion.hora_programada || ''}`;
+
+        await connection.query(
+            `UPDATE instalaciones 
+            SET 
+                fecha_programada = ?, 
+                hora_programada = ?,
+                estado = 'reagendada',
+                observaciones = CONCAT(IFNULL(observaciones, ''), '\n', ?),
+                updated_at = NOW()
+            WHERE id = ?`,
+            [fecha_programada, hora_programada, observacionesCompletas, id]
+        );
+
+        await connection.commit();
+
+        // Obtener instalación actualizada
+        const instalacionActualizada = await this.obtenerInstalacionCompleta(id);
+
+        res.json({
+            success: true,
+            message: 'Instalación reagendada exitosamente',
+            data: instalacionActualizada
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('❌ Error reagendando instalación:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error reagendando instalación'
+        });
+    } finally {
+        connection.release();
     }
+}
 
     /**
      * Cancelar una instalación
      */
-    static async cancelarInstalacion(instalacionId, motivoCancelacion) {
-        const connection = await Database.getConnection();
+    static async cancelarInstalacion(req, res) {
+    const connection = await Database.getConnection();
+    
+    try {
+        await connection.beginTransaction();
+        
+        const { id } = req.params;
+        const { motivo } = req.body;
 
-        try {
-            await connection.beginTransaction();
-
-            console.log('❌ Cancelando instalación ID:', instalacionId);
-
-            // Verificar que la instalación existe
-            const [instalacion] = await connection.query(
-                'SELECT * FROM instalaciones WHERE id = ?',
-                [instalacionId]
-            );
-
-            if (!instalacion) {
-                throw new Error('Instalación no encontrada');
-            }
-
-            // Verificar que puede ser cancelada
-            if (instalacion.estado === 'completada') {
-                throw new Error('No se puede cancelar una instalación completada');
-            }
-
-            if (instalacion.estado === 'cancelada') {
-                throw new Error('La instalación ya está cancelada');
-            }
-
-            // Liberar equipos asignados si los hay
-            if (instalacion.equipos_instalados) {
-                try {
-                    const equipos = JSON.parse(instalacion.equipos_instalados);
-                    for (const equipo of equipos) {
-                        if (equipo.equipo_id) {
-                            await connection.query(
-                                `UPDATE inventario_equipos 
-               SET estado = 'disponible', instalador_id = NULL, fecha_devolucion = NOW()
-               WHERE id = ?`,
-                                [equipo.equipo_id]
-                            );
-                        }
-                    }
-                } catch (parseError) {
-                    console.warn('Error liberando equipos:', parseError);
-                }
-            }
-
-            // Actualizar la instalación
-            await connection.query(
-                `UPDATE instalaciones 
-       SET 
-         estado = 'cancelada',
-         observaciones = ?,
-         updated_at = NOW()
-       WHERE id = ?`,
-                [motivoCancelacion, instalacionId]
-            );
-
-            await connection.commit();
-
-            // Obtener instalación actualizada
-            const instalacionActualizada = await this.obtenerInstalacionCompleta(instalacionId);
-
-            return instalacionActualizada;
-
-        } catch (error) {
-            await connection.rollback();
-            console.error('❌ Error cancelando instalación:', error);
-            throw error;
-        } finally {
-            connection.release();
+        if (!motivo || motivo.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                message: 'El motivo de cancelación es requerido'
+            });
         }
+
+        console.log(`❌ Cancelando instalación ${id}. Motivo: ${motivo}`);
+
+        // Verificar que la instalación existe
+        const [instalacion] = await connection.query(
+            'SELECT * FROM instalaciones WHERE id = ?',
+            [id]
+        );
+
+        if (!instalacion) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instalación no encontrada'
+            });
+        }
+
+        // Verificar que puede ser cancelada
+        if (instalacion.estado === 'completada') {
+            return res.status(400).json({
+                success: false,
+                message: 'No se puede cancelar una instalación completada'
+            });
+        }
+
+        if (instalacion.estado === 'cancelada') {
+            return res.status(400).json({
+                success: false,
+                message: 'La instalación ya está cancelada'
+            });
+        }
+
+        // Liberar equipos asignados si los hay
+        if (instalacion.equipos_instalados) {
+            try {
+                const equipos = JSON.parse(instalacion.equipos_instalados);
+                for (const equipo of equipos) {
+                    if (equipo.equipo_id) {
+                        await connection.query(
+                            `UPDATE inventario_equipos 
+                            SET estado = 'disponible', instalador_id = NULL, fecha_devolucion = NOW()
+                            WHERE id = ?`,
+                            [equipo.equipo_id]
+                        );
+                    }
+                }
+            } catch (parseError) {
+                console.warn('Error liberando equipos:', parseError);
+            }
+        }
+
+        // Actualizar la instalación
+        await connection.query(
+            `UPDATE instalaciones 
+            SET 
+                estado = 'cancelada',
+                observaciones = CONCAT(IFNULL(observaciones, ''), '\n', 'CANCELADA: ', ?),
+                updated_at = NOW()
+            WHERE id = ?`,
+            [motivo, id]
+        );
+
+        await connection.commit();
+
+        // Obtener instalación actualizada
+        const instalacionActualizada = await this.obtenerInstalacionCompleta(id);
+
+        res.json({
+            success: true,
+            message: 'Instalación cancelada exitosamente',
+            data: instalacionActualizada
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('❌ Error cancelando instalación:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error cancelando instalación'
+        });
+    } finally {
+        connection.release();
     }
+}
 
     /**
      * Obtener equipos disponibles para instalación
@@ -1515,114 +1580,287 @@ class InstalacionesController {
         }
     }
 
+    static async exportar(req, res) {
+    try {
+        const { formato = 'excel' } = req.query;
+        
+        console.log('📊 Exportando instalaciones en formato:', formato);
+
+        // Construir consulta con filtros
+        let query = `
+            SELECT 
+                i.id,
+                CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                c.identificacion as cliente_identificacion,
+                i.telefono_contacto,
+                i.direccion_instalacion,
+                CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre,
+                DATE_FORMAT(i.fecha_programada, '%d/%m/%Y') as fecha_programada,
+                i.hora_programada,
+                i.estado,
+                i.tipo_instalacion,
+                i.costo_instalacion,
+                i.observaciones,
+                DATE_FORMAT(i.created_at, '%d/%m/%Y %H:%i') as fecha_creacion
+            FROM instalaciones i
+            LEFT JOIN clientes c ON i.cliente_id = c.id
+            LEFT JOIN usuarios u ON i.instalador_id = u.id
+            WHERE i.activo = 1
+            ORDER BY i.created_at DESC
+        `;
+
+        const instalaciones = await Database.query(query);
+
+        if (formato === 'excel') {
+            const ExcelJS = require('exceljs');
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Instalaciones');
+
+            // Headers
+            worksheet.columns = [
+                { header: 'ID', key: 'id', width: 10 },
+                { header: 'Cliente', key: 'cliente_nombre', width: 30 },
+                { header: 'Identificación', key: 'cliente_identificacion', width: 15 },
+                { header: 'Teléfono', key: 'telefono_contacto', width: 15 },
+                { header: 'Dirección', key: 'direccion_instalacion', width: 40 },
+                { header: 'Instalador', key: 'instalador_nombre', width: 25 },
+                { header: 'Fecha Programada', key: 'fecha_programada', width: 15 },
+                { header: 'Hora', key: 'hora_programada', width: 10 },
+                { header: 'Estado', key: 'estado', width: 15 },
+                { header: 'Tipo', key: 'tipo_instalacion', width: 15 },
+                { header: 'Costo', key: 'costo_instalacion', width: 12 },
+                { header: 'Observaciones', key: 'observaciones', width: 50 },
+                { header: 'Fecha Creación', key: 'fecha_creacion', width: 20 }
+            ];
+
+            // Estilos del header
+            worksheet.getRow(1).font = { bold: true };
+            worksheet.getRow(1).fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF4F81BD' }
+            };
+
+            // Agregar datos
+            instalaciones.forEach(instalacion => {
+                worksheet.addRow({
+                    ...instalacion,
+                    costo_instalacion: instalacion.costo_instalacion || 0
+                });
+            });
+
+            // Headers para descarga
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', 'attachment; filename="instalaciones.xlsx"');
+
+            // Escribir al response
+            await workbook.xlsx.write(res);
+            res.end();
+
+        } else if (formato === 'csv') {
+            const headers = [
+                'ID', 'Cliente', 'Identificación', 'Teléfono', 'Dirección',
+                'Instalador', 'Fecha Programada', 'Hora', 'Estado', 'Tipo',
+                'Costo', 'Observaciones', 'Fecha Creación'
+            ];
+
+            const rows = instalaciones.map(inst => [
+                inst.id,
+                inst.cliente_nombre || '',
+                inst.cliente_identificacion || '',
+                inst.telefono_contacto || '',
+                inst.direccion_instalacion || '',
+                inst.instalador_nombre || 'Sin asignar',
+                inst.fecha_programada || '',
+                inst.hora_programada || '',
+                inst.estado || '',
+                inst.tipo_instalacion || '',
+                inst.costo_instalacion || '0',
+                inst.observaciones || '',
+                inst.fecha_creacion || ''
+            ]);
+
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => 
+                    row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+                )
+            ].join('\n');
+
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', 'attachment; filename="instalaciones.csv"');
+            res.send('\ufeff' + csvContent); // BOM para UTF-8
+
+        } else {
+            res.status(400).json({
+                success: false,
+                message: 'Formato no soportado'
+            });
+        }
+
+    } catch (error) {
+        console.error('❌ Error exportando instalaciones:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error exportando instalaciones'
+        });
+    }
+}
     /**
      * Generar orden de servicio en PDF
      */
-    static async generarOrdenServicioPDF(req, res) {
-        try {
-            const { id } = req.params;
-            console.log(`📄 Generando orden de servicio PDF para instalación ${id}`);
+  static async generarOrdenServicioPDF(req, res) {
+    try {
+        const { id } = req.params;
+        console.log(`📄 Generando orden de servicio PDF para instalación ${id}`);
 
-            // Obtener datos completos de la instalación
-            const instalacion = await this.obtenerInstalacionCompleta(id);
-
-            if (!instalacion) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Instalación no encontrada'
-                });
-            }
-
-            const PDFDocument = require('pdfkit');
-            const doc = new PDFDocument({ size: 'A4', margin: 50 });
-
-            // Configurar respuesta
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=orden-servicio-${instalacion.numero_orden || id}.pdf`);
-
-            // Pipe el PDF a la respuesta
-            doc.pipe(res);
-
-            // HEADER - Logo y título
-            doc.fontSize(18)
-                .font('Helvetica-Bold')
-                .text('PSI', 50, 50)
-                .fontSize(12)
-                .font('Helvetica')
-                .text('PROVEEDOR DE TELECOMUNICACIONES SAS', 50, 75)
-                .text('NIT 901.467.379-2', 50, 90);
-
-            // TÍTULO PRINCIPAL
-            doc.fontSize(14)
-                .font('Helvetica-Bold')
-                .text('ORDEN DE SERVICIO', 350, 50, { align: 'center', width: 200 });
-
-            // NÚMERO DE ORDEN
-            doc.fontSize(12)
-                .font('Helvetica')
-                .text(`N°: ${instalacion.numero_orden || `INS-${instalacion.id}`}`, 350, 70, { align: 'center', width: 200 });
-
-            // FECHA
-            const fechaOrden = new Date().toLocaleDateString('es-CO');
-            doc.text(`Fecha: ${fechaOrden}`, 350, 85, { align: 'center', width: 200 });
-
-            let yPosition = 160;
-
-            // INFORMACIÓN DEL CLIENTE
-            doc.fontSize(12)
-                .font('Helvetica-Bold')
-                .text('INFORMACIÓN DEL CLIENTE', 50, yPosition);
-
-            yPosition += 20;
-
-            doc.font('Helvetica')
-                .text(`Cliente: ${instalacion.cliente_nombre}`, 50, yPosition)
-                .text(`Identificación: ${instalacion.cliente_identificacion}`, 300, yPosition);
-
-            yPosition += 15;
-
-            doc.text(`Teléfono: ${instalacion.cliente_telefono || instalacion.telefono_contacto}`, 50, yPosition);
-
-            yPosition += 25;
-
-            // INFORMACIÓN DEL SERVICIO
-            doc.font('Helvetica-Bold')
-                .text('INFORMACIÓN DEL SERVICIO', 50, yPosition);
-
-            yPosition += 20;
-
-            doc.font('Helvetica')
-                .text(`Plan: ${instalacion.plan_nombre || 'No especificado'}`, 50, yPosition)
-                .text(`Tipo: ${instalacion.tipo_instalacion || 'Nueva'}`, 300, yPosition);
-
-            yPosition += 25;
-
-            // INFORMACIÓN DE INSTALACIÓN
-            doc.font('Helvetica-Bold')
-                .text('INFORMACIÓN DE INSTALACIÓN', 50, yPosition);
-
-            yPosition += 20;
-
-            const fechaProgramada = new Date(instalacion.fecha_programada).toLocaleDateString('es-CO');
-            doc.font('Helvetica')
-                .text(`Fecha Programada: ${fechaProgramada}`, 50, yPosition)
-                .text(`Hora: ${instalacion.hora_programada || 'Por definir'}`, 300, yPosition);
-
-            yPosition += 15;
-
-            doc.text(`Dirección: ${instalacion.direccion_instalacion}`, 50, yPosition);
-
-            // Finalizar el documento
-            doc.end();
-
-        } catch (error) {
-            console.error('❌ Error generando PDF:', error);
-            res.status(500).json({
+        // Obtener información completa de la instalación
+        const instalacion = await this.obtenerInstalacionCompleta(id);
+        
+        if (!instalacion) {
+            return res.status(404).json({
                 success: false,
-                message: 'Error generando orden de servicio'
+                message: 'Instalación no encontrada'
             });
         }
+
+        const PDFDocument = require('pdfkit');
+        const doc = new PDFDocument({ margin: 50 });
+
+        // Headers para descarga
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="orden-servicio-${id}.pdf"`);
+
+        // Pipe del documento al response
+        doc.pipe(res);
+
+        // ENCABEZADO DE LA EMPRESA
+        doc.font('Helvetica-Bold')
+            .fontSize(20)
+            .text('ORDEN DE SERVICIO', 50, 50, { align: 'center' });
+
+        doc.fontSize(12)
+            .text('InternetCorp S.A.S.', 50, 80, { align: 'center' })
+            .text('NIT: 123.456.789-0', 50, 95, { align: 'center' })
+            .text('Teléfono: (123) 456-7890', 50, 110, { align: 'center' });
+
+        // Línea divisoria
+        doc.moveTo(50, 130)
+            .lineTo(550, 130)
+            .stroke();
+
+        let yPosition = 150;
+
+        // INFORMACIÓN DE LA ORDEN
+        doc.font('Helvetica-Bold')
+            .fontSize(14)
+            .text('INFORMACIÓN DE LA ORDEN', 50, yPosition);
+
+        yPosition += 25;
+
+        doc.font('Helvetica')
+            .fontSize(10)
+            .text(`Orden No: #${instalacion.id}`, 50, yPosition)
+            .text(`Fecha de emisión: ${new Date().toLocaleDateString('es-CO')}`, 300, yPosition);
+
+        yPosition += 15;
+
+        doc.text(`Estado: ${instalacion.estado?.toUpperCase()}`, 50, yPosition)
+            .text(`Tipo: ${instalacion.tipo_instalacion || 'Nueva Instalación'}`, 300, yPosition);
+
+        yPosition += 30;
+
+        // INFORMACIÓN DEL CLIENTE
+        doc.font('Helvetica-Bold')
+            .fontSize(12)
+            .text('INFORMACIÓN DEL CLIENTE', 50, yPosition);
+
+        yPosition += 20;
+
+        doc.font('Helvetica')
+            .fontSize(10)
+            .text(`Cliente: ${instalacion.cliente_nombre || 'No especificado'}`, 50, yPosition);
+
+        yPosition += 15;
+
+        doc.text(`Identificación: ${instalacion.cliente_identificacion || 'No especificada'}`, 50, yPosition)
+            .text(`Teléfono: ${instalacion.telefono_contacto || 'No especificado'}`, 300, yPosition);
+
+        yPosition += 15;
+
+        doc.text(`Dirección: ${instalacion.direccion_instalacion || 'No especificada'}`, 50, yPosition);
+
+        yPosition += 30;
+
+        // INFORMACIÓN DEL SERVICIO
+        doc.font('Helvetica-Bold')
+            .fontSize(12)
+            .text('INFORMACIÓN DEL SERVICIO', 50, yPosition);
+
+        yPosition += 20;
+
+        doc.font('Helvetica')
+            .fontSize(10)
+            .text(`Plan: ${instalacion.plan_nombre || 'No especificado'}`, 50, yPosition)
+            .text(`Costo: $${instalacion.costo_instalacion?.toLocaleString() || '0'}`, 300, yPosition);
+
+        yPosition += 30;
+
+        // INFORMACIÓN DE INSTALACIÓN
+        doc.font('Helvetica-Bold')
+            .fontSize(12)
+            .text('PROGRAMACIÓN DE INSTALACIÓN', 50, yPosition);
+
+        yPosition += 20;
+
+        const fechaProgramada = instalacion.fecha_programada ? 
+            new Date(instalacion.fecha_programada).toLocaleDateString('es-CO') : 
+            'Por definir';
+
+        doc.font('Helvetica')
+            .fontSize(10)
+            .text(`Fecha Programada: ${fechaProgramada}`, 50, yPosition)
+            .text(`Hora: ${instalacion.hora_programada || 'Por definir'}`, 300, yPosition);
+
+        yPosition += 15;
+
+        doc.text(`Instalador: ${instalacion.instalador_nombre || 'Sin asignar'}`, 50, yPosition);
+
+        yPosition += 30;
+
+        // OBSERVACIONES
+        if (instalacion.observaciones) {
+            doc.font('Helvetica-Bold')
+                .fontSize(12)
+                .text('OBSERVACIONES', 50, yPosition);
+
+            yPosition += 20;
+
+            doc.font('Helvetica')
+                .fontSize(10)
+                .text(instalacion.observaciones, 50, yPosition, { width: 500 });
+
+            yPosition += 40;
+        }
+
+        // FOOTER
+        doc.fontSize(8)
+            .text('___________________________', 50, yPosition + 50)
+            .text('Firma del Cliente', 50, yPosition + 70)
+            .text('___________________________', 350, yPosition + 50)
+            .text('Firma del Instalador', 350, yPosition + 70);
+
+        // Finalizar el documento
+        doc.end();
+
+    } catch (error) {
+        console.error('❌ Error generando PDF:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error generando orden de servicio'
+        });
     }
+}
 }
 
 console.log('✅ Controlador de instalaciones inicializado');

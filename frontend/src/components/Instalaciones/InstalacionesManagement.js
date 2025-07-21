@@ -253,24 +253,24 @@ const InstalacionesManagement = () => {
 
   const asignarInstalador = async (instalacionId, instaladorId) => {
     try {
-      setProcesando(true);
-      
-      const response = await instalacionesService.asignarInstalador(instalacionId, instaladorId);
-      
-      if (response.success) {
-        setInstalaciones(prev => 
-          prev.map(inst => 
-            inst.id === instalacionId ? { ...inst, ...response.instalacion } : inst
-          )
-        );
+        setProcesando(true);
+        
+        await instalacionesService.asignarInstalador(instalacionId, instaladorId);
+        
         setSuccess('Instalador asignado exitosamente');
-      }
+        setInstaladores({ visible: false, instalacion: null });
+        
+        // Recargar instalaciones
+        cargarDatos();
+        
     } catch (error) {
-      setError('Error asignando instalador: ' + error.message);
+        console.error('Error asignando instalador:', error);
+        setError(error.message || 'Error asignando instalador');
     } finally {
-      setProcesando(false);
+        setProcesando(false);
     }
-  };
+};
+  
 
   const cambiarEstadoInstalacion = async (instalacionId, nuevoEstado, datosAdicionales = {}) => {
     try {
@@ -294,113 +294,147 @@ const InstalacionesManagement = () => {
     }
   };
 
-  const eliminarInstalacion = async (instalacion) => {
-    const confirmado = window.confirm(
-      `¿Estás seguro de que deseas eliminar la instalación del cliente ${instalacion.cliente_nombre}?`
-    );
 
-    if (!confirmado) {
-      return;
-    }
-
+ const eliminarInstalacion = async (instalacion) => {
     try {
-      setProcesando(true);
-      
-      const response = await instalacionesService.deleteInstalacion(instalacion.id);
-      
-      if (response.success) {
-        setInstalaciones(prev => prev.filter(inst => inst.id !== instalacion.id));
+        // Verificar que se puede eliminar
+        if (!['programada', 'cancelada'].includes(instalacion.estado)) {
+            setError('Solo se pueden eliminar instalaciones programadas o canceladas');
+            return;
+        }
+
+        const confirmacion = window.confirm(
+            `¿Estás seguro de eliminar permanentemente la instalación para ${instalacion.cliente_nombre}?\n\nEsta acción no se puede deshacer.`
+        );
+        
+        if (!confirmacion) return;
+
+        setProcesando(true);
+        
+        await instalacionesService.eliminar(instalacion.id);
+        
         setSuccess('Instalación eliminada exitosamente');
-        cargarEstadisticas();
-      }
+        
+        // Recargar instalaciones
+        cargarDatos();
+        
     } catch (error) {
-      setError('Error eliminando instalación: ' + error.message);
+        console.error('Error eliminando instalación:', error);
+        setError(error.message || 'Error eliminando instalación');
     } finally {
-      setProcesando(false);
+        setProcesando(false);
     }
-  };
+};
 
   // ==========================================
   // ACCIONES RÁPIDAS
   // ==========================================
 
-  const iniciarInstalacion = (instalacion) => {
-    cambiarEstadoInstalacion(instalacion.id, ESTADOS_INSTALACION.EN_PROCESO, {
-      hora_inicio: new Date().toTimeString().split(' ')[0].substring(0, 5),
-      observaciones: 'Instalación iniciada'
-    });
-  };
+ const iniciarInstalacion = async (instalacion) => {
+    try {
+        // Verificar permisos (solo instaladores)
+        if (!hasPermission(['instalador'])) {
+            setError('No tienes permisos para iniciar instalaciones');
+            return;
+        }
+
+        // Confirmar acción
+        const confirmacion = window.confirm(
+            `¿Confirmas que deseas iniciar la instalación para ${instalacion.cliente_nombre}?`
+        );
+        
+        if (!confirmacion) return;
+
+        setProcesando(true);
+        
+        await instalacionesService.iniciarInstalacion(instalacion.id);
+        
+        setSuccess('Instalación iniciada exitosamente');
+        
+        // Recargar instalaciones
+        cargarDatos();
+
+    } catch (error) {
+        console.error('Error iniciando instalación:', error);
+        setError(error.message || 'Error iniciando instalación');
+    } finally {
+        setProcesando(false);
+    }
+};
 
   const completarInstalacion = (instalacion) => {
     abrirModal('completar', instalacion);
   };
 
-  const cancelarInstalacion = async (instalacion) => {
-  const motivo = window.prompt('Motivo de cancelación:');
-  
-  if (motivo !== null && motivo.trim() !== '') {
+ const cancelarInstalacion = async (instalacion) => {
     try {
-      setProcesando(true);
-      
-      const response = await instalacionesService.cancelarInstalacion(instalacion.id, motivo);
-      
-      if (response.success) {
+        const motivo = prompt('Motivo de cancelación:');
+        if (!motivo || motivo.trim() === '') {
+            setError('El motivo de cancelación es requerido');
+            return;
+        }
+
+        const confirmacion = window.confirm(
+            `¿Estás seguro de cancelar la instalación para ${instalacion.cliente_nombre}?`
+        );
+        
+        if (!confirmacion) return;
+
+        setProcesando(true);
+        
+        await instalacionesService.cancelarInstalacion(instalacion.id, motivo);
+        
         setSuccess('Instalación cancelada exitosamente');
-        await cargarDatos();
-      }
+        
+        // Recargar instalaciones
+        cargarDatos();
+
     } catch (error) {
-      console.error('Error cancelando instalación:', error);
-      setError(error.message || 'Error cancelando instalación');
+        console.error('Error cancelando instalación:', error);
+        setError(error.message || 'Error cancelando instalación');
     } finally {
-      setProcesando(false);
+        setProcesando(false);
     }
-  }
 };
 
- const reagendarInstalacion = async (instalacion) => {
-  const nuevaFecha = window.prompt('Nueva fecha (YYYY-MM-DD):');
-  if (!nuevaFecha) return;
-  
-  const nuevaHora = window.prompt('Nueva hora (HH:MM):');
-  if (!nuevaHora) return;
-  
-  try {
-    setProcesando(true);
-    
-    const response = await instalacionesService.reagendarInstalacion(
-      instalacion.id, 
-      nuevaFecha, 
-      nuevaHora, 
-      'Reagendada por usuario'
-    );
-    
-    if (response.success) {
-      setSuccess('Instalación reagendada exitosamente');
-      await cargarDatos();
-      await cargarEstadisticas();
+const reagendarInstalacion = async (instalacion) => {
+    try {
+        const fechaNueva = prompt('Nueva fecha (YYYY-MM-DD):', instalacion.fecha_programada);
+        if (!fechaNueva) return;
+
+        const horaNueva = prompt('Nueva hora (HH:MM):', instalacion.hora_programada || '09:00');
+        if (!horaNueva) return;
+
+        const observaciones = prompt('Observaciones (opcional):');
+
+        setProcesando(true);
+        
+        await instalacionesService.reagendarInstalacion(
+            instalacion.id, 
+            fechaNueva, 
+            horaNueva, 
+            observaciones || ''
+        );
+        
+        setSuccess('Instalación reagendada exitosamente');
+        
+        // Recargar instalaciones
+        cargarDatos();
+
+    } catch (error) {
+        console.error('Error reagendando instalación:', error);
+        setError(error.message || 'Error reagendando instalación');
+    } finally {
+        setProcesando(false);
     }
-  } catch (error) {
-    console.error('Error reagendando instalación:', error);
-    setError(error.message || 'Error reagendando instalación');
-  } finally {
-    setProcesando(false);
-  }
 };
 
-  const mostrarAsignarInstalador = (instalacion) => {
-    const instaladorId = window.prompt(
-      `Selecciona instalador para ${instalacion.cliente_nombre}:\n` +
-      instaladores.map((inst, idx) => `${idx + 1}. ${inst.nombre_completo}`).join('\n') +
-      '\nIngresa el número:'
-    );
-    
-    if (instaladorId) {
-      const indice = parseInt(instaladorId) - 1;
-      if (indice >= 0 && indice < instaladores.length) {
-        asignarInstalador(instalacion.id, instaladores[indice].id);
-      }
-    }
-  };
+const mostrarAsignarInstalador = (instalacion) => {
+    setInstaladores({
+        visible: true,
+        instalacion
+    });
+};
 
   // ==========================================
   // MANEJO DE PAGINACIÓN
@@ -423,35 +457,39 @@ const InstalacionesManagement = () => {
   // ==========================================
 
   const exportarReporte = async () => {
-  try {
-    setProcesando(true);
-    
-    const params = new URLSearchParams();
-    Object.entries(filtros).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
+    try {
+        setProcesando(true);
+        
+        // Construir parámetros de filtros
+        const params = new URLSearchParams();
+        Object.entries(filtros).forEach(([key, value]) => {
+            if (value && value !== '') {
+                params.append(key, value);
+            }
+        });
 
-    await instalacionesService.exportarReporte(params.toString());
-    setSuccess('Reporte descargado exitosamente');
-  } catch (error) {
-    console.error('Error exportando reporte:', error);
-    setError(error.message || 'Error exportando reporte');
-  } finally {
-    setProcesando(false);
-  }
+        await instalacionesService.exportarReporte(params.toString(), 'excel');
+        setSuccess('Reporte descargado exitosamente');
+    } catch (error) {
+        console.error('Error exportando reporte:', error);
+        setError(error.message || 'Error exportando reporte');
+    } finally {
+        setProcesando(false);
+    }
 };
+
 const descargarOrdenPDF = async (instalacion) => {
-  try {
-    setProcesando(true);
-    
-    await instalacionesService.descargarOrdenPDF(instalacion.id);
-    setSuccess('Orden de servicio descargada exitosamente');
-  } catch (error) {
-    console.error('Error descargando orden PDF:', error);
-    setError(error.message || 'Error descargando orden de servicio');
-  } finally {
-    setProcesando(false);
-  }
+    try {
+        setProcesando(true);
+        
+        await instalacionesService.descargarOrdenPDF(instalacion.id);
+        setSuccess('Orden de servicio descargada exitosamente');
+    } catch (error) {
+        console.error('Error descargando orden PDF:', error);
+        setError(error.message || 'Error descargando orden de servicio');
+    } finally {
+        setProcesando(false);
+    }
 };
 
   const obtenerIconoEstado = (estado) => {

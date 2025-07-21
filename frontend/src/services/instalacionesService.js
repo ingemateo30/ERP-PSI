@@ -606,6 +606,39 @@ export const instalacionesHelpers = {
     return fecha < hoy;
   },
 
+async exportarReporte(queryParams = '', formato = 'excel') {
+    try {
+        console.log('📊 Exportando reporte de instalaciones:', { queryParams, formato });
+        
+        const params = new URLSearchParams(queryParams);
+        params.append('formato', formato);
+        
+        const response = await apiService.get(`${this.baseURL}/exportar?${params.toString()}`, {
+            responseType: 'blob'
+        });
+        
+        // Crear y descargar el archivo
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        
+        const extension = formato === 'excel' ? 'xlsx' : 'csv';
+        const timestamp = new Date().toISOString().split('T')[0];
+        link.download = `instalaciones_${timestamp}.${extension}`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        console.log('✅ Reporte descargado exitosamente');
+        return { success: true, message: 'Reporte descargado exitosamente' };
+        
+    } catch (error) {
+        console.error('❌ Error exportando reporte:', error);
+        throw this.handleError(error);
+    }
+},
   /**
    * Calcular días desde programación
    */

@@ -457,6 +457,100 @@ router.patch('/:id/cancelar',
 );
 
 /**
+ * @route PATCH /api/v1/instalaciones/:id/asignar-instalador
+ * @desc Asignar instalador a instalación
+ */
+router.patch('/:id/asignar-instalador',
+    requireRole('administrador', 'supervisor'),
+    validarObtenerPorId,
+    [
+        body('instalador_id')
+            .notEmpty()
+            .withMessage('El ID del instalador es requerido')
+            .isInt({ min: 1 })
+            .withMessage('El ID del instalador debe ser un número válido')
+    ],
+    handleValidationErrors,
+    InstalacionesController.asignarInstalador
+);
+
+/**
+ * @route GET /api/v1/instalaciones/exportar
+ * @desc Exportar instalaciones (CORREGIR RUTA)
+ */
+router.get('/exportar',
+    requireRole('administrador', 'supervisor'),
+    InstalacionesController.exportar
+);
+
+
+/**
+ * @route PATCH /api/v1/instalaciones/:id/iniciar
+ * @desc Iniciar instalación (CORREGIR RESTRICCIÓN)
+ */
+router.patch('/:id/iniciar',
+    requireRole('instalador'), // SOLO INSTALADORES
+    validarObtenerPorId,
+    handleValidationErrors,
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const userId = req.user.id;
+
+            // Verificar que es su instalación asignada
+            const [instalacion] = await Database.query(
+                'SELECT instalador_id, estado FROM instalaciones WHERE id = ?',
+                [id]
+            );
+
+            if (!instalacion) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Instalación no encontrada'
+                });
+            }
+
+            if (instalacion.instalador_id !== userId) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Solo puedes iniciar tus instalaciones asignadas'
+                });
+            }
+
+            if (instalacion.estado !== 'programada') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Solo se pueden iniciar instalaciones programadas'
+                });
+            }
+
+            // Actualizar estado a 'en_proceso'
+            await Database.query(
+                `UPDATE instalaciones 
+                SET estado = 'en_proceso', fecha_inicio = NOW(), updated_at = NOW()
+                WHERE id = ?`,
+                [id]
+            );
+
+            const instalacionActualizada = await InstalacionesController.obtenerInstalacionCompleta(id);
+
+            res.json({
+                success: true,
+                message: 'Instalación iniciada exitosamente',
+                data: instalacionActualizada
+            });
+
+        } catch (error) {
+            console.error('❌ Error iniciando instalación:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error iniciando instalación'
+            });
+        }
+    }
+);
+
+/**
  * @route PATCH /api/v1/instalaciones/:id/iniciar
  * @desc Iniciar instalación (solo para instaladores)
  */
@@ -500,6 +594,7 @@ router.patch('/:id/iniciar',
             });
         }
     }
+    
 );
 
 // ==========================================
