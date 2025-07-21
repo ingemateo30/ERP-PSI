@@ -424,6 +424,84 @@ function generarCSV(instalaciones) {
     )].join('\n');
 }
 
+/**
+ * @route GET /api/v1/instalaciones/:id/pdf
+ * @desc Generar orden de servicio en PDF
+ */
+router.get('/:id/pdf',
+    validarObtenerPorId,
+    handleValidationErrors,
+    InstalacionesController.generarOrdenServicioPDF
+);
+
+/**
+ * @route PATCH /api/v1/instalaciones/:id/reagendar
+ * @desc Reagendar instalación
+ */
+router.patch('/:id/reagendar',
+    requireRole('administrador', 'supervisor'),
+    validarObtenerPorId,
+    handleValidationErrors,
+    InstalacionesController.reagendarInstalacion
+);
+
+/**
+ * @route PATCH /api/v1/instalaciones/:id/cancelar
+ * @desc Cancelar instalación
+ */
+router.patch('/:id/cancelar',
+    requireRole('administrador', 'supervisor'),
+    validarObtenerPorId,
+    handleValidationErrors,
+    InstalacionesController.cancelarInstalacion
+);
+
+/**
+ * @route PATCH /api/v1/instalaciones/:id/iniciar
+ * @desc Iniciar instalación (solo para instaladores)
+ */
+router.patch('/:id/iniciar',
+    requireRole('instalador', 'supervisor'),
+    validarObtenerPorId,
+    handleValidationErrors,
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            // Verificar que es su instalación asignada (si es instalador)
+            if (req.user.rol === 'instalador') {
+                const [instalacion] = await Database.query(
+                    'SELECT instalador_id FROM instalaciones WHERE id = ?',
+                    [id]
+                );
+
+                if (!instalacion || instalacion.instalador_id !== req.user.id) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'No tienes permisos para iniciar esta instalación'
+                    });
+                }
+            }
+
+            // Cambiar estado a 'en_proceso'
+            req.body = {
+                estado: 'en_proceso',
+                hora_inicio: new Date().toTimeString().split(' ')[0],
+                observaciones: 'Instalación iniciada'
+            };
+
+            await InstalacionesController.cambiarEstado(req, res);
+
+        } catch (error) {
+            console.error('❌ Error iniciando instalación:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Error al iniciar instalación'
+            });
+        }
+    }
+);
+
 // ==========================================
 // MANEJO DE ERRORES
 // ==========================================

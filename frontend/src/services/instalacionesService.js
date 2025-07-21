@@ -424,7 +424,113 @@ export const instalacionesService = {
       console.error('❌ Error exportando reporte:', error);
       throw error;
     }
+  },
+
+  /**
+ * Reagendar instalación
+ */
+async reagendarInstalacion(id, fechaProgramada, horaProgramada, observaciones = '') {
+  try {
+    console.log(`📅 Reagendando instalación ${id} para ${fechaProgramada} ${horaProgramada}`);
+    
+    const response = await apiService.patch(`${this.baseURL}/${id}/reagendar`, {
+      fecha_programada: fechaProgramada,
+      hora_programada: horaProgramada,
+      observaciones
+    });
+    
+    console.log('✅ Instalación reagendada:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error reagendando instalación:', error);
+    throw this.handleError(error);
   }
+},
+
+/**
+ * Cancelar instalación
+ */
+async cancelarInstalacion(id, motivo) {
+  try {
+    console.log(`❌ Cancelando instalación ${id}. Motivo: ${motivo}`);
+    
+    const response = await apiService.patch(`${this.baseURL}/${id}/cancelar`, {
+      motivo
+    });
+    
+    console.log('✅ Instalación cancelada:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error cancelando instalación:', error);
+    throw this.handleError(error);
+  }
+},
+
+/**
+ * Descargar orden de servicio en PDF
+ */
+async descargarOrdenPDF(instalacionId) {
+  try {
+    console.log(`📄 Descargando orden de servicio PDF para instalación ${instalacionId}`);
+    
+    const response = await apiService.get(`${this.baseURL}/${instalacionId}/pdf`, {
+      responseType: 'blob'
+    });
+    
+    // Crear y descargar el archivo
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `orden-servicio-${instalacionId}.pdf`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    console.log('✅ Orden de servicio descargada exitosamente');
+    return { success: true, message: 'Orden de servicio descargada exitosamente' };
+  } catch (error) {
+    console.error('❌ Error descargando orden PDF:', error);
+    throw this.handleError(error);
+  }
+},
+
+/**
+ * Exportar reporte de instalaciones (CORREGIR MÉTODO EXISTENTE)
+ */
+async exportarReporte(queryParams = '', formato = 'excel') {
+  try {
+    console.log('📊 Exportando reporte de instalaciones:', { queryParams, formato });
+    
+    const params = new URLSearchParams(queryParams);
+    params.append('formato', formato);
+    
+    const response = await apiService.get(`${this.baseURL}/exportar?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    
+    // Crear y descargar el archivo
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const extension = formato === 'excel' ? 'xlsx' : 'json';
+    const fecha = new Date().toISOString().split('T')[0];
+    link.download = `instalaciones_${fecha}.${extension}`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    console.log('✅ Reporte descargado exitosamente');
+    return { success: true, message: 'Reporte descargado exitosamente' };
+  } catch (error) {
+    console.error('❌ Error exportando reporte:', error);
+    throw this.handleError(error);
+  }
+}
 };
 
 // ==========================================

@@ -1426,6 +1426,203 @@ class InstalacionesController {
             throw error;
         }
     }
+
+    /**
+ * Reagendar instalación
+ */
+    static async reagendarInstalacion(req, res) {
+        try {
+            const { id } = req.params;
+            const { fecha_programada, hora_programada, observaciones } = req.body;
+
+            console.log(`📅 Reagendando instalación ${id} para ${fecha_programada} ${hora_programada}`);
+
+            const query = `
+      UPDATE instalaciones 
+      SET fecha_programada = ?, 
+          hora_programada = ?, 
+          observaciones = CONCAT(IFNULL(observaciones, ''), '\n', 'Reagendada: ', ?),
+          estado = 'reagendada',
+          updated_at = NOW()
+      WHERE id = ?
+    `;
+
+            await Database.query(query, [
+                fecha_programada,
+                hora_programada,
+                observaciones || 'Instalación reagendada',
+                id
+            ]);
+
+            const instalacionActualizada = await this.obtenerInstalacionCompleta(id);
+
+            res.json({
+                success: true,
+                message: 'Instalación reagendada exitosamente',
+                data: instalacionActualizada
+            });
+
+        } catch (error) {
+            console.error('❌ Error reagendando instalación:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Error reagendando instalación'
+            });
+        }
+    }
+
+    /**
+     * Cancelar instalación
+     */
+    static async cancelarInstalacion(req, res) {
+        try {
+            const { id } = req.params;
+            const { motivo } = req.body;
+
+            if (!motivo || motivo.trim() === '') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El motivo de cancelación es requerido'
+                });
+            }
+
+            console.log(`❌ Cancelando instalación ${id}. Motivo: ${motivo}`);
+
+            const query = `
+      UPDATE instalaciones 
+      SET estado = 'cancelada',
+          observaciones = CONCAT(IFNULL(observaciones, ''), '\n', 'CANCELADA: ', ?),
+          updated_at = NOW()
+      WHERE id = ?
+    `;
+
+            await Database.query(query, [motivo, id]);
+
+            const instalacionActualizada = await this.obtenerInstalacionCompleta(id);
+
+            res.json({
+                success: true,
+                message: 'Instalación cancelada exitosamente',
+                data: instalacionActualizada
+            });
+
+        } catch (error) {
+            console.error('❌ Error cancelando instalación:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Error cancelando instalación'
+            });
+        }
+    }
+
+    /**
+     * Generar orden de servicio en PDF
+     */
+    static async generarOrdenServicioPDF(req, res) {
+        try {
+            const { id } = req.params;
+            console.log(`📄 Generando orden de servicio PDF para instalación ${id}`);
+
+            // Obtener datos completos de la instalación
+            const instalacion = await this.obtenerInstalacionCompleta(id);
+
+            if (!instalacion) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Instalación no encontrada'
+                });
+            }
+
+            const PDFDocument = require('pdfkit');
+            const doc = new PDFDocument({ size: 'A4', margin: 50 });
+
+            // Configurar respuesta
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=orden-servicio-${instalacion.numero_orden || id}.pdf`);
+
+            // Pipe el PDF a la respuesta
+            doc.pipe(res);
+
+            // HEADER - Logo y título
+            doc.fontSize(18)
+                .font('Helvetica-Bold')
+                .text('PSI', 50, 50)
+                .fontSize(12)
+                .font('Helvetica')
+                .text('PROVEEDOR DE TELECOMUNICACIONES SAS', 50, 75)
+                .text('NIT 901.467.379-2', 50, 90);
+
+            // TÍTULO PRINCIPAL
+            doc.fontSize(14)
+                .font('Helvetica-Bold')
+                .text('ORDEN DE SERVICIO', 350, 50, { align: 'center', width: 200 });
+
+            // NÚMERO DE ORDEN
+            doc.fontSize(12)
+                .font('Helvetica')
+                .text(`N°: ${instalacion.numero_orden || `INS-${instalacion.id}`}`, 350, 70, { align: 'center', width: 200 });
+
+            // FECHA
+            const fechaOrden = new Date().toLocaleDateString('es-CO');
+            doc.text(`Fecha: ${fechaOrden}`, 350, 85, { align: 'center', width: 200 });
+
+            let yPosition = 160;
+
+            // INFORMACIÓN DEL CLIENTE
+            doc.fontSize(12)
+                .font('Helvetica-Bold')
+                .text('INFORMACIÓN DEL CLIENTE', 50, yPosition);
+
+            yPosition += 20;
+
+            doc.font('Helvetica')
+                .text(`Cliente: ${instalacion.cliente_nombre}`, 50, yPosition)
+                .text(`Identificación: ${instalacion.cliente_identificacion}`, 300, yPosition);
+
+            yPosition += 15;
+
+            doc.text(`Teléfono: ${instalacion.cliente_telefono || instalacion.telefono_contacto}`, 50, yPosition);
+
+            yPosition += 25;
+
+            // INFORMACIÓN DEL SERVICIO
+            doc.font('Helvetica-Bold')
+                .text('INFORMACIÓN DEL SERVICIO', 50, yPosition);
+
+            yPosition += 20;
+
+            doc.font('Helvetica')
+                .text(`Plan: ${instalacion.plan_nombre || 'No especificado'}`, 50, yPosition)
+                .text(`Tipo: ${instalacion.tipo_instalacion || 'Nueva'}`, 300, yPosition);
+
+            yPosition += 25;
+
+            // INFORMACIÓN DE INSTALACIÓN
+            doc.font('Helvetica-Bold')
+                .text('INFORMACIÓN DE INSTALACIÓN', 50, yPosition);
+
+            yPosition += 20;
+
+            const fechaProgramada = new Date(instalacion.fecha_programada).toLocaleDateString('es-CO');
+            doc.font('Helvetica')
+                .text(`Fecha Programada: ${fechaProgramada}`, 50, yPosition)
+                .text(`Hora: ${instalacion.hora_programada || 'Por definir'}`, 300, yPosition);
+
+            yPosition += 15;
+
+            doc.text(`Dirección: ${instalacion.direccion_instalacion}`, 50, yPosition);
+
+            // Finalizar el documento
+            doc.end();
+
+        } catch (error) {
+            console.error('❌ Error generando PDF:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error generando orden de servicio'
+            });
+        }
+    }
 }
 
 console.log('✅ Controlador de instalaciones inicializado');

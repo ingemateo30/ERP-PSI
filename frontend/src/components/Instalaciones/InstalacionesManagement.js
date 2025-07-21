@@ -336,53 +336,56 @@ const InstalacionesManagement = () => {
   };
 
   const cancelarInstalacion = async (instalacion) => {
-    const motivo = window.prompt('Motivo de cancelación:');
-    if (motivo !== null && motivo.trim() !== '') {
-      try {
-        const response = await instalacionesService.cancelarInstalacion(instalacion.id, motivo);
-        if (response.success) {
-          setInstalaciones(prev => 
-            prev.map(inst => 
-              inst.id === instalacion.id ? { ...inst, ...response.instalacion } : inst
-            )
-          );
-          setSuccess('Instalación cancelada exitosamente');
-          cargarEstadisticas();
-        }
-      } catch (error) {
-        setError('Error cancelando instalación: ' + error.message);
-      }
-    }
-  };
-
-  const reagendarInstalacion = async (instalacion) => {
-    const nuevaFecha = window.prompt('Nueva fecha (YYYY-MM-DD):');
-    if (!nuevaFecha) return;
-    
-    const nuevaHora = window.prompt('Nueva hora (HH:MM):');
-    if (!nuevaHora) return;
-    
+  const motivo = window.prompt('Motivo de cancelación:');
+  
+  if (motivo !== null && motivo.trim() !== '') {
     try {
-      const response = await instalacionesService.reagendarInstalacion(
-        instalacion.id, 
-        nuevaFecha, 
-        nuevaHora, 
-        'Reagendada por usuario'
-      );
+      setProcesando(true);
+      
+      const response = await instalacionesService.cancelarInstalacion(instalacion.id, motivo);
       
       if (response.success) {
-        setInstalaciones(prev => 
-          prev.map(inst => 
-            inst.id === instalacion.id ? { ...inst, ...response.instalacion } : inst
-          )
-        );
-        setSuccess('Instalación reagendada exitosamente');
-        cargarEstadisticas();
+        setSuccess('Instalación cancelada exitosamente');
+        await cargarDatos();
       }
     } catch (error) {
-      setError('Error reagendando instalación: ' + error.message);
+      console.error('Error cancelando instalación:', error);
+      setError(error.message || 'Error cancelando instalación');
+    } finally {
+      setProcesando(false);
     }
-  };
+  }
+};
+
+ const reagendarInstalacion = async (instalacion) => {
+  const nuevaFecha = window.prompt('Nueva fecha (YYYY-MM-DD):');
+  if (!nuevaFecha) return;
+  
+  const nuevaHora = window.prompt('Nueva hora (HH:MM):');
+  if (!nuevaHora) return;
+  
+  try {
+    setProcesando(true);
+    
+    const response = await instalacionesService.reagendarInstalacion(
+      instalacion.id, 
+      nuevaFecha, 
+      nuevaHora, 
+      'Reagendada por usuario'
+    );
+    
+    if (response.success) {
+      setSuccess('Instalación reagendada exitosamente');
+      await cargarDatos();
+      await cargarEstadisticas();
+    }
+  } catch (error) {
+    console.error('Error reagendando instalación:', error);
+    setError(error.message || 'Error reagendando instalación');
+  } finally {
+    setProcesando(false);
+  }
+};
 
   const mostrarAsignarInstalador = (instalacion) => {
     const instaladorId = window.prompt(
@@ -420,13 +423,36 @@ const InstalacionesManagement = () => {
   // ==========================================
 
   const exportarReporte = async () => {
-    try {
-      await instalacionesService.exportarReporte(filtros, 'excel');
-      setSuccess('Reporte descargado exitosamente');
-    } catch (error) {
-      setError('Error exportando reporte: ' + error.message);
-    }
-  };
+  try {
+    setProcesando(true);
+    
+    const params = new URLSearchParams();
+    Object.entries(filtros).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+
+    await instalacionesService.exportarReporte(params.toString());
+    setSuccess('Reporte descargado exitosamente');
+  } catch (error) {
+    console.error('Error exportando reporte:', error);
+    setError(error.message || 'Error exportando reporte');
+  } finally {
+    setProcesando(false);
+  }
+};
+const descargarOrdenPDF = async (instalacion) => {
+  try {
+    setProcesando(true);
+    
+    await instalacionesService.descargarOrdenPDF(instalacion.id);
+    setSuccess('Orden de servicio descargada exitosamente');
+  } catch (error) {
+    console.error('Error descargando orden PDF:', error);
+    setError(error.message || 'Error descargando orden de servicio');
+  } finally {
+    setProcesando(false);
+  }
+};
 
   const obtenerIconoEstado = (estado) => {
     switch (estado) {
