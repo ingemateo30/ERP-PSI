@@ -456,7 +456,7 @@ export const instalacionesService = {
 
       // Hacer fetch directo con manejo correcto del blob
       const token = authService.getToken();
-      const response = await apiService.request(`${API_BASE}/${instalacionId}/pdf`, {
+      const response = await fetch(`http://localhost:3000/api/v1/instalaciones/${instalacionId}/pdf`, {
         method: 'GET',
         headers: {
           'Accept': 'application/pdf',
@@ -465,7 +465,13 @@ export const instalacionesService = {
       });
 
       console.log('📊 Response status:', response.status);
-      console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
+
+      // ✅ LÍNEA CORREGIDA - Manejo seguro de headers
+      try {
+        console.log('📊 Response headers:', response.headers && response.headers.entries ? Object.fromEntries(response.headers.entries()) : 'Headers no disponibles');
+      } catch (headerError) {
+        console.log('📊 Response headers: No se pudieron obtener');
+      }
 
       if (!response.ok) {
         let errorMessage = 'Error generando PDF';

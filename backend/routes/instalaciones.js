@@ -4,7 +4,8 @@ const express = require('express');
 const router = express.Router();
 const { Database } = require('../models/Database');
 const puppeteer = require('puppeteer');
-
+const fs = require('fs');
+const path = require('path');
 // Middleware de autenticación
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
@@ -37,7 +38,7 @@ router.get('/test', InstalacionesController.test);
 router.get('/estadisticas', async (req, res) => {
     try {
         console.log('📊 Obteniendo estadísticas de instalaciones');
-        
+
         let whereClause = 'WHERE 1=1';
         const params = [];
 
@@ -84,8 +85,8 @@ router.get('/estadisticas', async (req, res) => {
 /**
  * ARREGLADO: Obtener instaladores disponibles
  */
-router.get('/instaladores', 
-    requireRole('administrador', 'supervisor'), 
+router.get('/instaladores',
+    requireRole('administrador', 'supervisor'),
     async (req, res) => {
         try {
             console.log('👷 Obteniendo instaladores disponibles');
@@ -128,7 +129,7 @@ router.get('/exportar',
     async (req, res) => {
         try {
             console.log('📊 Exportando reporte de instalaciones');
-            
+
             const {
                 busqueda = '',
                 estado = '',
@@ -243,13 +244,13 @@ router.get('/exportar',
 
             const csvContent = [
                 headers.join(','),
-                ...rows.map(row => 
+                ...rows.map(row =>
                     row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
                 )
             ].join('\n');
 
             const filename = `instalaciones_${new Date().toISOString().split('T')[0]}.csv`;
-            
+
             res.setHeader('Content-Type', 'text/csv; charset=utf-8');
             res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
             res.send('\ufeff' + csvContent); // BOM for Excel UTF-8 support
@@ -271,39 +272,107 @@ router.get('/exportar',
  */
 router.get('/:id/pdf', async (req, res) => {
     let browser = null;
-    
+
     try {
         const { id } = req.params;
         console.log(`📄 Generando orden PSI para instalación: ${id}`);
 
-        // Obtener datos de la instalación
-        const [instalacionData] = await Database.query(`
+        // DEBUGGING: Verificar primero si existe la instalación
+        console.log('🔍 Verificando instalación con ID:', id, '(tipo:', typeof id, ')');
+
+        // PASO 1: Verificar que la instalación existe - CORREGIDO
+        const checkResult = await Database.query(`
+            SELECT COUNT(*) as total FROM instalaciones WHERE id = ?
+        `, [id]);
+
+        console.log('📊 Resultado verificación completo:', checkResult);
+        console.log('📊 Tipo de resultado:', typeof checkResult);
+        console.log('📊 Es array?:', Array.isArray(checkResult));
+
+        // CORRECCIÓN: Manejar diferentes estructuras de respuesta
+        let totalCount = 0;
+        if (Array.isArray(checkResult)) {
+            if (checkResult.length > 0) {
+                if (Array.isArray(checkResult[0])) {
+                    // Estructura: [[{total: 1}], metadata]
+                    totalCount = checkResult[0][0]?.total || 0;
+                } else {
+                    // Estructura: [{total: 1}]
+                    totalCount = checkResult[0]?.total || 0;
+                }
+            }
+        } else if (checkResult && checkResult.total !== undefined) {
+            // Estructura: {total: 1}
+            totalCount = checkResult.total;
+        }
+
+        console.log('📊 Total count extraído:', totalCount);
+
+        if (totalCount === 0) {
+            console.log('❌ No existe instalación con ID:', id);
+            return res.status(404).json({
+                success: false,
+                message: `Instalación con ID ${id} no encontrada en la base de datos`
+            });
+        }
+
+        // PASO 2: Obtener datos completos con JOINs opcionales - CORREGIDO
+        const instalacionResult = await Database.query(`
             SELECT 
                 i.*,
-                c.nombre as cliente_nombre,
-                c.identificacion as cliente_identificacion,
-                c.telefono as cliente_telefono,
-                c.direccion as cliente_direccion,
-                c.barrio as cliente_barrio,
+                COALESCE(c.nombre, 'Cliente no asignado') as cliente_nombre,
+                COALESCE(c.identificacion, '') as cliente_identificacion,
+                COALESCE(c.telefono, '') as cliente_telefono,
+                COALESCE(c.direccion, '') as cliente_direccion,
+                COALESCE(c.barrio, '') as cliente_barrio,
                 c.ciudad_id as cliente_ciudad,
-                u.nombre as instalador_nombre_completo,
-                u.telefono as instalador_telefono
+                COALESCE(u.nombre, 'Instalador no asignado') as instalador_nombre_completo,
+                COALESCE(u.telefono, '') as instalador_telefono
             FROM instalaciones i
             LEFT JOIN clientes c ON i.cliente_id = c.id
             LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
             WHERE i.id = ?
         `, [id]);
 
-        if (!instalacionData || instalacionData.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Instalación no encontrada'
+        console.log('📊 Resultado instalación completo:', instalacionResult);
+        console.log('📊 Tipo:', typeof instalacionResult, 'Es array:', Array.isArray(instalacionResult));
+
+        // CORRECCIÓN: Extraer datos según la estructura real
+        let instalacionData = [];
+        if (Array.isArray(instalacionResult)) {
+            if (instalacionResult.length > 0 && Array.isArray(instalacionResult[0])) {
+                // Estructura: [[datos], metadata]
+                instalacionData = instalacionResult[0];
+            } else {
+                // Estructura: [datos]
+                instalacionData = instalacionResult;
+            }
+        }
+
+        console.log('📊 Datos extraídos:', instalacionData?.length || 0, 'registros');
+
+        if (instalacionData && instalacionData.length > 0) {
+            console.log('✅ Instalación encontrada:', {
+                id: instalacionData[0].id,
+                cliente_id: instalacionData[0].cliente_id,
+                cliente_nombre: instalacionData[0].cliente_nombre
             });
         }
 
-        const instalacion = instalacionData[0];
+        // CORRECCIÓN: Verificar que existe el registro
+        if (!instalacionData || instalacionData.length === 0) {
+            console.log('❌ Query no devolvió resultados para ID:', id);
+            return res.status(404).json({
+                success: false,
+                message: 'Error obteniendo datos de la instalación'
+            });
+        }
 
-        // Obtener servicios
+        // CORRECCIÓN: Tomar el primer elemento del array
+        const instalacion = instalacionData[0];
+        console.log('✅ Instalación encontrada:', instalacion.id, instalacion.cliente_nombre);
+
+        // Obtener servicios - CORREGIDO
         let servicios = [];
         try {
             if (instalacion.servicio_cliente_id) {
@@ -320,16 +389,25 @@ router.get('/:id/pdf', async (req, res) => {
 
                 if (Array.isArray(serviciosIds) && serviciosIds.length > 0) {
                     const placeholders = serviciosIds.map(() => '?').join(',');
-                    const [serviciosData] = await Database.query(`
+                    const serviciosResult = await Database.query(`
                         SELECT nombre, velocidad_subida, velocidad_bajada
                         FROM planes_servicio
                         WHERE id IN (${placeholders})
                     `, serviciosIds);
-                    servicios = serviciosData;
+
+                    // CORRECCIÓN: Extraer servicios según estructura
+                    if (Array.isArray(serviciosResult)) {
+                        if (serviciosResult.length > 0 && Array.isArray(serviciosResult[0])) {
+                            servicios = serviciosResult[0] || [];
+                        } else {
+                            servicios = serviciosResult || [];
+                        }
+                    }
                 }
             }
         } catch (error) {
-            console.warn('⚠️ Error obteniendo servicios:', error);
+            console.warn('⚠️ Error obteniendo servicios:', error.message);
+            servicios = [];
         }
 
         // Construir descripción de servicios
@@ -339,7 +417,24 @@ router.get('/:id/pdf', async (req, res) => {
             servicioDescripcion = `${primerServicio.nombre || 'Internet'} ${primerServicio.velocidad_bajada || ''}${primerServicio.velocidad_bajada ? ' Mbps' : ''}`.trim();
         }
 
-        // HTML EXACTO como la imagen PSI
+        console.log('📋 Servicio descripción:', servicioDescripcion);
+
+        const logoPath = path.join(__dirname, '../public/logo2.png');
+        let logoBase64 = '';
+        try {
+            if (fs.existsSync(logoPath)) {
+                const logoBuffer = fs.readFileSync(logoPath);
+                logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+                console.log('✅ Logo cargado exitosamente desde:', logoPath);
+            } else {
+                console.log('⚠️ Logo no encontrado en:', logoPath);
+            }
+        } catch (logoError) {
+            console.warn('⚠️ Error cargando logo:', logoError.message);
+        }
+
+        // HTML EXACTO COMO LA IMAGEN PSI
+        // HTML EXACTO COMO LA IMAGEN PSI REAL
         const htmlContent = `
 <!DOCTYPE html>
 <html lang="es">
@@ -355,190 +450,319 @@ router.get('/:id/pdf', async (req, res) => {
         }
         
         body {
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            line-height: 1.2;
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            line-height: 1.1;
             color: #000;
+            background: white;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .psi-container {
+            width: 210mm;
+            height: 90mm;
+            padding: 4mm;
+            position: relative;
             background: white;
         }
         
-        .container {
-            width: 210mm;
-            height: 148mm;
-            margin: 0 auto;
-            padding: 10mm;
-            position: relative;
+        /* HEADER */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 4mm;
+            height: 15mm;
         }
         
-        .header {
-            text-align: right;
-            margin-bottom: 15px;
+        .left-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 3mm;
+        }
+        
+        .logo-section {
+            width: 18mm;
+            height: 12mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 1px solid #999; background: #f5f5f5;'}
         }
         
         .psi-title {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
+            margin-top: 1mm;
         }
         
-        .company-info {
-            margin-top: 5px;
-            font-size: 9px;
+        .right-header {
+            text-align: right;
+            font-size: 7px;
             line-height: 1.1;
+            max-width: 70mm;
         }
         
-        .main-content {
-            margin-top: 20px;
+        .company-line {
+            font-weight: bold;
+            margin-bottom: 1mm;
+        }
+        
+        .psi-number {
+            font-size: 8px;
+            font-weight: bold;
+            margin-top: 2mm;
+        }
+        
+        /* PRIMERA FILA DE CAMPOS */
+        .first-row {
+            display: flex;
+            gap: 5mm;
+            margin-bottom: 2.5mm;
+        }
+        
+        .left-fields {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2mm;
+        }
+        
+        .right-info {
+            width: 60mm;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5mm;
+            font-size: 8px;
+        }
+        
+        .field-row {
+            display: flex;
+            align-items: center;
+        }
+        
+        .field-label {
+            font-weight: bold;
+            min-width: 20mm;
+            font-size: 9px;
+        }
+        
+        .field-value {
+            flex: 1;
+            border-bottom: 1px solid #000;
+            min-height: 3.5mm;
+            padding: 0.5mm 1mm;
+            font-size: 9px;
         }
         
         .info-line {
-            margin-bottom: 8px;
             display: flex;
-            align-items: baseline;
+            align-items: center;
+            gap: 2mm;
         }
         
-        .label {
+        .info-label {
             font-weight: bold;
-            margin-right: 5px;
-            min-width: 80px;
+            min-width: 25mm;
+            font-size: 8px;
         }
         
-        .value {
+        .info-value {
+            font-size: 8px;
+        }
+        
+        /* SEGUNDA FILA - SERVICIOS */
+        .services-row {
+            display: flex;
+            gap: 5mm;
+            margin-bottom: 2mm;
+        }
+        
+        .service-item {
             flex: 1;
-            border-bottom: 1px solid #000;
-            min-height: 16px;
-            padding-bottom: 1px;
+            display: flex;
+            align-items: center;
         }
         
-        .description-section {
-            margin-top: 25px;
-            margin-bottom: 25px;
+        /* TERCERA FILA */
+        .internet-row, .description-row {
+            margin-bottom: 2mm;
         }
         
-        .description-label {
+        /* OBSERVACIONES */
+        .observations-section {
+            margin-bottom: 4mm;
+        }
+        
+        .observations-label {
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 1mm;
+            font-size: 9px;
         }
         
-        .description-box {
-            border: 1px solid #000;
-            min-height: 40px;
-            padding: 5px;
+        .observations-line {
+            border-bottom: 1px solid #000;
+            min-height: 12mm;
+            padding: 1mm;
+            font-size: 8px;
         }
         
+        /* FIRMAS */
         .signatures {
-            margin-top: 30px;
             display: flex;
             justify-content: space-between;
+            margin-top: auto;
         }
         
-        .signature-section {
-            width: 45%;
+        .signature-block {
+            text-align: center;
+            width: 50mm;
         }
         
         .signature-line {
             border-top: 1px solid #000;
-            margin-top: 30px;
-            margin-bottom: 5px;
+            margin-bottom: 1mm;
+            height: 6mm;
         }
         
         .signature-label {
-            text-align: center;
-            font-size: 10px;
+            font-size: 8px;
+            font-weight: bold;
+        }
+        
+        @page {
+            size: 216mm 93mm;
+            margin: 0;
         }
         
         @media print {
-            body { margin: 0; }
-            .container { 
-                width: 100%;
-                height: 100vh;
-                margin: 0;
-                padding: 10mm;
+            body { 
+                margin: 0; 
+                padding: 0;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="psi-container">
         <!-- HEADER -->
         <div class="header">
-            <div class="psi-title">PSI</div>
-            <div class="company-info">
-                PROVEEDOR DE TELECOMUNICACIONES S.A.S<br>
-                NIT: 900.123.456-7<br>
-                Carrera 15 #123-45
+            <div class="left-header">
+                <div class="logo-section">
+                    ${!logoBase64 ? '<span style="font-size: 6px; color: #999;">LOGO</span>' : ''}
+                </div>
+                <div class="psi-title">PSI</div>
+            </div>
+            
+            <div class="right-header">
+                <div class="company-line">PROVEEDOR DE TELECOMUNICACIONES S.A.S.</div>
+                <div>NIT: 901.123.456-7</div>
+                <div class="psi-number">
+                    ${String(instalacion.id).padStart(2, '0')} jul 25<br>
+                    02:36 am
+                </div>
             </div>
         </div>
 
-        <!-- CONTENIDO PRINCIPAL -->
-        <div class="main-content">
-            <!-- Nombre -->
-            <div class="info-line">
-                <span class="label">Nombre:</span>
-                <span class="value">${instalacion.cliente_nombre || ''}</span>
-            </div>
+        <!-- PRIMERA FILA -->
+        <div class="first-row">
+            <!-- CAMPOS IZQUIERDA -->
+            <div class="left-fields">
+                <div class="field-row">
+                    <span class="field-label">Nombre:</span>
+                    <span class="field-value">${instalacion.cliente_nombre || ''}</span>
+                </div>
 
-            <!-- Dirección -->
-            <div class="info-line">
-                <span class="label">Dirección:</span>
-                <span class="value">${instalacion.direccion_instalacion || instalacion.cliente_direccion || ''}</span>
-            </div>
+                <div class="field-row">
+                    <span class="field-label">Dirección:</span>
+                    <span class="field-value">${instalacion.direccion_instalacion || instalacion.cliente_direccion || ''}</span>
+                </div>
 
-            <!-- Barrio -->
-            <div class="info-line">
-                <span class="label">Barrio:</span>
-                <span class="value">${instalacion.barrio || instalacion.cliente_barrio || ''}</span>
-            </div>
+                <div class="field-row">
+                    <span class="field-label">Hora:</span>
+                    <span class="field-value">${instalacion.hora_programada || ''}</span>
+                </div>
 
-            <!-- Teléfono -->
-            <div class="info-line">
-                <span class="label">Teléfono:</span>
-                <span class="value">${instalacion.telefono_contacto || instalacion.cliente_telefono || ''}</span>
-            </div>
-
-            <!-- Identificación -->
-            <div class="info-line">
-                <span class="label">Identificación:</span>
-                <span class="value">${instalacion.cliente_identificacion || ''}</span>
-            </div>
-
-            <!-- Descripción/Observaciones -->
-            <div class="description-section">
-                <div class="description-label">Observaciones:</div>
-                <div class="description-box">
-                    Instalación de ${servicioDescripcion}<br>
-                    Fecha: ${instalacion.fecha_programada || 'Por programar'}<br>
-                    Hora: ${instalacion.hora_programada || 'Por definir'}<br>
-                    ${instalacion.observaciones || ''}
+                <div class="field-row">
+                    <span class="field-label">Fecha:</span>
+                    <span class="field-value">${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO') : ''}</span>
                 </div>
             </div>
 
-            <!-- Líneas adicionales -->
-            <div class="info-line">
-                <span class="label"></span>
-                <span class="value"></span>
-            </div>
-
-            <div class="info-line">
-                <span class="label"></span>
-                <span class="value"></span>
-            </div>
-
-            <!-- Firmas -->
-            <div class="signatures">
-                <div class="signature-section">
-                    <div class="signature-line"></div>
-                    <div class="signature-label">Firma Usuario</div>
+            <!-- INFO DERECHA -->
+            <div class="right-info">
+                <div class="info-line">
+                    <span class="info-label">Identificación:</span>
+                    <span class="info-value">${instalacion.cliente_identificacion || ''}</span>
                 </div>
-                <div class="signature-section">
-                    <div class="signature-line"></div>
-                    <div class="signature-label">PSI</div>
+                <div class="info-line">
+                    <span class="info-label">Teléfono:</span>
+                    <span class="info-value">${instalacion.telefono_contacto || instalacion.cliente_telefono || ''}</span>
                 </div>
+                <div class="info-line">
+                    <span class="info-label">Poste:</span>
+                    <span class="info-value"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- FILA DE SERVICIOS -->
+        <div class="services-row">
+            <div class="service-item">
+                <span class="field-label">Amarre:</span>
+                <span class="field-value"></span>
+            </div>
+            <div class="service-item">
+                <span class="field-label">Televisión:</span>
+                <span class="field-value"></span>
+            </div>
+        </div>
+
+        <!-- INTERNET -->
+        <div class="internet-row">
+            <div class="field-row">
+                <span class="field-label">Internet:</span>
+                <span class="field-value">${servicioDescripcion}</span>
+            </div>
+        </div>
+
+        <!-- DESCRIPCIÓN -->
+        <div class="description-row">
+            <div class="field-row">
+                <span class="field-label">Descripción:</span>
+                <span class="field-value">Instalación ${instalacion.observaciones || ''}</span>
+            </div>
+        </div>
+
+        <!-- OBSERVACIONES -->
+        <div class="observations-section">
+            <div class="observations-label">Observaciones:</div>
+            <div class="observations-line">
+                Instalador: ${instalacion.instalador_nombre_completo || 'Por asignar'}
+            </div>
+        </div>
+
+        <!-- FIRMAS -->
+        <div class="signatures">
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="signature-label">Firma Usuario</div>
+            </div>
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="signature-label">Fecha</div>
+            </div>
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="signature-label">PSI</div>
             </div>
         </div>
     </div>
 </body>
 </html>
+
         `;
 
         // Generar PDF con Puppeteer
@@ -555,21 +779,21 @@ router.get('/:id/pdf', async (req, res) => {
         });
 
         const page = await browser.newPage();
-        
+
         await page.setContent(htmlContent, {
             waitUntil: 'networkidle0',
             timeout: 30000
         });
 
-        // Configuración PDF para formato PSI (A5 landscape)
+        // Configuración PDF para formato PSI - 1/3 de carta
         const pdfBuffer = await page.pdf({
-            format: 'A5',
-            landscape: true,
+            width: '216mm',  // Ancho carta
+            height: '93mm',  // 1/3 de la altura carta (279mm/3)
             margin: {
-                top: '10mm',
-                right: '10mm',
-                bottom: '10mm',
-                left: '10mm'
+                top: '2mm',
+                right: '2mm',
+                bottom: '2mm',
+                left: '2mm'
             },
             printBackground: true,
             preferCSSPageSize: false
@@ -586,7 +810,7 @@ router.get('/:id/pdf', async (req, res) => {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
-        
+
         // CRÍTICO: Enviar el buffer directamente
         res.end(pdfBuffer);
 
@@ -594,7 +818,8 @@ router.get('/:id/pdf', async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error generando PDF PSI:', error);
-        
+        console.error('Stack completo:', error.stack);
+
         if (browser) {
             try {
                 await browser.close();
@@ -608,7 +833,7 @@ router.get('/:id/pdf', async (req, res) => {
             res.status(500).json({
                 success: false,
                 message: 'Error generando PDF PSI',
-                error: error.message
+                error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno del servidor'
             });
         }
     }
@@ -693,7 +918,7 @@ router.put('/:id', InstalacionesController.actualizar);
 /**
  * ARREGLADO: Eliminar instalación (solo administradores)
  */
-router.delete('/:id', 
+router.delete('/:id',
     requireRole('administrador'),
     async (req, res) => {
         try {
