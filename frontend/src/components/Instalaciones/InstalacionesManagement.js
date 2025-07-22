@@ -41,11 +41,11 @@ const ESTADOS_INSTALACION = {
 };
 
 const InstalacionesManagement = () => {
-  
+
   // ==========================================
   // ESTADOS PRINCIPALES
   // ==========================================
-  
+
   const [instalaciones, setInstalaciones] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState(false);
@@ -126,7 +126,7 @@ const InstalacionesManagement = () => {
     try {
       setCargando(true);
       setError(null);
-      
+
       const parametros = {
         page: paginacion.pagina_actual,
         limit: paginacion.registros_por_pagina,
@@ -134,9 +134,9 @@ const InstalacionesManagement = () => {
       };
 
       console.log('🔄 Cargando datos con parámetros:', parametros);
-      
+
       const response = await instalacionesService.getInstalaciones(parametros);
-      
+
       if (response.success) {
         setInstalaciones(response.instalaciones || []);
         setPaginacion(prev => ({
@@ -187,7 +187,7 @@ const InstalacionesManagement = () => {
 
   const abrirModal = (modo, instalacion = null) => {
     console.log(`📝 Abriendo modal en modo: ${modo}`, instalacion);
-    
+
     setModalModo(modo);
     setInstalacionSeleccionada(instalacion);
     setMostrarModal(true);
@@ -209,7 +209,7 @@ const InstalacionesManagement = () => {
         setSuccess('Instalación creada exitosamente');
       } else if (modalModo === 'editar') {
         response = await instalacionesService.updateInstalacion(
-          instalacionSeleccionada.id, 
+          instalacionSeleccionada.id,
           datosInstalacion
         );
         setSuccess('Instalación actualizada exitosamente');
@@ -254,13 +254,13 @@ const InstalacionesManagement = () => {
 
     try {
       setProcesando(true);
-      
+
       const response = await instalacionesService.cambiarEstado(
-        instalacion.id, 
+        instalacion.id,
         'en_proceso',
         { observaciones: 'Instalación iniciada por el técnico' }
       );
-      
+
       if (response.success) {
         setSuccess('Instalación iniciada exitosamente');
         cargarDatos();
@@ -284,9 +284,9 @@ const InstalacionesManagement = () => {
   const handleAsignarInstalador = async (instalacionId, instaladorId) => {
     try {
       setProcesando(true);
-      
+
       const response = await instalacionesService.asignarInstalador(instalacionId, instaladorId);
-      
+
       if (response.success) {
         setSuccess('Instalador asignado exitosamente');
         setMostrarAsignarModal(false);
@@ -311,14 +311,14 @@ const InstalacionesManagement = () => {
 
     try {
       setProcesando(true);
-      
+
       const response = await instalacionesService.updateInstalacion(instalacion.id, {
         fecha_programada: nuevaFecha,
         hora_programada: nuevaHora,
         estado: 'reagendada',
         observaciones: motivo || 'Instalación reagendada'
       });
-      
+
       if (response.success) {
         setSuccess('Instalación reagendada exitosamente');
         cargarDatos();
@@ -343,16 +343,16 @@ const InstalacionesManagement = () => {
 
     try {
       setProcesando(true);
-      
+
       const response = await instalacionesService.cambiarEstado(
-        instalacion.id, 
+        instalacion.id,
         'cancelada',
-        { 
+        {
           motivo_cancelacion: motivo,
           observaciones: `Cancelada: ${motivo}`
         }
       );
-      
+
       if (response.success) {
         setSuccess('Instalación cancelada exitosamente');
         cargarDatos();
@@ -380,9 +380,9 @@ const InstalacionesManagement = () => {
 
     try {
       setProcesando(true);
-      
+
       const response = await instalacionesService.deleteInstalacion(instalacion.id);
-      
+
       if (response.success) {
         setSuccess('Instalación eliminada exitosamente');
         cargarDatos();
@@ -400,9 +400,9 @@ const InstalacionesManagement = () => {
   const exportarDatos = async () => {
     try {
       setProcesando(true);
-      
+
       console.log('📊 Iniciando exportación...');
-      
+
       // Crear URL con parámetros
       const params = new URLSearchParams({
         ...filtros,
@@ -430,9 +430,9 @@ const InstalacionesManagement = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       setSuccess('Reporte exportado exitosamente');
-      
+
     } catch (error) {
       console.error('❌ Error exportando:', error);
       setError(`Error exportando reporte: ${error.message}`);
@@ -445,29 +445,56 @@ const InstalacionesManagement = () => {
   const generarOrdenServicioPDF = async (instalacion) => {
   try {
     setProcesando(true);
+    setError('');
     
-    console.log('📄 Generando orden de servicio PDF...');
+    console.log('📄 Generando orden PSI...');
+    console.log('🔍 Instalación recibida:', instalacion);
     
-    // ARREGLADO: Usar el service en lugar de fetch directo
+    // Validaciones mejoradas
+    if (!instalacion) {
+      throw new Error('No se proporcionó información de la instalación');
+    }
+    
+    if (!instalacion.id) {
+      console.error('❌ Instalación sin ID:', instalacion);
+      throw new Error('La instalación no tiene un ID válido');
+    }
+    
+    console.log('📋 Procesando instalación ID:', instalacion.id);
+    
+    // Llamar al servicio
     const response = await instalacionesService.generarOrdenServicioPDF(instalacion.id);
     
-    if (response.success) {
-      // Crear y descargar PDF
+    console.log('📊 Respuesta del servicio:', response);
+    
+    if (response && response.success && response.data) {
+      console.log('✅ PDF recibido, tamaño:', response.data.size);
+      
+      // Crear URL del blob y descargar
       const url = window.URL.createObjectURL(response.data);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `orden_servicio_${instalacion.id}.pdf`;
+      link.download = `PSI_${String(instalacion.id).padStart(6, '0')}.pdf`;
+      
+      // Agregar al DOM, hacer click y remover
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      // Limpiar URL del blob
       window.URL.revokeObjectURL(url);
       
-      setSuccess('Orden de servicio generada exitosamente');
+      setSuccess('Orden PSI generada y descargada exitosamente');
+      console.log('✅ Descarga completada');
+      
+    } else {
+      console.error('❌ Respuesta inválida:', response);
+      throw new Error('No se pudo generar el PDF correctamente');
     }
     
   } catch (error) {
-    console.error('❌ Error generando PDF:', error);
-    setError(`Error generando orden de servicio: ${error.message}`);
+    console.error('❌ Error completo generando PDF:', error);
+    setError(`Error generando orden PSI: ${error.message}`);
   } finally {
     setProcesando(false);
   }
@@ -545,9 +572,9 @@ const InstalacionesManagement = () => {
   const puedeEjecutarAccion = (accion, instalacion) => {
     switch (accion) {
       case 'iniciar':
-        return user.rol === 'instalador' && 
-               instalacion.instalador_id === user.id &&
-               instalacion.estado === 'programada';
+        return user.rol === 'instalador' &&
+          instalacion.instalador_id === user.id &&
+          instalacion.estado === 'programada';
       case 'asignar':
         return (user.rol === 'administrador' || user.rol === 'supervisor');
       case 'editar':
@@ -585,7 +612,7 @@ const InstalacionesManagement = () => {
                 Administra las instalaciones de servicios
               </p>
             </div>
-            
+
             <div className="flex items-center space-x-3">
               {/* ARREGLADO: Botón exportar - Solo admin y supervisor */}
               {(user.rol === 'administrador' || user.rol === 'supervisor') && (
@@ -598,7 +625,7 @@ const InstalacionesManagement = () => {
                   {procesando ? 'Exportando...' : 'Exportar'}
                 </button>
               )}
-              
+
               {/* Botón crear - Todos los roles pueden crear */}
               <button
                 onClick={() => abrirModal('crear')}
@@ -742,7 +769,7 @@ const InstalacionesManagement = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {instalaciones.map((instalacion) => (
                     <tr key={instalacion.id} className={`hover:bg-gray-50 ${estaVencida(instalacion) ? 'bg-red-50' : ''}`}>
-                      
+
                       {/* Cliente */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -776,14 +803,13 @@ const InstalacionesManagement = () => {
 
                       {/* Estado */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          instalacion.estado === 'programada' ? 'bg-blue-100 text-blue-800' :
-                          instalacion.estado === 'en_proceso' ? 'bg-yellow-100 text-yellow-800' :
-                          instalacion.estado === 'completada' ? 'bg-green-100 text-green-800' :
-                          instalacion.estado === 'cancelada' ? 'bg-red-100 text-red-800' :
-                          instalacion.estado === 'reagendada' ? 'bg-orange-100 text-orange-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${instalacion.estado === 'programada' ? 'bg-blue-100 text-blue-800' :
+                            instalacion.estado === 'en_proceso' ? 'bg-yellow-100 text-yellow-800' :
+                              instalacion.estado === 'completada' ? 'bg-green-100 text-green-800' :
+                                instalacion.estado === 'cancelada' ? 'bg-red-100 text-red-800' :
+                                  instalacion.estado === 'reagendada' ? 'bg-orange-100 text-orange-800' :
+                                    'bg-gray-100 text-gray-800'
+                          }`}>
                           {obtenerNombreEstado(instalacion.estado)}
                         </span>
                         {estaVencida(instalacion) && (
@@ -810,7 +836,7 @@ const InstalacionesManagement = () => {
                       {/* ARREGLADO: Acciones */}
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
-                          
+
                           {/* Ver detalles - ARREGLADO */}
                           {puedeEjecutarAccion('ver', instalacion) && (
                             <button
@@ -825,10 +851,29 @@ const InstalacionesManagement = () => {
                           {/* Generar orden de servicio PDF - NUEVO */}
                           {puedeEjecutarAccion('generar_pdf', instalacion) && (
                             <button
-                              onClick={() => generarOrdenServicioPDF(instalacion)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('🔍 DEBUG - Instalación completa:', instalacion);
+                                console.log('🔍 DEBUG - ID:', instalacion?.id);
+
+                                if (!instalacion) {
+                                  console.error('❌ Instalación es undefined');
+                                  setError('Error: No se encontró información de la instalación');
+                                  return;
+                                }
+
+                                if (!instalacion.id) {
+                                  console.error('❌ Instalación no tiene ID:', instalacion);
+                                  setError('Error: La instalación no tiene un ID válido');
+                                  return;
+                                }
+
+                                generarOrdenServicioPDF(instalacion);
+                              }}
                               disabled={procesando}
                               className="text-green-600 hover:text-green-800 disabled:opacity-50"
-                              title="Generar orden de servicio PDF"
+                              title="Generar orden PSI"
                             >
                               <FileText className="w-4 h-4" />
                             </button>
@@ -883,17 +928,17 @@ const InstalacionesManagement = () => {
                           )}
 
                           {/* Cancelar - ARREGLADO: Admin y supervisor */}
-                          {puedeEjecutarAccion('cancelar', instalacion) && 
-                           !['cancelada', 'completada'].includes(instalacion.estado) && (
-                            <button
-                              onClick={() => cancelarInstalacion(instalacion)}
-                              disabled={procesando}
-                              className="text-red-600 hover:text-red-800 disabled:opacity-50"
-                              title="Cancelar instalación"
-                            >
-                              <XCircle className="w-4 h-4" />
-                            </button>
-                          )}
+                          {puedeEjecutarAccion('cancelar', instalacion) &&
+                            !['cancelada', 'completada'].includes(instalacion.estado) && (
+                              <button
+                                onClick={() => cancelarInstalacion(instalacion)}
+                                disabled={procesando}
+                                className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                                title="Cancelar instalación"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            )}
 
                           {/* Eliminar - ARREGLADO: Solo admin */}
                           {puedeEjecutarAccion('eliminar', instalacion) && (
@@ -925,7 +970,7 @@ const InstalacionesManagement = () => {
               {Math.min(paginacion.pagina_actual * paginacion.registros_por_pagina, paginacion.total_registros)} de{' '}
               {paginacion.total_registros} registros
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setPaginacion(prev => ({
@@ -937,11 +982,11 @@ const InstalacionesManagement = () => {
               >
                 Anterior
               </button>
-              
+
               <span className="px-3 py-2 text-sm text-gray-700">
                 Página {paginacion.pagina_actual} de {paginacion.total_paginas}
               </span>
-              
+
               <button
                 onClick={() => setPaginacion(prev => ({
                   ...prev,
@@ -958,7 +1003,7 @@ const InstalacionesManagement = () => {
       </div>
 
       {/* MODALES */}
-      
+
       {/* Modal principal de instalaciones - ARREGLADO */}
       {mostrarModal && (
         <InstalacionModal
