@@ -614,8 +614,8 @@ router.patch('/:id/asignar-instalador',
             const [instalacionActualizada] = await Database.query(`
                 SELECT 
                     i.*,
-                    CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
-                    CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre_completo
+                    c.nombre as cliente_nombre,
+                    u.nombre as instalador_nombre_completo
                 FROM instalaciones i
                 LEFT JOIN clientes c ON i.cliente_id = c.id
                 LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
