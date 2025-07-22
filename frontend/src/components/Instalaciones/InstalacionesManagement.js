@@ -29,6 +29,7 @@ import { instalacionesService } from '../../services/instalacionesService';
 import { useAuth } from '../../contexts/AuthContext';
 import InstalacionModal from './InstalacionModal';
 import AsignarInstaladorModal from './AsignarInstaladorModal';
+import authService from '../../services/authService';
 
 // Constantes
 const ESTADOS_INSTALACION = {
@@ -442,25 +443,17 @@ const InstalacionesManagement = () => {
 
   // NUEVO: Función para generar orden de servicio PDF
   const generarOrdenServicioPDF = async (instalacion) => {
-    try {
-      setProcesando(true);
-      
-      console.log('📄 Generando orden de servicio PDF...');
-      
-      // Hacer petición al endpoint de PDF
-      const response = await fetch(`/api/v1/instalaciones/${instalacion.id}/pdf`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Error generando el PDF');
-      }
-
-      // Descargar PDF
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+  try {
+    setProcesando(true);
+    
+    console.log('📄 Generando orden de servicio PDF...');
+    
+    // ARREGLADO: Usar el service en lugar de fetch directo
+    const response = await instalacionesService.generarOrdenServicioPDF(instalacion.id);
+    
+    if (response.success) {
+      // Crear y descargar PDF
+      const url = window.URL.createObjectURL(response.data);
       const link = document.createElement('a');
       link.href = url;
       link.download = `orden_servicio_${instalacion.id}.pdf`;
@@ -470,14 +463,15 @@ const InstalacionesManagement = () => {
       window.URL.revokeObjectURL(url);
       
       setSuccess('Orden de servicio generada exitosamente');
-      
-    } catch (error) {
-      console.error('❌ Error generando PDF:', error);
-      setError(`Error generando orden de servicio: ${error.message}`);
-    } finally {
-      setProcesando(false);
     }
-  };
+    
+  } catch (error) {
+    console.error('❌ Error generando PDF:', error);
+    setError(`Error generando orden de servicio: ${error.message}`);
+  } finally {
+    setProcesando(false);
+  }
+};
 
   // ==========================================
   // FUNCIONES DE FILTROS

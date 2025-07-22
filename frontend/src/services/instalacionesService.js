@@ -436,6 +436,38 @@ export const instalacionesService = {
   // ESTADÍSTICAS Y REPORTES (ARREGLADOS)
   // ==========================================
 
+  async generarOrdenServicioPDF(instalacionId) {
+  try {
+    console.log('📄 Generando orden de servicio PDF para instalación:', instalacionId);
+    
+    // Hacer petición usando apiService para manejar autenticación automáticamente
+    const response = await fetch(`/api/v1/instalaciones/${instalacionId}/pdf`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Error generando PDF');
+    }
+
+    // Obtener el blob del PDF
+    const blob = await response.blob();
+    
+    return {
+      success: true,
+      data: blob,
+      message: 'PDF generado exitosamente'
+    };
+    
+  } catch (error) {
+    console.error('❌ Error generando PDF:', error);
+    throw error;
+  }
+},
   /**
    * ARREGLADO: Obtener estadísticas de instalaciones
    */

@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const { Database } = require('../models/Database');
+const puppeteer = require('puppeteer');
 
 // Middleware de autenticación
 const { authenticateToken, requireRole } = require('../middleware/auth');
@@ -142,8 +143,7 @@ router.get('/exportar',
 
             if (busqueda.trim()) {
                 whereClause += ` AND (
-                    CONCAT(c.nombres, ' ', c.apellidos) LIKE ? OR
-                    c.identificacion LIKE ? OR
+                    c.nombre LIKE ? OR
                     i.direccion_instalacion LIKE ?
                 )`;
                 const searchTerm = `%${busqueda}%`;
@@ -176,12 +176,12 @@ router.get('/exportar',
             const instalaciones = await Database.query(`
                 SELECT 
                     i.id,
-                    CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                    c.nombre as cliente_nombre,
                     c.identificacion as cliente_identificacion,
                     c.telefono as cliente_telefono,
                     i.fecha_programada,
                     i.hora_programada,
-                    CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre_completo,
+                    u.nombre as instalador_nombre_completo,
                     i.estado,
                     i.direccion_instalacion,
                     i.barrio,
@@ -270,23 +270,30 @@ router.get('/exportar',
  * ARREGLADO: Generar orden de servicio PDF
  */
 router.get('/:id/pdf', async (req, res) => {
+    let browser = null;
+    
     try {
         const { id } = req.params;
-        console.log(`📄 Generando PDF para instalación: ${id}`);
+        console.log(`📄 Generando PDF PSI para instalación: ${id}`);
 
-        // Verificar que la instalación existe
+        // Obtener datos de la instalación
         const [instalacion] = await Database.query(`
             SELECT 
                 i.*,
-                CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                c.nombre as cliente_nombre,
                 c.identificacion as cliente_identificacion,
                 c.telefono as cliente_telefono,
-                c.email as cliente_email,
-                CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre_completo,
-                u.telefono as instalador_telefono
+                c.correo as cliente_email,
+                c.direccion as cliente_direccion,
+                u.nombres as instalador_nombres,
+                u.apellidos as instalador_apellidos,
+                u.telefono as instalador_telefono,
+                ps.nombre as plan_nombre
             FROM instalaciones i
             LEFT JOIN clientes c ON i.cliente_id = c.id
             LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
+            LEFT JOIN servicios_cliente sc ON i.servicio_cliente_id = sc.id
+            LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
             WHERE i.id = ?
         `, [id]);
 
@@ -297,116 +304,299 @@ router.get('/:id/pdf', async (req, res) => {
             });
         }
 
-        // Generar contenido HTML del PDF
+        // HTML que replica exactamente el formato PSI
         const htmlContent = `
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="utf-8">
-    <title>Orden de Servicio - Instalación ${id}</title>
+    <title>Orden de Servicio PSI ${id}</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .section { margin-bottom: 20px; }
-        .section h3 { background-color: #f0f0f0; padding: 10px; margin: 0; }
-        .section-content { padding: 10px; border: 1px solid #ddd; }
-        .row { display: flex; margin-bottom: 10px; }
-        .label { font-weight: bold; width: 150px; }
-        .value { flex: 1; }
+        @page {
+            size: A4;
+            margin: 20mm 15mm;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.2;
+            color: #000;
+            background: white;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }
+        
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .company-info {
+            font-size: 9px;
+            line-height: 1.3;
+            margin-bottom: 8px;
+        }
+        
+        .document-title {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 10px;
+        }
+        
+        .content {
+            margin-top: 20px;
+        }
+        
+        .section {
+            margin-bottom: 15px;
+        }
+        
+        .section-title {
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            padding: 3px 0;
+            border-bottom: 1px solid #000;
+        }
+        
+        .field-group {
+            display: table;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        
+        .field {
+            display: table-row;
+        }
+        
+        .field-label {
+            display: table-cell;
+            width: 120px;
+            font-weight: bold;
+            padding-right: 10px;
+            vertical-align: top;
+        }
+        
+        .field-value {
+            display: table-cell;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+            min-height: 18px;
+            vertical-align: bottom;
+        }
+        
+        .two-columns {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+        }
+        
+        .column {
+            display: table-cell;
+            width: 50%;
+            padding-right: 15px;
+            vertical-align: top;
+        }
+        
+        .column:last-child {
+            padding-right: 0;
+            padding-left: 15px;
+        }
+        
+        .signatures {
+            margin-top: 40px;
+            display: table;
+            width: 100%;
+        }
+        
+        .signature-column {
+            display: table-cell;
+            width: 50%;
+            text-align: center;
+            padding: 0 20px;
+        }
+        
+        .signature-line {
+            border-bottom: 1px solid #000;
+            height: 40px;
+            margin-bottom: 5px;
+        }
+        
+        .signature-label {
+            font-size: 10px;
+            font-weight: bold;
+        }
+        
+        .order-number {
+            position: absolute;
+            top: 15mm;
+            right: 15mm;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        
+        .date-field {
+            margin-top: 10px;
+            text-align: right;
+            font-size: 10px;
+        }
     </style>
 </head>
 <body>
+    <div class="order-number">
+        Orden N°: ${String(id).padStart(6, '0')}
+    </div>
+
     <div class="header">
-        <h1>ORDEN DE SERVICIO - INSTALACIÓN</h1>
-        <p>Orden No: ${instalacion.id} | Fecha: ${new Date().toLocaleDateString('es-CO')}</p>
+        <div class="company-name">PSI</div>
+        <div class="company-info">
+            Proveedores de Servicios de Internet<br>
+            Dirección: [Dirección de la empresa]<br>
+            Teléfono: [Teléfono] | Email: [Email]<br>
+            NIT: [NIT de la empresa]
+        </div>
+        <div class="document-title">Proveedor de Telecomunicaciones SAS</div>
     </div>
 
-    <div class="section">
-        <h3>DATOS DEL CLIENTE</h3>
-        <div class="section-content">
-            <div class="row">
-                <div class="label">Cliente:</div>
-                <div class="value">${instalacion.cliente_nombre}</div>
+    <div class="content">
+        <div class="section">
+            <div class="section-title">Datos del Cliente</div>
+            
+            <div class="field-group">
+                <div class="field">
+                    <div class="field-label">Nombre:</div>
+                    <div class="field-value">${instalacion.cliente_nombre || ''}</div>
+                </div>
             </div>
-            <div class="row">
-                <div class="label">Identificación:</div>
-                <div class="value">${instalacion.cliente_identificacion}</div>
+            
+            <div class="two-columns">
+                <div class="column">
+                    <div class="field-group">
+                        <div class="field">
+                            <div class="field-label">Identificación:</div>
+                            <div class="field-value">${instalacion.cliente_identificacion || ''}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="field-group">
+                        <div class="field">
+                            <div class="field-label">Teléfono:</div>
+                            <div class="field-value">${instalacion.cliente_telefono || ''}</div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="row">
-                <div class="label">Teléfono:</div>
-                <div class="value">${instalacion.cliente_telefono || 'N/A'}</div>
-            </div>
-            <div class="row">
-                <div class="label">Email:</div>
-                <div class="value">${instalacion.cliente_email || 'N/A'}</div>
+            
+            <div class="field-group">
+                <div class="field">
+                    <div class="field-label">Dirección:</div>
+                    <div class="field-value">${instalacion.direccion_instalacion || ''}</div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="section">
-        <h3>DATOS DE LA INSTALACIÓN</h3>
-        <div class="section-content">
-            <div class="row">
-                <div class="label">Dirección:</div>
-                <div class="value">${instalacion.direccion_instalacion}</div>
-            </div>
-            <div class="row">
-                <div class="label">Barrio:</div>
-                <div class="value">${instalacion.barrio || 'N/A'}</div>
-            </div>
-            <div class="row">
-                <div class="label">Teléfono contacto:</div>
-                <div class="value">${instalacion.telefono_contacto}</div>
-            </div>
-            <div class="row">
-                <div class="label">Persona recibe:</div>
-                <div class="value">${instalacion.persona_recibe || 'N/A'}</div>
-            </div>
-            <div class="row">
-                <div class="label">Fecha programada:</div>
-                <div class="value">${new Date(instalacion.fecha_programada).toLocaleDateString('es-CO')}</div>
-            </div>
-            <div class="row">
-                <div class="label">Hora programada:</div>
-                <div class="value">${instalacion.hora_programada}</div>
+        <div class="section">
+            <div class="section-title">Datos del Servicio</div>
+            
+            <div class="two-columns">
+                <div class="column">
+                    <div class="field-group">
+                        <div class="field">
+                            <div class="field-label">Plan:</div>
+                            <div class="field-value">${instalacion.plan_nombre || ''}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="field-group">
+                        <div class="field">
+                            <div class="field-label">Fecha Instalación:</div>
+                            <div class="field-value">${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO') : ''}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="field-group">
+                        <div class="field">
+                            <div class="field-label">Hora:</div>
+                            <div class="field-value">${instalacion.hora_programada || ''}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="field-group">
+                        <div class="field">
+                            <div class="field-label">Valor Instalación:</div>
+                            <div class="field-value">$${instalacion.costo_instalacion ? instalacion.costo_instalacion.toLocaleString('es-CO') : '0'}</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    ${instalacion.instalador_nombre_completo ? `
-    <div class="section">
-        <h3>INSTALADOR ASIGNADO</h3>
-        <div class="section-content">
-            <div class="row">
-                <div class="label">Técnico:</div>
-                <div class="value">${instalacion.instalador_nombre_completo}</div>
-            </div>
-            <div class="row">
-                <div class="label">Teléfono:</div>
-                <div class="value">${instalacion.instalador_telefono || 'N/A'}</div>
+        <div class="section">
+            <div class="section-title">Técnico Asignado</div>
+            
+            <div class="two-columns">
+                <div class="column">
+                    <div class="field-group">
+                        <div class="field">
+                            <div class="field-label">Nombre:</div>
+                            <div class="field-value">${instalacion.instalador_nombres && instalacion.instalador_apellidos ? 
+                                `${instalacion.instalador_nombres} ${instalacion.instalador_apellidos}` : 
+                                'Por asignar'}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="field-group">
+                        <div class="field">
+                            <div class="field-label">Teléfono:</div>
+                            <div class="field-value">${instalacion.instalador_telefono || ''}</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    ` : ''}
 
-    ${instalacion.observaciones ? `
-    <div class="section">
-        <h3>OBSERVACIONES</h3>
-        <div class="section-content">
-            ${instalacion.observaciones}
-        </div>
-    </div>
-    ` : ''}
-
-    <div style="margin-top: 50px;">
-        <div style="display: flex; justify-content: space-between;">
-            <div style="text-align: center;">
-                <div style="border-bottom: 1px solid #000; width: 200px; margin-bottom: 10px;"></div>
-                <div>Firma del Cliente</div>
+        <div class="section">
+            <div class="section-title">Observaciones</div>
+            <div style="min-height: 60px; border-bottom: 1px solid #000; padding: 5px 0;">
+                ${instalacion.observaciones || ''}
             </div>
-            <div style="text-align: center;">
-                <div style="border-bottom: 1px solid #000; width: 200px; margin-bottom: 10px;"></div>
-                <div>Firma del Técnico</div>
+        </div>
+
+        <div class="date-field">
+            <div class="field-group">
+                <div class="field">
+                    <div class="field-label">Fecha:</div>
+                    <div class="field-value">${new Date().toLocaleDateString('es-CO')}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="signatures">
+            <div class="signature-column">
+                <div class="signature-line"></div>
+                <div class="signature-label">Firma Usuario</div>
+            </div>
+            <div class="signature-column">
+                <div class="signature-line"></div>
+                <div class="signature-label">PSI</div>
             </div>
         </div>
     </div>
@@ -414,18 +604,64 @@ router.get('/:id/pdf', async (req, res) => {
 </html>
         `;
 
-        const filename = `orden_servicio_${id}.html`;
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-        res.send(htmlContent);
+        // Generar PDF con Puppeteer
+        console.log('🚀 Iniciando Puppeteer para PDF PSI...');
+        browser = await puppeteer.launch({
+            headless: 'new',
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu'
+            ]
+        });
 
-        console.log('✅ PDF generado exitosamente');
+        const page = await browser.newPage();
+        
+        await page.setContent(htmlContent, {
+            waitUntil: 'networkidle0',
+            timeout: 30000
+        });
+
+        // Configuración PDF exacta para formato PSI
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            margin: {
+                top: '20mm',
+                right: '15mm',
+                bottom: '20mm',
+                left: '15mm'
+            },
+            printBackground: true,
+            preferCSSPageSize: true
+        });
+
+        await browser.close();
+        browser = null;
+
+        // Enviar PDF
+        const filename = `orden_servicio_PSI_${String(id).padStart(6, '0')}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.send(pdfBuffer);
+
+        console.log(`✅ PDF PSI generado: ${filename}`);
 
     } catch (error) {
-        console.error('❌ Error generando PDF:', error);
+        console.error('❌ Error generando PDF PSI:', error);
+        
+        if (browser) {
+            try {
+                await browser.close();
+            } catch (closeError) {
+                console.error('Error cerrando browser:', closeError);
+            }
+        }
+
         res.status(500).json({
             success: false,
-            message: error.message || 'Error generando orden de servicio'
+            message: error.message || 'Error generando PDF'
         });
     }
 });
@@ -441,11 +677,11 @@ router.get('/:id', async (req, res) => {
         const [instalacion] = await Database.query(`
             SELECT 
                 i.*,
-                CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                c.nombre as cliente_nombre,
                 c.identificacion as cliente_identificacion,
                 c.telefono as cliente_telefono,
-                c.email as cliente_email,
-                CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre_completo,
+                c.correo as cliente_email,
+                u.nombre as instalador_nombre_completo,
                 u.telefono as instalador_telefono
             FROM instalaciones i
             LEFT JOIN clientes c ON i.cliente_id = c.id
@@ -721,7 +957,7 @@ router.patch('/:id/cambiar-estado', async (req, res) => {
         const [instalacionActualizada] = await Database.query(`
             SELECT 
                 i.*,
-                CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre
+                c.nombre as cliente_nombre
             FROM instalaciones i
             LEFT JOIN clientes c ON i.cliente_id = c.id
             WHERE i.id = ?
