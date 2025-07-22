@@ -1,26 +1,16 @@
-// backend/routes/instalaciones.js - VERSIÓN CORREGIDA COMPLETA
+// backend/routes/instalaciones.js - ARREGLADO BASADO EN CÓDIGO ACTUAL
 
 const express = require('express');
 const router = express.Router();
+const { Database } = require('../models/Database');
 
 // Middleware de autenticación
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
-// Validaciones
-const { 
-  validarCrearInstalacion,
-  validarActualizarInstalacion,
-  validarCambiarEstado,
-  validarObtenerPorId,
-  validarEquiposDisponibles,
-  validarPermisosInstalacion,
-  handleValidationErrors
-} = require('../middleware/instalacionValidations');
-
-// Controlador de instalaciones
+// Controlador de instalaciones (usar el existente)
 const InstalacionesController = require('../controllers/instalacionesController');
 
-console.log('🔧 Inicializando rutas de instalaciones...');
+console.log('🔧 Inicializando rutas de instalaciones ARREGLADAS...');
 
 // Middleware de autenticación para todas las rutas
 router.use(authenticateToken);
@@ -32,28 +22,105 @@ router.use((req, res, next) => {
 });
 
 // ==========================================
-// RUTAS DE PRUEBA
+// RUTAS PRINCIPALES (ORDEN IMPORTANTE)
 // ==========================================
 
 /**
- * @route GET /api/v1/instalaciones/test
- * @desc Test del controlador
+ * ARREGLADO: Test del controlador
  */
 router.get('/test', InstalacionesController.test);
 
-// ==========================================
-// RUTAS PRINCIPALES
-// ==========================================
-
 /**
- * @route GET /api/v1/instalaciones/estadisticas
- * @desc Obtener estadísticas (debe ir antes de /:id)
+ * ARREGLADO: Obtener estadísticas (debe ir antes de /:id)
  */
-router.get('/estadisticas', InstalacionesController.obtenerEstadisticas);
+router.get('/estadisticas', async (req, res) => {
+    try {
+        console.log('📊 Obteniendo estadísticas de instalaciones');
+        
+        let whereClause = 'WHERE 1=1';
+        const params = [];
+
+        // Filtrar por instalador si es necesario
+        if (req.user.rol === 'instalador') {
+            whereClause += ' AND instalador_id = ?';
+            params.push(req.user.id);
+        }
+
+        const [stats] = await Database.query(`
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN estado = 'programada' THEN 1 ELSE 0 END) as programadas,
+                SUM(CASE WHEN estado = 'en_proceso' THEN 1 ELSE 0 END) as en_proceso,
+                SUM(CASE WHEN estado = 'completada' THEN 1 ELSE 0 END) as completadas,
+                SUM(CASE WHEN estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas,
+                SUM(CASE WHEN estado = 'reagendada' THEN 1 ELSE 0 END) as reagendadas,
+                SUM(CASE WHEN estado = 'programada' AND DATE(fecha_programada) < CURDATE() THEN 1 ELSE 0 END) as vencidas
+            FROM instalaciones ${whereClause}
+        `, params);
+
+        res.json({
+            success: true,
+            data: stats || {
+                total: 0,
+                programadas: 0,
+                en_proceso: 0,
+                completadas: 0,
+                canceladas: 0,
+                reagendadas: 0,
+                vencidas: 0
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo estadísticas:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error obteniendo estadísticas'
+        });
+    }
+});
 
 /**
- * @route GET /api/v1/instalaciones/exportar
- * @desc Exportar reporte de instalaciones (CORREGIDO)
+ * ARREGLADO: Obtener instaladores disponibles
+ */
+router.get('/instaladores', 
+    requireRole('administrador', 'supervisor'), 
+    async (req, res) => {
+        try {
+            console.log('👷 Obteniendo instaladores disponibles');
+
+            const instaladores = await Database.query(`
+                SELECT 
+                    id,
+                    nombre,
+                    telefono,
+                    email,
+                    activo
+                FROM sistema_usuarios 
+                WHERE rol IN ('instalador') 
+                AND activo = 1
+                ORDER BY nombre
+            `);
+
+            console.log(`✅ ${instaladores.length} instaladores encontrados`);
+
+            res.json({
+                success: true,
+                data: instaladores
+            });
+
+        } catch (error) {
+            console.error('❌ Error obteniendo instaladores:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Error obteniendo instaladores'
+            });
+        }
+    }
+);
+
+/**
+ * ARREGLADO: Exportar reporte de instalaciones
  */
 router.get('/exportar',
     requireRole('administrador', 'supervisor'),
@@ -61,438 +128,397 @@ router.get('/exportar',
         try {
             console.log('📊 Exportando reporte de instalaciones');
             
-            const formato = req.query.formato || 'excel';
-            const filtros = {
-                estado: req.query.estado,
-                instalador_id: req.query.instalador_id,
-                fecha_desde: req.query.fecha_desde,
-                fecha_hasta: req.query.fecha_hasta,
-                busqueda: req.query.busqueda
-            };
+            const {
+                busqueda = '',
+                estado = '',
+                instalador_id = '',
+                fecha_desde = '',
+                fecha_hasta = ''
+            } = req.query;
 
-            // Obtener datos para exportar
-            const response = await InstalacionesController.listar(req, { 
-                json: (data) => data 
-            });
+            // Construir WHERE clause para exportar
+            let whereClause = 'WHERE 1=1';
+            const params = [];
 
-            if (!response.success) {
-                throw new Error('Error obteniendo datos para exportar');
+            if (busqueda.trim()) {
+                whereClause += ` AND (
+                    CONCAT(c.nombres, ' ', c.apellidos) LIKE ? OR
+                    c.identificacion LIKE ? OR
+                    i.direccion_instalacion LIKE ?
+                )`;
+                const searchTerm = `%${busqueda}%`;
+                params.push(searchTerm, searchTerm, searchTerm);
             }
 
-            const instalaciones = response.data;
-            const timestamp = new Date().toISOString().split('T')[0];
+            if (estado) {
+                whereClause += ' AND i.estado = ?';
+                params.push(estado);
+            }
 
-            if (formato === 'json') {
-                res.setHeader('Content-Type', 'application/json');
-                res.setHeader('Content-Disposition', `attachment; filename=instalaciones_${timestamp}.json`);
-                return res.json({
-                    fecha_exportacion: new Date().toISOString(),
-                    total_registros: instalaciones.length,
-                    filtros_aplicados: filtros,
-                    instalaciones: instalaciones
+            if (instalador_id && instalador_id !== 'sin_asignar') {
+                whereClause += ' AND i.instalador_id = ?';
+                params.push(instalador_id);
+            } else if (instalador_id === 'sin_asignar') {
+                whereClause += ' AND i.instalador_id IS NULL';
+            }
+
+            if (fecha_desde) {
+                whereClause += ' AND DATE(i.fecha_programada) >= ?';
+                params.push(fecha_desde);
+            }
+
+            if (fecha_hasta) {
+                whereClause += ' AND DATE(i.fecha_programada) <= ?';
+                params.push(fecha_hasta);
+            }
+
+            // Obtener datos para exportar
+            const instalaciones = await Database.query(`
+                SELECT 
+                    i.id,
+                    CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                    c.identificacion as cliente_identificacion,
+                    c.telefono as cliente_telefono,
+                    i.fecha_programada,
+                    i.hora_programada,
+                    CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre_completo,
+                    i.estado,
+                    i.direccion_instalacion,
+                    i.barrio,
+                    i.telefono_contacto,
+                    i.persona_recibe,
+                    i.costo_instalacion,
+                    i.observaciones,
+                    i.created_at
+                FROM instalaciones i
+                LEFT JOIN clientes c ON i.cliente_id = c.id
+                LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
+                ${whereClause}
+                ORDER BY i.fecha_programada DESC, i.created_at DESC
+            `, params);
+
+            if (instalaciones.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'No hay datos para exportar'
                 });
             }
 
-            if (formato === 'csv') {
-                // Generar CSV
-                const csv = generarCSV(instalaciones);
-                res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-                res.setHeader('Content-Disposition', `attachment; filename=instalaciones_${timestamp}.csv`);
-                return res.send('\uFEFF' + csv); // BOM para UTF-8
-            }
+            // Generar CSV
+            const headers = [
+                'ID',
+                'Cliente',
+                'Identificación',
+                'Teléfono Cliente',
+                'Fecha Programada',
+                'Hora Programada',
+                'Instalador',
+                'Estado',
+                'Dirección',
+                'Barrio',
+                'Teléfono Contacto',
+                'Persona Recibe',
+                'Costo',
+                'Observaciones',
+                'Fecha Creación'
+            ];
 
-            // Por defecto, JSON
-            res.setHeader('Content-Type', 'application/json');
-            res.setHeader('Content-Disposition', `attachment; filename=instalaciones_${timestamp}.json`);
-            res.json({
-                fecha_exportacion: new Date().toISOString(),
-                total_registros: instalaciones.length,
-                instalaciones: instalaciones
-            });
+            const rows = instalaciones.map(inst => [
+                inst.id || '',
+                inst.cliente_nombre || '',
+                inst.cliente_identificacion || '',
+                inst.cliente_telefono || '',
+                inst.fecha_programada || '',
+                inst.hora_programada || '',
+                inst.instalador_nombre_completo || 'Sin asignar',
+                inst.estado || '',
+                inst.direccion_instalacion || '',
+                inst.barrio || '',
+                inst.telefono_contacto || '',
+                inst.persona_recibe || '',
+                inst.costo_instalacion || '0',
+                inst.observaciones || '',
+                inst.created_at || ''
+            ]);
+
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => 
+                    row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+                )
+            ].join('\n');
+
+            const filename = `instalaciones_${new Date().toISOString().split('T')[0]}.csv`;
+            
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+            res.send('\ufeff' + csvContent); // BOM for Excel UTF-8 support
+
+            console.log('✅ Reporte exportado exitosamente');
 
         } catch (error) {
-            console.error('❌ Error exportando reporte:', error);
+            console.error('❌ Error exportando:', error);
             res.status(500).json({
                 success: false,
-                message: 'Error exportando reporte de instalaciones',
-                error: error.message
+                message: error.message || 'Error exportando datos'
             });
         }
     }
 );
 
 /**
- * @route GET /api/v1/instalaciones
- * @desc Listar instalaciones con filtros y paginación
+ * ARREGLADO: Generar orden de servicio PDF
+ */
+router.get('/:id/pdf', async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`📄 Generando PDF para instalación: ${id}`);
+
+        // Verificar que la instalación existe
+        const [instalacion] = await Database.query(`
+            SELECT 
+                i.*,
+                CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                c.identificacion as cliente_identificacion,
+                c.telefono as cliente_telefono,
+                c.email as cliente_email,
+                CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre_completo,
+                u.telefono as instalador_telefono
+            FROM instalaciones i
+            LEFT JOIN clientes c ON i.cliente_id = c.id
+            LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
+            WHERE i.id = ?
+        `, [id]);
+
+        if (!instalacion) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instalación no encontrada'
+            });
+        }
+
+        // Generar contenido HTML del PDF
+        const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Orden de Servicio - Instalación ${id}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .section { margin-bottom: 20px; }
+        .section h3 { background-color: #f0f0f0; padding: 10px; margin: 0; }
+        .section-content { padding: 10px; border: 1px solid #ddd; }
+        .row { display: flex; margin-bottom: 10px; }
+        .label { font-weight: bold; width: 150px; }
+        .value { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ORDEN DE SERVICIO - INSTALACIÓN</h1>
+        <p>Orden No: ${instalacion.id} | Fecha: ${new Date().toLocaleDateString('es-CO')}</p>
+    </div>
+
+    <div class="section">
+        <h3>DATOS DEL CLIENTE</h3>
+        <div class="section-content">
+            <div class="row">
+                <div class="label">Cliente:</div>
+                <div class="value">${instalacion.cliente_nombre}</div>
+            </div>
+            <div class="row">
+                <div class="label">Identificación:</div>
+                <div class="value">${instalacion.cliente_identificacion}</div>
+            </div>
+            <div class="row">
+                <div class="label">Teléfono:</div>
+                <div class="value">${instalacion.cliente_telefono || 'N/A'}</div>
+            </div>
+            <div class="row">
+                <div class="label">Email:</div>
+                <div class="value">${instalacion.cliente_email || 'N/A'}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>DATOS DE LA INSTALACIÓN</h3>
+        <div class="section-content">
+            <div class="row">
+                <div class="label">Dirección:</div>
+                <div class="value">${instalacion.direccion_instalacion}</div>
+            </div>
+            <div class="row">
+                <div class="label">Barrio:</div>
+                <div class="value">${instalacion.barrio || 'N/A'}</div>
+            </div>
+            <div class="row">
+                <div class="label">Teléfono contacto:</div>
+                <div class="value">${instalacion.telefono_contacto}</div>
+            </div>
+            <div class="row">
+                <div class="label">Persona recibe:</div>
+                <div class="value">${instalacion.persona_recibe || 'N/A'}</div>
+            </div>
+            <div class="row">
+                <div class="label">Fecha programada:</div>
+                <div class="value">${new Date(instalacion.fecha_programada).toLocaleDateString('es-CO')}</div>
+            </div>
+            <div class="row">
+                <div class="label">Hora programada:</div>
+                <div class="value">${instalacion.hora_programada}</div>
+            </div>
+        </div>
+    </div>
+
+    ${instalacion.instalador_nombre_completo ? `
+    <div class="section">
+        <h3>INSTALADOR ASIGNADO</h3>
+        <div class="section-content">
+            <div class="row">
+                <div class="label">Técnico:</div>
+                <div class="value">${instalacion.instalador_nombre_completo}</div>
+            </div>
+            <div class="row">
+                <div class="label">Teléfono:</div>
+                <div class="value">${instalacion.instalador_telefono || 'N/A'}</div>
+            </div>
+        </div>
+    </div>
+    ` : ''}
+
+    ${instalacion.observaciones ? `
+    <div class="section">
+        <h3>OBSERVACIONES</h3>
+        <div class="section-content">
+            ${instalacion.observaciones}
+        </div>
+    </div>
+    ` : ''}
+
+    <div style="margin-top: 50px;">
+        <div style="display: flex; justify-content: space-between;">
+            <div style="text-align: center;">
+                <div style="border-bottom: 1px solid #000; width: 200px; margin-bottom: 10px;"></div>
+                <div>Firma del Cliente</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="border-bottom: 1px solid #000; width: 200px; margin-bottom: 10px;"></div>
+                <div>Firma del Técnico</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+
+        const filename = `orden_servicio_${id}.html`;
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.send(htmlContent);
+
+        console.log('✅ PDF generado exitosamente');
+
+    } catch (error) {
+        console.error('❌ Error generando PDF:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error generando orden de servicio'
+        });
+    }
+});
+
+/**
+ * ARREGLADO: Obtener instalación por ID
+ */
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`🔍 Obteniendo instalación ID: ${id}`);
+
+        const [instalacion] = await Database.query(`
+            SELECT 
+                i.*,
+                CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                c.identificacion as cliente_identificacion,
+                c.telefono as cliente_telefono,
+                c.email as cliente_email,
+                CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre_completo,
+                u.telefono as instalador_telefono
+            FROM instalaciones i
+            LEFT JOIN clientes c ON i.cliente_id = c.id
+            LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
+            WHERE i.id = ?
+        `, [id]);
+
+        if (!instalacion) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instalación no encontrada'
+            });
+        }
+
+        // Verificar permisos
+        if (req.user.rol === 'instalador' && instalacion.instalador_id !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: 'No tienes permisos para ver esta instalación'
+            });
+        }
+
+        // Procesar campos JSON
+        if (instalacion.equipos_instalados) {
+            try {
+                instalacion.equipos_instalados = JSON.parse(instalacion.equipos_instalados);
+            } catch (e) {
+                instalacion.equipos_instalados = [];
+            }
+        }
+
+        res.json({
+            success: true,
+            data: instalacion
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo instalación:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error obteniendo instalación'
+        });
+    }
+});
+
+/**
+ * ARREGLADO: Listar instalaciones
  */
 router.get('/', InstalacionesController.listar);
 
 /**
- * @route GET /api/v1/instalaciones/:id
- * @desc Obtener instalación por ID (CORREGIDO)
+ * ARREGLADO: Crear nueva instalación
  */
-router.get('/:id', 
-    validarObtenerPorId,
-    handleValidationErrors,
-    InstalacionesController.obtenerPorId
-);
+router.post('/', InstalacionesController.crear);
 
 /**
- * @route POST /api/v1/instalaciones
- * @desc Crear nueva instalación
+ * ARREGLADO: Actualizar instalación
  */
-router.post('/', 
-    requireRole('administrador', 'supervisor'),
-    validarCrearInstalacion,
-    handleValidationErrors,
-    validarEquiposDisponibles,
-    validarPermisosInstalacion,
-    InstalacionesController.crear
-);
+router.put('/:id', InstalacionesController.actualizar);
 
 /**
- * @route PUT /api/v1/instalaciones/:id
- * @desc Actualizar instalación (CORREGIDO)
+ * ARREGLADO: Eliminar instalación (solo administradores)
  */
-router.put('/:id',
-    requireRole('administrador', 'supervisor', 'instalador'),
-    validarActualizarInstalacion,
-    handleValidationErrors,
-    validarPermisosInstalacion,
-    InstalacionesController.actualizar
-);
-
-/**
- * @route PATCH /api/v1/instalaciones/:id/estado
- * @desc Cambiar estado de instalación
- */
-router.patch('/:id/estado', 
-    validarCambiarEstado,
-    handleValidationErrors,
-    validarPermisosInstalacion,
-    InstalacionesController.cambiarEstado
-);
-
-/**
- * @route PATCH /api/v1/instalaciones/:id/asignar-instalador
- * @desc Asignar instalador a una instalación (NUEVO)
- */
-router.patch('/:id/asignar-instalador',
-    requireRole('administrador', 'supervisor'),
-    validarObtenerPorId,
-    handleValidationErrors,
-    async (req, res) => {
-        try {
-            const { id } = req.params;
-            const { instalador_id } = req.body;
-
-            if (!instalador_id) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El ID del instalador es requerido'
-                });
-            }
-
-            // Llamar al controlador para asignar instalador
-            const resultado = await InstalacionesController.asignarInstalador(id, instalador_id);
-            
-            res.json({
-                success: true,
-                message: 'Instalador asignado exitosamente',
-                data: resultado
-            });
-
-        } catch (error) {
-            console.error('❌ Error asignando instalador:', error);
-            res.status(400).json({
-                success: false,
-                message: error.message || 'Error al asignar instalador'
-            });
-        }
-    }
-);
-
-/**
- * @route PATCH /api/v1/instalaciones/:id/reagendar
- * @desc Reagendar una instalación (NUEVO)
- */
-router.patch('/:id/reagendar',
-    requireRole('administrador', 'supervisor'),
-    validarObtenerPorId,
-    handleValidationErrors,
-    async (req, res) => {
-        try {
-            const { id } = req.params;
-            const { fecha_programada, hora_programada, observaciones } = req.body;
-
-            if (!fecha_programada || !hora_programada) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Fecha y hora programada son requeridas'
-                });
-            }
-
-            // Llamar al controlador para reagendar
-            const resultado = await InstalacionesController.reagendarInstalacion(
-                id, 
-                fecha_programada, 
-                hora_programada, 
-                observaciones
-            );
-            
-            res.json({
-                success: true,
-                message: 'Instalación reagendada exitosamente',
-                data: resultado
-            });
-
-        } catch (error) {
-            console.error('❌ Error reagendando instalación:', error);
-            res.status(400).json({
-                success: false,
-                message: error.message || 'Error al reagendar instalación'
-            });
-        }
-    }
-);
-
-/**
- * @route PATCH /api/v1/instalaciones/:id/cancelar
- * @desc Cancelar una instalación (NUEVO)
- */
-router.patch('/:id/cancelar',
-    requireRole('administrador', 'supervisor'),
-    validarObtenerPorId,
-    handleValidationErrors,
-    async (req, res) => {
-        try {
-            const { id } = req.params;
-            const { motivo_cancelacion } = req.body;
-
-            if (!motivo_cancelacion) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El motivo de cancelación es requerido'
-                });
-            }
-
-            // Llamar al controlador para cancelar
-            const resultado = await InstalacionesController.cancelarInstalacion(id, motivo_cancelacion);
-            
-            res.json({
-                success: true,
-                message: 'Instalación cancelada exitosamente',
-                data: resultado
-            });
-
-        } catch (error) {
-            console.error('❌ Error cancelando instalación:', error);
-            res.status(400).json({
-                success: false,
-                message: error.message || 'Error al cancelar instalación'
-            });
-        }
-    }
-);
-
-/**
- * @route DELETE /api/v1/instalaciones/:id
- * @desc Eliminar instalación (CORREGIDO)
- */
-router.delete('/:id',
+router.delete('/:id', 
     requireRole('administrador'),
-    validarObtenerPorId,
-    handleValidationErrors,
-    InstalacionesController.eliminar
-);
-
-// ==========================================
-// RUTAS ADICIONALES
-// ==========================================
-
-/**
- * @route POST /api/v1/instalaciones/:id/fotos
- * @desc Subir fotos de instalación
- */
-router.post('/:id/fotos',
-    validarObtenerPorId,
-    handleValidationErrors,
-    async (req, res) => {
-        try {
-            // Esta funcionalidad puede implementarse más tarde
-            res.status(501).json({
-                success: false,
-                message: 'Funcionalidad de subida de fotos no implementada aún'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: 'Error interno del servidor'
-            });
-        }
-    }
-);
-
-/**
- * @route GET /api/v1/instalaciones/equipos/disponibles
- * @desc Obtener equipos disponibles para instalación
- */
-router.get('/equipos/disponibles',
-    requireRole('administrador', 'supervisor', 'instalador'),
-    async (req, res) => {
-        try {
-            const equipos = await InstalacionesController.obtenerEquiposDisponibles();
-            res.json({
-                success: true,
-                data: equipos
-            });
-        } catch (error) {
-            console.error('❌ Error obteniendo equipos disponibles:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error obteniendo equipos disponibles'
-            });
-        }
-    }
-);
-
-/**
- * @route GET /api/v1/instalaciones/instaladores/disponibles
- * @desc Obtener lista de instaladores disponibles
- */
-router.get('/instaladores/disponibles',
-    requireRole('administrador', 'supervisor'),
-    async (req, res) => {
-        try {
-            const instaladores = await InstalacionesController.obtenerInstaladores();
-            res.json({
-                success: true,
-                data: instaladores
-            });
-        } catch (error) {
-            console.error('❌ Error obteniendo instaladores:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error obteniendo instaladores disponibles'
-            });
-        }
-    }
-);
-
-// ==========================================
-// FUNCIONES AUXILIARES
-// ==========================================
-
-/**
- * Generar CSV a partir de los datos de instalaciones
- */
-function generarCSV(instalaciones) {
-    const headers = [
-        'ID',
-        'Cliente',
-        'Identificación',
-        'Teléfono',
-        'Dirección',
-        'Instalador',
-        'Fecha Programada',
-        'Hora Programada',
-        'Estado',
-        'Tipo Instalación',
-        'Costo',
-        'Observaciones',
-        'Fecha Creación'
-    ];
-
-    const rows = instalaciones.map(inst => [
-        inst.id,
-        inst.cliente_nombre || '',
-        inst.cliente_identificacion || '',
-        inst.telefono_contacto || '',
-        inst.direccion_instalacion || '',
-        inst.instalador_nombre || 'Sin asignar',
-        inst.fecha_programada || '',
-        inst.hora_programada || '',
-        inst.estado || '',
-        inst.tipo_instalacion || '',
-        inst.costo_instalacion || '0',
-        inst.observaciones || '',
-        inst.created_at || ''
-    ]);
-
-    return [headers.join(','), ...rows.map(row => 
-        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-    )].join('\n');
-}
-
-/**
- * @route GET /api/v1/instalaciones/:id/pdf
- * @desc Generar orden de servicio en PDF
- */
-router.get('/:id/pdf',
-    validarObtenerPorId,
-    handleValidationErrors,
-    InstalacionesController.generarOrdenServicioPDF
-);
-
-/**
- * @route PATCH /api/v1/instalaciones/:id/reagendar
- * @desc Reagendar instalación
- */
-router.patch('/:id/reagendar',
-    requireRole('administrador', 'supervisor'),
-    validarObtenerPorId,
-    handleValidationErrors,
-    InstalacionesController.reagendarInstalacion
-);
-
-/**
- * @route PATCH /api/v1/instalaciones/:id/cancelar
- * @desc Cancelar instalación
- */
-router.patch('/:id/cancelar',
-    requireRole('administrador', 'supervisor'),
-    validarObtenerPorId,
-    handleValidationErrors,
-    InstalacionesController.cancelarInstalacion
-);
-
-/**
- * @route PATCH /api/v1/instalaciones/:id/asignar-instalador
- * @desc Asignar instalador a instalación
- */
-router.patch('/:id/asignar-instalador',
-    requireRole('administrador', 'supervisor'),
-    validarObtenerPorId,
-    handleValidationErrors,
-    InstalacionesController.asignarInstalador
-);
-
-/**
- * @route GET /api/v1/instalaciones/exportar
- * @desc Exportar instalaciones
- */
-router.get('/exportar',
-    requireRole('administrador', 'supervisor'),
-    InstalacionesController.exportar
-);
-
-
-/**
- * @route PATCH /api/v1/instalaciones/:id/iniciar
- * @desc Iniciar instalación (CORREGIR RESTRICCIÓN)
- */
-router.patch('/:id/iniciar',
-    requireRole('instalador'), // SOLO INSTALADORES
-    validarObtenerPorId,
-    handleValidationErrors,
     async (req, res) => {
         try {
             const { id } = req.params;
-            const userId = req.user.id;
+            console.log(`🗑️ Eliminando instalación ID: ${id}`);
 
-            // Verificar que es su instalación asignada
+            // Verificar que la instalación existe
             const [instalacion] = await Database.query(
-                'SELECT instalador_id, estado FROM instalaciones WHERE id = ?',
+                'SELECT * FROM instalaciones WHERE id = ?',
                 [id]
             );
 
@@ -503,106 +529,278 @@ router.patch('/:id/iniciar',
                 });
             }
 
-            if (instalacion.instalador_id !== userId) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Solo puedes iniciar tus instalaciones asignadas'
-                });
-            }
-
-            if (instalacion.estado !== 'programada') {
+            // Solo permitir eliminar si está en estado programada o cancelada
+            if (!['programada', 'cancelada'].includes(instalacion.estado)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Solo se pueden iniciar instalaciones programadas'
+                    message: 'Solo se pueden eliminar instalaciones programadas o canceladas'
                 });
             }
 
-            // Actualizar estado a 'en_proceso'
-            await Database.query(
-                `UPDATE instalaciones 
-                SET estado = 'en_proceso', fecha_inicio = NOW(), updated_at = NOW()
-                WHERE id = ?`,
-                [id]
-            );
-
-            const instalacionActualizada = await InstalacionesController.obtenerInstalacionCompleta(id);
+            // Eliminar instalación
+            await Database.query('DELETE FROM instalaciones WHERE id = ?', [id]);
 
             res.json({
                 success: true,
-                message: 'Instalación iniciada exitosamente',
+                message: 'Instalación eliminada exitosamente'
+            });
+
+        } catch (error) {
+            console.error('❌ Error eliminando instalación:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Error eliminando instalación'
+            });
+        }
+    }
+);
+
+// ==========================================
+// RUTAS DE ACCIONES ESPECÍFICAS (ARREGLADAS)
+// ==========================================
+
+/**
+ * ARREGLADO: Asignar instalador
+ */
+router.patch('/:id/asignar-instalador',
+    requireRole('administrador', 'supervisor'),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { instalador_id } = req.body;
+
+            console.log(`👷‍♂️ Asignando instalador ${instalador_id} a instalación ${id}`);
+
+            if (!instalador_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El ID del instalador es requerido'
+                });
+            }
+
+            // Verificar que la instalación existe
+            const [instalacion] = await Database.query(
+                'SELECT * FROM instalaciones WHERE id = ?',
+                [id]
+            );
+
+            if (!instalacion) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Instalación no encontrada'
+                });
+            }
+
+            // Verificar que el instalador existe
+            const [instalador] = await Database.query(
+                'SELECT * FROM sistema_usuarios WHERE id = ? AND rol IN ("instalador", "supervisor")',
+                [instalador_id]
+            );
+
+            if (!instalador) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Instalador no encontrado o no tiene permisos'
+                });
+            }
+
+            // Actualizar instalador
+            await Database.query(
+                'UPDATE instalaciones SET instalador_id = ?, updated_at = NOW() WHERE id = ?',
+                [instalador_id, id]
+            );
+
+            // Obtener instalación actualizada
+            const [instalacionActualizada] = await Database.query(`
+                SELECT 
+                    i.*,
+                    CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                    CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre_completo
+                FROM instalaciones i
+                LEFT JOIN clientes c ON i.cliente_id = c.id
+                LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
+                WHERE i.id = ?
+            `, [id]);
+
+            res.json({
+                success: true,
+                message: 'Instalador asignado exitosamente',
                 data: instalacionActualizada
             });
 
         } catch (error) {
-            console.error('❌ Error iniciando instalación:', error);
+            console.error('❌ Error asignando instalador:', error);
             res.status(500).json({
                 success: false,
-                message: 'Error iniciando instalación'
+                message: error.message || 'Error asignando instalador'
             });
         }
     }
 );
 
 /**
- * @route PATCH /api/v1/instalaciones/:id/iniciar
- * @desc Iniciar instalación (solo para instaladores)
+ * ARREGLADO: Cambiar estado de instalación
  */
-router.patch('/:id/iniciar',
-    requireRole('instalador', 'supervisor'),
-    validarObtenerPorId,
-    handleValidationErrors,
-    async (req, res) => {
-        try {
-            const { id } = req.params;
+router.patch('/:id/cambiar-estado', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { estado, observaciones, motivo_cancelacion } = req.body;
 
-            // Verificar que es su instalación asignada (si es instalador)
-            if (req.user.rol === 'instalador') {
-                const [instalacion] = await Database.query(
-                    'SELECT instalador_id FROM instalaciones WHERE id = ?',
-                    [id]
-                );
+        console.log(`🔄 Cambiando estado de instalación ${id} a: ${estado}`);
 
-                if (!instalacion || instalacion.instalador_id !== req.user.id) {
-                    return res.status(403).json({
-                        success: false,
-                        message: 'No tienes permisos para iniciar esta instalación'
-                    });
-                }
-            }
-
-            // Cambiar estado a 'en_proceso'
-            req.body = {
-                estado: 'en_proceso',
-                hora_inicio: new Date().toTimeString().split(' ')[0],
-                observaciones: 'Instalación iniciada'
-            };
-
-            await InstalacionesController.cambiarEstado(req, res);
-
-        } catch (error) {
-            console.error('❌ Error iniciando instalación:', error);
-            res.status(500).json({
+        if (!estado) {
+            return res.status(400).json({
                 success: false,
-                message: error.message || 'Error al iniciar instalación'
+                message: 'El estado es requerido'
             });
         }
+
+        // Verificar que la instalación existe
+        const [instalacion] = await Database.query(
+            'SELECT * FROM instalaciones WHERE id = ?',
+            [id]
+        );
+
+        if (!instalacion) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instalación no encontrada'
+            });
+        }
+
+        // Verificar permisos según el estado
+        const permisosEstado = {
+            'en_proceso': ['instalador'], // Solo el instalador asignado
+            'completada': ['instalador'], // Solo el instalador asignado
+            'cancelada': ['administrador', 'supervisor'],
+            'reagendada': ['administrador', 'supervisor'],
+            'programada': ['administrador', 'supervisor']
+        };
+
+        if (!permisosEstado[estado]?.includes(req.user.rol)) {
+            return res.status(403).json({
+                success: false,
+                message: 'No tienes permisos para cambiar a este estado'
+            });
+        }
+
+        // Para instaladores, verificar que sea su instalación
+        if (req.user.rol === 'instalador' && instalacion.instalador_id !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: 'Solo puedes cambiar el estado de tus propias instalaciones'
+            });
+        }
+
+        // Construir query de actualización
+        const updates = ['estado = ?', 'updated_at = NOW()'];
+        const params = [estado];
+
+        if (estado === 'cancelada' && motivo_cancelacion) {
+            updates.push('motivo_cancelacion = ?');
+            params.push(motivo_cancelacion);
+        }
+
+        if (estado === 'completada') {
+            updates.push('fecha_completada = ?');
+            params.push(new Date().toISOString().split('T')[0]);
+        }
+
+        if (observaciones) {
+            updates.push('observaciones = ?');
+            params.push(observaciones);
+        }
+
+        // Ejecutar actualización
+        const query = `UPDATE instalaciones SET ${updates.join(', ')} WHERE id = ?`;
+        params.push(id);
+
+        await Database.query(query, params);
+
+        // Obtener instalación actualizada
+        const [instalacionActualizada] = await Database.query(`
+            SELECT 
+                i.*,
+                CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre
+            FROM instalaciones i
+            LEFT JOIN clientes c ON i.cliente_id = c.id
+            WHERE i.id = ?
+        `, [id]);
+
+        res.json({
+            success: true,
+            message: `Estado cambiado a: ${estado}`,
+            data: instalacionActualizada
+        });
+
+    } catch (error) {
+        console.error('❌ Error cambiando estado:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error cambiando estado'
+        });
     }
-    
-);
-
-// ==========================================
-// MANEJO DE ERRORES
-// ==========================================
-
-router.use((error, req, res, next) => {
-    console.error('❌ Error en rutas de instalaciones:', error);
-    res.status(500).json({
-        success: false,
-        message: 'Error en el módulo de instalaciones',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
-    });
 });
 
-console.log('✅ Rutas de instalaciones configuradas');
+/**
+ * ARREGLADO: Iniciar instalación (solo instaladores)
+ */
+router.patch('/:id/iniciar', async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`▶️ Iniciando instalación ${id}`);
+
+        // Solo instaladores pueden iniciar instalaciones
+        if (req.user.rol !== 'instalador') {
+            return res.status(403).json({
+                success: false,
+                message: 'Solo los instaladores pueden iniciar instalaciones'
+            });
+        }
+
+        // Verificar que es su instalación asignada
+        const [instalacion] = await Database.query(
+            'SELECT * FROM instalaciones WHERE id = ? AND instalador_id = ?',
+            [id, req.user.id]
+        );
+
+        if (!instalacion) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instalación no encontrada o no asignada a ti'
+            });
+        }
+
+        if (instalacion.estado !== 'programada') {
+            return res.status(400).json({
+                success: false,
+                message: 'Solo se pueden iniciar instalaciones programadas'
+            });
+        }
+
+        // Cambiar estado a en_proceso
+        req.body = {
+            estado: 'en_proceso',
+            observaciones: 'Instalación iniciada por el técnico'
+        };
+
+        // Reutilizar la ruta de cambiar estado
+        return router.handle({
+            ...req,
+            method: 'PATCH',
+            originalUrl: `/api/v1/instalaciones/${id}/cambiar-estado`,
+            params: { id }
+        }, res);
+
+    } catch (error) {
+        console.error('❌ Error iniciando instalación:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error al iniciar instalación'
+        });
+    }
+});
+
+console.log('✅ Rutas de instalaciones ARREGLADAS configuradas');
 
 module.exports = router;

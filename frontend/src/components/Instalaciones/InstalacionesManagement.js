@@ -1,4 +1,4 @@
-// frontend/src/components/Instalaciones/InstalacionesManagement.js - VERSIÓN CORREGIDA COMPLETA
+// frontend/src/components/Instalaciones/InstalacionesManagement.js - ARREGLADO BASADO EN CÓDIGO ACTUAL
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -21,12 +21,14 @@ import {
   CheckCircle,
   Play,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from 'lucide-react';
 
 import { instalacionesService } from '../../services/instalacionesService';
 import { useAuth } from '../../contexts/AuthContext';
 import InstalacionModal from './InstalacionModal';
+import AsignarInstaladorModal from './AsignarInstaladorModal';
 
 // Constantes
 const ESTADOS_INSTALACION = {
@@ -53,6 +55,9 @@ const InstalacionesManagement = () => {
   const [mostrarModal, setMostrarModal] = useState(false);
   const [modalModo, setModalModo] = useState('crear');
   const [instalacionSeleccionada, setInstalacionSeleccionada] = useState(null);
+
+  // ARREGLADO: Estado para modal de asignar instalador
+  const [mostrarAsignarModal, setMostrarAsignarModal] = useState(false);
 
   // Estados para filtros
   const [filtros, setFiltros] = useState({
@@ -94,131 +99,94 @@ const InstalacionesManagement = () => {
 
   useEffect(() => {
     cargarDatos();
-    cargarDatosAuxiliares();
+    cargarInstaladores();
   }, []);
 
   useEffect(() => {
     cargarDatos();
-  }, [filtros, paginacion.pagina_actual, paginacion.registros_por_pagina]);
-
-  // Auto-refresh cada 30 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      cargarDatos(false); // Sin loading para refresh automático
-    }, 30000);
-
-    return () => clearInterval(interval);
   }, [filtros, paginacion.pagina_actual]);
+
+  // Auto-limpiar mensajes después de 5 segundos
+  useEffect(() => {
+    if (error || success) {
+      const timer = setTimeout(() => {
+        setError(null);
+        setSuccess(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, success]);
 
   // ==========================================
   // FUNCIONES DE CARGA DE DATOS
   // ==========================================
 
- const cargarDatos = async (mostrarCargando = true) => {
-  try {
-    if (mostrarCargando) setCargando(true);
-    setError(null);
-
-    const params = {
-      page: paginacion.pagina_actual,
-      limit: paginacion.registros_por_pagina,
-      ...filtros
-    };
-
-    console.log('📡 Cargando datos con parámetros:', params);
-
-    const response = await instalacionesService.getInstalaciones(params);
-    
-    console.log('📥 Respuesta del servicio:', response);
-    console.log('📋 response.instalaciones:', response.instalaciones);
-    console.log('📋 Tipo de instalaciones:', typeof response.instalaciones);
-    console.log('📋 Es array?', Array.isArray(response.instalaciones));
-
-    if (response.success) {
-      // Asegurar que instalaciones sea siempre un array
-      const instalacionesData = Array.isArray(response.instalaciones) 
-        ? response.instalaciones 
-        : [];
+  const cargarDatos = useCallback(async () => {
+    try {
+      setCargando(true);
+      setError(null);
       
-      console.log('📋 Instalaciones procesadas:', instalacionesData);
-      console.log('📋 Cantidad de instalaciones:', instalacionesData.length);
+      const parametros = {
+        page: paginacion.pagina_actual,
+        limit: paginacion.registros_por_pagina,
+        ...filtros
+      };
+
+      console.log('🔄 Cargando datos con parámetros:', parametros);
       
-      setInstalaciones(instalacionesData);
+      const response = await instalacionesService.getInstalaciones(parametros);
       
-      if (response.pagination) {
+      if (response.success) {
+        setInstalaciones(response.instalaciones || []);
         setPaginacion(prev => ({
           ...prev,
-          total_registros: response.pagination.total || 0,
-          total_paginas: response.pagination.totalPages || 0
+          total_registros: response.pagination?.total || 0,
+          total_paginas: response.pagination?.totalPages || 0
         }));
+        setEstadisticas(response.estadisticas || {});
+        console.log('✅ Datos cargados correctamente:', response.instalaciones?.length, 'instalaciones');
+      } else {
+        throw new Error(response.message || 'Error cargando instalaciones');
       }
-
-      if (response.estadisticas) {
-        setEstadisticas(response.estadisticas);
-      }
-    } else {
-      console.error('❌ Error en respuesta del servicio:', response);
-      setError(response.message || 'Error cargando instalaciones');
+    } catch (error) {
+      console.error('❌ Error cargando instalaciones:', error);
+      setError(`Error cargando datos: ${error.message}`);
       setInstalaciones([]);
+    } finally {
+      setCargando(false);
     }
-  } catch (error) {
-    console.error('❌ Error cargando instalaciones:', error);
-    setError('Error cargando instalaciones: ' + error.message);
-    setInstalaciones([]);
-  } finally {
-    if (mostrarCargando) setCargando(false);
-  }
-};
+  }, [filtros, paginacion.pagina_actual, paginacion.registros_por_pagina]);
 
-  const cargarDatosAuxiliares = async () => {
+  const cargarInstaladores = useCallback(async () => {
     try {
-      // Cargar instaladores
-      const responseInstaladores = await instalacionesService.getInstaladores();
-      if (responseInstaladores.success) {
-        setInstaladores(responseInstaladores.instaladores);
-      }
-    } catch (error) {
-      console.error('Error cargando datos auxiliares:', error);
-    }
-  };
-
-  const cargarEstadisticas = async () => {
-    try {
-      const response = await instalacionesService.getEstadisticas(filtros);
+      const response = await instalacionesService.getInstaladores();
       if (response.success) {
-        setEstadisticas(response.estadisticas);
+        setInstaladores(response.instaladores || []);
       }
     } catch (error) {
-      console.error('Error cargando estadísticas:', error);
+      console.error('❌ Error cargando instaladores:', error);
     }
-  };
+  }, []);
+
+  // ARREGLADO: Función para cargar estadísticas
+  const cargarEstadisticas = useCallback(async () => {
+    try {
+      const response = await instalacionesService.getEstadisticas();
+      if (response.success) {
+        setEstadisticas(response.estadisticas || {});
+      }
+    } catch (error) {
+      console.error('❌ Error cargando estadísticas:', error);
+    }
+  }, []);
 
   // ==========================================
-  // MANEJO DE FILTROS
-  // ==========================================
-
-  const aplicarFiltros = (nuevosFiltros) => {
-    setFiltros(prev => ({ ...prev, ...nuevosFiltros }));
-    setPaginacion(prev => ({ ...prev, pagina_actual: 1 }));
-  };
-
-  const limpiarFiltros = () => {
-    setFiltros({
-      busqueda: '',
-      estado: '',
-      instalador_id: '',
-      fecha_desde: '',
-      fecha_hasta: '',
-      vencidas: false
-    });
-    setPaginacion(prev => ({ ...prev, pagina_actual: 1 }));
-  };
-
-  // ==========================================
-  // MANEJO DE MODAL
+  // FUNCIONES DE ACCIONES ARREGLADAS
   // ==========================================
 
   const abrirModal = (modo, instalacion = null) => {
+    console.log(`📝 Abriendo modal en modo: ${modo}`, instalacion);
+    
     setModalModo(modo);
     setInstalacionSeleccionada(instalacion);
     setMostrarModal(true);
@@ -230,558 +198,516 @@ const InstalacionesManagement = () => {
     setInstalacionSeleccionada(null);
   };
 
-  const handleGuardarInstalacion = (instalacionActualizada) => {
-    if (modalModo === 'crear') {
-      setInstalaciones(prev => [instalacionActualizada, ...prev]);
-      setSuccess('Instalación creada exitosamente');
-    } else {
-      setInstalaciones(prev => 
-        prev.map(inst => 
-          inst.id === instalacionActualizada.id ? instalacionActualizada : inst
-        )
-      );
-      setSuccess('Instalación actualizada exitosamente');
-    }
-    
-    cargarEstadisticas();
-    cerrarModal();
-  };
-
-  // ==========================================
-  // ACCIONES DE INSTALACIONES
-  // ==========================================
-
-  const asignarInstalador = async (instalacionId, instaladorId) => {
-    try {
-        setProcesando(true);
-        
-        await instalacionesService.asignarInstalador(instalacionId, instaladorId);
-        
-        setSuccess('Instalador asignado exitosamente');
-        setInstaladores({ visible: false, instalacion: null });
-        
-        // Recargar instalaciones
-        cargarDatos();
-        
-    } catch (error) {
-        console.error('Error asignando instalador:', error);
-        setError(error.message || 'Error asignando instalador');
-    } finally {
-        setProcesando(false);
-    }
-};
-  
-
-  const cambiarEstadoInstalacion = async (instalacionId, nuevoEstado, datosAdicionales = {}) => {
+  const handleGuardarInstalacion = async (datosInstalacion) => {
     try {
       setProcesando(true);
-      
-      const response = await instalacionesService.cambiarEstado(instalacionId, nuevoEstado, datosAdicionales);
-      
-      if (response.success) {
-        setInstalaciones(prev => 
-          prev.map(inst => 
-            inst.id === instalacionId ? { ...inst, ...response.instalacion } : inst
-          )
+      let response;
+
+      if (modalModo === 'crear') {
+        response = await instalacionesService.createInstalacion(datosInstalacion);
+        setSuccess('Instalación creada exitosamente');
+      } else if (modalModo === 'editar') {
+        response = await instalacionesService.updateInstalacion(
+          instalacionSeleccionada.id, 
+          datosInstalacion
         );
-        setSuccess(`Estado cambiado a: ${nuevoEstado}`);
+        setSuccess('Instalación actualizada exitosamente');
+      }
+
+      if (response.success) {
+        cargarDatos();
         cargarEstadisticas();
+        cerrarModal();
       }
     } catch (error) {
-      setError('Error cambiando estado: ' + error.message);
+      console.error('❌ Error guardando instalación:', error);
+      setError(`Error guardando instalación: ${error.message}`);
     } finally {
       setProcesando(false);
     }
   };
 
+  // ARREGLADO: Función de ver detalles
+  const verDetalles = (instalacion) => {
+    console.log('👁️ Viendo detalles de instalación:', instalacion.id);
+    abrirModal('ver', instalacion);
+  };
 
- const eliminarInstalacion = async (instalacion) => {
-    try {
-        // Verificar que se puede eliminar
-        if (!['programada', 'cancelada'].includes(instalacion.estado)) {
-            setError('Solo se pueden eliminar instalaciones programadas o canceladas');
-            return;
-        }
-
-        const confirmacion = window.confirm(
-            `¿Estás seguro de eliminar permanentemente la instalación para ${instalacion.cliente_nombre}?\n\nEsta acción no se puede deshacer.`
-        );
-        
-        if (!confirmacion) return;
-
-        setProcesando(true);
-        
-        await instalacionesService.eliminar(instalacion.id);
-        
-        setSuccess('Instalación eliminada exitosamente');
-        
-        // Recargar instalaciones
-        cargarDatos();
-        
-    } catch (error) {
-        console.error('Error eliminando instalación:', error);
-        setError(error.message || 'Error eliminando instalación');
-    } finally {
-        setProcesando(false);
+  // ARREGLADO: Función de iniciar instalación solo para instaladores
+  const iniciarInstalacion = async (instalacion) => {
+    // Verificar que es instalador
+    if (user.rol !== 'instalador') {
+      setError('Solo los instaladores pueden iniciar instalaciones');
+      return;
     }
-};
 
-  // ==========================================
-  // ACCIONES RÁPIDAS
-  // ==========================================
+    // Verificar que es su instalación
+    if (instalacion.instalador_id !== user.id) {
+      setError('Solo puedes iniciar instalaciones asignadas a ti');
+      return;
+    }
 
- const iniciarInstalacion = async (instalacion) => {
+    if (!window.confirm('¿Confirmas que deseas iniciar esta instalación?')) {
+      return;
+    }
+
     try {
-        // Verificar permisos (solo instaladores)
-        if (!hasPermission(['instalador'])) {
-            setError('No tienes permisos para iniciar instalaciones');
-            return;
-        }
-
-        // Confirmar acción
-        const confirmacion = window.confirm(
-            `¿Confirmas que deseas iniciar la instalación para ${instalacion.cliente_nombre}?`
-        );
-        
-        if (!confirmacion) return;
-
-        setProcesando(true);
-        
-        await instalacionesService.iniciarInstalacion(instalacion.id);
-        
+      setProcesando(true);
+      
+      const response = await instalacionesService.cambiarEstado(
+        instalacion.id, 
+        'en_proceso',
+        { observaciones: 'Instalación iniciada por el técnico' }
+      );
+      
+      if (response.success) {
         setSuccess('Instalación iniciada exitosamente');
-        
-        // Recargar instalaciones
         cargarDatos();
-
+        cargarEstadisticas();
+      }
     } catch (error) {
-        console.error('Error iniciando instalación:', error);
-        setError(error.message || 'Error iniciando instalación');
+      console.error('❌ Error iniciando instalación:', error);
+      setError(`Error iniciando instalación: ${error.message}`);
     } finally {
-        setProcesando(false);
+      setProcesando(false);
     }
-};
-
-  const completarInstalacion = (instalacion) => {
-    abrirModal('completar', instalacion);
   };
 
- const cancelarInstalacion = async (instalacion) => {
+  // ARREGLADO: Función de asignar instalador
+  const abrirAsignarInstalador = (instalacion) => {
+    console.log('👷‍♂️ Abriendo modal para asignar instalador a:', instalacion.id);
+    setInstalacionSeleccionada(instalacion);
+    setMostrarAsignarModal(true);
+  };
+
+  const handleAsignarInstalador = async (instalacionId, instaladorId) => {
     try {
-        const motivo = prompt('Motivo de cancelación:');
-        if (!motivo || motivo.trim() === '') {
-            setError('El motivo de cancelación es requerido');
-            return;
-        }
-
-        const confirmacion = window.confirm(
-            `¿Estás seguro de cancelar la instalación para ${instalacion.cliente_nombre}?`
-        );
-        
-        if (!confirmacion) return;
-
-        setProcesando(true);
-        
-        await instalacionesService.cancelarInstalacion(instalacion.id, motivo);
-        
-        setSuccess('Instalación cancelada exitosamente');
-        
-        // Recargar instalaciones
+      setProcesando(true);
+      
+      const response = await instalacionesService.asignarInstalador(instalacionId, instaladorId);
+      
+      if (response.success) {
+        setSuccess('Instalador asignado exitosamente');
+        setMostrarAsignarModal(false);
         cargarDatos();
-
+        cargarEstadisticas();
+      }
     } catch (error) {
-        console.error('Error cancelando instalación:', error);
-        setError(error.message || 'Error cancelando instalación');
+      console.error('❌ Error asignando instalador:', error);
+      setError(`Error asignando instalador: ${error.message}`);
     } finally {
-        setProcesando(false);
+      setProcesando(false);
     }
-};
+  };
 
-const reagendarInstalacion = async (instalacion) => {
+  // ARREGLADO: Función de reagendar
+  const reagendarInstalacion = async (instalacion) => {
+    const nuevaFecha = prompt('Ingresa la nueva fecha (YYYY-MM-DD):');
+    if (!nuevaFecha) return;
+
+    const nuevaHora = prompt('Ingresa la nueva hora (HH:MM):');
+    const motivo = prompt('Motivo del reagendamiento:');
+
     try {
-        const fechaNueva = prompt('Nueva fecha (YYYY-MM-DD):', instalacion.fecha_programada);
-        if (!fechaNueva) return;
-
-        const horaNueva = prompt('Nueva hora (HH:MM):', instalacion.hora_programada || '09:00');
-        if (!horaNueva) return;
-
-        const observaciones = prompt('Observaciones (opcional):');
-
-        setProcesando(true);
-        
-        await instalacionesService.reagendarInstalacion(
-            instalacion.id, 
-            fechaNueva, 
-            horaNueva, 
-            observaciones || ''
-        );
-        
+      setProcesando(true);
+      
+      const response = await instalacionesService.updateInstalacion(instalacion.id, {
+        fecha_programada: nuevaFecha,
+        hora_programada: nuevaHora,
+        estado: 'reagendada',
+        observaciones: motivo || 'Instalación reagendada'
+      });
+      
+      if (response.success) {
         setSuccess('Instalación reagendada exitosamente');
-        
-        // Recargar instalaciones
         cargarDatos();
-
+        cargarEstadisticas();
+      }
     } catch (error) {
-        console.error('Error reagendando instalación:', error);
-        setError(error.message || 'Error reagendando instalación');
+      console.error('❌ Error reagendando instalación:', error);
+      setError(`Error reagendando instalación: ${error.message}`);
     } finally {
-        setProcesando(false);
+      setProcesando(false);
     }
-};
-
-const mostrarAsignarInstalador = (instalacion) => {
-    setInstaladores({
-        visible: true,
-        instalacion
-    });
-};
-
-  // ==========================================
-  // MANEJO DE PAGINACIÓN
-  // ==========================================
-
-  const cambiarPagina = (nuevaPagina) => {
-    setPaginacion(prev => ({ ...prev, pagina_actual: nuevaPagina }));
   };
 
-  const cambiarLimite = (nuevoLimite) => {
-    setPaginacion(prev => ({ 
-      ...prev, 
-      registros_por_pagina: nuevoLimite,
-      pagina_actual: 1 
+  // ARREGLADO: Función de cancelar
+  const cancelarInstalacion = async (instalacion) => {
+    const motivo = prompt('Ingresa el motivo de la cancelación:');
+    if (!motivo) return;
+
+    if (!window.confirm('¿Estás seguro de que deseas cancelar esta instalación?')) {
+      return;
+    }
+
+    try {
+      setProcesando(true);
+      
+      const response = await instalacionesService.cambiarEstado(
+        instalacion.id, 
+        'cancelada',
+        { 
+          motivo_cancelacion: motivo,
+          observaciones: `Cancelada: ${motivo}`
+        }
+      );
+      
+      if (response.success) {
+        setSuccess('Instalación cancelada exitosamente');
+        cargarDatos();
+        cargarEstadisticas();
+      }
+    } catch (error) {
+      console.error('❌ Error cancelando instalación:', error);
+      setError(`Error cancelando instalación: ${error.message}`);
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  // ARREGLADO: Función de eliminar
+  const eliminarInstalacion = async (instalacion) => {
+    // Solo administradores pueden eliminar
+    if (user.rol !== 'administrador') {
+      setError('Solo los administradores pueden eliminar instalaciones');
+      return;
+    }
+
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente la instalación para ${instalacion.cliente_nombre}?\n\nEsta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      setProcesando(true);
+      
+      const response = await instalacionesService.deleteInstalacion(instalacion.id);
+      
+      if (response.success) {
+        setSuccess('Instalación eliminada exitosamente');
+        cargarDatos();
+        cargarEstadisticas();
+      }
+    } catch (error) {
+      console.error('❌ Error eliminando instalación:', error);
+      setError(`Error eliminando instalación: ${error.message}`);
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  // ARREGLADO: Función de exportar
+  const exportarDatos = async () => {
+    try {
+      setProcesando(true);
+      
+      console.log('📊 Iniciando exportación...');
+      
+      // Crear URL con parámetros
+      const params = new URLSearchParams({
+        ...filtros,
+        formato: 'excel'
+      });
+
+      // Hacer petición al endpoint de exportar
+      const response = await fetch(`/api/v1/instalaciones/exportar?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error en la exportación');
+      }
+
+      // Descargar archivo
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `instalaciones_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      setSuccess('Reporte exportado exitosamente');
+      
+    } catch (error) {
+      console.error('❌ Error exportando:', error);
+      setError(`Error exportando reporte: ${error.message}`);
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  // NUEVO: Función para generar orden de servicio PDF
+  const generarOrdenServicioPDF = async (instalacion) => {
+    try {
+      setProcesando(true);
+      
+      console.log('📄 Generando orden de servicio PDF...');
+      
+      // Hacer petición al endpoint de PDF
+      const response = await fetch(`/api/v1/instalaciones/${instalacion.id}/pdf`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error generando el PDF');
+      }
+
+      // Descargar PDF
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `orden_servicio_${instalacion.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      setSuccess('Orden de servicio generada exitosamente');
+      
+    } catch (error) {
+      console.error('❌ Error generando PDF:', error);
+      setError(`Error generando orden de servicio: ${error.message}`);
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  // ==========================================
+  // FUNCIONES DE FILTROS
+  // ==========================================
+
+  const aplicarFiltro = (campo, valor) => {
+    setFiltros(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+    setPaginacion(prev => ({
+      ...prev,
+      pagina_actual: 1
+    }));
+  };
+
+  const limpiarFiltros = () => {
+    setFiltros({
+      busqueda: '',
+      estado: '',
+      instalador_id: '',
+      fecha_desde: '',
+      fecha_hasta: '',
+      vencidas: false
+    });
+    setPaginacion(prev => ({
+      ...prev,
+      pagina_actual: 1
     }));
   };
 
   // ==========================================
-  // UTILIDADES
+  // FUNCIONES DE UTILIDAD
   // ==========================================
 
-  const exportarReporte = async () => {
-    try {
-        setProcesando(true);
-        
-        // Construir parámetros de filtros
-        const params = new URLSearchParams();
-        Object.entries(filtros).forEach(([key, value]) => {
-            if (value && value !== '') {
-                params.append(key, value);
-            }
-        });
-
-        await instalacionesService.exportarReporte(params.toString(), 'excel');
-        setSuccess('Reporte descargado exitosamente');
-    } catch (error) {
-        console.error('Error exportando reporte:', error);
-        setError(error.message || 'Error exportando reporte');
-    } finally {
-        setProcesando(false);
-    }
-};
-
-const descargarOrdenPDF = async (instalacion) => {
-    try {
-        setProcesando(true);
-        
-        await instalacionesService.descargarOrdenPDF(instalacion.id);
-        setSuccess('Orden de servicio descargada exitosamente');
-    } catch (error) {
-        console.error('Error descargando orden PDF:', error);
-        setError(error.message || 'Error descargando orden de servicio');
-    } finally {
-        setProcesando(false);
-    }
-};
-
-  const obtenerIconoEstado = (estado) => {
-    switch (estado) {
-      case ESTADOS_INSTALACION.PROGRAMADA:
-        return <Calendar className="w-4 h-4" />;
-      case ESTADOS_INSTALACION.EN_PROCESO:
-        return <Play className="w-4 h-4" />;
-      case ESTADOS_INSTALACION.COMPLETADA:
-        return <CheckCircle className="w-4 h-4" />;
-      case ESTADOS_INSTALACION.CANCELADA:
-        return <XCircle className="w-4 h-4" />;
-      case ESTADOS_INSTALACION.REAGENDADA:
-        return <RotateCcw className="w-4 h-4" />;
-      default:
-        return <AlertCircle className="w-4 h-4" />;
-    }
+  const obtenerNombreEstado = (estado) => {
+    const nombres = {
+      'programada': 'Programada',
+      'en_proceso': 'En Proceso',
+      'completada': 'Completada',
+      'cancelada': 'Cancelada',
+      'reagendada': 'Reagendada'
+    };
+    return nombres[estado] || estado;
   };
 
-  const obtenerClasesEstado = (estado) => {
-    switch (estado) {
-      case ESTADOS_INSTALACION.PROGRAMADA:
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case ESTADOS_INSTALACION.EN_PROCESO:
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case ESTADOS_INSTALACION.COMPLETADA:
-        return 'bg-green-100 text-green-800 border-green-200';
-      case ESTADOS_INSTALACION.CANCELADA:
-        return 'bg-red-100 text-red-800 border-red-200';
-      case ESTADOS_INSTALACION.REAGENDADA:
-        return 'bg-purple-100 text-purple-800 border-purple-200';
+  const formatearFecha = (fecha) => {
+    if (!fecha) return '-';
+    return new Date(fecha).toLocaleDateString('es-CO', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const formatearHora = (hora) => {
+    if (!hora) return '-';
+    return hora.substring(0, 5);
+  };
+
+  // Verificar si una instalación está vencida
+  const estaVencida = (instalacion) => {
+    if (instalacion.estado !== 'programada') return false;
+    const fechaProgramada = new Date(instalacion.fecha_programada);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return fechaProgramada < hoy;
+  };
+
+  // ARREGLADO: Verificar permisos para acciones
+  const puedeEjecutarAccion = (accion, instalacion) => {
+    switch (accion) {
+      case 'iniciar':
+        return user.rol === 'instalador' && 
+               instalacion.instalador_id === user.id &&
+               instalacion.estado === 'programada';
+      case 'asignar':
+        return (user.rol === 'administrador' || user.rol === 'supervisor');
+      case 'editar':
+        return (user.rol === 'administrador' || user.rol === 'supervisor');
+      case 'eliminar':
+        return user.rol === 'administrador';
+      case 'reagendar':
+        return (user.rol === 'administrador' || user.rol === 'supervisor');
+      case 'cancelar':
+        return (user.rol === 'administrador' || user.rol === 'supervisor');
+      case 'ver':
+        return true; // Todos pueden ver
+      case 'generar_pdf':
+        return true; // Todos pueden generar PDF
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return false;
     }
   };
 
   // ==========================================
-  // RENDERIZADO PRINCIPAL
+  // RENDER
   // ==========================================
-
-  // Limpiar mensajes después de 5 segundos
-  useEffect(() => {
-    if (error || success) {
-      const timer = setTimeout(() => {
-        setError(null);
-        setSuccess(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [error, success]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Gestión de Instalaciones
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Administra las instalaciones de servicios
+              </p>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              {/* ARREGLADO: Botón exportar - Solo admin y supervisor */}
+              {(user.rol === 'administrador' || user.rol === 'supervisor') && (
+                <button
+                  onClick={exportarDatos}
+                  disabled={procesando}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  {procesando ? 'Exportando...' : 'Exportar'}
+                </button>
+              )}
+              
+              {/* Botón crear - Todos los roles pueden crear */}
+              <button
+                onClick={() => abrirModal('crear')}
+                disabled={procesando}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nueva Instalación
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Mensajes de estado */}
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center">
-          <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
-          <span className="text-red-800">{error}</span>
-          <button 
-            onClick={() => setError(null)}
-            className="ml-auto text-red-600 hover:text-red-800"
-          >
-            <XCircle className="w-4 h-4" />
-          </button>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 text-red-400 mr-2" />
+                <p className="text-red-800">{error}</p>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-400 hover:text-red-600"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center">
-          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-          <span className="text-green-800">{success}</span>
-          <button 
-            onClick={() => setSuccess(null)}
-            className="ml-auto text-green-600 hover:text-green-800"
-          >
-            <XCircle className="w-4 h-4" />
-          </button>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <CheckCircle className="w-5 h-5 text-green-400 mr-2" />
+                <p className="text-green-800">{success}</p>
+              </div>
+              <button
+                onClick={() => setSuccess(null)}
+                className="text-green-400 hover:text-green-600"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Instalaciones</h1>
-          <p className="text-gray-600 mt-1">
-            Administra y da seguimiento a las instalaciones de servicios
-          </p>
-        </div>
-
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => cargarDatos()}
-            disabled={cargando}
-            className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors border border-gray-300"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${cargando ? 'animate-spin' : ''}`} />
-            Actualizar
-          </button>
-
-          <button
-            onClick={exportarReporte}
-            className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Exportar
-          </button>
-
-          {hasPermission(['administrador', 'supervisor']) && (
-            <button
-              onClick={() => abrirModal('crear')}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nueva Instalación
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* Estadísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <Wrench className="w-8 h-8 text-gray-500" />
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Total</p>
-              <p className="text-2xl font-bold text-gray-900">{estadisticas.total || 0}</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="bg-white rounded-lg border p-4">
+            <div className="text-2xl font-bold text-gray-900">
+              {estadisticas.total || 0}
             </div>
+            <div className="text-sm text-gray-600">Total</div>
           </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <Calendar className="w-8 h-8 text-blue-500" />
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Programadas</p>
-              <p className="text-2xl font-bold text-blue-900">{estadisticas.programadas || 0}</p>
+          <div className="bg-white rounded-lg border p-4">
+            <div className="text-2xl font-bold text-blue-600">
+              {estadisticas.programadas || 0}
             </div>
+            <div className="text-sm text-gray-600">Programadas</div>
           </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <Play className="w-8 h-8 text-yellow-500" />
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">En Proceso</p>
-              <p className="text-2xl font-bold text-yellow-900">{estadisticas.en_proceso || 0}</p>
+          <div className="bg-white rounded-lg border p-4">
+            <div className="text-2xl font-bold text-yellow-600">
+              {estadisticas.en_proceso || 0}
             </div>
+            <div className="text-sm text-gray-600">En Proceso</div>
           </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <CheckCircle className="w-8 h-8 text-green-500" />
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Completadas</p>
-              <p className="text-2xl font-bold text-green-900">{estadisticas.completadas || 0}</p>
+          <div className="bg-white rounded-lg border p-4">
+            <div className="text-2xl font-bold text-green-600">
+              {estadisticas.completadas || 0}
             </div>
+            <div className="text-sm text-gray-600">Completadas</div>
           </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <XCircle className="w-8 h-8 text-red-500" />
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Canceladas</p>
-              <p className="text-2xl font-bold text-red-900">{estadisticas.canceladas || 0}</p>
+          <div className="bg-white rounded-lg border p-4">
+            <div className="text-2xl font-bold text-red-600">
+              {estadisticas.canceladas || 0}
             </div>
+            <div className="text-sm text-gray-600">Canceladas</div>
           </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <AlertCircle className="w-8 h-8 text-orange-500" />
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Vencidas</p>
-              <p className="text-2xl font-bold text-orange-900">{estadisticas.vencidas || 0}</p>
+          <div className="bg-white rounded-lg border p-4">
+            <div className="text-2xl font-bold text-orange-600">
+              {estadisticas.vencidas || 0}
             </div>
+            <div className="text-sm text-gray-600">Vencidas</div>
           </div>
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Búsqueda */}
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Buscar por cliente, dirección, teléfono..."
-                  value={filtros.busqueda}
-                  onChange={(e) => aplicarFiltros({ busqueda: e.target.value })}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Filtro por estado */}
-            <select
-              value={filtros.estado}
-              onChange={(e) => aplicarFiltros({ estado: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos los estados</option>
-              <option value="programada">Programadas</option>
-              <option value="en_proceso">En Proceso</option>
-              <option value="completada">Completadas</option>
-              <option value="cancelada">Canceladas</option>
-              <option value="reagendada">Reagendadas</option>
-            </select>
-
-            {/* Filtro por instalador */}
-            <select
-              value={filtros.instalador_id}
-              onChange={(e) => aplicarFiltros({ instalador_id: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos los instaladores</option>
-              <option value="sin_asignar">Sin asignar</option>
-              {instaladores.map(instalador => (
-                <option key={instalador.id} value={instalador.id}>
-                  {instalador.nombre_completo}
-                </option>
-              ))}
-            </select>
-
-            {/* Botón vencidas */}
-            <button
-              onClick={() => aplicarFiltros({ vencidas: !filtros.vencidas })}
-              className={`px-3 py-2 rounded-lg border transition-colors ${
-                filtros.vencidas
-                  ? 'bg-red-100 text-red-800 border-red-200'
-                  : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
-              }`}
-            >
-              {filtros.vencidas ? 'Mostrando vencidas' : 'Solo vencidas'}
-            </button>
-
-            <button
-              onClick={() => setMostrarFiltros(true)}
-              className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors border border-gray-300"
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Más filtros
-            </button>
-
-            <button
-              onClick={limpiarFiltros}
-              className="px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              Limpiar
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Lista de instalaciones */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        {/* Header de la tabla */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Instalaciones ({paginacion.total_registros})
-            </h2>
-            
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Mostrar:</span>
-              <select
-                value={paginacion.registros_por_pagina}
-                onChange={(e) => cambiarLimite(parseInt(e.target.value))}
-                className="border border-gray-300 rounded px-2 py-1 text-sm"
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <span className="text-sm text-gray-600">por página</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Contenido de la tabla */}
-        <div className="overflow-x-auto">
+      {/* Tabla de instalaciones */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+        <div className="bg-white rounded-lg border">
           {cargando ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Cargando instalaciones...</p>
+                <p className="text-gray-600">Cargando datos...</p>
               </div>
             </div>
           ) : instalaciones.length === 0 ? (
@@ -791,258 +717,273 @@ const descargarOrdenPDF = async (instalacion) => {
                 No hay instalaciones
               </h3>
               <p className="text-gray-600 mb-4">
-                {Object.values(filtros).some(v => v) 
-                  ? 'No se encontraron instalaciones con los filtros aplicados'
-                  : 'Comienza creando tu primera instalación'
-                }
+                Aún no hay instalaciones registradas
               </p>
-              {!Object.values(filtros).some(v => v) && hasPermission(['administrador', 'supervisor']) && (
-                <button
-                  onClick={() => abrirModal('crear')}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Crear Primera Instalación
-                </button>
-              )}
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
-              {instalaciones.map(instalacion => (
-                <div key={instalacion.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <span className="text-sm font-medium text-gray-500">
-                          #{instalacion.id}
-                        </span>
-                        
-                        <span className={`px-2 py-1 text-xs rounded-full border ${obtenerClasesEstado(instalacion.estado)}`}>
-                          <div className="flex items-center">
-                            {obtenerIconoEstado(instalacion.estado)}
-                            <span className="ml-1 capitalize">{instalacion.estado}</span>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Cliente
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fecha/Hora
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Instalador
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Estado
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Dirección
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {instalaciones.map((instalacion) => (
+                    <tr key={instalacion.id} className={`hover:bg-gray-50 ${estaVencida(instalacion) ? 'bg-red-50' : ''}`}>
+                      
+                      {/* Cliente */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {instalacion.cliente_nombre}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {instalacion.cliente_identificacion}
+                            </div>
                           </div>
+                        </div>
+                      </td>
+
+                      {/* Fecha/Hora */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {formatearFecha(instalacion.fecha_programada)}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatearHora(instalacion.hora_programada)}
+                        </div>
+                      </td>
+
+                      {/* Instalador */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {instalacion.instalador_nombre_completo || 'Sin asignar'}
+                        </div>
+                      </td>
+
+                      {/* Estado */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          instalacion.estado === 'programada' ? 'bg-blue-100 text-blue-800' :
+                          instalacion.estado === 'en_proceso' ? 'bg-yellow-100 text-yellow-800' :
+                          instalacion.estado === 'completada' ? 'bg-green-100 text-green-800' :
+                          instalacion.estado === 'cancelada' ? 'bg-red-100 text-red-800' :
+                          instalacion.estado === 'reagendada' ? 'bg-orange-100 text-orange-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {obtenerNombreEstado(instalacion.estado)}
                         </span>
-
-                        {instalacion.fecha_programada && new Date(instalacion.fecha_programada) < new Date() && 
-                         !['completada', 'cancelada'].includes(instalacion.estado) && (
-                          <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full border border-orange-200">
-                            Vencida
-                          </span>
+                        {estaVencida(instalacion) && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                              Vencida
+                            </span>
+                          </div>
                         )}
-                      </div>
+                      </td>
 
-                      <h3 className="text-lg font-medium text-gray-900 mb-1">
-                        {instalacion.cliente_nombre || 'Cliente no especificado'}
-                      </h3>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600">
-                        <div className="flex items-center">
-                          <User className="w-4 h-4 mr-2 text-gray-400" />
-                          ID: {instalacion.cliente_identificacion || 'N/A'}
+                      {/* Dirección */}
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          {instalacion.direccion_instalacion}
                         </div>
+                        {instalacion.barrio && (
+                          <div className="text-sm text-gray-500">
+                            {instalacion.barrio}
+                          </div>
+                        )}
+                      </td>
 
-                        <div className="flex items-center">
-                          <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                          {instalacion.telefono_contacto || 'Sin teléfono'}
+                      {/* ARREGLADO: Acciones */}
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end space-x-2">
+                          
+                          {/* Ver detalles - ARREGLADO */}
+                          {puedeEjecutarAccion('ver', instalacion) && (
+                            <button
+                              onClick={() => verDetalles(instalacion)}
+                              className="text-blue-600 hover:text-blue-800"
+                              title="Ver detalles"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {/* Generar orden de servicio PDF - NUEVO */}
+                          {puedeEjecutarAccion('generar_pdf', instalacion) && (
+                            <button
+                              onClick={() => generarOrdenServicioPDF(instalacion)}
+                              disabled={procesando}
+                              className="text-green-600 hover:text-green-800 disabled:opacity-50"
+                              title="Generar orden de servicio PDF"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {/* Iniciar instalación - ARREGLADO: Solo instaladores en sus instalaciones */}
+                          {puedeEjecutarAccion('iniciar', instalacion) && (
+                            <button
+                              onClick={() => iniciarInstalacion(instalacion)}
+                              disabled={procesando}
+                              className="text-green-600 hover:text-green-800 disabled:opacity-50"
+                              title="Iniciar instalación"
+                            >
+                              <Play className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {/* Asignar instalador - ARREGLADO: Admin y supervisor */}
+                          {puedeEjecutarAccion('asignar', instalacion) && (
+                            <button
+                              onClick={() => abrirAsignarInstalador(instalacion)}
+                              disabled={procesando}
+                              className="text-purple-600 hover:text-purple-800 disabled:opacity-50"
+                              title="Asignar instalador"
+                            >
+                              <UserPlus className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {/* Editar - ARREGLADO: Admin y supervisor */}
+                          {puedeEjecutarAccion('editar', instalacion) && (
+                            <button
+                              onClick={() => abrirModal('editar', instalacion)}
+                              disabled={procesando}
+                              className="text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                              title="Editar instalación"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {/* Reagendar - ARREGLADO: Admin y supervisor */}
+                          {puedeEjecutarAccion('reagendar', instalacion) && instalacion.estado !== 'completada' && (
+                            <button
+                              onClick={() => reagendarInstalacion(instalacion)}
+                              disabled={procesando}
+                              className="text-yellow-600 hover:text-yellow-800 disabled:opacity-50"
+                              title="Reagendar instalación"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {/* Cancelar - ARREGLADO: Admin y supervisor */}
+                          {puedeEjecutarAccion('cancelar', instalacion) && 
+                           !['cancelada', 'completada'].includes(instalacion.estado) && (
+                            <button
+                              onClick={() => cancelarInstalacion(instalacion)}
+                              disabled={procesando}
+                              className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                              title="Cancelar instalación"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {/* Eliminar - ARREGLADO: Solo admin */}
+                          {puedeEjecutarAccion('eliminar', instalacion) && (
+                            <button
+                              onClick={() => eliminarInstalacion(instalacion)}
+                              disabled={procesando}
+                              className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                              title="Eliminar instalación"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+
                         </div>
-
-                        <div className="flex items-center">
-                          <MapPin className="w-4 h-4 mr-2 text-gray-400" />
-                          {instalacion.direccion_instalacion || 'Sin dirección'}
-                        </div>
-
-                        <div className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                          {instalacion.fecha_programada ? 
-                            new Date(instalacion.fecha_programada).toLocaleDateString('es-CO') : 
-                            'Sin fecha'
-                          }
-                          {instalacion.hora_programada && ` - ${instalacion.hora_programada}`}
-                        </div>
-                      </div>
-
-                      {instalacion.instalador_nombre && (
-                        <div className="mt-2 flex items-center text-sm text-gray-600">
-                          <User className="w-4 h-4 mr-2 text-gray-400" />
-                          Instalador: {instalacion.instalador_nombre}
-                        </div>
-                      )}
-
-                      {instalacion.observaciones && (
-                        <div className="mt-2 text-sm text-gray-600">
-                          <span className="font-medium">Observaciones:</span> {instalacion.observaciones}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Acciones */}
-                    <div className="flex items-center space-x-2 ml-4">
-                      {/* Ver detalles */}
-                      <button
-                        onClick={() => abrirModal('ver', instalacion)}
-                        className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Ver detalles"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-
-                      {/* Editar */}
-                      {hasPermission(['administrador', 'supervisor']) && 
-                       !['completada', 'cancelada'].includes(instalacion.estado) && (
-                        <button
-                          onClick={() => abrirModal('editar', instalacion)}
-                          className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {/* Asignar instalador */}
-                      {hasPermission(['administrador', 'supervisor']) && 
-                       !instalacion.instalador_id && 
-                       !['completada', 'cancelada'].includes(instalacion.estado) && (
-                        <button
-                          onClick={() => mostrarAsignarInstalador(instalacion)}
-                          className="p-2 text-green-600 hover:text-green-800 hover:bg-green-100 rounded-lg transition-colors"
-                          title="Asignar instalador"
-                        >
-                          <UserPlus className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {/* Iniciar instalación */}
-                      {instalacion.estado === 'programada' && instalacion.instalador_id && (
-                        <button
-                          onClick={() => iniciarInstalacion(instalacion)}
-                          className="p-2 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100 rounded-lg transition-colors"
-                          title="Iniciar instalación"
-                        >
-                          <Play className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {/* Completar instalación */}
-                      {instalacion.estado === 'en_proceso' && (
-                        <button
-                          onClick={() => completarInstalacion(instalacion)}
-                          className="p-2 text-green-600 hover:text-green-800 hover:bg-green-100 rounded-lg transition-colors"
-                          title="Completar instalación"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {/* Reagendar */}
-                      {hasPermission(['administrador', 'supervisor']) && 
-                       !['completada', 'cancelada'].includes(instalacion.estado) && (
-                        <button
-                          onClick={() => reagendarInstalacion(instalacion)}
-                          className="p-2 text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded-lg transition-colors"
-                          title="Reagendar"
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {/* Cancelar */}
-                      {hasPermission(['administrador', 'supervisor']) && 
-                       !['completada', 'cancelada'].includes(instalacion.estado) && (
-                        <button
-                          onClick={() => cancelarInstalacion(instalacion)}
-                          className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-lg transition-colors"
-                          title="Cancelar instalación"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {/* Eliminar */}
-                      {hasPermission(['administrador']) && (
-                        <button
-                          onClick={() => eliminarInstalacion(instalacion)}
-                          className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-lg transition-colors"
-                          title="Eliminar instalación"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
 
         {/* Paginación */}
-        {paginacion.total_paginas > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                Mostrando {((paginacion.pagina_actual - 1) * paginacion.registros_por_pagina) + 1} a{' '}
-                {Math.min(paginacion.pagina_actual * paginacion.registros_por_pagina, paginacion.total_registros)} de{' '}
-                {paginacion.total_registros} resultados
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => cambiarPagina(paginacion.pagina_actual - 1)}
-                  disabled={paginacion.pagina_actual <= 1}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Anterior
-                </button>
-
-                <div className="flex items-center space-x-1">
-                  {Array.from({ length: Math.min(5, paginacion.total_paginas) }, (_, i) => {
-                    let pageNum;
-                    if (paginacion.total_paginas <= 5) {
-                      pageNum = i + 1;
-                    } else if (paginacion.pagina_actual <= 3) {
-                      pageNum = i + 1;
-                    } else if (paginacion.pagina_actual >= paginacion.total_paginas - 2) {
-                      pageNum = paginacion.total_paginas - 4 + i;
-                    } else {
-                      pageNum = paginacion.pagina_actual - 2 + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => cambiarPagina(pageNum)}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg ${
-                          pageNum === paginacion.pagina_actual
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={() => cambiarPagina(paginacion.pagina_actual + 1)}
-                  disabled={paginacion.pagina_actual >= paginacion.total_paginas}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Siguiente
-                </button>
-              </div>
+        {!cargando && instalaciones.length > 0 && (
+          <div className="mt-6 flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Mostrando {((paginacion.pagina_actual - 1) * paginacion.registros_por_pagina) + 1} a{' '}
+              {Math.min(paginacion.pagina_actual * paginacion.registros_por_pagina, paginacion.total_registros)} de{' '}
+              {paginacion.total_registros} registros
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setPaginacion(prev => ({
+                  ...prev,
+                  pagina_actual: Math.max(1, prev.pagina_actual - 1)
+                }))}
+                disabled={paginacion.pagina_actual <= 1 || cargando}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              
+              <span className="px-3 py-2 text-sm text-gray-700">
+                Página {paginacion.pagina_actual} de {paginacion.total_paginas}
+              </span>
+              
+              <button
+                onClick={() => setPaginacion(prev => ({
+                  ...prev,
+                  pagina_actual: Math.min(paginacion.total_paginas, prev.pagina_actual + 1)
+                }))}
+                disabled={paginacion.pagina_actual >= paginacion.total_paginas || cargando}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Siguiente
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Modal de instalación */}
+      {/* MODALES */}
+      
+      {/* Modal principal de instalaciones - ARREGLADO */}
       {mostrarModal && (
         <InstalacionModal
           instalacion={instalacionSeleccionada}
           modo={modalModo}
           onCerrar={cerrarModal}
           onGuardar={handleGuardarInstalacion}
+        />
+      )}
+
+      {/* Modal de asignar instalador - ARREGLADO */}
+      {mostrarAsignarModal && (
+        <AsignarInstaladorModal
+          visible={mostrarAsignarModal}
+          instalacion={instalacionSeleccionada}
+          instaladores={instaladores}
+          onAsignar={handleAsignarInstalador}
+          onCerrar={() => setMostrarAsignarModal(false)}
+          procesando={procesando}
         />
       )}
     </div>

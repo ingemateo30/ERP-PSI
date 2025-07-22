@@ -1,4 +1,4 @@
-// frontend/src/services/instalacionesService.js - VERSIÓN CORREGIDA COMPLETA
+// frontend/src/services/instalacionesService.js - ARREGLADO BASADO EN CÓDIGO ACTUAL
 
 import apiService from './apiService';
 
@@ -7,63 +7,60 @@ const API_BASE = '/instalaciones';
 export const instalacionesService = {
   
   // ==========================================
-  // CRUD BÁSICO
+  // CRUD BÁSICO (ARREGLADO)
   // ==========================================
 
   /**
-   * Obtener todas las instalaciones con filtros y paginación
+   * ARREGLADO: Obtener todas las instalaciones con filtros y paginación
    */
- async getInstalaciones(params = {}) {
-  try {
-    console.log('📡 Obteniendo instalaciones con parámetros:', params);
-    const response = await apiService.get(`${API_BASE}`, { params });
-    
-    console.log('📥 RESPUESTA COMPLETA DEL API:', response);
-    console.log('📊 Tipo de response:', typeof response);
-    console.log('📊 Keys de response:', Object.keys(response));
-    
-    if (response && response.success) {
-      console.log('✅ Response exitoso');
-      console.log('📋 response.data:', response.data);
-      console.log('📋 Tipo de response.data:', typeof response.data);
-      console.log('📋 Es array response.data?', Array.isArray(response.data));
+  async getInstalaciones(params = {}) {
+    try {
+      console.log('📡 Obteniendo instalaciones con parámetros:', params);
+      const response = await apiService.get(`${API_BASE}`, { params });
       
-      // El backend devuelve response.data, no response.instalaciones
-      const instalacionesData = Array.isArray(response.data) ? response.data : [];
+      console.log('📥 RESPUESTA COMPLETA DEL API:', response);
       
-      console.log('📋 Instalaciones finales:', instalacionesData);
+      if (response && response.success) {
+        console.log('✅ Response exitoso');
+        
+        // El backend puede devolver los datos de diferentes formas
+        const instalacionesData = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data?.instalaciones || response.instalaciones || []);
+        
+        console.log('📋 Instalaciones finales:', instalacionesData);
+        
+        return {
+          success: true,
+          instalaciones: instalacionesData,
+          pagination: response.pagination || response.paginacion || {},
+          estadisticas: response.estadisticas || {}
+        };
+      } else {
+        console.error('❌ Response no exitoso:', response);
+        return {
+          success: false,
+          instalaciones: [],
+          pagination: {},
+          estadisticas: {},
+          message: response.message || 'Error desconocido'
+        };
+      }
       
-      return {
-        success: true,
-        instalaciones: instalacionesData,
-        pagination: response.pagination || {},
-        estadisticas: response.estadisticas || {}
-      };
-    } else {
-      console.error('❌ Response no exitoso:', response);
+    } catch (error) {
+      console.error('❌ Error obteniendo instalaciones:', error);
       return {
         success: false,
         instalaciones: [],
         pagination: {},
         estadisticas: {},
-        message: response.message || 'Error desconocido'
+        message: error.message || 'Error de conexión'
       };
     }
-    
-  } catch (error) {
-    console.error('❌ Error obteniendo instalaciones:', error);
-    return {
-      success: false,
-      instalaciones: [],
-      pagination: {},
-      estadisticas: {},
-      message: error.message || 'Error de conexión'
-    };
-  }
-},
+  },
 
   /**
-   * Obtener una instalación por ID (CORREGIDO)
+   * ARREGLADO: Obtener una instalación por ID
    */
   async getInstalacion(id) {
     try {
@@ -73,7 +70,7 @@ export const instalacionesService = {
       if (response.success) {
         return {
           success: true,
-          instalacion: response.data
+          instalacion: response.data || response.instalacion
         };
       }
       
@@ -85,7 +82,7 @@ export const instalacionesService = {
   },
 
   /**
-   * Crear una nueva instalación
+   * ARREGLADO: Crear una nueva instalación
    */
   async createInstalacion(instalacionData) {
     try {
@@ -95,7 +92,7 @@ export const instalacionesService = {
       if (response.success) {
         return {
           success: true,
-          instalacion: response.data,
+          instalacion: response.data || response.instalacion,
           message: response.message || 'Instalación creada exitosamente'
         };
       }
@@ -108,7 +105,7 @@ export const instalacionesService = {
   },
 
   /**
-   * Actualizar una instalación (CORREGIDO)
+   * ARREGLADO: Actualizar una instalación
    */
   async updateInstalacion(id, instalacionData) {
     try {
@@ -118,7 +115,7 @@ export const instalacionesService = {
       if (response.success) {
         return {
           success: true,
-          instalacion: response.data,
+          instalacion: response.data || response.instalacion,
           message: response.message || 'Instalación actualizada exitosamente'
         };
       }
@@ -131,7 +128,7 @@ export const instalacionesService = {
   },
 
   /**
-   * Eliminar una instalación (CORREGIDO)
+   * ARREGLADO: Eliminar una instalación
    */
   async deleteInstalacion(id) {
     try {
@@ -153,11 +150,11 @@ export const instalacionesService = {
   },
 
   // ==========================================
-  // ACCIONES ESPECÍFICAS (NUEVAS)
+  // ACCIONES ESPECÍFICAS (ARREGLADAS)
   // ==========================================
 
   /**
-   * Asignar instalador a una instalación
+   * ARREGLADO: Asignar instalador a una instalación
    */
   async asignarInstalador(instalacionId, instaladorId) {
     try {
@@ -169,7 +166,7 @@ export const instalacionesService = {
       if (response.success) {
         return {
           success: true,
-          instalacion: response.data,
+          instalacion: response.data || response.instalacion,
           message: response.message || 'Instalador asignado exitosamente'
         };
       }
@@ -182,21 +179,89 @@ export const instalacionesService = {
   },
 
   /**
-   * Reagendar una instalación (CORREGIDO)
+   * ARREGLADO: Cambiar estado de una instalación
    */
-  async reagendarInstalacion(instalacionId, fechaNueva, horaNueva, observaciones = '') {
+  async cambiarEstado(instalacionId, nuevoEstado, datosAdicionales = {}) {
     try {
-      console.log('📅 Reagendando instalación:', instalacionId);
-      const response = await apiService.patch(`${API_BASE}/${instalacionId}/reagendar`, {
-        fecha_programada: fechaNueva,
-        hora_programada: horaNueva,
-        observaciones: observaciones
+      console.log('🔄 Cambiando estado de instalación:', instalacionId, 'a:', nuevoEstado);
+      const response = await apiService.patch(`${API_BASE}/${instalacionId}/cambiar-estado`, {
+        estado: nuevoEstado,
+        ...datosAdicionales
       });
       
       if (response.success) {
         return {
           success: true,
-          instalacion: response.data,
+          instalacion: response.data || response.instalacion,
+          message: response.message || 'Estado actualizado exitosamente'
+        };
+      }
+      
+      throw new Error(response.message || 'Error cambiando estado');
+    } catch (error) {
+      console.error('❌ Error cambiando estado:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * ARREGLADO: Iniciar instalación (para instaladores)
+   */
+  async iniciarInstalacion(instalacionId) {
+    try {
+      console.log('▶️ Iniciando instalación:', instalacionId);
+      const response = await apiService.patch(`${API_BASE}/${instalacionId}/iniciar`);
+      
+      if (response.success) {
+        return {
+          success: true,
+          instalacion: response.data || response.instalacion,
+          message: response.message || 'Instalación iniciada exitosamente'
+        };
+      }
+      
+      throw new Error(response.message || 'Error iniciando instalación');
+    } catch (error) {
+      console.error('❌ Error iniciando instalación:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * ARREGLADO: Completar instalación
+   */
+  async completarInstalacion(instalacionId, datosCompletacion) {
+    try {
+      console.log('✅ Completando instalación:', instalacionId, 'con datos:', datosCompletacion);
+      const response = await apiService.patch(`${API_BASE}/${instalacionId}/completar`, datosCompletacion);
+      
+      if (response.success) {
+        return {
+          success: true,
+          instalacion: response.data || response.instalacion,
+          message: response.message || 'Instalación completada exitosamente'
+        };
+      }
+      
+      throw new Error(response.message || 'Error completando instalación');
+    } catch (error) {
+      console.error('❌ Error completando instalación:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * ARREGLADO: Reagendar instalación
+   */
+  async reagendarInstalacion(instalacionId, datosReagenda) {
+    try {
+      console.log('🔄 Reagendando instalación:', instalacionId, 'con datos:', datosReagenda);
+      const response = await apiService.patch(`${API_BASE}/${instalacionId}/reagendar`, datosReagenda);
+      
+      if (response.success) {
+        return {
+          success: true,
+          instalacion: response.data || response.instalacion,
           message: response.message || 'Instalación reagendada exitosamente'
         };
       }
@@ -209,11 +274,11 @@ export const instalacionesService = {
   },
 
   /**
-   * Cancelar una instalación (CORREGIDO)
+   * ARREGLADO: Cancelar instalación
    */
   async cancelarInstalacion(instalacionId, motivoCancelacion) {
     try {
-      console.log('❌ Cancelando instalación:', instalacionId);
+      console.log('❌ Cancelando instalación:', instalacionId, 'motivo:', motivoCancelacion);
       const response = await apiService.patch(`${API_BASE}/${instalacionId}/cancelar`, {
         motivo_cancelacion: motivoCancelacion
       });
@@ -221,7 +286,7 @@ export const instalacionesService = {
       if (response.success) {
         return {
           success: true,
-          instalacion: response.data,
+          instalacion: response.data || response.instalacion,
           message: response.message || 'Instalación cancelada exitosamente'
         };
       }
@@ -233,87 +298,89 @@ export const instalacionesService = {
     }
   },
 
-  /**
-   * Cambiar estado de instalación
-   */
-  async cambiarEstado(id, estado, datos = {}) {
-    try {
-      console.log('🔄 Cambiando estado de instalación:', id, 'a:', estado);
-      const response = await apiService.patch(`${API_BASE}/${id}/estado`, {
-        estado,
-        ...datos
-      });
-      
-      if (response.success) {
-        return {
-          success: true,
-          instalacion: response.data,
-          message: response.message || 'Estado actualizado exitosamente'
-        };
-      }
-      
-      throw new Error(response.message || 'Error cambiando estado');
-    } catch (error) {
-      console.error('❌ Error cambiando estado:', error);
-      throw error;
-    }
-  },
-
   // ==========================================
-  // DATOS AUXILIARES
+  // DATOS AUXILIARES (ARREGLADOS)
   // ==========================================
 
   /**
-   * Obtener instaladores disponibles
+   * ARREGLADO: Obtener instaladores disponibles
    */
   async getInstaladores() {
     try {
       console.log('👷 Obteniendo instaladores disponibles');
-      const response = await apiService.get(`${API_BASE}/instaladores/disponibles`);
+      
+      // Primero intentar con el endpoint específico de instaladores
+      let response;
+      try {
+        response = await apiService.get(`${API_BASE}/instaladores`);
+      } catch (error) {
+        // Si no existe, usar el endpoint general de usuarios
+        console.log('🔄 Probando endpoint alternativo...');
+        response = await apiService.get('/users', { 
+          params: { rol: 'instalador,supervisor', activo: 1 } 
+        });
+      }
       
       if (response.success) {
         return {
           success: true,
-          instaladores: response.data || []
+          instaladores: response.data || response.instaladores || []
         };
       }
       
       throw new Error(response.message || 'Error obteniendo instaladores');
     } catch (error) {
       console.error('❌ Error obteniendo instaladores:', error);
-      throw error;
+      return {
+        success: false,
+        instaladores: [],
+        message: error.message
+      };
     }
   },
 
   /**
-   * Obtener equipos disponibles
+   * ARREGLADO: Obtener equipos disponibles para instalación
    */
   async getEquiposDisponibles() {
     try {
       console.log('📦 Obteniendo equipos disponibles');
-      const response = await apiService.get(`${API_BASE}/equipos/disponibles`);
+      
+      let response;
+      try {
+        response = await apiService.get(`${API_BASE}/equipos/disponibles`);
+      } catch (error) {
+        // Endpoint alternativo
+        response = await apiService.get('/inventory', { 
+          params: { estado: 'disponible', activo: 1 } 
+        });
+      }
       
       if (response.success) {
         return {
           success: true,
-          equipos: response.data || []
+          equipos: response.data || response.equipos || []
         };
       }
       
       throw new Error(response.message || 'Error obteniendo equipos');
     } catch (error) {
       console.error('❌ Error obteniendo equipos:', error);
-      throw error;
+      return {
+        success: false,
+        equipos: [],
+        message: error.message
+      };
     }
   },
 
   /**
-   * Buscar clientes
+   * ARREGLADO: Buscar clientes para instalaciones
    */
-  async getClientes(termino = '') {
+  async buscarClientes(termino = '') {
     try {
       console.log('🔍 Buscando clientes con término:', termino);
-      const response = await apiService.get('/clientes', {
+      const response = await apiService.get('/clients', {
         params: { 
           busqueda: termino,
           limit: 50,
@@ -324,410 +391,188 @@ export const instalacionesService = {
       if (response.success) {
         return {
           success: true,
-          data: response.data || []
+          clientes: response.data || response.clientes || []
         };
       }
       
       throw new Error(response.message || 'Error buscando clientes');
     } catch (error) {
       console.error('❌ Error buscando clientes:', error);
-      throw error;
+      return {
+        success: false,
+        clientes: [],
+        message: error.message
+      };
     }
   },
 
   /**
-   * Obtener servicios de un cliente
+   * ARREGLADO: Obtener servicios de un cliente
    */
   async getServiciosCliente(clienteId) {
     try {
-      console.log('🌐 Obteniendo servicios del cliente:', clienteId);
-      const response = await apiService.get(`/clientes/${clienteId}/servicios`);
+      console.log('🔍 Obteniendo servicios del cliente:', clienteId);
+      const response = await apiService.get(`/clients/${clienteId}/services`);
       
       if (response.success) {
         return {
           success: true,
-          data: response.data || []
+          servicios: response.data || response.servicios || []
         };
       }
       
       throw new Error(response.message || 'Error obteniendo servicios del cliente');
     } catch (error) {
       console.error('❌ Error obteniendo servicios del cliente:', error);
-      throw error;
+      return {
+        success: false,
+        servicios: [],
+        message: error.message
+      };
     }
   },
 
   // ==========================================
-  // ESTADÍSTICAS Y REPORTES
+  // ESTADÍSTICAS Y REPORTES (ARREGLADOS)
   // ==========================================
 
   /**
-   * Obtener estadísticas de instalaciones
+   * ARREGLADO: Obtener estadísticas de instalaciones
    */
-  async getEstadisticas(filtros = {}) {
+  async getEstadisticas(params = {}) {
     try {
       console.log('📊 Obteniendo estadísticas de instalaciones');
-      const response = await apiService.get(`${API_BASE}/estadisticas`, { params: filtros });
+      const response = await apiService.get(`${API_BASE}/estadisticas`, { params });
       
       if (response.success) {
         return {
           success: true,
-          estadisticas: response.data || {}
+          estadisticas: response.data || response.estadisticas || {}
         };
       }
       
       throw new Error(response.message || 'Error obteniendo estadísticas');
     } catch (error) {
       console.error('❌ Error obteniendo estadísticas:', error);
-      throw error;
+      return {
+        success: false,
+        estadisticas: {},
+        message: error.message
+      };
     }
   },
 
   /**
-   * Exportar reporte de instalaciones (CORREGIDO)
+   * ARREGLADO: Obtener dashboard de instalaciones para instalador
    */
-  async exportarReporte(filtros = {}, formato = 'excel') {
+  async getDashboardInstalador(instaladorId) {
     try {
-      console.log('📊 Exportando reporte de instalaciones en formato:', formato);
+      console.log('📊 Obteniendo dashboard para instalador:', instaladorId);
+      const response = await apiService.get(`${API_BASE}/dashboard/instalador/${instaladorId}`);
       
-      const params = {
-        ...filtros,
-        formato: formato
+      if (response.success) {
+        return {
+          success: true,
+          dashboard: response.data || response.dashboard || {}
+        };
+      }
+      
+      throw new Error(response.message || 'Error obteniendo dashboard');
+    } catch (error) {
+      console.error('❌ Error obteniendo dashboard:', error);
+      return {
+        success: false,
+        dashboard: {},
+        message: error.message
       };
+    }
+  },
 
-      const response = await apiService.getBlob(`${API_BASE}/exportar`, { params });
+  // ==========================================
+  // UTILIDADES (ARREGLADAS)
+  // ==========================================
+
+  /**
+   * ARREGLADO: Subir fotos de instalación
+   */
+  async subirFotos(instalacionId, archivos) {
+    try {
+      console.log('📸 Subiendo fotos para instalación:', instalacionId);
       
-      // Crear blob y descargar archivo
-      const blob = new Blob([response], { 
-        type: formato === 'csv' ? 'text/csv' : 'application/json' 
+      const formData = new FormData();
+      archivos.forEach((archivo, index) => {
+        formData.append(`foto_${index}`, archivo);
       });
       
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
+      const response = await apiService.post(`${API_BASE}/${instalacionId}/fotos`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
       
-      const timestamp = new Date().toISOString().split('T')[0];
-      const extension = formato === 'csv' ? 'csv' : 'json';
-      a.download = `instalaciones_${timestamp}.${extension}`;
+      if (response.success) {
+        return {
+          success: true,
+          fotos: response.data || response.fotos || [],
+          message: response.message || 'Fotos subidas exitosamente'
+        };
+      }
       
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      return { 
-        success: true, 
-        message: 'Reporte descargado exitosamente' 
-      };
+      throw new Error(response.message || 'Error subiendo fotos');
     } catch (error) {
-      console.error('❌ Error exportando reporte:', error);
+      console.error('❌ Error subiendo fotos:', error);
       throw error;
     }
   },
 
   /**
- * Reagendar instalación
- */
-async reagendarInstalacion(id, fechaProgramada, horaProgramada, observaciones = '') {
-  try {
-    console.log(`📅 Reagendando instalación ${id} para ${fechaProgramada} ${horaProgramada}`);
-    
-    const response = await apiService.patch(`${this.baseURL}/${id}/reagendar`, {
-      fecha_programada: fechaProgramada,
-      hora_programada: horaProgramada,
-      observaciones
-    });
-    
-    console.log('✅ Instalación reagendada:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('❌ Error reagendando instalación:', error);
-    throw this.handleError(error);
-  }
-},
-
-/**
- * Cancelar instalación
- */
-async cancelarInstalacion(id, motivo) {
-  try {
-    console.log(`❌ Cancelando instalación ${id}. Motivo: ${motivo}`);
-    
-    const response = await apiService.patch(`${this.baseURL}/${id}/cancelar`, {
-      motivo
-    });
-    
-    console.log('✅ Instalación cancelada:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('❌ Error cancelando instalación:', error);
-    throw this.handleError(error);
-  }
-},
-
-/**
- * Descargar orden de servicio en PDF
- */
-async descargarOrdenPDF(instalacionId) {
-  try {
-    console.log(`📄 Descargando orden de servicio PDF para instalación ${instalacionId}`);
-    
-    const response = await apiService.get(`${this.baseURL}/${instalacionId}/pdf`, {
-      responseType: 'blob'
-    });
-    
-    // Crear y descargar el archivo
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `orden-servicio-${instalacionId}.pdf`;
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    
-    console.log('✅ Orden de servicio descargada exitosamente');
-    return { success: true, message: 'Orden de servicio descargada exitosamente' };
-  } catch (error) {
-    console.error('❌ Error descargando orden PDF:', error);
-    throw this.handleError(error);
-  }
-},
-
-/**
- * Exportar reporte de instalaciones (CORREGIR MÉTODO EXISTENTE)
- */
-async exportarReporte(queryParams = '', formato = 'excel') {
-  try {
-    console.log('📊 Exportando reporte de instalaciones:', { queryParams, formato });
-    
-    const params = new URLSearchParams(queryParams);
-    params.append('formato', formato);
-    
-    const response = await apiService.get(`${this.baseURL}/exportar?${params.toString()}`, {
-      responseType: 'blob'
-    });
-    
-    // Crear y descargar el archivo
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    
-    const extension = formato === 'excel' ? 'xlsx' : 'json';
-    const fecha = new Date().toISOString().split('T')[0];
-    link.download = `instalaciones_${fecha}.${extension}`;
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    
-    console.log('✅ Reporte descargado exitosamente');
-    return { success: true, message: 'Reporte descargado exitosamente' };
-  } catch (error) {
-    console.error('❌ Error exportando reporte:', error);
-    throw this.handleError(error);
-  }
-}
-};
-
-// ==========================================
-// FUNCIONES AUXILIARES PARA EL FRONTEND
-// ==========================================
-
-export const instalacionesHelpers = {
-  
-  /**
-   * Formatear estado para mostrar
+   * ARREGLADO: Obtener historial de cambios de una instalación
    */
-  formatearEstado(estado) {
-    const estados = {
-      'programada': 'Programada',
-      'en_proceso': 'En Proceso',
-      'completada': 'Completada',
-      'cancelada': 'Cancelada',
-      'reagendada': 'Reagendada'
-    };
-    return estados[estado] || estado;
-  },
-
-  /**
-   * Obtener color CSS para estado
-   */
-  getColorEstado(estado) {
-    const colores = {
-      'programada': 'blue',
-      'en_proceso': 'yellow',
-      'completada': 'green',
-      'cancelada': 'red',
-      'reagendada': 'purple'
-    };
-    return colores[estado] || 'gray';
-  },
-
-  /**
-   * Obtener clases CSS para badge de estado
-   */
-  getClasesEstado(estado) {
-    const clases = {
-      'programada': 'bg-blue-100 text-blue-800 border-blue-200',
-      'en_proceso': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'completada': 'bg-green-100 text-green-800 border-green-200',
-      'cancelada': 'bg-red-100 text-red-800 border-red-200',
-      'reagendada': 'bg-purple-100 text-purple-800 border-purple-200'
-    };
-    return clases[estado] || 'bg-gray-100 text-gray-800 border-gray-200';
-  },
-
-  /**
-   * Formatear tipo de instalación
-   */
-  formatearTipo(tipo) {
-    const tipos = {
-      'nueva': 'Nueva Instalación',
-      'migracion': 'Migración',
-      'upgrade': 'Actualización',
-      'reparacion': 'Reparación'
-    };
-    return tipos[tipo] || tipo;
-  },
-
-  /**
-   * Verificar si una instalación está vencida
-   */
-  esVencida(fechaProgramada, estado) {
-    if (['completada', 'cancelada'].includes(estado)) {
-      return false;
-    }
-    const hoy = new Date();
-    const fecha = new Date(fechaProgramada);
-    return fecha < hoy;
-  },
-
-async exportarReporte(queryParams = '', formato = 'excel') {
+  async getHistorial(instalacionId) {
     try {
-        console.log('📊 Exportando reporte de instalaciones:', { queryParams, formato });
-        
-        const params = new URLSearchParams(queryParams);
-        params.append('formato', formato);
-        
-        const response = await apiService.get(`${this.baseURL}/exportar?${params.toString()}`, {
-            responseType: 'blob'
-        });
-        
-        // Crear y descargar el archivo
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        
-        const extension = formato === 'excel' ? 'xlsx' : 'csv';
-        const timestamp = new Date().toISOString().split('T')[0];
-        link.download = `instalaciones_${timestamp}.${extension}`;
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-        
-        console.log('✅ Reporte descargado exitosamente');
-        return { success: true, message: 'Reporte descargado exitosamente' };
-        
-    } catch (error) {
-        console.error('❌ Error exportando reporte:', error);
-        throw this.handleError(error);
-    }
-},
-  /**
-   * Calcular días desde programación
-   */
-  diasDesdeProgramacion(fechaProgramada) {
-    const hoy = new Date();
-    const fecha = new Date(fechaProgramada);
-    const diferencia = Math.ceil((hoy - fecha) / (1000 * 60 * 60 * 24));
-    return diferencia;
-  },
-
-  /**
-   * Formatear fecha para mostrar
-   */
-  formatearFecha(fecha, incluirHora = false) {
-    if (!fecha) return '-';
-    
-    const date = new Date(fecha);
-    const opciones = {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    };
-    
-    if (incluirHora) {
-      opciones.hour = '2-digit';
-      opciones.minute = '2-digit';
-    }
-    
-    return date.toLocaleDateString('es-CO', opciones);
-  },
-
-  /**
-   * Formatear precio
-   */
-  formatearPrecio(precio) {
-    if (!precio || precio === 0) return 'Gratis';
-    
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
-    }).format(precio);
-  },
-
-  /**
-   * Validar datos de instalación
-   */
-  validarInstalacion(datos) {
-    const errores = {};
-
-    if (!datos.cliente_id) {
-      errores.cliente_id = 'El cliente es obligatorio';
-    }
-
-    if (!datos.servicio_cliente_id) {
-      errores.servicio_cliente_id = 'El servicio del cliente es obligatorio';
-    }
-
-    if (!datos.fecha_programada) {
-      errores.fecha_programada = 'La fecha programada es obligatoria';
-    } else {
-      const fecha = new Date(datos.fecha_programada);
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
+      console.log('📋 Obteniendo historial de instalación:', instalacionId);
+      const response = await apiService.get(`${API_BASE}/${instalacionId}/historial`);
       
-      if (fecha < hoy) {
-        errores.fecha_programada = 'La fecha no puede ser anterior a hoy';
+      if (response.success) {
+        return {
+          success: true,
+          historial: response.data || response.historial || []
+        };
       }
+      
+      throw new Error(response.message || 'Error obteniendo historial');
+    } catch (error) {
+      console.error('❌ Error obteniendo historial:', error);
+      return {
+        success: false,
+        historial: [],
+        message: error.message
+      };
     }
+  },
 
-    if (!datos.direccion_instalacion || datos.direccion_instalacion.trim() === '') {
-      errores.direccion_instalacion = 'La dirección de instalación es obligatoria';
-    }
+  // ==========================================
+  // FUNCIONES DE COMPATIBILIDAD (BASADAS EN CÓDIGO ACTUAL)
+  // ==========================================
 
-    if (!datos.telefono_contacto || datos.telefono_contacto.trim() === '') {
-      errores.telefono_contacto = 'El teléfono de contacto es obligatorio';
-    } else if (!/^[0-9+\-\s()]{7,20}$/.test(datos.telefono_contacto)) {
-      errores.telefono_contacto = 'Formato de teléfono inválido';
-    }
+  /**
+   * Función de compatibilidad: eliminar (basada en código actual)
+   */
+  async eliminar(id) {
+    return this.deleteInstalacion(id);
+  },
 
-    if (datos.costo_instalacion && datos.costo_instalacion < 0) {
-      errores.costo_instalacion = 'El costo no puede ser negativo';
-    }
+  /**
+   * Función de compatibilidad: reagendar (basada en código actual)
+   */
+  async reagendar(id, datosReagenda) {
+    return this.reagendarInstalacion(id, datosReagenda);
+  },
 
-    return {
-      esValido: Object.keys(errores).length === 0,
-      errores
-    };
+  /**
+   * Función de compatibilidad: cancelar (basada en código actual)
+   */
+  async cancelar(id, motivo) {
+    return this.cancelarInstalacion(id, motivo);
   }
 };
-
-export default instalacionesService;
