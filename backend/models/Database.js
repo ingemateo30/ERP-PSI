@@ -40,8 +40,24 @@ class Database {
       if (connection) connection.release();
     }
   }
+
+  static async getConnection() {
+  try {
+    const connection = await pool.getConnection();
+    return connection;
+  } catch (error) {
+    logger.error('Error obteniendo conexión:', error.message);
+    throw error;
+  }
+}
 }
 
+ 
+
+
+  /**
+   * Ejecutar transacción con callback
+   */
 async function connectDatabase() {
   try {
     const connection = await pool.getConnection();

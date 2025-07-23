@@ -1,4 +1,4 @@
-// frontend/src/components/Instalaciones/InstalacionesManagement.js - ARREGLADO BASADO EN CÓDIGO ACTUAL
+// frontend/src/components/Instalaciones/InstalacionesManagement.js - ACTUALIZADO CON MODAL DE REAGENDAMIENTO
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -29,6 +29,7 @@ import { instalacionesService } from '../../services/instalacionesService';
 import { useAuth } from '../../contexts/AuthContext';
 import InstalacionModal from './InstalacionModal';
 import AsignarInstaladorModal from './AsignarInstaladorModal';
+import ReagendarInstalacionModal from './ReagendarInstalacionModal'; // NUEVO IMPORT
 import authService from '../../services/authService';
 
 // Constantes
@@ -52,13 +53,14 @@ const InstalacionesManagement = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  // Estados para modal
+  // Estados para modales
   const [mostrarModal, setMostrarModal] = useState(false);
   const [modalModo, setModalModo] = useState('crear');
   const [instalacionSeleccionada, setInstalacionSeleccionada] = useState(null);
-
-  // ARREGLADO: Estado para modal de asignar instalador
+  
+  // ARREGLADO: Estados para modales adicionales  
   const [mostrarAsignarModal, setMostrarAsignarModal] = useState(false);
+  const [mostrarReagendarModal, setMostrarReagendarModal] = useState(false); // NUEVO ESTADO
 
   // Estados para filtros
   const [filtros, setFiltros] = useState({
@@ -301,26 +303,28 @@ const InstalacionesManagement = () => {
     }
   };
 
-  // ARREGLADO: Función de reagendar
-  const reagendarInstalacion = async (instalacion) => {
-    const nuevaFecha = prompt('Ingresa la nueva fecha (YYYY-MM-DD):');
-    if (!nuevaFecha) return;
+  // NUEVO: Función para abrir modal de reagendamiento
+  const abrirReagendarModal = (instalacion) => {
+    console.log('📅 Abriendo modal para reagendar instalación:', instalacion.id);
+    setInstalacionSeleccionada(instalacion);
+    setMostrarReagendarModal(true);
+  };
 
-    const nuevaHora = prompt('Ingresa la nueva hora (HH:MM):');
-    const motivo = prompt('Motivo del reagendamiento:');
-
+  // NUEVO: Función para manejar reagendamiento con modal
+  const handleReagendarInstalacion = async (instalacionId, datosReagendamiento) => {
     try {
       setProcesando(true);
 
-      const response = await instalacionesService.updateInstalacion(instalacion.id, {
-        fecha_programada: nuevaFecha,
-        hora_programada: nuevaHora,
+      const response = await instalacionesService.updateInstalacion(instalacionId, {
+        fecha_programada: datosReagendamiento.fecha_programada,
+        hora_programada: datosReagendamiento.hora_programada,
         estado: 'reagendada',
-        observaciones: motivo || 'Instalación reagendada'
+        observaciones: `${datosReagendamiento.motivo}${datosReagendamiento.observaciones ? '\n\nObservaciones adicionales: ' + datosReagendamiento.observaciones : ''}`
       });
 
       if (response.success) {
         setSuccess('Instalación reagendada exitosamente');
+        setMostrarReagendarModal(false);
         cargarDatos();
         cargarEstadisticas();
       }
@@ -443,62 +447,62 @@ const InstalacionesManagement = () => {
 
   // NUEVO: Función para generar orden de servicio PDF
   const generarOrdenServicioPDF = async (instalacion) => {
-  try {
-    setProcesando(true);
-    setError('');
-    
-    console.log('📄 Generando orden PSI...');
-    console.log('🔍 Instalación recibida:', instalacion);
-    
-    // Validaciones mejoradas
-    if (!instalacion) {
-      throw new Error('No se proporcionó información de la instalación');
+    try {
+      setProcesando(true);
+      setError('');
+      
+      console.log('📄 Generando orden PSI...');
+      console.log('🔍 Instalación recibida:', instalacion);
+      
+      // Validaciones mejoradas
+      if (!instalacion) {
+        throw new Error('No se proporcionó información de la instalación');
+      }
+      
+      if (!instalacion.id) {
+        console.error('❌ Instalación sin ID:', instalacion);
+        throw new Error('La instalación no tiene un ID válido');
+      }
+      
+      console.log('📋 Procesando instalación ID:', instalacion.id);
+      
+      // Llamar al servicio
+      const response = await instalacionesService.generarOrdenServicioPDF(instalacion.id);
+      
+      console.log('📊 Respuesta del servicio:', response);
+      
+      if (response && response.success && response.data) {
+        console.log('✅ PDF recibido, tamaño:', response.data.size);
+        
+        // Crear URL del blob y descargar
+        const url = window.URL.createObjectURL(response.data);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `PSI_${String(instalacion.id).padStart(6, '0')}.pdf`;
+        
+        // Agregar al DOM, hacer click y remover
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Limpiar URL del blob
+        window.URL.revokeObjectURL(url);
+        
+        setSuccess('Orden PSI generada y descargada exitosamente');
+        console.log('✅ Descarga completada');
+        
+      } else {
+        console.error('❌ Respuesta inválida:', response);
+        throw new Error('No se pudo generar el PDF correctamente');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error completo generando PDF:', error);
+      setError(`Error generando orden PSI: ${error.message}`);
+    } finally {
+      setProcesando(false);
     }
-    
-    if (!instalacion.id) {
-      console.error('❌ Instalación sin ID:', instalacion);
-      throw new Error('La instalación no tiene un ID válido');
-    }
-    
-    console.log('📋 Procesando instalación ID:', instalacion.id);
-    
-    // Llamar al servicio
-    const response = await instalacionesService.generarOrdenServicioPDF(instalacion.id);
-    
-    console.log('📊 Respuesta del servicio:', response);
-    
-    if (response && response.success && response.data) {
-      console.log('✅ PDF recibido, tamaño:', response.data.size);
-      
-      // Crear URL del blob y descargar
-      const url = window.URL.createObjectURL(response.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `PSI_${String(instalacion.id).padStart(6, '0')}.pdf`;
-      
-      // Agregar al DOM, hacer click y remover
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Limpiar URL del blob
-      window.URL.revokeObjectURL(url);
-      
-      setSuccess('Orden PSI generada y descargada exitosamente');
-      console.log('✅ Descarga completada');
-      
-    } else {
-      console.error('❌ Respuesta inválida:', response);
-      throw new Error('No se pudo generar el PDF correctamente');
-    }
-    
-  } catch (error) {
-    console.error('❌ Error completo generando PDF:', error);
-    setError(`Error generando orden PSI: ${error.message}`);
-  } finally {
-    setProcesando(false);
-  }
-};
+  };
 
   // ==========================================
   // FUNCIONES DE FILTROS
@@ -915,12 +919,12 @@ const InstalacionesManagement = () => {
                             </button>
                           )}
 
-                          {/* Reagendar - ARREGLADO: Admin y supervisor */}
+                          {/* NUEVO: Reagendar con modal - ARREGLADO: Admin y supervisor */}
                           {puedeEjecutarAccion('reagendar', instalacion) && instalacion.estado !== 'completada' && (
                             <button
-                              onClick={() => reagendarInstalacion(instalacion)}
+                              onClick={() => abrirReagendarModal(instalacion)}
                               disabled={procesando}
-                              className="text-yellow-600 hover:text-yellow-800 disabled:opacity-50"
+                              className="text-orange-600 hover:text-orange-800 disabled:opacity-50"
                               title="Reagendar instalación"
                             >
                               <RotateCcw className="w-4 h-4" />
@@ -1022,6 +1026,17 @@ const InstalacionesManagement = () => {
           instaladores={instaladores}
           onAsignar={handleAsignarInstalador}
           onCerrar={() => setMostrarAsignarModal(false)}
+          procesando={procesando}
+        />
+      )}
+
+      {/* NUEVO: Modal de reagendar instalación */}
+      {mostrarReagendarModal && (
+        <ReagendarInstalacionModal
+          visible={mostrarReagendarModal}
+          instalacion={instalacionSeleccionada}
+          onReagendar={handleReagendarInstalacion}
+          onCerrar={() => setMostrarReagendarModal(false)}
           procesando={procesando}
         />
       )}
