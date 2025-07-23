@@ -433,8 +433,6 @@ router.get('/:id/pdf', async (req, res) => {
             console.warn('⚠️ Error cargando logo:', logoError.message);
         }
 
-        // HTML EXACTO COMO LA IMAGEN PSI
-        // HTML EXACTO COMO LA IMAGEN PSI REAL
         const htmlContent = `
 <!DOCTYPE html>
 <html lang="es">
@@ -444,7 +442,7 @@ router.get('/:id/pdf', async (req, res) => {
     <title>PSI - ${instalacion.id}</title>
     <style>
         * {
-            box-sizing: border-box;
+            box-sizing: border-box; 
             margin: 0;
             padding: 0;
         }
