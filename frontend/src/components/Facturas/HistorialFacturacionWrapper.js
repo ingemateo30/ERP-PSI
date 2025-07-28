@@ -64,7 +64,7 @@ const HistorialFacturacionWrapper = () => {
             let response;
             try {
                 // Intentar usar el servicio de clientes (si existe)
-                const clientesService = await import('../../services/clientesService');
+                const clientesService = await import('../../services/clientService');
                 response = await clientesService.default.obtenerTodos({
                     page: 1,
                     limit: 100
