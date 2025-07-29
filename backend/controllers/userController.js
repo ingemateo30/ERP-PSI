@@ -15,6 +15,9 @@ class UsersController {
 
       const connection = await pool.getConnection();
 
+      console.log("page:", page, "limit:", limit);
+     
+
       let query = `
         SELECT 
           id, email, nombre, telefono, rol, activo, ultimo_acceso, 
@@ -55,9 +58,9 @@ class UsersController {
       query += ` ORDER BY ${finalSort} ${finalOrder}`;
 
       // Paginación
-      const offset = (parseInt(page) - 1) * parseInt(limit);
+      const offset = (parseInt(page) - 1) * limit;
       query += ' LIMIT ? OFFSET ?';
-      params.push(parseInt(limit), offset);
+      params.push(limit, offset);
 
       const [users] = await connection.execute(query, params);
 
