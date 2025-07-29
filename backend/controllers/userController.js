@@ -16,90 +16,107 @@ class UsersController {
       const connection = await pool.getConnection();
 
       console.log("page:", page, "limit:", limit);
-     
 
-      let query = `
-        SELECT 
-          id, email, nombre, telefono, rol, activo, ultimo_acceso, 
-          created_at, updated_at
-        FROM sistema_usuarios
-      `;
+      try {
+        let baseQuery = `
+          SELECT 
+            id, email, nombre, telefono, rol, activo, ultimo_acceso, 
+            created_at, updated_at
+          FROM sistema_usuarios
+        `;
 
-      let whereConditions = [];
-      let params = [];
+        let whereConditions = [];
+        let params = [];
 
-      // Filtros
-      if (search) {
-        whereConditions.push('(nombre LIKE ? OR email LIKE ?)');
-        params.push(`%${search}%`, `%${search}%`);
-      }
-
-      if (rol) {
-        whereConditions.push('rol = ?');
-        params.push(rol);
-      }
-
-      if (activo !== undefined) {
-        whereConditions.push('activo = ?');
-        params.push(activo === 'true' ? 1 : 0);
-      }
-
-      if (whereConditions.length > 0) {
-        query += ' WHERE ' + whereConditions.join(' AND ');
-      }
-
-      // Ordenamiento
-      const validSorts = ['nombre', 'email', 'rol', 'created_at', 'ultimo_acceso'];
-      const validOrders = ['ASC', 'DESC'];
-
-      const finalSort = validSorts.includes(sort) ? sort : 'created_at';
-      const finalOrder = validOrders.includes(order.toUpperCase()) ? order.toUpperCase() : 'DESC';
-
-      query += ` ORDER BY ${finalSort} ${finalOrder}`;
-
-      // Paginación
-      const offset = (page - 1) * limit;
-      query += ' LIMIT ? OFFSET ?';
-      params.push(limit, offset);
-
-      const [users] = await connection.execute(query, params);
-
-      // Contar total para paginación
-      let countQuery = 'SELECT COUNT(*) as total FROM sistema_usuarios';
-      let countParams = [];
-
-      if (whereConditions.length > 0) {
-        countQuery += ' WHERE ' + whereConditions.join(' AND ');
-        countParams = params.slice(0, -2); // Remover LIMIT y OFFSET
-      }
-
-      const [countResult] = await connection.execute(countQuery, countParams);
-      const total = countResult[0].total;
-
-      connection.release();
-
-      // Calcular paginación
-      const totalPages = Math.ceil(total / parseInt(limit));
-      const currentPage = parseInt(page);
-
-      return success(res, 'Usuarios obtenidos exitosamente', {
-        users,
-        pagination: {
-          currentPage,
-          totalPages,
-          totalItems: total,
-          itemsPerPage: parseInt(limit),
-          hasNextPage: currentPage < totalPages,
-          hasPrevPage: currentPage > 1
+        // Aplicar filtros
+        if (search) {
+          whereConditions.push('(nombre LIKE ? OR email LIKE ?)');
+          params.push(`%${search}%`, `%${search}%`);
         }
-      });
+
+        if (rol) {
+          whereConditions.push('rol = ?');
+          params.push(rol);
+        }
+
+        if (activo !== undefined) {
+          whereConditions.push('activo = ?');
+          params.push(activo === 'true' ? 1 : 0);
+        }
+
+        // Agregar WHERE clause si hay condiciones
+        if (whereConditions.length > 0) {
+          baseQuery += ' WHERE ' + whereConditions.join(' AND ');
+        }
+
+        // Validar ordenamiento
+        const validSorts = ['nombre', 'email', 'rol', 'created_at', 'ultimo_acceso'];
+        const validOrders = ['ASC', 'DESC'];
+
+        const finalSort = validSorts.includes(sort) ? sort : 'created_at';
+        const finalOrder = validOrders.includes(order.toUpperCase()) ? order.toUpperCase() : 'DESC';
+
+        // Calcular paginación
+        const pageNum = parseInt(page) || 1;
+        const limitNum = parseInt(limit) || 10;
+        const offset = (pageNum - 1) * limitNum;
+
+        // ✅ SOLUCIÓN: Construir query completa SIN parámetros para LIMIT/OFFSET
+        const finalQuery = `${baseQuery} ORDER BY ${finalSort} ${finalOrder} LIMIT ${limitNum} OFFSET ${offset}`;
+
+        console.log('🔍 Query final:', finalQuery);
+        console.log('📊 Parámetros:', params);
+
+        // ✅ EJECUTAR QUERY SIN PARÁMETROS PARA LIMIT/OFFSET
+        const [users] = params.length > 0 ? 
+          await connection.execute(finalQuery, params) : 
+          await connection.query(finalQuery);
+
+        // Contar total para paginación
+        let countQuery = 'SELECT COUNT(*) as total FROM sistema_usuarios';
+        let countParams = [];
+
+        if (whereConditions.length > 0) {
+          countQuery += ' WHERE ' + whereConditions.join(' AND ');
+          countParams = params; // Usar los mismos parámetros de filtro
+        }
+
+        console.log('🔍 Count query:', countQuery);
+        console.log('📊 Count params:', countParams);
+
+        const [countResult] = countParams.length > 0 ? 
+          await connection.execute(countQuery, countParams) : 
+          await connection.query(countQuery);
+
+        const total = countResult[0].total;
+
+        // Calcular paginación
+        const totalPages = Math.ceil(total / limitNum);
+
+        console.log(`✅ Usuarios obtenidos: ${users.length}/${total} total, página ${pageNum}/${totalPages}`);
+
+        return success(res, 'Usuarios obtenidos exitosamente', {
+          users,
+          pagination: {
+            currentPage: pageNum,
+            totalPages,
+            totalItems: total,
+            itemsPerPage: limitNum,
+            hasNextPage: pageNum < totalPages,
+            hasPrevPage: pageNum > 1
+          }
+        });
+
+      } finally {
+        connection.release();
+      }
 
     } catch (err) {
+      console.error('❌ Error completo:', err);
       logger.error('Error obteniendo usuarios:', err);
       return error(res, 'Error interno del servidor', 500);
     }
   }
-
   // Obtener usuario por ID
   static async getUserById(req, res) {
     try {
