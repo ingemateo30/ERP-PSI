@@ -4,9 +4,9 @@ const pool = require('../config/database');
 
 class Cliente {
   // Obtener todos los clientes con filtros
-  static async obtenerTodos(filtros = {}) {
+   static async obtenerTodos(filtros = {}) {
     try {
-      let query = `
+      let baseQuery = `
         SELECT 
           c.*,
           s.nombre as sector_nombre,
@@ -24,49 +24,66 @@ class Cliente {
 
       // Filtros dinámicos
       if (filtros.estado) {
-        query += ' AND c.estado = ?';
+        baseQuery += ' AND c.estado = ?';
         params.push(filtros.estado);
       }
 
       if (filtros.identificacion) {
-        query += ' AND c.identificacion LIKE ?';
+        baseQuery += ' AND c.identificacion LIKE ?';
         params.push(`%${filtros.identificacion}%`);
       }
 
       if (filtros.nombre) {
-        query += ' AND c.nombre LIKE ?';
+        baseQuery += ' AND c.nombre LIKE ?';
         params.push(`%${filtros.nombre}%`);
       }
 
       if (filtros.sector_id) {
-        query += ' AND c.sector_id = ?';
+        baseQuery += ' AND c.sector_id = ?';
         params.push(filtros.sector_id);
       }
 
       if (filtros.ciudad_id) {
-        query += ' AND c.ciudad_id = ?';
+        baseQuery += ' AND c.ciudad_id = ?';
         params.push(filtros.ciudad_id);
       }
 
       if (filtros.telefono) {
-        query += ' AND (c.telefono LIKE ? OR c.telefono_2 LIKE ?)';
+        baseQuery += ' AND (c.telefono LIKE ? OR c.telefono_2 LIKE ?)';
         params.push(`%${filtros.telefono}%`, `%${filtros.telefono}%`);
       }
 
-      query += ' ORDER BY c.created_at DESC';
+      // ✅ SOLUCIÓN: Construir query final SIN parámetros para LIMIT/OFFSET
+      let finalQuery = baseQuery + ' ORDER BY c.created_at DESC';
 
       // Paginación
       if (filtros.limite && filtros.offset !== undefined) {
-        query += ' LIMIT ? OFFSET ?';
-        params.push(parseInt(filtros.limite), parseInt(filtros.offset));
+        const limite = parseInt(filtros.limite);
+        const offset = parseInt(filtros.offset);
+        finalQuery += ` LIMIT ${limite} OFFSET ${offset}`;
       }
 
-      const connection = await pool.getConnection();
-      const [filas] = await connection.execute(query, params);
-      connection.release();
+      console.log('🔍 Query clientes:', finalQuery);
+      console.log('📊 Parámetros:', params);
 
-      return filas;
+      const connection = await pool.getConnection();
+
+      try {
+        // ✅ EJECUTAR SIN parámetros para LIMIT/OFFSET
+        const [filas] = params.length > 0 ? 
+          await connection.execute(finalQuery, params) : 
+          await connection.query(finalQuery);
+
+        console.log(`✅ Clientes obtenidos: ${filas.length} registros`);
+
+        return filas;
+
+      } finally {
+        connection.release();
+      }
+
     } catch (error) {
+      console.error('❌ Error obteniendo clientes:', error);
       throw new Error(`Error al obtener clientes: ${error.message}`);
     }
   }
