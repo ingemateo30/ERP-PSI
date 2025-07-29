@@ -58,7 +58,7 @@ class UsersController {
       query += ` ORDER BY ${finalSort} ${finalOrder}`;
 
       // Paginación
-      const offset = (parseInt(page) - 1) * limit;
+      const offset = (page - 1) * limit;
       query += ' LIMIT ? OFFSET ?';
       params.push(limit, offset);
 
