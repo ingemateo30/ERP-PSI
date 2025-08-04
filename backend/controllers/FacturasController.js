@@ -252,7 +252,7 @@ class FacturasController {
           f.*,
           c.telefono as cliente_telefono_adicional,
           c.direccion as cliente_direccion_adicional,
-          c.email as cliente_email_adicional,
+          c.correo as cliente_email_adicional,
           DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencimiento
         FROM facturas f
         LEFT JOIN clientes c ON f.cliente_id = c.id

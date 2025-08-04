@@ -1,29 +1,38 @@
-// components/PQR/PQRManagement.js
+// frontend/src/components/PQR/PQRManagement.js
 import React, { useState, useEffect } from 'react';
 import { 
     Plus, Search, Filter, MessageCircle, AlertTriangle, 
     CheckCircle, Clock, Eye, Edit, Trash2, FileText,
-    Phone, Mail, User, Calendar
+    Phone, Mail, User, Calendar, X, Save, UserCheck,
+    ExternalLink, History, Star, Download, RefreshCw
 } from 'lucide-react';
+import pqrService from '../../services/pqrService';
 
 const PQRManagement = () => {
     const [pqrs, setPqrs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedPqr, setSelectedPqr] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
     const [filters, setFilters] = useState({
         estado: '',
         tipo: '',
+        categoria: '',
         fechaInicio: '',
         fechaFin: '',
-        search: ''
+        search: '',
+        page: 1,
+        limit: 50
     });
     const [stats, setStats] = useState({
         total: 0,
         abiertos: 0,
-        enProceso: 0,
+        en_proceso: 0,
         resueltos: 0,
-        cerrados: 0
+        cerrados: 0,
+        escalados: 0
     });
 
     const tiposPQR = [
@@ -37,23 +46,32 @@ const PQRManagement = () => {
         { value: 'abierto', label: 'Abierto', color: 'gray', icon: Clock },
         { value: 'en_proceso', label: 'En Proceso', color: 'yellow', icon: AlertTriangle },
         { value: 'resuelto', label: 'Resuelto', color: 'green', icon: CheckCircle },
-        { value: 'cerrado', label: 'Cerrado', color: 'blue', icon: CheckCircle }
+        { value: 'cerrado', label: 'Cerrado', color: 'blue', icon: CheckCircle },
+        { value: 'escalado', label: 'Escalado', color: 'red', icon: AlertTriangle }
     ];
 
     const categorias = [
-        'facturacion',
-        'tecnico',
-        'comercial',
-        'atencion_cliente',
-        'otros'
+        { value: 'facturacion', label: 'Facturación' },
+        { value: 'tecnico', label: 'Técnico' },
+        { value: 'comercial', label: 'Comercial' },
+        { value: 'atencion_cliente', label: 'Atención al Cliente' },
+        { value: 'otros', label: 'Otros' }
     ];
 
     const mediosRecepcion = [
-        'telefono',
-        'email',
-        'presencial',
-        'web',
-        'chat'
+        { value: 'telefono', label: 'Teléfono', icon: Phone },
+        { value: 'email', label: 'Email', icon: Mail },
+        { value: 'presencial', label: 'Presencial', icon: User },
+        { value: 'web', label: 'Web', icon: ExternalLink },
+        { value: 'chat', label: 'Chat', icon: MessageCircle },
+        { value: 'whatsapp', label: 'WhatsApp', icon: MessageCircle }
+    ];
+
+    const prioridades = [
+        { value: 'baja', label: 'Baja', color: 'green' },
+        { value: 'media', label: 'Media', color: 'yellow' },
+        { value: 'alta', label: 'Alta', color: 'orange' },
+        { value: 'critica', label: 'Crítica', color: 'red' }
     ];
 
     useEffect(() => {
@@ -64,16 +82,20 @@ const PQRManagement = () => {
     const cargarPQRs = async () => {
         setLoading(true);
         try {
-            const queryParams = new URLSearchParams(filters);
-            const response = await fetch(`/api/pqr?${queryParams}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
+            const response = await pqrService.getPQRs({
+                ...filters,
+                page: currentPage
             });
-            const data = await response.json();
-            setPqrs(data.pqrs || []);
+            
+            if (response.success) {
+                setPqrs(response.pqrs || []);
+                if (response.pagination) {
+                    setTotalPages(response.pagination.total_pages);
+                }
+            }
         } catch (error) {
             console.error('Error cargando PQRs:', error);
+            setPqrs([]);
         } finally {
             setLoading(false);
         }
@@ -81,13 +103,10 @@ const PQRManagement = () => {
 
     const cargarEstadisticas = async () => {
         try {
-            const response = await fetch('/api/pqr/estadisticas', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-            const data = await response.json();
-            setStats(data);
+            const response = await pqrService.getEstadisticas();
+            if (response.success) {
+                setStats(response.estadisticas || stats);
+            }
         } catch (error) {
             console.error('Error cargando estadísticas:', error);
         }
@@ -96,44 +115,24 @@ const PQRManagement = () => {
     const handleFilterChange = (key, value) => {
         setFilters(prev => ({
             ...prev,
-            [key]: value
+            [key]: value,
+            page: 1
         }));
+        setCurrentPage(1);
     };
 
-    const getEstadoColor = (estado) => {
-        const estadoData = estadosPQR.find(e => e.value === estado);
-        return estadoData ? estadoData.color : 'gray';
-    };
-
-    const getTipoColor = (tipo) => {
-        const tipoData = tiposPQR.find(t => t.value === tipo);
-        return tipoData ? tipoData.color : 'gray';
-    };
-
-    const formatFecha = (fecha) => {
-        return new Date(fecha).toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+    const limpiarFiltros = () => {
+        setFilters({
+            estado: '',
+            tipo: '',
+            categoria: '',
+            fechaInicio: '',
+            fechaFin: '',
+            search: '',
+            page: 1,
+            limit: 50
         });
-    };
-
-    const calcularTiempoTranscurrido = (fechaRecepcion) => {
-        const ahora = new Date();
-        const fecha = new Date(fechaRecepcion);
-        const diffMs = ahora - fecha;
-        const diffHoras = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffDias = Math.floor(diffHoras / 24);
-        
-        if (diffDias > 0) {
-            return `${diffDias} día${diffDias > 1 ? 's' : ''}`;
-        } else if (diffHoras > 0) {
-            return `${diffHoras} hora${diffHoras > 1 ? 's' : ''}`;
-        } else {
-            return 'Menos de 1 hora';
-        }
+        setCurrentPage(1);
     };
 
     const abrirModal = (pqr = null) => {
@@ -142,22 +141,115 @@ const PQRManagement = () => {
     };
 
     const cerrarModal = () => {
-        setSelectedPqr(null);
         setShowModal(false);
+        setSelectedPqr(null);
+    };
+
+    const abrirDetalle = (pqr) => {
+        setSelectedPqr(pqr);
+        setShowDetailModal(true);
+    };
+
+    const cerrarDetalle = () => {
+        setShowDetailModal(false);
+        setSelectedPqr(null);
+    };
+
+    const eliminarPQR = async (id) => {
+        if (!window.confirm('¿Estás seguro de que quieres eliminar esta PQR?')) {
+            return;
+        }
+
+        try {
+            await pqrService.deletePQR(id);
+            cargarPQRs();
+            cargarEstadisticas();
+        } catch (error) {
+            alert('Error eliminando PQR: ' + error.message);
+        }
+    };
+
+    const exportarDatos = () => {
+        try {
+            pqrService.exportarCSV(pqrs, `pqrs_${new Date().toISOString().split('T')[0]}.csv`);
+        } catch (error) {
+            alert('Error exportando datos: ' + error.message);
+        }
+    };
+
+    const getEstadoBadge = (estado) => {
+        const estadoConfig = estadosPQR.find(e => e.value === estado);
+        if (!estadoConfig) return null;
+
+        const colorClasses = {
+            gray: 'bg-gray-100 text-gray-800',
+            yellow: 'bg-yellow-100 text-yellow-800',
+            green: 'bg-green-100 text-green-800',
+            blue: 'bg-blue-100 text-blue-800',
+            red: 'bg-red-100 text-red-800'
+        };
+
+        return (
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClasses[estadoConfig.color]}`}>
+                <estadoConfig.icon className="w-3 h-3 mr-1" />
+                {estadoConfig.label}
+            </span>
+        );
+    };
+
+    const getTipoBadge = (tipo) => {
+        const tipoConfig = tiposPQR.find(t => t.value === tipo);
+        if (!tipoConfig) return null;
+
+        const colorClasses = {
+            blue: 'bg-blue-100 text-blue-800',
+            red: 'bg-red-100 text-red-800',
+            orange: 'bg-orange-100 text-orange-800',
+            green: 'bg-green-100 text-green-800'
+        };
+
+        return (
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClasses[tipoConfig.color]}`}>
+                {tipoConfig.label}
+            </span>
+        );
+    };
+
+    const getPrioridadBadge = (prioridad) => {
+        const prioridadConfig = prioridades.find(p => p.value === prioridad);
+        if (!prioridadConfig) return null;
+
+        const colorClasses = {
+            green: 'bg-green-100 text-green-800',
+            yellow: 'bg-yellow-100 text-yellow-800',
+            orange: 'bg-orange-100 text-orange-800',
+            red: 'bg-red-100 text-red-800'
+        };
+
+        return (
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClasses[prioridadConfig.color]}`}>
+                {prioridadConfig.label}
+            </span>
+        );
     };
 
     return (
-        <div className="p-6">
-            <div className="mb-6">
-                <div className="flex justify-between items-center mb-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">
-                            Gestión de PQR
-                        </h1>
-                        <p className="text-gray-600">
-                            Peticiones, Quejas y Reclamos
-                        </p>
-                    </div>
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Gestión de PQR</h1>
+                    <p className="text-gray-600">Peticiones, Quejas y Reclamos</p>
+                </div>
+                <div className="flex space-x-3">
+                    <button
+                        onClick={exportarDatos}
+                        className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                        disabled={pqrs.length === 0}
+                    >
+                        <Download className="w-4 h-4 mr-2" />
+                        Exportar
+                    </button>
                     <button
                         onClick={() => abrirModal()}
                         className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -166,87 +258,39 @@ const PQRManagement = () => {
                         Nueva PQR
                     </button>
                 </div>
+            </div>
 
-                {/* Estadísticas */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                    <div className="bg-white p-4 rounded-lg shadow">
-                        <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-                        <div className="text-sm text-gray-600">Total</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow">
-                        <div className="text-2xl font-bold text-gray-500">{stats.abiertos}</div>
-                        <div className="text-sm text-gray-600">Abiertos</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow">
-                        <div className="text-2xl font-bold text-yellow-600">{stats.enProceso}</div>
-                        <div className="text-sm text-gray-600">En Proceso</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow">
-                        <div className="text-2xl font-bold text-green-600">{stats.resueltos}</div>
-                        <div className="text-sm text-gray-600">Resueltos</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow">
-                        <div className="text-2xl font-bold text-blue-600">{stats.cerrados}</div>
-                        <div className="text-sm text-gray-600">Cerrados</div>
-                    </div>
+            {/* Estadísticas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                <div className="bg-white p-4 rounded-lg shadow">
+                    <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+                    <div className="text-sm text-gray-600">Total</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                    <div className="text-2xl font-bold text-gray-600">{stats.abiertos}</div>
+                    <div className="text-sm text-gray-600">Abiertos</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                    <div className="text-2xl font-bold text-yellow-600">{stats.en_proceso}</div>
+                    <div className="text-sm text-gray-600">En Proceso</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                    <div className="text-2xl font-bold text-green-600">{stats.resueltos}</div>
+                    <div className="text-sm text-gray-600">Resueltos</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                    <div className="text-2xl font-bold text-blue-600">{stats.cerrados}</div>
+                    <div className="text-sm text-gray-600">Cerrados</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                    <div className="text-2xl font-bold text-red-600">{stats.escalados}</div>
+                    <div className="text-sm text-gray-600">Escalados</div>
                 </div>
             </div>
 
             {/* Filtros */}
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Buscar
-                        </label>
-                        <div className="relative">
-                            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Radicado, cliente..."
-                                value={filters.search}
-                                onChange={(e) => handleFilterChange('search', e.target.value)}
-                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Estado
-                        </label>
-                        <select
-                            value={filters.estado}
-                            onChange={(e) => handleFilterChange('estado', e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">Todos los estados</option>
-                            {estadosPQR.map(estado => (
-                                <option key={estado.value} value={estado.value}>
-                                    {estado.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Tipo
-                        </label>
-                        <select
-                            value={filters.tipo}
-                            onChange={(e) => handleFilterChange('tipo', e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">Todos los tipos</option>
-                            {tiposPQR.map(tipo => (
-                                <option key={tipo.value} value={tipo.value}>
-                                    {tipo.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Fecha Inicio
@@ -271,14 +315,32 @@ const PQRManagement = () => {
                         />
                     </div>
                 </div>
+                
+                <div className="flex justify-end mt-4">
+                    <button
+                        onClick={limpiarFiltros}
+                        className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-800"
+                    >
+                        <X className="w-4 h-4 mr-2" />
+                        Limpiar Filtros
+                    </button>
+                </div>
             </div>
 
             {/* Lista de PQRs */}
             <div className="bg-white rounded-lg shadow">
-                <div className="px-6 py-4 border-b border-gray-200">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                     <h2 className="text-lg font-semibold text-gray-900">
                         Lista de PQR ({pqrs.length})
                     </h2>
+                    <button
+                        onClick={cargarPQRs}
+                        className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-800"
+                        disabled={loading}
+                    >
+                        <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                        Actualizar
+                    </button>
                 </div>
 
                 {loading ? (
@@ -306,6 +368,9 @@ const PQRManagement = () => {
                                         Estado
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Prioridad
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Fecha
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -325,50 +390,56 @@ const PQRManagement = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-900">
-                                                {pqr.cliente_nombre}
-                                            </div>
-                                            <div className="text-sm text-gray-500">
-                                                {pqr.cliente_identificacion}
-                                            </div>
+                                            <div className="text-sm text-gray-900">{pqr.cliente_nombre}</div>
+                                            <div className="text-sm text-gray-500">{pqr.cliente_identificacion}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${getTipoColor(pqr.tipo)}-100 text-${getTipoColor(pqr.tipo)}-800`}>
-                                                {tiposPQR.find(t => t.value === pqr.tipo)?.label}
-                                            </span>
+                                            {getTipoBadge(pqr.tipo)}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900 max-w-xs truncate">
+                                            <div className="text-sm text-gray-900 max-w-xs truncate" title={pqr.asunto}>
                                                 {pqr.asunto}
                                             </div>
-                                            <div className="text-sm text-gray-500 capitalize">
-                                                {pqr.categoria.replace('_', ' ')}
+                                            <div className="text-sm text-gray-500">{pqr.categoria}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {getEstadoBadge(pqr.estado)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {getPrioridadBadge(pqr.prioridad)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm text-gray-900">
+                                                {pqrService.formatFecha(pqr.fecha_recepcion)}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${getEstadoColor(pqr.estado)}-100 text-${getEstadoColor(pqr.estado)}-800`}>
-                                                {estadosPQR.find(e => e.value === pqr.estado)?.label}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {formatFecha(pqr.fecha_recepcion)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {calcularTiempoTranscurrido(pqr.fecha_recepcion)}
+                                            <div className="text-sm text-gray-900">
+                                                {pqrService.calcularTiempoTranscurrido(pqr.fecha_recepcion)}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div className="flex space-x-2 justify-end">
-                                                <button
-                                                    onClick={() => abrirModal(pqr)}
+                                            <div className="flex items-center justify-end space-x-2">
+                                                <button 
+                                                    onClick={() => abrirDetalle(pqr)}
                                                     className="text-blue-600 hover:text-blue-900"
+                                                    title="Ver detalle"
                                                 >
                                                     <Eye className="w-4 h-4" />
                                                 </button>
-                                                <button
+                                                <button 
                                                     onClick={() => abrirModal(pqr)}
                                                     className="text-green-600 hover:text-green-900"
+                                                    title="Editar"
                                                 >
                                                     <Edit className="w-4 h-4" />
+                                                </button>
+                                                <button 
+                                                    onClick={() => eliminarPQR(pqr.id)}
+                                                    className="text-red-600 hover:text-red-900"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
                                         </td>
@@ -379,27 +450,40 @@ const PQRManagement = () => {
                     </div>
                 ) : (
                     <div className="text-center py-12">
-                        <MessageCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            No hay PQR registradas
-                        </h3>
-                        <p className="text-gray-600 mb-4">
-                            Comienza registrando la primera PQR
-                        </p>
-                        <button
-                            onClick={() => abrirModal()}
-                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                        >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Nueva PQR
-                        </button>
+                        <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500">No se encontraron PQRs</p>
+                    </div>
+                )}
+
+                {/* Paginación */}
+                {totalPages > 1 && (
+                    <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+                        <div className="text-sm text-gray-700">
+                            Página {currentPage} de {totalPages}
+                        </div>
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                            >
+                                Anterior
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                            >
+                                Siguiente
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
 
-            {/* Modal para crear/editar PQR */}
+            {/* Modal de formulario */}
             {showModal && (
-                <PQRModal
+                <PQRModal 
                     pqr={selectedPqr}
                     onClose={cerrarModal}
                     onSave={() => {
@@ -409,11 +493,19 @@ const PQRManagement = () => {
                     }}
                 />
             )}
+
+            {/* Modal de detalle */}
+            {showDetailModal && selectedPqr && (
+                <PQRDetailModal 
+                    pqr={selectedPqr}
+                    onClose={cerrarDetalle}
+                />
+            )}
         </div>
     );
 };
 
-// Componente Modal para PQR
+// Componente Modal para crear/editar PQR
 const PQRModal = ({ pqr, onClose, onSave }) => {
     const [formData, setFormData] = useState({
         cliente_id: '',
@@ -423,13 +515,16 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
         asunto: '',
         descripcion: '',
         prioridad: 'media',
-        servicio_afectado: 'internet'
+        servicio_afectado: 'ninguno'
     });
     const [loading, setLoading] = useState(false);
     const [clientes, setClientes] = useState([]);
+    const [usuarios, setUsuarios] = useState([]);
+    const [clienteSearch, setClienteSearch] = useState('');
 
     useEffect(() => {
         cargarClientes();
+        cargarUsuarios();
         if (pqr) {
             setFormData({
                 cliente_id: pqr.cliente_id || '',
@@ -439,54 +534,34 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                 asunto: pqr.asunto || '',
                 descripcion: pqr.descripcion || '',
                 prioridad: pqr.prioridad || 'media',
-                servicio_afectado: pqr.servicio_afectado || 'internet',
+                servicio_afectado: pqr.servicio_afectado || 'ninguno',
                 estado: pqr.estado || 'abierto',
-                respuesta: pqr.respuesta || ''
+                respuesta: pqr.respuesta || '',
+                usuario_asignado: pqr.usuario_asignado || '',
+                notas_internas: pqr.notas_internas || ''
             });
         }
     }, [pqr]);
 
     const cargarClientes = async () => {
         try {
-            const response = await fetch('/api/clientes/activos', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-            const data = await response.json();
-            setClientes(data.clientes || []);
+            const response = await pqrService.getClientesActivos(clienteSearch);
+            if (response.success) {
+                setClientes(response.clientes || response.data || []);
+            }
         } catch (error) {
             console.error('Error cargando clientes:', error);
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-
+    const cargarUsuarios = async () => {
         try {
-            const url = pqr ? `/api/pqr/${pqr.id}` : '/api/pqr';
-            const method = pqr ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (response.ok) {
-                onSave();
-            } else {
-                throw new Error('Error guardando PQR');
+            const response = await pqrService.getUsuariosDisponibles();
+            if (response.success) {
+                setUsuarios(response.usuarios || []);
             }
         } catch (error) {
-            console.error('Error:', error);
-            alert('Error guardando la PQR');
-        } finally {
-            setLoading(false);
+            console.error('Error cargando usuarios:', error);
         }
     };
 
@@ -497,16 +572,48 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
         }));
     };
 
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+
+        try {
+            // Validar datos
+            const validation = pqrService.validatePQRData(formData);
+            if (!validation.isValid) {
+                alert('Errores en el formulario:\n' + validation.errors.join('\n'));
+                return;
+            }
+
+            if (pqr) {
+                await pqrService.updatePQR(pqr.id, formData);
+            } else {
+                await pqrService.createPQR(formData);
+            }
+            
+            onSave();
+        } catch (error) {
+            alert('Error guardando PQR: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h3 className="text-lg font-medium text-gray-900">
                         {pqr ? 'Editar PQR' : 'Nueva PQR'}
-                    </h2>
+                    </h3>
+                    <button 
+                        onClick={onClose}
+                        className="text-gray-400 hover:text-gray-600"
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6">
+                <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Cliente */}
                         <div className="md:col-span-2">
@@ -519,7 +626,7 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                                 required
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
-                                <option value="">Seleccionar cliente</option>
+                                <option value="">Seleccionar cliente...</option>
                                 {clientes.map(cliente => (
                                     <option key={cliente.id} value={cliente.id}>
                                         {cliente.nombre} - {cliente.identificacion}
@@ -581,6 +688,7 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                                 <option value="presencial">Presencial</option>
                                 <option value="web">Web</option>
                                 <option value="chat">Chat</option>
+                                <option value="whatsapp">WhatsApp</option>
                             </select>
                         </div>
 
@@ -601,40 +709,44 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                             </select>
                         </div>
 
-                        {/* Servicio Afectado */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Servicio Afectado
-                            </label>
-                            <select
-                                value={formData.servicio_afectado}
-                                onChange={(e) => handleChange('servicio_afectado', e.target.value)}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="internet">Internet</option>
-                                <option value="television">Televisión</option>
-                                <option value="combo">Combo</option>
-                                <option value="todos">Todos</option>
-                            </select>
-                        </div>
-
-                        {/* Estado (solo para edición) */}
+                        {/* Estado y Usuario Asignado (solo para edición) */}
                         {pqr && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Estado
-                                </label>
-                                <select
-                                    value={formData.estado}
-                                    onChange={(e) => handleChange('estado', e.target.value)}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                    <option value="abierto">Abierto</option>
-                                    <option value="en_proceso">En Proceso</option>
-                                    <option value="resuelto">Resuelto</option>
-                                    <option value="cerrado">Cerrado</option>
-                                </select>
-                            </div>
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Estado
+                                    </label>
+                                    <select
+                                        value={formData.estado}
+                                        onChange={(e) => handleChange('estado', e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="abierto">Abierto</option>
+                                        <option value="en_proceso">En Proceso</option>
+                                        <option value="resuelto">Resuelto</option>
+                                        <option value="cerrado">Cerrado</option>
+                                        <option value="escalado">Escalado</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Usuario Asignado
+                                    </label>
+                                    <select
+                                        value={formData.usuario_asignado}
+                                        onChange={(e) => handleChange('usuario_asignado', e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="">Sin asignar</option>
+                                        {usuarios.map(usuario => (
+                                            <option key={usuario.id} value={usuario.id}>
+                                                {usuario.nombre} - {usuario.rol}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </>
                         )}
 
                         {/* Asunto */}
@@ -648,7 +760,7 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                                 onChange={(e) => handleChange('asunto', e.target.value)}
                                 required
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Resumen del motivo de la PQR"
+                                placeholder="Resumen del caso..."
                             />
                         </div>
 
@@ -682,6 +794,22 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                                 />
                             </div>
                         )}
+
+                        {/* Notas Internas (solo para edición) */}
+                        {pqr && (
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Notas Internas
+                                </label>
+                                <textarea
+                                    value={formData.notas_internas || ''}
+                                    onChange={(e) => handleChange('notas_internas', e.target.value)}
+                                    rows={3}
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Notas para uso interno..."
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {/* Botones */}
@@ -702,6 +830,92 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    );
+};
+
+// Componente Modal de detalle
+const PQRDetailModal = ({ pqr, onClose }) => {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h3 className="text-lg font-medium text-gray-900">
+                        Detalle PQR - {pqr.numero_radicado}
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Información del Cliente</h4>
+                            <div className="space-y-2 text-sm">
+                                <p><span className="font-medium">Nombre:</span> {pqr.cliente_nombre}</p>
+                                <p><span className="font-medium">Identificación:</span> {pqr.cliente_identificacion}</p>
+                                <p><span className="font-medium">Teléfono:</span> {pqr.cliente_telefono}</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Información de la PQR</h4>
+                            <div className="space-y-2 text-sm">
+                                <p><span className="font-medium">Tipo:</span> {pqr.tipo}</p>
+                                <p><span className="font-medium">Categoría:</span> {pqr.categoria}</p>
+                                <p><span className="font-medium">Prioridad:</span> {pqr.prioridad}</p>
+                                <p><span className="font-medium">Estado:</span> {pqr.estado}</p>
+                            </div>
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <h4 className="font-medium text-gray-900 mb-2">Asunto</h4>
+                            <p className="text-sm text-gray-700">{pqr.asunto}</p>
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <h4 className="font-medium text-gray-900 mb-2">Descripción</h4>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{pqr.descripcion}</p>
+                        </div>
+
+                        {pqr.respuesta && (
+                            <div className="md:col-span-2">
+                                <h4 className="font-medium text-gray-900 mb-2">Respuesta</h4>
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{pqr.respuesta}</p>
+                            </div>
+                        )}
+
+                        <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Fechas</h4>
+                            <div className="space-y-2 text-sm">
+                                <p><span className="font-medium">Recepción:</span> {pqrService.formatFecha(pqr.fecha_recepcion)}</p>
+                                {pqr.fecha_respuesta && (
+                                    <p><span className="font-medium">Respuesta:</span> {pqrService.formatFecha(pqr.fecha_respuesta)}</p>
+                                )}
+                                <p><span className="font-medium">Tiempo transcurrido:</span> {pqrService.calcularTiempoTranscurrido(pqr.fecha_recepcion)}</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Asignación</h4>
+                            <div className="space-y-2 text-sm">
+                                <p><span className="font-medium">Usuario asignado:</span> {pqr.usuario_asignado_nombre || 'Sin asignar'}</p>
+                                <p><span className="font-medium">Medio de recepción:</span> {pqr.medio_recepcion}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                        Cerrar
+                    </button>
+                </div>
             </div>
         </div>
     );
