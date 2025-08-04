@@ -9,407 +9,617 @@ const db = Database;
 // Middleware de autenticación para todas las rutas
 router.use(authenticateToken);
 
-// Obtener todas las incidencias con filtros
-router.get('/', async (req, res) => {
+// =====================================================
+// RUTAS PRINCIPALES DE INCIDENCIAS
+// =====================================================
+
+/**
+ * @route GET /api/incidencias
+ * @desc Obtener todas las incidencias con filtros opcionales
+ * @access Private (Administrador, Supervisor, Instalador)
+ */
+router.get('/', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
     try {
+        console.log('📋 GET /api/incidencias - Obteniendo incidencias');
+        
         const { 
+            tipo, 
             estado, 
-            tipo_incidencia, 
-            categoria,
-            fechaInicio, 
-            fechaFin, 
-            search, 
+            municipio_id, 
+            fecha_inicio, 
+            fecha_fin, 
+            responsable_id,
+            search,
             page = 1, 
             limit = 50 
         } = req.query;
-        
+
         let query = `
             SELECT 
                 i.*,
-                m.nombre as municipio_nombre,
-                m.departamento_nombre,
-                u.nombre as responsable_nombre,
+                c.nombre as municipio_nombre,
+                d.nombre as departamento_nombre,
+                CONCAT(u.nombres, ' ', u.apellidos) as responsable_nombre,
                 TIMESTAMPDIFF(MINUTE, i.fecha_inicio, COALESCE(i.fecha_fin, NOW())) as duracion_minutos
             FROM incidencias_servicio i
-            LEFT JOIN municipios m ON i.municipio_id = m.id
+            LEFT JOIN ciudades c ON i.municipio_id = c.id
+            LEFT JOIN departamentos d ON c.departamento_id = d.id
             LEFT JOIN sistema_usuarios u ON i.responsable_id = u.id
             WHERE 1=1
         `;
-        
-        const params = [];
-        
+
+        const queryParams = [];
+
+        if (tipo) {
+            query += ' AND i.tipo = ?';
+            queryParams.push(tipo);
+        }
+
         if (estado) {
             query += ' AND i.estado = ?';
-            params.push(estado);
+            queryParams.push(estado);
         }
-        
-        if (tipo_incidencia) {
-            query += ' AND i.tipo_incidencia = ?';
-            params.push(tipo_incidencia);
+
+        if (municipio_id) {
+            query += ' AND i.municipio_id = ?';
+            queryParams.push(municipio_id);
         }
-        
-        if (categoria) {
-            query += ' AND i.categoria = ?';
-            params.push(categoria);
-        }
-        
-        if (fechaInicio) {
+
+        if (fecha_inicio) {
             query += ' AND DATE(i.fecha_inicio) >= ?';
-            params.push(fechaInicio);
+            queryParams.push(fecha_inicio);
         }
-        
-        if (fechaFin) {
+
+        if (fecha_fin) {
             query += ' AND DATE(i.fecha_inicio) <= ?';
-            params.push(fechaFin);
+            queryParams.push(fecha_fin);
         }
-        
+
+        if (responsable_id) {
+            query += ' AND i.responsable_id = ?';
+            queryParams.push(responsable_id);
+        }
+
         if (search) {
-            query += ' AND (i.numero_incidencia LIKE ? OR i.descripcion LIKE ? OR m.nombre LIKE ?)';
+            query += ' AND (i.titulo LIKE ? OR i.descripcion LIKE ? OR c.nombre LIKE ?)';
             const searchParam = `%${search}%`;
-            params.push(searchParam, searchParam, searchParam);
+            queryParams.push(searchParam, searchParam, searchParam);
         }
-        
-        // Contar total de registros
-        const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
-        const [countResult] = await db.query(countQuery, params);
-        const total = countResult.total;
-        
-        // Agregar ordenamiento y paginación
+
+        // Contar total para paginación
+        let countQuery = `
+            SELECT COUNT(*) as total
+            FROM incidencias_servicio i
+            LEFT JOIN ciudades c ON i.municipio_id = c.id
+            WHERE 1=1
+        `;
+        const countParams = [...queryParams.slice(0, -3)]; // Excluir parámetros de búsqueda para el conteo
+
+        // Aplicar los mismos filtros al conteo
+        let countParamIndex = 0;
+        if (tipo) {
+            countQuery += ' AND i.tipo = ?';
+            countParamIndex++;
+        }
+        if (estado) {
+            countQuery += ' AND i.estado = ?';
+            countParamIndex++;
+        }
+        if (municipio_id) {
+            countQuery += ' AND i.municipio_id = ?';
+            countParamIndex++;
+        }
+        if (fecha_inicio) {
+            countQuery += ' AND DATE(i.fecha_inicio) >= ?';
+            countParamIndex++;
+        }
+        if (fecha_fin) {
+            countQuery += ' AND DATE(i.fecha_inicio) <= ?';
+            countParamIndex++;
+        }
+        if (responsable_id) {
+            countQuery += ' AND i.responsable_id = ?';
+            countParamIndex++;
+        }
+        if (search) {
+            countQuery += ' AND (i.titulo LIKE ? OR i.descripcion LIKE ? OR c.nombre LIKE ?)';
+            const searchParam = `%${search}%`;
+            countParams.push(searchParam, searchParam, searchParam);
+        }
+
+        const [{ total }] = await db.query(countQuery, countParams);
+
+        // Agregar ordenamiento y paginación a la consulta principal
         query += ' ORDER BY i.fecha_inicio DESC';
-        const offset = (page - 1) * limit;
+        const offset = (parseInt(page) - 1) * parseInt(limit);
         query += ' LIMIT ? OFFSET ?';
-        params.push(parseInt(limit), parseInt(offset));
-        
-        const incidencias = await db.query(query, params);
-        
+        queryParams.push(parseInt(limit), offset);
+
+        const incidencias = await db.query(query, queryParams);
+
+        console.log(`✅ Encontradas ${incidencias.length} incidencias de ${total} total`);
+
         res.json({
             success: true,
-            incidencias,
-            pagination: {
-                current_page: parseInt(page),
-                per_page: parseInt(limit),
-                total,
-                total_pages: Math.ceil(total / limit)
-            }
+            data: {
+                incidencias,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    total: parseInt(total),
+                    pages: Math.ceil(total / limit)
+                }
+            },
+            message: 'Incidencias obtenidas exitosamente'
         });
-        
+
     } catch (error) {
-        console.error('Error obteniendo incidencias activas:', error);
-        res.status(500).json({ 
+        console.error('❌ Error obteniendo incidencias:', error);
+        res.status(500).json({
             success: false,
-            error: 'Error obteniendo incidencias activas' 
+            message: 'Error interno del servidor',
+            error: error.message
         });
     }
 });
 
-// Obtener incidencia por ID
+/**
+ * @route GET /api/incidencias/estadisticas
+ * @desc Obtener estadísticas de incidencias
+ * @access Private (Administrador, Supervisor)
+ */
+router.get('/estadisticas', requireRole('administrador', 'supervisor'), async (req, res) => {
+    try {
+        console.log('📊 GET /api/incidencias/estadisticas');
+
+        const estadisticas = {};
+
+        // Total por estado
+        const porEstado = await db.query(`
+            SELECT estado, COUNT(*) as cantidad
+            FROM incidencias_servicio 
+            GROUP BY estado
+        `);
+
+        estadisticas.por_estado = porEstado.reduce((acc, item) => {
+            acc[item.estado] = item.cantidad;
+            return acc;
+        }, {});
+
+        // Total por tipo
+        const porTipo = await db.query(`
+            SELECT tipo, COUNT(*) as cantidad
+            FROM incidencias_servicio 
+            GROUP BY tipo
+        `);
+
+        estadisticas.por_tipo = porTipo.reduce((acc, item) => {
+            acc[item.tipo] = item.cantidad;
+            return acc;
+        }, {});
+
+        // Incidencias por mes (últimos 6 meses)
+        const porMes = await db.query(`
+            SELECT 
+                DATE_FORMAT(fecha_inicio, '%Y-%m') as mes,
+                COUNT(*) as cantidad
+            FROM incidencias_servicio 
+            WHERE fecha_inicio >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+            GROUP BY mes
+            ORDER BY mes
+        `);
+
+        estadisticas.por_mes = porMes;
+
+        // Tiempo promedio de resolución
+        const [tiempoPromedio] = await db.query(`
+            SELECT AVG(tiempo_duracion_minutos) as promedio_minutos
+            FROM incidencias_servicio 
+            WHERE estado = 'cerrado' AND tiempo_duracion_minutos IS NOT NULL
+        `);
+
+        estadisticas.tiempo_promedio_resolucion = tiempoPromedio?.promedio_minutos || 0;
+
+        // Incidencias activas
+        const [activasCount] = await db.query(`
+            SELECT COUNT(*) as total
+            FROM incidencias_servicio 
+            WHERE estado IN ('reportado', 'en_progreso')
+        `);
+
+        estadisticas.incidencias_activas = activasCount?.total || 0;
+
+        // Usuarios afectados total
+        const [usuariosAfectados] = await db.query(`
+            SELECT SUM(usuarios_afectados) as total
+            FROM incidencias_servicio 
+            WHERE estado IN ('reportado', 'en_progreso')
+        `);
+
+        estadisticas.usuarios_afectados_activos = usuariosAfectados?.total || 0;
+
+        console.log('✅ Estadísticas obtenidas exitosamente');
+
+        res.json({
+            success: true,
+            data: estadisticas,
+            message: 'Estadísticas obtenidas exitosamente'
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo estadísticas:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route GET /api/incidencias/activas/resumen
+ * @desc Obtener resumen de incidencias activas
+ * @access Private (Administrador, Supervisor, Instalador)
+ */
+router.get('/activas/resumen', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
+    try {
+        console.log('🚨 GET /api/incidencias/activas/resumen');
+
+        const incidenciasActivas = await db.query(`
+            SELECT 
+                i.*,
+                c.nombre as municipio_nombre,
+                CONCAT(u.nombres, ' ', u.apellidos) as responsable_nombre,
+                TIMESTAMPDIFF(MINUTE, i.fecha_inicio, NOW()) as minutos_transcurridos
+            FROM incidencias_servicio i
+            LEFT JOIN ciudades c ON i.municipio_id = c.id
+            LEFT JOIN sistema_usuarios u ON i.responsable_id = u.id
+            WHERE i.estado IN ('reportado', 'en_progreso')
+            ORDER BY i.fecha_inicio ASC
+            LIMIT 10
+        `);
+
+        console.log(`✅ Encontradas ${incidenciasActivas.length} incidencias activas`);
+
+        res.json({
+            success: true,
+            data: incidenciasActivas,
+            message: 'Resumen de incidencias activas obtenido'
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo incidencias activas:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route GET /api/incidencias/municipios/disponibles
+ * @desc Obtener municipios disponibles
+ * @access Private
+ */
+router.get('/municipios/disponibles', async (req, res) => {
+    try {
+        console.log('🏘️ GET /api/incidencias/municipios/disponibles');
+
+        const municipios = await db.query(`
+            SELECT 
+                c.id,
+                c.nombre,
+                d.nombre as departamento_nombre
+            FROM ciudades c
+            INNER JOIN departamentos d ON c.departamento_id = d.id
+            WHERE c.activo = 1
+            ORDER BY d.nombre, c.nombre
+        `);
+
+        console.log(`✅ Encontrados ${municipios.length} municipios`);
+
+        res.json({
+            success: true,
+            data: { municipios },
+            message: 'Municipios obtenidos exitosamente'
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo municipios:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route GET /api/incidencias/responsables/disponibles
+ * @desc Obtener responsables disponibles
+ * @access Private
+ */
+router.get('/responsables/disponibles', async (req, res) => {
+    try {
+        console.log('👷 GET /api/incidencias/responsables/disponibles');
+
+        const responsables = await db.query(`
+            SELECT 
+                id,
+                CONCAT(nombres, ' ', apellidos) as nombre,
+                rol
+            FROM sistema_usuarios
+            WHERE rol IN ('instalador', 'supervisor', 'administrador') 
+            AND activo = 1
+            ORDER BY nombres, apellidos
+        `);
+
+        console.log(`✅ Encontrados ${responsables.length} responsables`);
+
+        res.json({
+            success: true,
+            data: { responsables },
+            message: 'Responsables obtenidos exitosamente'
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo responsables:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route GET /api/incidencias/:id
+ * @desc Obtener incidencia por ID
+ * @access Private
+ */
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        
-        const query = `
+        console.log(`🔍 GET /api/incidencias/${id}`);
+
+        const [incidencia] = await db.query(`
             SELECT 
                 i.*,
-                m.nombre as municipio_nombre,
-                m.departamento_nombre,
-                u.nombre as responsable_nombre,
-                u.correo as responsable_correo,
-                u.telefono as responsable_telefono,
+                c.nombre as municipio_nombre,
+                d.nombre as departamento_nombre,
+                CONCAT(u.nombres, ' ', u.apellidos) as responsable_nombre,
                 TIMESTAMPDIFF(MINUTE, i.fecha_inicio, COALESCE(i.fecha_fin, NOW())) as duracion_minutos
             FROM incidencias_servicio i
-            LEFT JOIN municipios m ON i.municipio_id = m.id
+            LEFT JOIN ciudades c ON i.municipio_id = c.id
+            LEFT JOIN departamentos d ON c.departamento_id = d.id
             LEFT JOIN sistema_usuarios u ON i.responsable_id = u.id
             WHERE i.id = ?
-        `;
-        
-        const [incidencia] = await db.query(query, [id]);
-        
+        `, [id]);
+
         if (!incidencia) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 success: false,
-                error: 'Incidencia no encontrada' 
+                message: 'Incidencia no encontrada'
             });
         }
-        
+
+        console.log(`✅ Incidencia ${id} encontrada`);
+
         res.json({
             success: true,
-            incidencia
+            data: incidencia,
+            message: 'Incidencia obtenida exitosamente'
         });
-        
+
     } catch (error) {
-        console.error('Error obteniendo incidencia:', error);
-        res.status(500).json({ 
+        console.error('❌ Error obteniendo incidencia:', error);
+        res.status(500).json({
             success: false,
-            error: 'Error obteniendo incidencia' 
+            message: 'Error interno del servidor',
+            error: error.message
         });
     }
 });
 
-// Crear nueva incidencia
-router.post('/', async (req, res) => {
+/**
+ * @route POST /api/incidencias
+ * @desc Crear nueva incidencia
+ * @access Private (Administrador, Supervisor, Instalador)
+ */
+router.post('/', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
     try {
+        console.log('➕ POST /api/incidencias - Creando incidencia');
+
         const {
-            tipo_incidencia,
-            categoria,
-            fecha_inicio,
-            usuarios_afectados = 0,
+            tipo,
+            titulo,
+            descripcion,
             municipio_id,
             direccion,
             coordenadas_lat,
             coordenadas_lng,
-            descripcion,
-            causa_raiz,
-            responsable_id
-        } = req.body;
-        
-        // Validaciones básicas
-        if (!tipo_incidencia || !categoria || !descripcion) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Faltan campos obligatorios (tipo_incidencia, categoria, descripcion)' 
-            });
-        }
-        
-        // Generar número de incidencia
-        const year = new Date().getFullYear();
-        const month = String(new Date().getMonth() + 1).padStart(2, '0');
-        const queryLastIncidencia = `
-            SELECT numero_incidencia as ultimo 
-            FROM incidencias_servicio 
-            WHERE numero_incidencia LIKE ? 
-            ORDER BY id DESC LIMIT 1
-        `;
-        const [lastIncidencia] = await db.query(queryLastIncidencia, [`INC${year}${month}%`]);
-        
-        let numeroIncidencia;
-        if (lastIncidencia && lastIncidencia.ultimo) {
-            const ultimoNumero = parseInt(lastIncidencia.ultimo.substring(7));
-            numeroIncidencia = `INC${year}${month}${(ultimoNumero + 1).toString().padStart(4, '0')}`;
-        } else {
-            numeroIncidencia = `INC${year}${month}0001`;
-        }
-        
-        const query = `
-            INSERT INTO incidencias_servicio (
-                numero_incidencia, tipo_incidencia, categoria, fecha_inicio,
-                usuarios_afectados, municipio_id, direccion, coordenadas_lat,
-                coordenadas_lng, descripcion, causa_raiz, responsable_id, estado
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reportado')
-        `;
-        
-        const fechaInicioFinal = fecha_inicio || new Date();
-        
-        const result = await db.query(query, [
-            numeroIncidencia, tipo_incidencia, categoria, fechaInicioFinal,
-            usuarios_afectados, municipio_id, direccion, coordenadas_lat,
-            coordenadas_lng, descripcion, causa_raiz, responsable_id
-        ]);
-        
-        res.status(201).json({ 
-            success: true,
-            id: result.insertId,
-            numero_incidencia: numeroIncidencia,
-            message: 'Incidencia creada exitosamente' 
-        });
-        
-    } catch (error) {
-        console.error('Error creando incidencia:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Error creando incidencia' 
-        });
-    }
-});
-
-// Actualizar incidencia
-router.put('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const {
-            tipo_incidencia,
-            categoria,
-            fecha_inicio,
-            fecha_fin,
             usuarios_afectados,
-            municipio_id,
-            direccion,
-            coordenadas_lat,
-            coordenadas_lng,
-            descripcion,
-            causa_raiz,
-            solucion_aplicada,
-            mecanismo_solucion,
-            estado,
             responsable_id,
             observaciones
         } = req.body;
-        
-        // Verificar que la incidencia existe
-        const checkQuery = 'SELECT id, estado as estado_anterior FROM incidencias_servicio WHERE id = ?';
-        const [existing] = await db.query(checkQuery, [id]);
-        
-        if (!existing) {
-            return res.status(404).json({ 
+
+        // Validaciones básicas
+        if (!tipo || !titulo || !descripcion || !municipio_id) {
+            return res.status(400).json({
                 success: false,
-                error: 'Incidencia no encontrada' 
+                message: 'Campos requeridos: tipo, titulo, descripcion, municipio_id'
             });
         }
-        
-        const updateFields = [];
-        const params = [];
-        
-        if (tipo_incidencia) {
-            updateFields.push('tipo_incidencia = ?');
-            params.push(tipo_incidencia);
-        }
-        
-        if (categoria) {
-            updateFields.push('categoria = ?');
-            params.push(categoria);
-        }
-        
-        if (fecha_inicio) {
-            updateFields.push('fecha_inicio = ?');
-            params.push(fecha_inicio);
-        }
-        
-        if (fecha_fin) {
-            updateFields.push('fecha_fin = ?');
-            params.push(fecha_fin);
-        }
-        
-        if (usuarios_afectados !== undefined) {
-            updateFields.push('usuarios_afectados = ?');
-            params.push(usuarios_afectados);
-        }
-        
-        if (municipio_id) {
-            updateFields.push('municipio_id = ?');
-            params.push(municipio_id);
-        }
-        
-        if (direccion) {
-            updateFields.push('direccion = ?');
-            params.push(direccion);
-        }
-        
-        if (coordenadas_lat) {
-            updateFields.push('coordenadas_lat = ?');
-            params.push(coordenadas_lat);
-        }
-        
-        if (coordenadas_lng) {
-            updateFields.push('coordenadas_lng = ?');
-            params.push(coordenadas_lng);
-        }
-        
-        if (descripcion) {
-            updateFields.push('descripcion = ?');
-            params.push(descripcion);
-        }
-        
-        if (causa_raiz) {
-            updateFields.push('causa_raiz = ?');
-            params.push(causa_raiz);
-        }
-        
-        if (solucion_aplicada) {
-            updateFields.push('solucion_aplicada = ?');
-            params.push(solucion_aplicada);
-        }
-        
-        if (mecanismo_solucion) {
-            updateFields.push('mecanismo_solucion = ?');
-            params.push(mecanismo_solucion);
-        }
-        
-        if (estado) {
-            updateFields.push('estado = ?');
-            params.push(estado);
-            
-            // Si se resuelve o cierra automáticamente, agregar fecha fin
-            if ((estado === 'resuelto' || estado === 'cerrado') && !fecha_fin) {
-                updateFields.push('fecha_fin = NOW()');
-                
-                // Calcular duración
-                const duracionQuery = `
-                    SELECT TIMESTAMPDIFF(MINUTE, fecha_inicio, NOW()) as minutos
-                    FROM incidencias_servicio WHERE id = ?
-                `;
-                const [duracionResult] = await db.query(duracionQuery, [id]);
-                if (duracionResult) {
-                    updateFields.push('tiempo_duracion_minutos = ?');
-                    params.push(duracionResult.minutos);
-                }
-            }
-        }
-        
-        if (responsable_id) {
-            updateFields.push('responsable_id = ?');
-            params.push(responsable_id);
-        }
-        
-        if (observaciones) {
-            updateFields.push('observaciones = ?');
-            params.push(observaciones);
-        }
-        
-        if (updateFields.length === 0) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'No hay campos para actualizar' 
-            });
-        }
-        
-        updateFields.push('updated_at = NOW()');
-        params.push(id);
-        
-        const query = `UPDATE incidencias_servicio SET ${updateFields.join(', ')} WHERE id = ?`;
-        await db.query(query, params);
-        
-        res.json({ 
+
+        const result = await db.query(`
+            INSERT INTO incidencias_servicio (
+                tipo,
+                titulo,
+                descripcion,
+                municipio_id,
+                direccion,
+                coordenadas_lat,
+                coordenadas_lng,
+                usuarios_afectados,
+                responsable_id,
+                observaciones,
+                estado,
+                fecha_inicio,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reportado', NOW(), NOW())
+        `, [
+            tipo,
+            titulo,
+            descripcion,
+            municipio_id,
+            direccion || null,
+            coordenadas_lat || null,
+            coordenadas_lng || null,
+            usuarios_afectados || 0,
+            responsable_id || null,
+            observaciones || null
+        ]);
+
+        console.log(`✅ Incidencia creada con ID: ${result.insertId}`);
+
+        res.status(201).json({
             success: true,
-            message: 'Incidencia actualizada exitosamente' 
+            data: { id: result.insertId },
+            message: 'Incidencia creada exitosamente'
         });
-        
+
     } catch (error) {
-        console.error('Error actualizando incidencia:', error);
-        res.status(500).json({ 
+        console.error('❌ Error creando incidencia:', error);
+        res.status(500).json({
             success: false,
-            error: 'Error actualizando incidencia' 
+            message: 'Error interno del servidor',
+            error: error.message
         });
     }
 });
 
-// Cerrar incidencia
-router.post('/:id/cerrar', async (req, res) => {
+/**
+ * @route PUT /api/incidencias/:id
+ * @desc Actualizar incidencia
+ * @access Private (Administrador, Supervisor, Instalador)
+ */
+router.put('/:id', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { 
-            solucion_aplicada, 
-            mecanismo_solucion, 
-            observaciones 
+        console.log(`✏️ PUT /api/incidencias/${id} - Actualizando incidencia`);
+
+        const {
+            tipo,
+            titulo,
+            descripcion,
+            municipio_id,
+            direccion,
+            coordenadas_lat,
+            coordenadas_lng,
+            usuarios_afectados,
+            responsable_id,
+            observaciones,
+            estado
         } = req.body;
-        
+
+        // Verificar que la incidencia existe
+        const [incidenciaExistente] = await db.query(
+            'SELECT id FROM incidencias_servicio WHERE id = ?',
+            [id]
+        );
+
+        if (!incidenciaExistente) {
+            return res.status(404).json({
+                success: false,
+                message: 'Incidencia no encontrada'
+            });
+        }
+
+        await db.query(`
+            UPDATE incidencias_servicio SET
+                tipo = COALESCE(?, tipo),
+                titulo = COALESCE(?, titulo),
+                descripcion = COALESCE(?, descripcion),
+                municipio_id = COALESCE(?, municipio_id),
+                direccion = COALESCE(?, direccion),
+                coordenadas_lat = COALESCE(?, coordenadas_lat),
+                coordenadas_lng = COALESCE(?, coordenadas_lng),
+                usuarios_afectados = COALESCE(?, usuarios_afectados),
+                responsable_id = COALESCE(?, responsable_id),
+                observaciones = COALESCE(?, observaciones),
+                estado = COALESCE(?, estado),
+                updated_at = NOW()
+            WHERE id = ?
+        `, [
+            tipo,
+            titulo,
+            descripcion,
+            municipio_id,
+            direccion,
+            coordenadas_lat,
+            coordenadas_lng,
+            usuarios_afectados,
+            responsable_id,
+            observaciones,
+            estado,
+            id
+        ]);
+
+        console.log(`✅ Incidencia ${id} actualizada exitosamente`);
+
+        res.json({
+            success: true,
+            message: 'Incidencia actualizada exitosamente'
+        });
+
+    } catch (error) {
+        console.error('❌ Error actualizando incidencia:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route POST /api/incidencias/:id/cerrar
+ * @desc Cerrar incidencia
+ * @access Private (Administrador, Supervisor, Instalador)
+ */
+router.post('/:id/cerrar', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`🔒 POST /api/incidencias/${id}/cerrar - Cerrando incidencia`);
+
+        const {
+            solucion_aplicada,
+            mecanismo_solucion,
+            observaciones_cierre
+        } = req.body;
+
         // Verificar que la incidencia existe y no está cerrada
-        const checkQuery = 'SELECT id, estado FROM incidencias_servicio WHERE id = ?';
-        const [existing] = await db.query(checkQuery, [id]);
-        
-        if (!existing) {
-            return res.status(404).json({ 
+        const [incidencia] = await db.query(
+            'SELECT id, estado, fecha_inicio FROM incidencias_servicio WHERE id = ?',
+            [id]
+        );
+
+        if (!incidencia) {
+            return res.status(404).json({
                 success: false,
-                error: 'Incidencia no encontrada' 
+                message: 'Incidencia no encontrada'
             });
         }
-        
-        if (existing.estado === 'cerrado') {
-            return res.status(400).json({ 
+
+        if (incidencia.estado === 'cerrado') {
+            return res.status(400).json({
                 success: false,
-                error: 'La incidencia ya está cerrada' 
+                message: 'La incidencia ya está cerrada'
             });
         }
-        
-        // Calcular duración
+
+        // Calcular duración en minutos
         const duracionQuery = `
             SELECT TIMESTAMPDIFF(MINUTE, fecha_inicio, NOW()) as minutos
             FROM incidencias_servicio WHERE id = ?
@@ -417,160 +627,44 @@ router.post('/:id/cerrar', async (req, res) => {
         const [duracionResult] = await db.query(duracionQuery, [id]);
         const duracion = duracionResult ? duracionResult.minutos : 0;
         
-        const query = `
+        await db.query(`
             UPDATE incidencias_servicio 
             SET estado = 'cerrado',
                 fecha_fin = NOW(),
                 tiempo_duracion_minutos = ?,
                 solucion_aplicada = COALESCE(?, solucion_aplicada),
                 mecanismo_solucion = COALESCE(?, mecanismo_solucion),
-                observaciones = COALESCE(?, observaciones),
+                observaciones = CASE 
+                    WHEN ? IS NOT NULL THEN 
+                        CONCAT(COALESCE(observaciones, ''), '\n\nCierre: ', ?)
+                    ELSE observaciones
+                END,
                 updated_at = NOW()
             WHERE id = ?
-        `;
-        
-        await db.query(query, [
-            duracion, 
-            solucion_aplicada, 
-            mecanismo_solucion, 
-            observaciones, 
+        `, [
+            duracion,
+            solucion_aplicada,
+            mecanismo_solucion,
+            observaciones_cierre,
+            observaciones_cierre,
             id
         ]);
-        
-        res.json({ 
-            success: true,
-            message: 'Incidencia cerrada exitosamente',
-            duracion_minutos: duracion
-        });
-        
-    } catch (error) {
-        console.error('Error cerrando incidencia:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Error cerrando incidencia' 
-        });
-    }
-});
 
-// Obtener municipios para formulario
-router.get('/municipios/disponibles', async (req, res) => {
-    try {
-        const query = `
-            SELECT id, nombre, departamento_nombre
-            FROM municipios 
-            ORDER BY departamento_nombre, nombre
-        `;
-        
-        const municipios = await db.query(query);
-        
+        console.log(`✅ Incidencia ${id} cerrada exitosamente`);
+
         res.json({
             success: true,
-            municipios
+            message: 'Incidencia cerrada exitosamente'
         });
-        
-    } catch (error) {
-        console.error('Error obteniendo municipios:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Error obteniendo municipios' 
-        });
-    }
-});
 
-// Obtener responsables disponibles
-router.get('/responsables/disponibles', async (req, res) => {
-    try {
-        const query = `
-            SELECT id, nombre, correo, telefono
-            FROM sistema_usuarios 
-            WHERE activo = 1 AND rol IN ('administrador', 'supervisor', 'instalador')
-            ORDER BY nombre
-        `;
-        
-        const responsables = await db.query(query);
-        
-        res.json({
-            success: true,
-            responsables
-        });
-        
     } catch (error) {
-        console.error('Error obteniendo responsables:', error);
-        res.status(500).json({ 
+        console.error('❌ Error cerrando incidencia:', error);
+        res.status(500).json({
             success: false,
-            error: 'Error obteniendo responsables' 
-        });
-    }
-});
-
-// Reporte de disponibilidad del servicio
-router.get('/reportes/disponibilidad', async (req, res) => {
-    try {
-        const { mes, anno } = req.query;
-        
-        if (!mes || !anno) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'mes y anno son requeridos' 
-            });
-        }
-        
-        // Calcular métricas de disponibilidad
-        const query = `
-            SELECT 
-                COUNT(*) as total_incidencias,
-                SUM(tiempo_duracion_minutos) as total_minutos_inactividad,
-                SUM(usuarios_afectados) as total_usuarios_afectados,
-                AVG(tiempo_duracion_minutos) as promedio_duracion,
-                COUNT(CASE WHEN tipo_incidencia = 'no_programado' THEN 1 END) as incidencias_no_programadas,
-                COUNT(CASE WHEN tipo_incidencia = 'emergencia' THEN 1 END) as emergencias
-            FROM incidencias_servicio
-            WHERE YEAR(fecha_inicio) = ? AND MONTH(fecha_inicio) = ?
-                AND estado = 'cerrado'
-        `;
-        
-        const [metricas] = await db.query(query, [anno, mes]);
-        
-        // Calcular disponibilidad (asumiendo 30 días * 24 horas * 60 minutos = 43,200 minutos/mes)
-        const minutosTotalesMes = 30 * 24 * 60;
-        const minutosInactividad = metricas.total_minutos_inactividad || 0;
-        const disponibilidadPorcentaje = ((minutosTotalesMes - minutosInactividad) / minutosTotalesMes) * 100;
-        
-        // Detalle por categoría
-        const queryCategoria = `
-            SELECT 
-                categoria,
-                COUNT(*) as cantidad,
-                SUM(tiempo_duracion_minutos) as minutos_inactividad,
-                SUM(usuarios_afectados) as usuarios_afectados
-            FROM incidencias_servicio
-            WHERE YEAR(fecha_inicio) = ? AND MONTH(fecha_inicio) = ?
-                AND estado = 'cerrado'
-            GROUP BY categoria
-        `;
-        
-        const categorias = await db.query(queryCategoria, [anno, mes]);
-        
-        res.json({
-            success: true,
-            reporte: {
-                mes: parseInt(mes),
-                anno: parseInt(anno),
-                disponibilidad_porcentaje: Math.round(disponibilidadPorcentaje * 100) / 100,
-                ...metricas,
-                minutos_totales_mes: minutosTotalesMes,
-                por_categoria: categorias
-            }
-        });
-        
-    } catch (error) {
-        console.error('Error generando reporte de disponibilidad:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Error generando reporte' 
+            message: 'Error interno del servidor',
+            error: error.message
         });
     }
 });
 
 module.exports = router;
-       
