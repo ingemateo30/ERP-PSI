@@ -165,93 +165,86 @@ router.get('/', requireRole('administrador', 'supervisor', 'instalador'), async 
 
 /**
  * @route GET /api/incidencias/estadisticas
- * @desc Obtener estadísticas de incidencias
+ * @desc Obtener estadísticas completas de incidencias
  * @access Private (Administrador, Supervisor)
  */
 router.get('/estadisticas', requireRole('administrador', 'supervisor'), async (req, res) => {
     try {
         console.log('📊 GET /api/incidencias/estadisticas');
 
-        const estadisticas = {};
-
-        // Total por estado
-        const porEstado = await db.query(`
-            SELECT estado, COUNT(*) as cantidad  
-FROM incidencias_servicio 
-GROUP BY estado
-        `);
-
-        estadisticas.por_estado = porEstado.reduce((acc, item) => {
-            acc[item.estado] = item.cantidad;
-            return acc;
-        }, {});
-
-        // Total por tipo
-        const porTipo = await db.query(`
-            SELECT categoria, COUNT(*) as cantidad
-FROM incidencias_servicio 
-GROUP BY categoria
-        `);
-
-        estadisticas.por_tipo = porTipo.reduce((acc, item) => {
-            acc[item.tipo] = item.cantidad;
-            return acc;
-        }, {});
-
-        // Incidencias por mes (últimos 6 meses)
-        const porMes = await db.query(`
+        // Estadísticas por estado
+        const estadisticasPorEstado = await db.query(`
             SELECT 
-                DATE_FORMAT(fecha_inicio, '%Y-%m') as mes,
-                COUNT(*) as cantidad
+                estado,
+                COUNT(*) as total,
+                ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM incidencias_servicio), 2) as porcentaje
             FROM incidencias_servicio 
-            WHERE fecha_inicio >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-            GROUP BY mes
-            ORDER BY mes
+            GROUP BY estado
+            ORDER BY total DESC
         `);
 
-        estadisticas.por_mes = porMes;
-
-        // Tiempo promedio de resolución
-        const [tiempoPromedio] = await db.query(`
-            SELECT AVG(tiempo_duracion_minutos) as promedio_minutos
+        // Estadísticas por tipo
+        const estadisticasPorTipo = await db.query(`
+            SELECT 
+                tipo,
+                COUNT(*) as total,
+                ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM incidencias_servicio), 2) as porcentaje
             FROM incidencias_servicio 
-            WHERE estado = 'cerrado' AND tiempo_duracion_minutos IS NOT NULL
+            GROUP BY tipo
+            ORDER BY total DESC
         `);
 
-        estadisticas.tiempo_promedio_resolucion = tiempoPromedio?.promedio_minutos || 0;
+        // Incidencias del mes actual
+        const incidenciasMesActual = await db.query(`
+            SELECT COUNT(*) as total
+            FROM incidencias_servicio 
+            WHERE YEAR(fecha_inicio) = YEAR(CURDATE()) 
+            AND MONTH(fecha_inicio) = MONTH(CURDATE())
+        `);
 
         // Incidencias activas
-        const [activasCount] = await db.query(`
+        const incidenciasActivas = await db.query(`
             SELECT COUNT(*) as total
             FROM incidencias_servicio 
             WHERE estado IN ('reportado', 'en_progreso')
         `);
 
-        estadisticas.incidencias_activas = activasCount?.total || 0;
-
-        // Usuarios afectados total
-        const [usuariosAfectados] = await db.query(`
-            SELECT SUM(usuarios_afectados) as total
+        // Tiempo promedio de resolución
+        const tiempoPromedioResolucion = await db.query(`
+            SELECT 
+                ROUND(AVG(TIMESTAMPDIFF(HOUR, fecha_inicio, fecha_fin)), 2) as promedio_horas
             FROM incidencias_servicio 
-            WHERE estado IN ('reportado', 'en_progreso')
+            WHERE estado = 'resuelto' 
+            AND fecha_fin IS NOT NULL
         `);
 
-        estadisticas.usuarios_afectados_activos = usuariosAfectados?.total || 0;
+        const estadisticas = {
+            resumen: {
+                total_incidencias: estadisticasPorEstado.reduce((sum, e) => sum + e.total, 0),
+                incidencias_activas: incidenciasActivas[0]?.total || 0,
+                incidencias_mes_actual: incidenciasMesActual[0]?.total || 0,
+                tiempo_promedio_resolucion: tiempoPromedioResolucion[0]?.promedio_horas || 0
+            },
+            por_estado: estadisticasPorEstado,
+            por_tipo: estadisticasPorTipo
+        };
 
-        console.log('✅ Estadísticas obtenidas exitosamente');
+        console.log('✅ Estadísticas de incidencias generadas');
 
         res.json({
             success: true,
             data: estadisticas,
-            message: 'Estadísticas obtenidas exitosamente'
+            message: 'Estadísticas obtenidas exitosamente',
+            timestamp: new Date().toISOString()
         });
 
     } catch (error) {
-        console.error('❌ Error obteniendo estadísticas:', error);
+        console.error('❌ Error obteniendo estadísticas de incidencias:', error);
         res.status(500).json({
             success: false,
             message: 'Error interno del servidor',
-            error: error.message
+            error: error.message,
+            timestamp: new Date().toISOString()
         });
     }
 });
