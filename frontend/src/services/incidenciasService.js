@@ -3,12 +3,12 @@
 
 import authService from './authService';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_BASE_URL = 'http://localhost:3000';
 
 class IncidenciasService {
     constructor() {
         // ✅ CORRECCIÓN: URL base correcta según backend routes
-        this.baseURL = `${API_BASE_URL}/incidencias`;
+        this.baseURL = `${API_BASE_URL}/api/incidencias`;
         console.log('🚨 IncidenciasService inicializado con URL:', this.baseURL);
         
         // Tipos de incidencia predefinidos

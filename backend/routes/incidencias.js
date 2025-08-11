@@ -39,7 +39,7 @@ router.get('/', requireRole('administrador', 'supervisor', 'instalador'), async 
                 i.*,
                 c.nombre as municipio_nombre,
                 d.nombre as departamento_nombre,
-                CONCAT(u.nombres, ' ', u.apellidos) as responsable_nombre,
+                u.nombre as responsable_nombre,
                 TIMESTAMPDIFF(MINUTE, i.fecha_inicio, COALESCE(i.fecha_fin, NOW())) as duracion_minutos
             FROM incidencias_servicio i
             LEFT JOIN ciudades c ON i.municipio_id = c.id
@@ -186,11 +186,11 @@ router.get('/estadisticas', requireRole('administrador', 'supervisor'), async (r
         // Estadísticas por tipo
         const estadisticasPorTipo = await db.query(`
             SELECT 
-                tipo,
+                tipo_incidencia,
                 COUNT(*) as total,
                 ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM incidencias_servicio), 2) as porcentaje
             FROM incidencias_servicio 
-            GROUP BY tipo
+            GROUP BY tipo_incidencia
             ORDER BY total DESC
         `);
 
