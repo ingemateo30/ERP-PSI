@@ -21,17 +21,17 @@ router.use(authenticateToken);
 router.get('/', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
     try {
         console.log('📋 GET /api/incidencias - Obteniendo incidencias');
-        
-        const { 
-            tipo, 
-            estado, 
-            municipio_id, 
-            fecha_inicio, 
-            fecha_fin, 
+
+        const {
+            tipo,
+            estado,
+            municipio_id,
+            fecha_inicio,
+            fecha_fin,
             responsable_id,
             search,
-            page = 1, 
-            limit = 50 
+            page = 1,
+            limit = 50
         } = req.query;
 
         let query = `
@@ -176,9 +176,9 @@ router.get('/estadisticas', requireRole('administrador', 'supervisor'), async (r
 
         // Total por estado
         const porEstado = await db.query(`
-            SELECT estado, COUNT(*) as cantidad
-            FROM incidencias_servicio 
-            GROUP BY estado
+            SELECT estado, COUNT(*) as cantidad  
+FROM incidencias_servicio 
+GROUP BY estado
         `);
 
         estadisticas.por_estado = porEstado.reduce((acc, item) => {
@@ -188,9 +188,9 @@ router.get('/estadisticas', requireRole('administrador', 'supervisor'), async (r
 
         // Total por tipo
         const porTipo = await db.query(`
-            SELECT tipo, COUNT(*) as cantidad
-            FROM incidencias_servicio 
-            GROUP BY tipo
+            SELECT categoria, COUNT(*) as cantidad
+FROM incidencias_servicio 
+GROUP BY categoria
         `);
 
         estadisticas.por_tipo = porTipo.reduce((acc, item) => {
@@ -626,7 +626,7 @@ router.post('/:id/cerrar', requireRole('administrador', 'supervisor', 'instalado
         `;
         const [duracionResult] = await db.query(duracionQuery, [id]);
         const duracion = duracionResult ? duracionResult.minutos : 0;
-        
+
         await db.query(`
             UPDATE incidencias_servicio 
             SET estado = 'cerrado',
