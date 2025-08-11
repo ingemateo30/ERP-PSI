@@ -592,21 +592,22 @@ const IncidenciasManagement = () => {
 // Componente Modal para crear/editar incidencia
 const IncidenciaModal = ({ incidencia, onClose, onSave }) => {
     const [formData, setFormData] = useState({
-        tipo_incidencia: 'no_programado',
-        categoria: 'otros',
-        fecha_inicio: '',
-        usuarios_afectados: 0,
+        tipo: 'red',
+        titulo: '',
+        descripcion: '',
         municipio_id: '',
         direccion: '',
         coordenadas_lat: '',
         coordenadas_lng: '',
-        descripcion: '',
-        causa_raiz: '',
-        responsable_id: ''
+        usuarios_afectados: 0,
+        responsable_id: '',
+        observaciones: ''
     });
+    
     const [loading, setLoading] = useState(false);
     const [municipios, setMunicipios] = useState([]);
     const [responsables, setResponsables] = useState([]);
+    const [loadingData, setLoadingData] = useState(true);
 
     useEffect(() => {
         cargarMunicipios();
@@ -633,28 +634,37 @@ const IncidenciaModal = ({ incidencia, onClose, onSave }) => {
         }
     }, [incidencia]);
 
-    const cargarMunicipios = async () => {
+   const cargarMunicipios = async () => {
         try {
+            console.log('🏘️ Cargando municipios en modal...');
             const response = await incidenciasService.getMunicipiosDisponibles();
             if (response.success) {
                 setMunicipios(response.municipios || []);
+                console.log(`✅ ${response.municipios?.length || 0} municipios cargados en modal`);
+            } else {
+                console.error('❌ Error en respuesta de municipios:', response);
             }
         } catch (error) {
-            console.error('Error cargando municipios:', error);
+            console.error('❌ Error cargando municipios en modal:', error);
+            setMunicipios([]);
         }
     };
 
     const cargarResponsables = async () => {
         try {
+            console.log('👷 Cargando responsables en modal...');
             const response = await incidenciasService.getResponsablesDisponibles();
             if (response.success) {
                 setResponsables(response.responsables || []);
+                console.log(`✅ ${response.responsables?.length || 0} responsables cargados en modal`);
+            } else {
+                console.error('❌ Error en respuesta de responsables:', response);
             }
         } catch (error) {
-            console.error('Error cargando responsables:', error);
+            console.error('❌ Error cargando responsables en modal:', error);
+            setResponsables([]);
         }
     };
-
     const handleChange = (field, value) => {
         setFormData(prev => ({
             ...prev,

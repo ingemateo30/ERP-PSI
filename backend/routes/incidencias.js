@@ -306,7 +306,6 @@ router.get('/municipios/disponibles', async (req, res) => {
                 d.nombre as departamento_nombre
             FROM ciudades c
             INNER JOIN departamentos d ON c.departamento_id = d.id
-            WHERE c.activo = 1
             ORDER BY d.nombre, c.nombre
         `);
 
@@ -340,12 +339,12 @@ router.get('/responsables/disponibles', async (req, res) => {
         const responsables = await db.query(`
             SELECT 
                 id,
-                CONCAT(nombres, ' ', apellidos) as nombre,
+                nombre as nombre,
                 rol
             FROM sistema_usuarios
-            WHERE rol IN ('instalador', 'supervisor', 'administrador') 
+            WHERE rol IN ('instalador') 
             AND activo = 1
-            ORDER BY nombres, apellidos
+            ORDER BY nombre
         `);
 
         console.log(`✅ Encontrados ${responsables.length} responsables`);
