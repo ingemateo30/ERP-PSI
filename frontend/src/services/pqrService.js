@@ -1,12 +1,13 @@
-// frontend/src/services/pqrService.js
+// frontend/src/services/pqrService.js - VERSIÓN CORREGIDA
 import authService from './authService';
 
 class PQRService {
     constructor() {
-        this.baseURL = '/api/pqr';
+        // CORRECCIÓN: Usar la URL completa del servidor
+        this.baseURL = 'http://localhost:3000/api/pqr'; // URL por defecto para desarrollo
     }
 
-    // Método auxiliar para hacer peticiones
+    // Método auxiliar para hacer peticiones - VERSIÓN MEJORADA
     async makeRequest(url, options = {}) {
         const token = authService.getToken();
         
@@ -27,18 +28,47 @@ class PQRService {
         };
 
         try {
+            console.log('🌐 Haciendo petición a:', url); // Debug
+            
             const response = await fetch(url, mergedOptions);
             
+            console.log('📡 Respuesta status:', response.status); // Debug
+            console.log('📡 Respuesta headers:', response.headers.get('content-type')); // Debug
+            
+            // Verificar si la respuesta es HTML (error 404 o similar)
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('text/html')) {
+                console.error('❌ Recibiendo HTML en lugar de JSON. URL probablemente incorrecta.');
+                console.error('URL solicitada:', url);
+                throw new Error(`Endpoint no encontrado: ${url}. Verifica que el servidor backend esté corriendo.`);
+            }
+            
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ 
-                    message: 'Error de conexión' 
-                }));
+                const errorText = await response.text();
+                console.error('❌ Error de respuesta:', errorText);
+                
+                let errorData;
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch (e) {
+                    errorData = { message: 'Error de conexión con el servidor' };
+                }
+                
                 throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
             
-            return await response.json();
+            const data = await response.json();
+            console.log('✅ Respuesta exitosa:', data); // Debug
+            return data;
+            
         } catch (error) {
-            console.error('Error en petición PQR:', error);
+            console.error('❌ Error en petición PQR:', error);
+            
+            // Errores de red comunes
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                throw new Error('No se puede conectar con el servidor. Verifica que esté ejecutándose en el puerto correcto.');
+            }
+            
             throw error;
         }
     }
@@ -57,7 +87,7 @@ class PQRService {
             const url = `${this.baseURL}?${queryParams.toString()}`;
             return await this.makeRequest(url);
         } catch (error) {
-            console.error('Error obteniendo PQRs:', error);
+            console.error('❌ Error obteniendo PQRs:', error);
             throw error;
         }
     }
@@ -68,7 +98,7 @@ class PQRService {
             const url = `${this.baseURL}/estadisticas`;
             return await this.makeRequest(url);
         } catch (error) {
-            console.error('Error obteniendo estadísticas PQR:', error);
+            console.error('❌ Error obteniendo estadísticas PQR:', error);
             throw error;
         }
     }
@@ -79,7 +109,7 @@ class PQRService {
             const url = `${this.baseURL}/${id}`;
             return await this.makeRequest(url);
         } catch (error) {
-            console.error('Error obteniendo PQR:', error);
+            console.error('❌ Error obteniendo PQR:', error);
             throw error;
         }
     }
@@ -93,7 +123,7 @@ class PQRService {
                 body: JSON.stringify(pqrData)
             });
         } catch (error) {
-            console.error('Error creando PQR:', error);
+            console.error('❌ Error creando PQR:', error);
             throw error;
         }
     }
@@ -107,7 +137,7 @@ class PQRService {
                 body: JSON.stringify(pqrData)
             });
         } catch (error) {
-            console.error('Error actualizando PQR:', error);
+            console.error('❌ Error actualizando PQR:', error);
             throw error;
         }
     }
@@ -120,7 +150,7 @@ class PQRService {
                 method: 'DELETE'
             });
         } catch (error) {
-            console.error('Error eliminando PQR:', error);
+            console.error('❌ Error eliminando PQR:', error);
             throw error;
         }
     }
@@ -134,7 +164,7 @@ class PQRService {
                 body: JSON.stringify({ usuario_id: usuarioId })
             });
         } catch (error) {
-            console.error('Error asignando PQR:', error);
+            console.error('❌ Error asignando PQR:', error);
             throw error;
         }
     }
@@ -145,217 +175,50 @@ class PQRService {
             const url = `${this.baseURL}/cliente/${clienteId}`;
             return await this.makeRequest(url);
         } catch (error) {
-            console.error('Error obteniendo PQRs del cliente:', error);
+            console.error('❌ Error obteniendo PQRs del cliente:', error);
             throw error;
         }
     }
 
-    // Obtener usuarios disponibles para asignación
-    async getUsuariosDisponibles() {
-        try {
-            const url = `${this.baseURL}/usuarios/disponibles`;
-            return await this.makeRequest(url);
-        } catch (error) {
-            console.error('Error obteniendo usuarios:', error);
-            throw error;
-        }
-    }
-
-    // Generar reporte para CRC
-    async getReporteCRC(anno, trimestre) {
-        try {
-            const url = `${this.baseURL}/reportes/crc?anno=${anno}&trimestre=${trimestre}`;
-            return await this.makeRequest(url);
-        } catch (error) {
-            console.error('Error generando reporte CRC:', error);
-            throw error;
-        }
-    }
-
-    // Obtener clientes activos para formulario
-    async getClientesActivos(search = '') {
-        try {
-            const token = authService.getToken();
-            const url = `/api/v1/clients?search=${encodeURIComponent(search)}&limit=50&estado=activo`;
-            
-            const response = await fetch(url, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            if (!response.ok) {
-                throw new Error('Error cargando clientes');
-            }
-            
-            return await response.json();
-        } catch (error) {
-            console.error('Error obteniendo clientes:', error);
-            throw error;
-        }
-    }
-
-    // Validar datos de PQR
-    validatePQRData(data) {
-        const errors = [];
-
-        if (!data.cliente_id) {
-            errors.push('Cliente es requerido');
-        }
-
-        if (!data.tipo) {
-            errors.push('Tipo de PQR es requerido');
-        }
-
-        if (!data.categoria) {
-            errors.push('Categoría es requerida');
-        }
-
-        if (!data.medio_recepcion) {
-            errors.push('Medio de recepción es requerido');
-        }
-
-        if (!data.asunto || data.asunto.trim().length < 10) {
-            errors.push('Asunto debe tener al menos 10 caracteres');
-        }
-
-        if (!data.descripcion || data.descripcion.trim().length < 20) {
-            errors.push('Descripción debe tener al menos 20 caracteres');
-        }
-
-        return {
-            isValid: errors.length === 0,
-            errors
-        };
-    }
-
-    // Formatear fecha para mostrar
+    // Utilidades para fechas y tiempo
     formatFecha(fecha) {
         if (!fecha) return 'N/A';
-        
-        try {
-            return new Date(fecha).toLocaleDateString('es-CO', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        } catch (error) {
-            return 'Fecha inválida';
-        }
+        return new Date(fecha).toLocaleDateString('es-CO', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     }
 
-    // Calcular tiempo transcurrido
     calcularTiempoTranscurrido(fechaInicio) {
         if (!fechaInicio) return 'N/A';
         
-        try {
-            const inicio = new Date(fechaInicio);
-            const ahora = new Date();
-            const diferencia = ahora - inicio;
-            
-            const dias = Math.floor(diferencia / (1000 * 60 * 60 * 24));
-            const horas = Math.floor((diferencia % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutos = Math.floor((diferencia % (1000 * 60 * 60)) / (1000 * 60));
-            
-            if (dias > 0) {
-                return `${dias}d ${horas}h`;
-            } else if (horas > 0) {
-                return `${horas}h ${minutos}m`;
-            } else {
-                return `${minutos}m`;
-            }
-        } catch (error) {
-            return 'N/A';
-        }
-    }
-
-    // Obtener color según estado
-    getColorEstado(estado) {
-        const colores = {
-            'abierto': 'gray',
-            'en_proceso': 'yellow',
-            'resuelto': 'green',
-            'cerrado': 'blue',
-            'escalado': 'red'
-        };
-        return colores[estado] || 'gray';
-    }
-
-    // Obtener color según tipo
-    getColorTipo(tipo) {
-        const colores = {
-            'peticion': 'blue',
-            'queja': 'red',
-            'reclamo': 'orange',
-            'sugerencia': 'green'
-        };
-        return colores[tipo] || 'gray';
-    }
-
-    // Obtener prioridad con color
-    getColorPrioridad(prioridad) {
-        const colores = {
-            'baja': 'green',
-            'media': 'yellow',
-            'alta': 'orange',
-            'critica': 'red'
-        };
-        return colores[prioridad] || 'gray';
-    }
-
-    // Exportar datos a CSV
-    exportarCSV(pqrs, filename = 'pqrs_export.csv') {
-        if (!pqrs || pqrs.length === 0) {
-            throw new Error('No hay datos para exportar');
-        }
-
-        const headers = [
-            'Número Radicado',
-            'Cliente',
-            'Identificación',
-            'Tipo',
-            'Categoría',
-            'Estado',
-            'Fecha Recepción',
-            'Asunto',
-            'Prioridad',
-            'Usuario Asignado',
-            'Tiempo Respuesta (horas)'
-        ];
-
-        const csvContent = [
-            headers.join(','),
-            ...pqrs.map(pqr => [
-                pqr.numero_radicado,
-                `"${pqr.cliente_nombre}"`,
-                pqr.cliente_identificacion,
-                pqr.tipo,
-                pqr.categoria,
-                pqr.estado,
-                this.formatFecha(pqr.fecha_recepcion),
-                `"${pqr.asunto}"`,
-                pqr.prioridad,
-                pqr.usuario_asignado_nombre || 'Sin asignar',
-                pqr.tiempo_respuesta_horas || 'N/A'
-            ].join(','))
-        ].join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
+        const inicio = new Date(fechaInicio);
+        const ahora = new Date();
+        const diferencia = ahora - inicio;
         
-        if (link.download !== undefined) {
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', filename);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        const dias = Math.floor(diferencia / (1000 * 60 * 60 * 24));
+        const horas = Math.floor((diferencia % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        
+        if (dias > 0) {
+            return `${dias} día${dias > 1 ? 's' : ''} y ${horas} hora${horas > 1 ? 's' : ''}`;
+        } else {
+            return `${horas} hora${horas > 1 ? 's' : ''}`;
+        }
+    }
+
+    // Método para verificar conectividad con el backend
+    async checkConnection() {
+        try {
+            const url = this.baseURL.replace('/api/pqr', '/health');
+            const response = await fetch(url);
+            return response.ok;
+        } catch {
+            return false;
         }
     }
 }
 
-const pqrService = new PQRService();
-export default pqrService;
+export default new PQRService();
