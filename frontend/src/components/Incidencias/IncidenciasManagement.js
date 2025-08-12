@@ -1,7 +1,7 @@
 // frontend/src/components/Incidencias/IncidenciasManagement.js
 import React, { useState, useEffect } from 'react';
-import { 
-    Plus, Search, Filter, AlertTriangle, CheckCircle, Clock, 
+import {
+    Plus, Search, Filter, AlertTriangle, CheckCircle, Clock,
     Eye, Edit, MapPin, Users, Calendar, X, Save, RefreshCw,
     Download, ExternalLink, Activity, Zap, Settings, FileText
 } from 'lucide-react';
@@ -69,33 +69,86 @@ const IncidenciasManagement = () => {
         cargarEstadisticas();
     }, [filters]);
 
-    const cargarIncidencias = async () => {
-        setLoading(true);
-        try {
-            const response = await incidenciasService.getIncidencias({
-                ...filters,
-                page: currentPage
-            });
-            
-            if (response.success) {
-                setIncidencias(response.incidencias || []);
-                if (response.pagination) {
-                    setTotalPages(response.pagination.total_pages);
-                }
-            }
-        } catch (error) {
-            console.error('Error cargando incidencias:', error);
-            setIncidencias([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // REEMPLAZAR la función cargarIncidencias en IncidenciasManagement.js:
 
+const cargarIncidencias = async () => {
+    setLoading(true);
+    try {
+        const response = await incidenciasService.getIncidencias({
+            ...filters,
+            page: currentPage
+        });
+        
+        console.log('🔍 Respuesta completa del servicio:', response);
+        console.log('🔍 response.incidencias:', response.incidencias);
+        
+        if (response.success) {
+            // ✅ CORRECCIÓN: Los datos vienen en response.incidencias.incidencias
+            const incidenciasData = response.incidencias?.incidencias || response.incidencias || response.data || [];
+            console.log('✅ Datos de incidencias a establecer:', incidenciasData);
+            console.log('✅ Es array?', Array.isArray(incidenciasData));
+            console.log('✅ Longitud:', incidenciasData.length);
+            
+            setIncidencias(incidenciasData);
+            
+            // ✅ CORRECCIÓN: Pagination también viene en response.incidencias.pagination
+            const paginationData = response.incidencias?.pagination || response.pagination;
+            if (paginationData) {
+                setTotalPages(paginationData.pages || paginationData.total_pages || 1);
+            }
+        }
+    } catch (error) {
+        console.error('Error cargando incidencias:', error);
+        setIncidencias([]);
+    } finally {
+        setLoading(false);
+    }
+};
     const cargarEstadisticas = async () => {
         try {
             const response = await incidenciasService.getEstadisticas();
-            if (response.success) {
-                setStats(response.estadisticas || stats);
+
+            console.log('📊 Respuesta estadísticas completa:', response);
+
+            if (response.success && response.estadisticas) {
+                const { resumen, por_estado, por_tipo } = response.estadisticas;
+
+                // ✅ MAPEAR los datos del backend al formato que espera el frontend
+                const statsFormateadas = {
+                    total: resumen?.total_incidencias || 0,
+                    reportadas: 0, // Se calculará desde por_estado
+                    en_atencion: 0, // Se calculará desde por_estado
+                    resueltas: 0, // Se calculará desde por_estado
+                    cerradas: 0, // Se calculará desde por_estado
+                    emergencias_activas: resumen?.incidencias_activas || 0,
+                    tiempo_promedio_resolucion: resumen?.tiempo_promedio_resolucion || 0,
+                    total_usuarios_afectados: resumen?.total_usuarios_afectados || 0
+                };
+
+                // ✅ PROCESAR estadísticas por estado
+                if (Array.isArray(por_estado)) {
+                    por_estado.forEach(estado => {
+                        switch (estado.estado) {
+                            case 'reportado':
+                                statsFormateadas.reportadas = estado.cantidad || 0;
+                                break;
+                            case 'en_atencion':
+                                statsFormateadas.en_atencion = estado.cantidad || 0;
+                                break;
+                            case 'resuelto':
+                                statsFormateadas.resueltas = estado.cantidad || 0;
+                                break;
+                            case 'cerrado':
+                                statsFormateadas.cerradas = estado.cantidad || 0;
+                                break;
+                        }
+                    });
+                }
+
+                console.log('✅ Estadísticas formateadas:', statsFormateadas);
+                setStats(statsFormateadas);
+            } else {
+                console.log('❌ response.success es false para estadísticas');
             }
         } catch (error) {
             console.error('Error cargando estadísticas:', error);
@@ -380,7 +433,7 @@ const IncidenciasManagement = () => {
                         />
                     </div>
                 </div>
-                
+
                 <div className="flex justify-end mt-4">
                     <button
                         onClick={limpiarFiltros}
@@ -473,7 +526,7 @@ const IncidenciasManagement = () => {
                                                 {incidencia.municipio_nombre || 'N/A'}
                                             </div>
                                             {incidencia.coordenadas_lat && incidencia.coordenadas_lng && (
-                                                <a 
+                                                <a
                                                     href={incidenciasService.getGoogleMapsUrl(incidencia.coordenadas_lat, incidencia.coordenadas_lng)}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
@@ -498,14 +551,14 @@ const IncidenciasManagement = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end space-x-2">
-                                                <button 
+                                                <button
                                                     onClick={() => abrirDetalle(incidencia)}
                                                     className="text-blue-600 hover:text-blue-900"
                                                     title="Ver detalle"
                                                 >
                                                     <Eye className="w-4 h-4" />
                                                 </button>
-                                                <button 
+                                                <button
                                                     onClick={() => abrirModal(incidencia)}
                                                     className="text-green-600 hover:text-green-900"
                                                     title="Editar"
@@ -513,7 +566,7 @@ const IncidenciasManagement = () => {
                                                     <Edit className="w-4 h-4" />
                                                 </button>
                                                 {incidencia.estado !== 'cerrado' && (
-                                                    <button 
+                                                    <button
                                                         onClick={() => cerrarIncidencia(incidencia.id, {})}
                                                         className="text-purple-600 hover:text-purple-900"
                                                         title="Cerrar incidencia"
@@ -563,7 +616,7 @@ const IncidenciasManagement = () => {
 
             {/* Modal de formulario */}
             {showModal && (
-                <IncidenciaModal 
+                <IncidenciaModal
                     incidencia={selectedIncidencia}
                     onClose={cerrarModal}
                     onSave={() => {
@@ -576,7 +629,7 @@ const IncidenciasManagement = () => {
 
             {/* Modal de detalle */}
             {showDetailModal && selectedIncidencia && (
-                <IncidenciaDetailModal 
+                <IncidenciaDetailModal
                     incidencia={selectedIncidencia}
                     onClose={cerrarDetalle}
                     onUpdate={() => {
@@ -592,8 +645,9 @@ const IncidenciasManagement = () => {
 // Componente Modal para crear/editar incidencia
 const IncidenciaModal = ({ incidencia, onClose, onSave }) => {
     const [formData, setFormData] = useState({
-        tipo: 'red',
+        tipo: 'no_programado',  // ← CORREGIDO
         titulo: '',
+        categoria: 'otros',
         descripcion: '',
         municipio_id: '',
         direccion: '',
@@ -603,7 +657,7 @@ const IncidenciaModal = ({ incidencia, onClose, onSave }) => {
         responsable_id: '',
         observaciones: ''
     });
-    
+
     const [loading, setLoading] = useState(false);
     const [municipios, setMunicipios] = useState([]);
     const [responsables, setResponsables] = useState([]);
@@ -634,7 +688,7 @@ const IncidenciaModal = ({ incidencia, onClose, onSave }) => {
         }
     }, [incidencia]);
 
-   const cargarMunicipios = async () => {
+    const cargarMunicipios = async () => {
         try {
             console.log('🏘️ Cargando municipios en modal...');
             const response = await incidenciasService.getMunicipiosDisponibles();
@@ -678,7 +732,7 @@ const IncidenciaModal = ({ incidencia, onClose, onSave }) => {
 
         try {
             // Validar datos
-            const validation = incidenciasService.validateIncidenciaData(formData);
+            const validation = incidenciasService.validarIncidencia(formData);
             if (!validation.isValid) {
                 alert('Errores en el formulario:\n' + validation.errors.join('\n'));
                 return;
@@ -689,7 +743,7 @@ const IncidenciaModal = ({ incidencia, onClose, onSave }) => {
             } else {
                 await incidenciasService.createIncidencia(formData);
             }
-            
+
             onSave();
         } catch (error) {
             alert('Error guardando incidencia: ' + error.message);
@@ -705,7 +759,7 @@ const IncidenciaModal = ({ incidencia, onClose, onSave }) => {
                     <h3 className="text-lg font-medium text-gray-900">
                         {incidencia ? 'Editar Incidencia' : 'Nueva Incidencia'}
                     </h3>
-                    <button 
+                    <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600"
                     >
@@ -715,6 +769,20 @@ const IncidenciaModal = ({ incidencia, onClose, onSave }) => {
 
                 <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Título *
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.titulo}
+                                onChange={(e) => handleChange('titulo', e.target.value)}
+                                required
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Título descriptivo de la incidencia..."
+                            />
+                        </div>
                         {/* Tipo de Incidencia */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1072,7 +1140,7 @@ const IncidenciaDetailModal = ({ incidencia, onClose, onUpdate }) => {
                                             <span className="text-xs">
                                                 {incidencia.coordenadas_lat}, {incidencia.coordenadas_lng}
                                             </span>
-                                            <a 
+                                            <a
                                                 href={incidenciasService.getGoogleMapsUrl(incidencia.coordenadas_lat, incidencia.coordenadas_lng)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
@@ -1111,11 +1179,10 @@ const IncidenciaDetailModal = ({ incidencia, onClose, onUpdate }) => {
                                 {incidencia.tipo_incidencia !== 'programado' && (
                                     <div className="flex justify-between">
                                         <span className="font-medium text-gray-600">SLA:</span>
-                                        <span className={`${
-                                            incidenciasService.calcularSLA(incidencia.tipo_incidencia, incidencia.fecha_inicio).vencido 
-                                                ? 'text-red-600' : 'text-green-600'
-                                        }`}>
-                                            {incidenciasService.calcularSLA(incidencia.tipo_incidencia, incidencia.fecha_inicio).vencido 
+                                        <span className={`${incidenciasService.calcularSLA(incidencia.tipo_incidencia, incidencia.fecha_inicio).vencido
+                                            ? 'text-red-600' : 'text-green-600'
+                                            }`}>
+                                            {incidenciasService.calcularSLA(incidencia.tipo_incidencia, incidencia.fecha_inicio).vencido
                                                 ? 'Vencido' : 'Dentro del SLA'
                                             }
                                         </span>
@@ -1202,7 +1269,7 @@ const IncidenciaDetailModal = ({ incidencia, onClose, onUpdate }) => {
 
             {/* Modal para cerrar incidencia */}
             {showCerrarModal && (
-                <CerrarIncidenciaModal 
+                <CerrarIncidenciaModal
                     onClose={() => setShowCerrarModal(false)}
                     onConfirm={manejarCierre}
                 />

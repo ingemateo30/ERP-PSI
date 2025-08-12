@@ -446,8 +446,7 @@ router.post('/', requireRole('administrador', 'supervisor', 'instalador'), async
 
         const result = await db.query(`
             INSERT INTO incidencias_servicio (
-                tipo,
-                titulo,
+                tipo_incidencia,
                 descripcion,
                 municipio_id,
                 direccion,
@@ -459,10 +458,9 @@ router.post('/', requireRole('administrador', 'supervisor', 'instalador'), async
                 estado,
                 fecha_inicio,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reportado', NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'reportado', NOW(), NOW())
         `, [
             tipo,
-            titulo,
             descripcion,
             municipio_id,
             direccion || null,

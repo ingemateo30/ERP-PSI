@@ -10,7 +10,7 @@ class IncidenciasService {
         // ✅ CORRECCIÓN: URL base correcta según backend routes
         this.baseURL = `${API_BASE_URL}/api/incidencias`;
         console.log('🚨 IncidenciasService inicializado con URL:', this.baseURL);
-        
+
         // Tipos de incidencia predefinidos
         this.tiposIncidencia = [
             { value: 'red', label: 'Falla de Red', icon: '🌐' },
@@ -102,8 +102,7 @@ class IncidenciasService {
             console.log('📋 Obteniendo incidencias con filtros:', filtros);
 
             const params = new URLSearchParams();
-            
-            // Agregar filtros como parámetros de consulta
+
             Object.entries(filtros).forEach(([key, value]) => {
                 if (value !== null && value !== undefined && value !== '') {
                     params.append(key, value);
@@ -114,10 +113,11 @@ class IncidenciasService {
             const url = queryString ? `${this.baseURL}?${queryString}` : this.baseURL;
 
             const response = await this.makeRequest(url);
-            
+
+            // ✅ CORRECCIÓN: Retornar la estructura que espera el frontend
             return {
                 success: true,
-                incidencias: response.data || [],
+                incidencias: response.data || response, // Los datos pueden venir en response.data o directamente en response
                 total: response.total || 0,
                 pagination: response.pagination || {}
             };
@@ -127,13 +127,60 @@ class IncidenciasService {
         }
     }
 
+    getNivelImpacto(usuariosAfectados) {
+        if (!usuariosAfectados || usuariosAfectados === 0) {
+            return { nivel: 'Sin impacto', color: 'gray' };
+        } else if (usuariosAfectados <= 10) {
+            return { nivel: 'Bajo', color: 'green' };
+        } else if (usuariosAfectados <= 50) {
+            return { nivel: 'Medio', color: 'yellow' };
+        } else if (usuariosAfectados <= 100) {
+            return { nivel: 'Alto', color: 'orange' };
+        } else {
+            return { nivel: 'Crítico', color: 'red' };
+        }
+    }
+
+    // Generar URL de Google Maps
+    getGoogleMapsUrl(lat, lng) {
+        return `https://www.google.com/maps?q=${lat},${lng}`;
+    }
+
+    // Formatear fecha (alias para formatearFecha)
+    formatFecha(fecha) {
+        return this.formatearFecha(fecha);
+    }
+
+    // Calcular SLA
+    calcularSLA(tipo, fechaInicio) {
+        if (!fechaInicio) return { vencido: false };
+
+        const inicio = new Date(fechaInicio);
+        const ahora = new Date();
+        const horasTranscurridas = (ahora - inicio) / (1000 * 60 * 60);
+
+        let slaHoras;
+        switch (tipo) {
+            case 'emergencia':
+                slaHoras = 2;
+                break;
+            case 'no_programado':
+                slaHoras = 8;
+                break;
+            default:
+                return { vencido: false };
+        }
+
+        return { vencido: horasTranscurridas > slaHoras };
+    }
+
     // Obtener estadísticas de incidencias
     async getEstadisticas() {
         try {
             console.log('📊 Obteniendo estadísticas de incidencias');
             const url = `${this.baseURL}/estadisticas`;
             const response = await this.makeRequest(url);
-            
+
             return {
                 success: true,
                 estadisticas: response.data || {}
@@ -150,7 +197,7 @@ class IncidenciasService {
             console.log('⚡ Obteniendo incidencias activas');
             const url = `${this.baseURL}/activas/resumen`;
             const response = await this.makeRequest(url);
-            
+
             return {
                 success: true,
                 incidenciasActivas: response.data || []
@@ -167,7 +214,7 @@ class IncidenciasService {
             console.log(`🔍 Obteniendo incidencia con ID: ${id}`);
             const url = `${this.baseURL}/${id}`;
             const response = await this.makeRequest(url);
-            
+
             return {
                 success: true,
                 incidencia: response.data
@@ -186,7 +233,7 @@ class IncidenciasService {
                 method: 'POST',
                 body: JSON.stringify(incidenciaData)
             });
-            
+
             return response;
         } catch (error) {
             console.error('❌ Error creando incidencia:', error);
@@ -203,7 +250,7 @@ class IncidenciasService {
                 method: 'PUT',
                 body: JSON.stringify(incidenciaData)
             });
-            
+
             return response;
         } catch (error) {
             console.error('❌ Error actualizando incidencia:', error);
@@ -220,7 +267,7 @@ class IncidenciasService {
                 method: 'POST',
                 body: JSON.stringify(datosCierre)
             });
-            
+
             return response;
         } catch (error) {
             console.error('❌ Error cerrando incidencia:', error);
@@ -238,7 +285,7 @@ class IncidenciasService {
             console.log('🏘️ Obteniendo municipios disponibles');
             const url = `${this.baseURL}/municipios/disponibles`;
             const response = await this.makeRequest(url);
-            
+
             return {
                 success: true,
                 municipios: response.data?.municipios || []
@@ -255,7 +302,7 @@ class IncidenciasService {
             console.log('👷 Obteniendo responsables disponibles');
             const url = `${this.baseURL}/responsables/disponibles`;
             const response = await this.makeRequest(url);
-            
+
             return {
                 success: true,
                 responsables: response.data?.responsables || []
@@ -301,10 +348,10 @@ class IncidenciasService {
     // Formatear duración
     formatearDuracion(minutos) {
         if (!minutos) return 'N/A';
-        
+
         const horas = Math.floor(minutos / 60);
         const mins = minutos % 60;
-        
+
         if (horas > 0) {
             return `${horas}h ${mins}m`;
         }
@@ -314,7 +361,7 @@ class IncidenciasService {
     // Formatear fecha
     formatearFecha(fecha) {
         if (!fecha) return 'N/A';
-        
+
         try {
             return new Date(fecha).toLocaleString('es-ES', {
                 year: 'numeric',
@@ -331,21 +378,16 @@ class IncidenciasService {
     // Validar formulario de incidencia
     validarIncidencia(incidenciaData) {
         const errores = [];
-
-        if (!incidenciaData.tipo) {
+        if (!incidenciaData.tipo_incidencia && !incidenciaData.tipo) {
             errores.push('El tipo de incidencia es requerido');
         }
 
-        if (!incidenciaData.titulo?.trim()) {
-            errores.push('El título es requerido');
+        if (!incidenciaData.categoria) {
+            errores.push('La categoría es requerida');
         }
 
         if (!incidenciaData.descripcion?.trim()) {
             errores.push('La descripción es requerida');
-        }
-
-        if (!incidenciaData.municipio_id) {
-            errores.push('El municipio es requerido');
         }
 
         if (incidenciaData.usuarios_afectados && incidenciaData.usuarios_afectados < 0) {
@@ -353,8 +395,8 @@ class IncidenciasService {
         }
 
         return {
-            esValido: errores.length === 0,
-            errores
+            isValid: errores.length === 0,
+            errors: errores
         };
     }
 
