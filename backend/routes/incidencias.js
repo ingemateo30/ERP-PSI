@@ -500,8 +500,9 @@ router.put('/:id', requireRole('administrador', 'supervisor', 'instalador'), asy
         console.log(`✏️ PUT /api/incidencias/${id} - Actualizando incidencia`);
 
         const {
-            tipo,
-            titulo,
+            tipo_incidencia,          // Cambiado de 'tipo'
+            categoria,                // Nuevo campo obligatorio
+            titulo,                   // Este campo NO existe en la BD
             descripcion,
             municipio_id,
             direccion,
@@ -510,8 +511,42 @@ router.put('/:id', requireRole('administrador', 'supervisor', 'instalador'), asy
             usuarios_afectados,
             responsable_id,
             observaciones,
-            estado
+            estado,
+            fecha_inicio,             // Nuevo campo
+            fecha_fin,                // Nuevo campo
+            causa_raiz,               // Nuevo campo
+            solucion_aplicada,        // Nuevo campo
+            mecanismo_solucion        // Nuevo campo
         } = req.body;
+
+        // Validaciones básicas
+        if (tipo_incidencia && !['programado', 'no_programado', 'emergencia'].includes(tipo_incidencia)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Tipo de incidencia inválido. Debe ser: programado, no_programado, emergencia'
+            });
+        }
+
+        if (categoria && !['fibra_cortada', 'falla_energia', 'mantenimiento', 'actualizacion', 'otros'].includes(categoria)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Categoría inválida. Debe ser: fibra_cortada, falla_energia, mantenimiento, actualizacion, otros'
+            });
+        }
+
+        if (estado && !['reportado', 'en_atencion', 'resuelto', 'cerrado'].includes(estado)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Estado inválido. Debe ser: reportado, en_atencion, resuelto, cerrado'
+            });
+        }
+
+        if (mecanismo_solucion && !['reparacion', 'reemplazo', 'configuracion', 'otro'].includes(mecanismo_solucion)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Mecanismo de solución inválido. Debe ser: reparacion, reemplazo, configuracion, otro'
+            });
+        }
 
         // Verificar que la incidencia existe
         const [incidenciaExistente] = await db.query(
@@ -526,35 +561,98 @@ router.put('/:id', requireRole('administrador', 'supervisor', 'instalador'), asy
             });
         }
 
-        await db.query(`
+        // Construir la query dinámicamente solo con los campos que se envían
+        const updates = [];
+        const values = [];
+
+        if (tipo_incidencia !== undefined) {
+            updates.push('tipo_incidencia = ?');
+            values.push(tipo_incidencia);
+        }
+        if (categoria !== undefined) {
+            updates.push('categoria = ?');
+            values.push(categoria);
+        }
+        if (descripcion !== undefined) {
+            updates.push('descripcion = ?');
+            values.push(descripcion);
+        }
+        if (municipio_id !== undefined) {
+            updates.push('municipio_id = ?');
+            values.push(municipio_id);
+        }
+        if (direccion !== undefined) {
+            updates.push('direccion = ?');
+            values.push(direccion);
+        }
+        if (coordenadas_lat !== undefined) {
+            updates.push('coordenadas_lat = ?');
+            values.push(coordenadas_lat);
+        }
+        if (coordenadas_lng !== undefined) {
+            updates.push('coordenadas_lng = ?');
+            values.push(coordenadas_lng);
+        }
+        if (usuarios_afectados !== undefined) {
+            updates.push('usuarios_afectados = ?');
+            values.push(usuarios_afectados);
+        }
+        if (responsable_id !== undefined) {
+            updates.push('responsable_id = ?');
+            values.push(responsable_id);
+        }
+        if (observaciones !== undefined) {
+            updates.push('observaciones = ?');
+            values.push(observaciones);
+        }
+        if (estado !== undefined) {
+            updates.push('estado = ?');
+            values.push(estado);
+        }
+        if (fecha_inicio !== undefined) {
+            updates.push('fecha_inicio = ?');
+            values.push(fecha_inicio);
+        }
+        if (fecha_fin !== undefined) {
+            updates.push('fecha_fin = ?');
+            values.push(fecha_fin);
+        }
+        if (causa_raiz !== undefined) {
+            updates.push('causa_raiz = ?');
+            values.push(causa_raiz);
+        }
+        if (solucion_aplicada !== undefined) {
+            updates.push('solucion_aplicada = ?');
+            values.push(solucion_aplicada);
+        }
+        if (mecanismo_solucion !== undefined) {
+            updates.push('mecanismo_solucion = ?');
+            values.push(mecanismo_solucion);
+        }
+
+        // Siempre actualizar updated_at
+        updates.push('updated_at = NOW()');
+
+        if (updates.length === 1) { // Solo updated_at
+            return res.status(400).json({
+                success: false,
+                message: 'No se proporcionaron campos para actualizar'
+            });
+        }
+
+        // Agregar el ID al final
+        values.push(id);
+
+        const query = `
             UPDATE incidencias_servicio SET
-                tipo = COALESCE(?, tipo),
-                titulo = COALESCE(?, titulo),
-                descripcion = COALESCE(?, descripcion),
-                municipio_id = COALESCE(?, municipio_id),
-                direccion = COALESCE(?, direccion),
-                coordenadas_lat = COALESCE(?, coordenadas_lat),
-                coordenadas_lng = COALESCE(?, coordenadas_lng),
-                usuarios_afectados = COALESCE(?, usuarios_afectados),
-                responsable_id = COALESCE(?, responsable_id),
-                observaciones = COALESCE(?, observaciones),
-                estado = COALESCE(?, estado),
-                updated_at = NOW()
+                ${updates.join(', ')}
             WHERE id = ?
-        `, [
-            tipo,
-            titulo,
-            descripcion,
-            municipio_id,
-            direccion,
-            coordenadas_lat,
-            coordenadas_lng,
-            usuarios_afectados,
-            responsable_id,
-            observaciones,
-            estado,
-            id
-        ]);
+        `;
+
+        console.log('📝 Query de actualización:', query);
+        console.log('📝 Valores:', values);
+
+        await db.query(query, values);
 
         console.log(`✅ Incidencia ${id} actualizada exitosamente`);
 
@@ -589,9 +687,17 @@ router.post('/:id/cerrar', requireRole('administrador', 'supervisor', 'instalado
             observaciones_cierre
         } = req.body;
 
+        // Validar mecanismo_solucion si se proporciona
+        if (mecanismo_solucion && !['reparacion', 'reemplazo', 'configuracion', 'otro'].includes(mecanismo_solucion)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Mecanismo de solución inválido. Debe ser: reparacion, reemplazo, configuracion, otro'
+            });
+        }
+
         // Verificar que la incidencia existe y no está cerrada
         const [incidencia] = await db.query(
-            'SELECT id, estado, fecha_inicio FROM incidencias_servicio WHERE id = ?',
+            'SELECT id, estado, fecha_inicio, observaciones FROM incidencias_servicio WHERE id = ?',
             [id]
         );
 
@@ -617,34 +723,93 @@ router.post('/:id/cerrar', requireRole('administrador', 'supervisor', 'instalado
         const [duracionResult] = await db.query(duracionQuery, [id]);
         const duracion = duracionResult ? duracionResult.minutos : 0;
 
-        await db.query(`
-            UPDATE incidencias_servicio 
-            SET estado = 'cerrado',
-                fecha_fin = NOW(),
-                tiempo_duracion_minutos = ?,
-                solucion_aplicada = COALESCE(?, solucion_aplicada),
-                mecanismo_solucion = COALESCE(?, mecanismo_solucion),
-                observaciones = CASE 
-                    WHEN ? IS NOT NULL THEN 
-                        CONCAT(COALESCE(observaciones, ''), '\n\nCierre: ', ?)
-                    ELSE observaciones
-                END,
-                updated_at = NOW()
-            WHERE id = ?
-        `, [
-            duracion,
-            solucion_aplicada,
-            mecanismo_solucion,
-            observaciones_cierre,
-            observaciones_cierre,
-            id
-        ]);
+        // Construir observaciones actualizadas
+        let observaciones_actualizadas = incidencia.observaciones || '';
+        if (observaciones_cierre) {
+            const timestamp = new Date().toLocaleString('es-CO', {
+                timeZone: 'America/Bogota',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            if (observaciones_actualizadas) {
+                observaciones_actualizadas += `\n\n--- CIERRE (${timestamp}) ---\n${observaciones_cierre}`;
+            } else {
+                observaciones_actualizadas = `--- CIERRE (${timestamp}) ---\n${observaciones_cierre}`;
+            }
+        }
 
-        console.log(`✅ Incidencia ${id} cerrada exitosamente`);
+        // Construir query dinámicamente para evitar undefined
+        const updates = [
+            'estado = "cerrado"',
+            'fecha_fin = NOW()',
+            `tiempo_duracion_minutos = ${duracion}`,
+            'updated_at = NOW()'
+        ];
+        const params = [];
+
+        // Solo agregar campos que no son undefined/null
+        if (solucion_aplicada !== undefined && solucion_aplicada !== null) {
+            updates.push('solucion_aplicada = ?');
+            params.push(solucion_aplicada);
+        }
+
+        if (mecanismo_solucion !== undefined && mecanismo_solucion !== null) {
+            updates.push('mecanismo_solucion = ?');
+            params.push(mecanismo_solucion);
+        }
+
+        if (observaciones_cierre !== undefined && observaciones_cierre !== null) {
+            updates.push('observaciones = ?');
+            params.push(observaciones_actualizadas);
+        }
+
+        // Agregar el ID al final
+        params.push(id);
+
+        const query = `
+            UPDATE incidencias_servicio 
+            SET ${updates.join(', ')}
+            WHERE id = ?
+        `;
+
+        console.log('📝 Query de cierre:', query);
+        console.log('📝 Parámetros:', params);
+
+        await db.query(query, params);
+
+        console.log(`✅ Incidencia ${id} cerrada exitosamente - Duración: ${duracion} minutos`);
+
+        // Obtener la incidencia actualizada para responder
+        const [incidenciaActualizada] = await db.query(
+            `SELECT 
+                i.*,
+                u.nombre as responsable_nombre,
+                m.nombre as municipio_nombre
+            FROM incidencias_servicio i
+            LEFT JOIN sistema_usuarios u ON i.responsable_id = u.id
+            LEFT JOIN ciudades m ON i.municipio_id = m.id
+            WHERE i.id = ?`,
+            [id]
+        );
 
         res.json({
             success: true,
-            message: 'Incidencia cerrada exitosamente'
+            message: 'Incidencia cerrada exitosamente',
+            data: {
+                id: incidenciaActualizada.id,
+                numero_incidencia: incidenciaActualizada.numero_incidencia,
+                estado: incidenciaActualizada.estado,
+                fecha_inicio: incidenciaActualizada.fecha_inicio,
+                fecha_fin: incidenciaActualizada.fecha_fin,
+                tiempo_duracion_minutos: incidenciaActualizada.tiempo_duracion_minutos,
+                duracion_formateada: formatearDuracion(incidenciaActualizada.tiempo_duracion_minutos),
+                solucion_aplicada: incidenciaActualizada.solucion_aplicada,
+                mecanismo_solucion: incidenciaActualizada.mecanismo_solucion
+            }
         });
 
     } catch (error) {
@@ -656,5 +821,33 @@ router.post('/:id/cerrar', requireRole('administrador', 'supervisor', 'instalado
         });
     }
 });
+
+// Función auxiliar para formatear duración
+function formatearDuracion(minutos) {
+    if (!minutos || minutos === 0) return '0 minutos';
+    
+    const horas = Math.floor(minutos / 60);
+    const mins = minutos % 60;
+    const dias = Math.floor(horas / 24);
+    const horasRestantes = horas % 24;
+    
+    let resultado = '';
+    
+    if (dias > 0) {
+        resultado += `${dias} día${dias > 1 ? 's' : ''}`;
+    }
+    
+    if (horasRestantes > 0) {
+        if (resultado) resultado += ', ';
+        resultado += `${horasRestantes} hora${horasRestantes > 1 ? 's' : ''}`;
+    }
+    
+    if (mins > 0) {
+        if (resultado) resultado += ', ';
+        resultado += `${mins} minuto${mins > 1 ? 's' : ''}`;
+    }
+    
+    return resultado || '0 minutos';
+}
 
 module.exports = router;
