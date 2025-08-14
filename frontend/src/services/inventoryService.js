@@ -179,15 +179,22 @@ class InventoryService {
   /**
    * Obtener instaladores activos
    */
-  async getActiveInstallers() {
-    try {
-      const response = await apiService.get('/inventory/installers');
-      return response.data;
-    } catch (error) {
-      console.error('Error obteniendo instaladores:', error);
-      throw this.handleError(error);
-    }
+async getActiveInstallers() {
+  try {
+    console.log('🔄 InventoryService - Obteniendo instaladores activos...');
+    const response = await apiService.get('/inventory/installers');
+    
+    console.log('📥 InventoryService - Respuesta raw:', response);
+    console.log('📥 InventoryService - Response.data:', response.data);
+    
+    // ✅ CORRECCIÓN: response YA ES el objeto completo, no response.data
+    return response;
+    
+  } catch (error) {
+    console.error('❌ InventoryService - Error obteniendo instaladores:', error);
+    throw this.handleError(error);
   }
+}
   
   // ==========================================
   // HISTORIAL Y REPORTES

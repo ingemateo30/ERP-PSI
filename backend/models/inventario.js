@@ -573,26 +573,34 @@ class InventoryModel {
   /**
    * Obtener instaladores activos
    */
-  static async getActiveInstallers() {
+   static async getActiveInstallers() {
     try {
+      // ✅ USANDO LA MISMA CONSULTA QUE FUNCIONA EN INCIDENCIAS
+      // pero manteniendo los campos adicionales que necesita inventario
       const query = `
         SELECT 
           u.id,
-          u.nombre,
+          u.nombre as nombre,
           u.telefono,
           u.email,
+          u.rol,
           COUNT(e.id) as equipos_asignados
         FROM sistema_usuarios u
         LEFT JOIN inventario_equipos e ON u.id = e.instalador_id AND e.estado IN ('asignado', 'instalado')
         WHERE u.rol = 'instalador' AND u.activo = 1
-        GROUP BY u.id, u.nombre, u.telefono, u.email
+        GROUP BY u.id, u.nombre, u.telefono, u.email, u.rol
         ORDER BY u.nombre
       `;
       
       const [instaladores] = await db.execute(query);
+      
+      console.log(`✅ Instaladores activos encontrados: ${instaladores.length}`);
+      console.log('👥 Lista de instaladores:', instaladores.map(i => ({ id: i.id, nombre: i.nombre })));
+      
       return instaladores;
     } catch (error) {
-      console.error('Error obteniendo instaladores activos:', error);
+      console.error('❌ Error obteniendo instaladores activos:', error);
+      console.error('❌ Detalles del error:', error.message);
       throw error;
     }
   }

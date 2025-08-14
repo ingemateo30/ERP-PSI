@@ -56,22 +56,38 @@ const EquipmentFilters = ({ filters, onFilterChange, userRole }) => {
 
   const loadInstaladores = async () => {
     try {
+      console.log('🔄 Cargando instaladores...');
       const response = await inventoryService.getActiveInstallers();
-      console.log('👥 Instaladores recibidos:', response);
-      
-      // Manejar diferentes estructuras de respuesta
+      console.log('📥 Respuesta de instaladores:', response);
+
+      // ✅ MANEJO ROBUSTO DE LA RESPUESTA
       let instaladoresList = [];
-      if (response.message && Array.isArray(response.message)) {
-        instaladoresList = response.message;
-      } else if (response.data && Array.isArray(response.data)) {
-        instaladoresList = response.data;
-      } else if (Array.isArray(response)) {
-        instaladoresList = response;
+
+      if (response) {
+        if (response.success && response.message) {
+          instaladoresList = response.message;
+        } else if (response.data) {
+          instaladoresList = response.data;
+        } else if (Array.isArray(response)) {
+          instaladoresList = response;
+        } else if (response.message && Array.isArray(response.message)) {
+          instaladoresList = response.message;
+        }
       }
-      
+
+      // ✅ VERIFICACIÓN ADICIONAL: Asegurar que tienen el campo nombre
+      instaladoresList = instaladoresList.map(instalador => ({
+        ...instalador,
+        nombre: instalador.nombre || `${instalador.nombres || ''} ${instalador.apellidos || ''}`.trim()
+      }));
+
+      console.log(`✅ ${instaladoresList.length} instaladores cargados:`, instaladoresList);
       setInstaladores(instaladoresList);
+
     } catch (error) {
-      console.error('Error cargando instaladores:', error);
+      console.error('❌ Error cargando instaladores:', error);
+      console.error('❌ Detalles del error:', error.response?.data || error.message);
+      setInstaladores([]);
     }
   };
 
@@ -168,11 +184,10 @@ const EquipmentFilters = ({ filters, onFilterChange, userRole }) => {
           {/* Botón de filtros avanzados */}
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className={`px-4 py-2 border rounded-md text-sm font-medium transition-colors ${
-              showAdvanced
+            className={`px-4 py-2 border rounded-md text-sm font-medium transition-colors ${showAdvanced
                 ? 'border-blue-500 text-blue-700 bg-blue-50'
                 : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
-            }`}
+              }`}
           >
             <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100-4m0 4v2m0-6V4" />
@@ -241,31 +256,28 @@ const EquipmentFilters = ({ filters, onFilterChange, userRole }) => {
               <div className="space-y-2">
                 <button
                   onClick={() => handleFilterChange('estado', 'disponible')}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-                    filters.estado === 'disponible'
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm ${filters.estado === 'disponible'
                       ? 'bg-green-100 text-green-800 border border-green-200'
                       : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   📦 Solo disponibles
                 </button>
                 <button
                   onClick={() => handleFilterChange('estado', 'asignado')}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-                    filters.estado === 'asignado'
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm ${filters.estado === 'asignado'
                       ? 'bg-blue-100 text-blue-800 border border-blue-200'
                       : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   👤 Solo asignados
                 </button>
                 <button
                   onClick={() => handleFilterChange('estado', 'dañado')}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-                    filters.estado === 'dañado'
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm ${filters.estado === 'dañado'
                       ? 'bg-red-100 text-red-800 border border-red-200'
                       : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   🔧 Solo dañados
                 </button>

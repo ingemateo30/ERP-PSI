@@ -19,13 +19,28 @@ const AssignmentModal = ({ equipo, onSubmit, onCancel }) => {
   }, []);
 
   const loadInstaladores = async () => {
-    try {
-      const response = await inventoryService.getActiveInstallers();
-      setInstaladores(response.message || []);
-    } catch (error) {
-      console.error('Error cargando instaladores:', error);
+  try {
+    console.log('🔄 Cargando instaladores...');
+    const response = await inventoryService.getActiveInstallers();
+    console.log('📥 Respuesta completa:', response);
+    
+    // Ahora response ES el objeto { success: true, message: [...] }
+    let instaladoresList = [];
+    
+    if (response && response.success && response.message) {
+      instaladoresList = response.message;
+    } else if (response && Array.isArray(response)) {
+      instaladoresList = response;
     }
-  };
+    
+    console.log('👥 Instaladores procesados:', instaladoresList);
+    setInstaladores(instaladoresList);
+    
+  } catch (error) {
+    console.error('❌ Error cargando instaladores:', error);
+    setInstaladores([]);
+  }
+};
 
   // Manejar cambios en el formulario
   const handleChange = (e) => {
