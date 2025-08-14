@@ -252,14 +252,14 @@ router.post('/', async (req, res) => {
         const query = `
             INSERT INTO pqr (
                 numero_radicado, cliente_id, tipo, categoria, servicio_afectado,
-                medio_recepcion, fecha_recepcion, fecha_vencimiento, asunto, 
+                medio_recepcion, fecha_recepcion, asunto, 
                 descripcion, prioridad, estado
-            ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, 'abierto')
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, 'abierto')
         `;
         
         const result = await db.query(query, [
             numeroRadicado, cliente_id, tipo, categoria, servicio_afectado,
-            medio_recepcion, fechaVencimiento, asunto, descripcion, prioridad
+            medio_recepcion, asunto, descripcion, prioridad
         ]);
         
         res.status(201).json({ 
