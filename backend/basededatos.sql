@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 18-07-2025 a las 15:56:09
+-- Tiempo de generación: 14-08-2025 a las 16:46:39
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.1.25
 
@@ -520,33 +520,36 @@ INSERT INTO `clientes` (`id`, `identificacion`, `tipo_documento`, `nombre`, `dir
 (25, '52487048', 'cedula', 'prueba prueba', 'calle 32e 11 13', 3, '1', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 19:36:14', '2025-07-08 19:36:14'),
 (26, '52487049', 'cedula', 'prueba prueba', 'calle 32e 11 13', 3, '1', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 21:27:30', '2025-07-08 21:27:30'),
 (27, '52487050', 'cedula', 'prueba editar', 'calle 32e 11 13', 3, '1', 'san luis', 6, '3024773516', '3024773516', 'msalazar5@udi.edu.co', '2025-07-08', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-08 21:49:13', '2025-07-10 00:35:34'),
-(28, '52487090', 'cedula', 'prueba editar 2', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'msalazar5@udi.edu.co', '2025-07-09', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, '2025-07-10 00:03:23', '2025-07-10 01:03:16'),
-(44, '1005450341', 'cedula', 'mateo salazar prueba', 'calle 32e 11 13', 3, '1', 'arboledas', 6, '3024773516', NULL, 'Mortiz5@gmail.com', '2025-07-10', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR0341901198', NULL, NULL, '2025-07-10 04:31:41', '2025-07-10 04:31:41'),
-(45, '1005450360', 'cedula', 'Prueba 10 julio', 'calle 32e 11 13', 3, '2', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-10', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR0360211183', NULL, NULL, '2025-07-10 13:46:51', '2025-07-10 13:46:51'),
-(46, '79882888', 'cedula', 'prueba 10 julio permanencia', 'calle 32e 11 13', 4, '3', 'san luis', 1, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-10', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR2888501723', NULL, NULL, '2025-07-10 14:25:01', '2025-07-10 14:25:01'),
-(48, '79071052', 'nit', 'prueba permanencia 6 meses', 'calle 32e 11 13', 2, '2', 'san luis', 1, '3007015239', NULL, 'mateo.s3009@gmail.com', '2025-07-10', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR1052664102', NULL, NULL, '2025-07-10 14:44:24', '2025-07-10 14:44:24'),
-(49, '1005451340', 'cedula', 'prueba 11 julio', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3007015239', NULL, 'mateo.s3009@gmail.com', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR1340222819', NULL, NULL, '2025-07-11 14:13:42', '2025-07-11 14:13:42'),
-(50, '1005452345', 'cedula', 'prueba 11 julio 2', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3007015239', NULL, 'mateo.s3009@gmail.com', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR2345617840', NULL, NULL, '2025-07-11 14:36:57', '2025-07-11 14:36:57'),
-(51, '1005450380', 'cedula', 'prueba 11 julio 2 iva', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3007015239', NULL, 'mateo.s3009@gmail.com', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR0380019272', NULL, NULL, '2025-07-11 14:43:39', '2025-07-11 14:43:39'),
-(55, '1005450391', 'cedula', 'prueba 11 julio 2 iva2', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3007015239', NULL, 'mateo.s3009@gmail.com', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR0391464958', NULL, NULL, '2025-07-11 14:51:04', '2025-07-11 14:51:04'),
-(57, '79882997', 'cedula', 'prueba iva factura', 'calle 32e 11 13', 2, '4', 'san luis', 1, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR2997397879', NULL, NULL, '2025-07-11 15:06:37', '2025-07-11 15:06:37'),
-(58, '52488048', 'cedula', 'prueba sin iva', 'calle 32e 11 13', 2, '2', 'san luis', 1, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR8048381835', NULL, NULL, '2025-07-11 16:29:41', '2025-07-11 16:29:41'),
-(59, '1111015142', 'cedula', 'prueba fechas', 'calle 32e 11 13', 2, '2', 'san luis', 1, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR5142497760', NULL, NULL, '2025-07-11 16:48:17', '2025-07-11 16:48:17'),
-(60, '1111015143', 'cedula', 'prueba 12 de julio', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-12', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR5143483399', NULL, NULL, '2025-07-12 14:28:03', '2025-07-12 14:28:03'),
-(69, '1111015145', '', 'prueba 14 de julio', 'calle 32e 11 13', NULL, '4', NULL, NULL, '3024773516', NULL, 'msalazar5@udi.edu.co', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, 1, '2025-07-14 14:20:23', '2025-07-14 15:59:12'),
-(79, '1111015166', 'cedula', 'prueba 12 de julio 2', 'calle 32e 11 13', 3, '1', 'san luis', 6, '3024773516', '3024773516', 'msalazar5@udi.edu.co', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR51668534', NULL, 1, '2025-07-14 19:30:58', '2025-07-14 19:30:58'),
-(84, '1111015100', 'cedula', 'prueba 12 de julio 3', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3024773516', NULL, 'msalazar5@udi.edu.co', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR51000977', NULL, 1, '2025-07-14 19:54:10', '2025-07-14 19:54:10'),
-(88, '79882898', 'cedula', 'prueba 14 julio', 'calle 32e 11 13', 3, '2', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR2898418610', NULL, NULL, '2025-07-14 21:10:18', '2025-07-14 21:10:18'),
-(96, '1005450311', 'cedula', 'prueba 14 julio ffffffff', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR0311476089', NULL, NULL, '2025-07-14 21:44:36', '2025-07-14 21:44:36'),
-(97, '79882885', 'cedula', 'prueba 14 JULIO CONTRATOS', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR2885952253', NULL, NULL, '2025-07-14 22:09:12', '2025-07-14 22:09:12'),
-(98, '79882117', 'cedula', 'prueba PERMAMNENCIA', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR2117430152', NULL, NULL, '2025-07-14 22:17:10', '2025-07-14 22:17:10'),
-(99, '79882127', 'cedula', 'prueba PERMAMNENCIA2', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR2127541688', NULL, NULL, '2025-07-14 22:19:01', '2025-07-14 22:19:01'),
-(100, '79882147', 'cedula', 'prueba PERMAMNENCIA2', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR2147618487', NULL, NULL, '2025-07-14 22:20:18', '2025-07-14 22:20:18'),
-(101, '79882347', 'cedula', 'prueba PERMAMNENCIA 5', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR2347793358', NULL, NULL, '2025-07-14 22:23:13', '2025-07-14 22:23:13'),
-(102, '79882547', 'cedula', 'prueba PERMAMNENCIA 6', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR2547862630', NULL, NULL, '2025-07-14 22:24:22', '2025-07-14 22:24:22'),
-(103, '79887887', 'cedula', 'prueba 9 julio', 'calle 32e 11 13', 2, '3', 'san luis', 1, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR7887499060', NULL, NULL, '2025-07-14 22:34:59', '2025-07-14 22:34:59'),
-(104, '79227887', 'cedula', 'prueba 15 julio', 'calle 32e 11 13', 3, '3', 'san antonio', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-15', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR7887135647', NULL, NULL, '2025-07-15 13:45:35', '2025-07-15 13:45:35'),
-(105, '1101045348', 'cedula', 'prueba 18 julio', 'calle 32e 11 13', 3, '4', 'san antonio', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-18', NULL, 'activo', NULL, NULL, NULL, NULL, NULL, NULL, 0, 'USR5348261816', NULL, 1, '2025-07-18 13:44:21', '2025-07-18 13:44:21');
+(28, '52487090', 'cedula', 'prueba editar 2', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'msalazar5@udi.edu.co', '2025-07-09', NULL, 'activo', NULL, NULL, NULL, NULL, 'CONT-2025-000001', NULL, 0, NULL, NULL, NULL, '2025-07-10 00:03:23', '2025-07-18 14:05:08'),
+(44, '1005450341', 'cedula', 'mateo salazar prueba', 'calle 32e 11 13', 3, '1', 'arboledas', 6, '3024773516', NULL, 'Mortiz5@gmail.com', '2025-07-10', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000002', NULL, 0, 'USR0341901198', NULL, NULL, '2025-07-10 04:31:41', '2025-07-18 14:05:08'),
+(45, '1005450360', 'cedula', 'Prueba 10 julio', 'calle 32e 11 13', 3, '2', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-10', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000003', NULL, 0, 'USR0360211183', NULL, NULL, '2025-07-10 13:46:51', '2025-07-18 14:05:08'),
+(46, '79882888', 'cedula', 'prueba 10 julio permanencia', 'calle 32e 11 13', 4, '3', 'san luis', 1, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-10', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000004', NULL, 0, 'USR2888501723', NULL, NULL, '2025-07-10 14:25:01', '2025-07-18 14:05:08'),
+(48, '79071052', 'nit', 'prueba permanencia 6 meses', 'calle 32e 11 13', 2, '2', 'san luis', 1, '3007015239', NULL, 'mateo.s3009@gmail.com', '2025-07-10', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000005', NULL, 0, 'USR1052664102', NULL, NULL, '2025-07-10 14:44:24', '2025-07-18 14:05:08'),
+(49, '1005451340', 'cedula', 'prueba 11 julio', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3007015239', NULL, 'mateo.s3009@gmail.com', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000006', NULL, 0, 'USR1340222819', NULL, NULL, '2025-07-11 14:13:42', '2025-07-18 14:05:08'),
+(50, '1005452345', 'cedula', 'prueba 11 julio 2', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3007015239', NULL, 'mateo.s3009@gmail.com', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000007', NULL, 0, 'USR2345617840', NULL, NULL, '2025-07-11 14:36:57', '2025-07-18 14:05:08'),
+(51, '1005450380', 'cedula', 'prueba 11 julio 2 iva', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3007015239', NULL, 'mateo.s3009@gmail.com', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000008', NULL, 0, 'USR0380019272', NULL, NULL, '2025-07-11 14:43:39', '2025-07-18 14:05:08'),
+(55, '1005450391', 'cedula', 'prueba 11 julio 2 iva2', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3007015239', NULL, 'mateo.s3009@gmail.com', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000009', NULL, 0, 'USR0391464958', NULL, NULL, '2025-07-11 14:51:04', '2025-07-18 14:05:08'),
+(57, '79882997', 'cedula', 'prueba iva factura', 'calle 32e 11 13', 2, '4', 'san luis', 1, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000010', NULL, 0, 'USR2997397879', NULL, NULL, '2025-07-11 15:06:37', '2025-07-18 14:05:08'),
+(58, '52488048', 'cedula', 'prueba sin iva', 'calle 32e 11 13', 2, '2', 'san luis', 1, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000011', NULL, 0, 'USR8048381835', NULL, NULL, '2025-07-11 16:29:41', '2025-07-18 14:05:08'),
+(59, '1111015142', 'cedula', 'prueba fechas', 'calle 32e 11 13', 2, '2', 'san luis', 1, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-11', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000012', NULL, 0, 'USR5142497760', NULL, NULL, '2025-07-11 16:48:17', '2025-07-18 14:05:08'),
+(60, '1111015143', 'cedula', 'prueba 12 de julio', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-12', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000013', NULL, 0, 'USR5143483399', NULL, NULL, '2025-07-12 14:28:03', '2025-07-18 14:05:08'),
+(69, '1111015145', '', 'prueba 14 de julio', 'calle 32e 11 13', NULL, '4', NULL, NULL, '3024773516', NULL, 'msalazar5@udi.edu.co', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CONT-2025-000069-716', NULL, 0, NULL, NULL, 1, '2025-07-14 14:20:23', '2025-07-18 14:05:08'),
+(79, '1111015166', 'cedula', 'prueba 12 de julio 2', 'calle 32e 11 13', 3, '1', 'san luis', 6, '3024773516', '3024773516', 'msalazar5@udi.edu.co', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000014', NULL, 0, 'USR51668534', NULL, 1, '2025-07-14 19:30:58', '2025-07-18 14:05:08'),
+(84, '1111015100', 'cedula', 'prueba 12 de julio 3', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3024773516', NULL, 'msalazar5@udi.edu.co', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON000015', NULL, 0, 'USR51000977', NULL, 1, '2025-07-14 19:54:10', '2025-07-18 14:05:08'),
+(88, '79882898', 'cedula', 'prueba 14 julio', 'calle 32e 11 13', 3, '2', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CONT-2025-000NaN', NULL, 0, 'USR2898418610', NULL, NULL, '2025-07-14 21:10:18', '2025-07-18 14:05:08'),
+(96, '1005450311', 'cedula', 'prueba 14 julio ffffffff', 'calle 32e 11 13', 3, '4', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000015', NULL, 0, 'USR0311476089', NULL, NULL, '2025-07-14 21:44:36', '2025-07-18 14:05:08'),
+(97, '79882885', 'cedula', 'prueba 14 JULIO CONTRATOS', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000016', NULL, 0, 'USR2885952253', NULL, NULL, '2025-07-14 22:09:12', '2025-07-18 14:05:08'),
+(98, '79882117', 'cedula', 'prueba PERMAMNENCIA', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000017', NULL, 0, 'USR2117430152', NULL, NULL, '2025-07-14 22:17:10', '2025-07-18 14:05:08'),
+(99, '79882127', 'cedula', 'prueba PERMAMNENCIA2', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000018', NULL, 0, 'USR2127541688', NULL, NULL, '2025-07-14 22:19:01', '2025-07-18 14:05:08'),
+(100, '79882147', 'cedula', 'prueba PERMAMNENCIA2', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000019', NULL, 0, 'USR2147618487', NULL, NULL, '2025-07-14 22:20:18', '2025-07-18 14:05:08'),
+(101, '79882347', 'cedula', 'prueba PERMAMNENCIA 5', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000020', NULL, 0, 'USR2347793358', NULL, NULL, '2025-07-14 22:23:13', '2025-07-18 14:05:08'),
+(102, '79882547', 'cedula', 'prueba PERMAMNENCIA 6', 'calle 32e 11 13', 3, '3', 'san luis', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000021', NULL, 0, 'USR2547862630', NULL, NULL, '2025-07-14 22:24:22', '2025-07-18 14:05:08'),
+(103, '79887887', 'cedula', 'prueba 9 julio', 'calle 32e 11 13', 2, '3', 'san luis', 1, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-14', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000022', NULL, 0, 'USR7887499060', NULL, NULL, '2025-07-14 22:34:59', '2025-07-18 14:05:08'),
+(104, '79227887', 'cedula', 'prueba 15 julio', 'calle 32e 11 13', 3, '3', 'san antonio', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-15', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000023', NULL, 0, 'USR7887135647', NULL, NULL, '2025-07-15 13:45:35', '2025-07-18 14:05:08'),
+(105, '1101045348', 'cedula', 'prueba 18 julio', 'calle 32e 11 13', 3, '4', 'san antonio', 6, '3024773516', NULL, 'MSALAZAR5@UDI.EDU.CO', '2025-07-18', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000024', NULL, 0, 'USR5348261816', NULL, 1, '2025-07-18 13:44:21', '2025-07-18 14:05:08'),
+(116, '47882996', 'cedula', '8 julio', 'calle 32e 11 13', 3, '3', 'san antonio', 6, '3024773516', NULL, 'msalazar5@udi.edu.co', '2025-07-18', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000025', NULL, 0, 'USR2996218952', NULL, 1, '2025-07-18 19:16:58', '2025-07-18 19:16:58'),
+(117, '1002451342', 'cedula', 'prueba 18 julio 2', 'calle 32e 11 13', 3, '3', 'san antonio', 6, '3024773516', NULL, 'mateo.s3009@gmail.com', '2025-07-18', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000026', NULL, 0, 'USR1342444962', NULL, 1, '2025-07-18 19:20:44', '2025-07-18 19:20:45'),
+(120, '79884883', 'cedula', '18julio44', 'calle 32e 11 13', 3, '3', 'san antonio', 6, '3024773516', NULL, 'mateo@gmail.com', '2025-07-18', NULL, 'activo', NULL, NULL, NULL, NULL, 'CON-2025-000027', NULL, 0, 'USR4883965828', NULL, 1, '2025-07-18 19:46:05', '2025-07-18 19:46:05');
 
 -- --------------------------------------------------------
 
@@ -771,7 +774,7 @@ CREATE TABLE `configuracion_empresa` (
 --
 
 INSERT INTO `configuracion_empresa` (`id`, `licencia`, `empresa_nombre`, `empresa_nit`, `empresa_direccion`, `empresa_ciudad`, `empresa_departamento`, `empresa_telefono`, `empresa_email`, `resolucion_facturacion`, `licencia_internet`, `vigilado`, `vigilado_internet`, `comentario`, `prefijo_factura`, `codigo_gs1`, `fecha_actualizacion`, `consecutivo_factura`, `consecutivo_contrato`, `consecutivo_recibo`, `valor_reconexion`, `dias_mora_corte`, `porcentaje_iva`, `porcentaje_interes`, `updated_at`, `prefijo_contrato`, `consecutivo_orden`, `prefijo_orden`) VALUES
-(1, 'PRINCIPAL1', 'PROVEEDOR DE TELECOMUNICACIONES SAS.', '901582657-3', 'Carrera 9 No. 9-94', 'San Gil', 'SANTANDER', '3184550936', 'facturacion@psi.net.co', 'pendiente', 'pendiente', 'Registro unico de tic No. 96006732', 'pendiente', 'hola', 'FAC', 'GS11', '2025-06-11', 42, 25, 1, 10000.00, 15, 19.00, 2.00, '2025-07-18 13:44:21', 'CON', 1, 'ORD');
+(1, 'PRINCIPAL1', 'PROVEEDOR DE TELECOMUNICACIONES SAS.', '901582657-3', 'Carrera 9 No. 9-94', 'San Gil', 'SANTANDER', '3184550936', 'facturacion@psi.net.co', 'pendiente', 'pendiente', 'Registro unico de tic No. 96006732', 'pendiente', 'hola', 'FAC', 'GS11', '2025-06-11', 49, 28, 1, 10000.00, 15, 19.00, 2.00, '2025-07-18 19:46:05', 'CON', 1, 'ORD');
 
 -- --------------------------------------------------------
 
@@ -852,7 +855,7 @@ CREATE TABLE `contratos` (
   `id` int(11) NOT NULL,
   `numero_contrato` varchar(20) NOT NULL,
   `cliente_id` int(11) NOT NULL,
-  `servicio_id` int(11) DEFAULT NULL,
+  `servicio_id` text DEFAULT NULL COMMENT 'ID único para un servicio o JSON array para múltiples servicios',
   `tipo_contrato` enum('servicio','permanencia','comercial') DEFAULT 'servicio',
   `tipo_permanencia` enum('con_permanencia','sin_permanencia') DEFAULT 'sin_permanencia',
   `permanencia_meses` int(11) DEFAULT NULL,
@@ -879,19 +882,19 @@ CREATE TABLE `contratos` (
 --
 
 INSERT INTO `contratos` (`id`, `numero_contrato`, `cliente_id`, `servicio_id`, `tipo_contrato`, `tipo_permanencia`, `permanencia_meses`, `costo_instalacion`, `fecha_generacion`, `fecha_inicio`, `fecha_fin`, `fecha_vencimiento_permanencia`, `estado`, `clausulas_especiales`, `penalizacion_terminacion`, `documento_pdf_path`, `firmado_cliente`, `fecha_firma`, `generado_automaticamente`, `observaciones`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'CONT-2025-000001', 28, 13, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-09', '2025-07-09', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-10 00:03:24', '2025-07-10 04:50:47'),
-(11, 'CON000002', 44, 26, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-09', '2025-07-09', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-10 04:31:41', '2025-07-10 04:50:47'),
-(12, 'CON000003', 45, 27, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-10', '2025-07-10', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-10 13:46:51', '2025-07-10 13:46:51'),
-(13, 'CON000004', 46, 28, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-10', '2025-07-10', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-10 14:25:01', '2025-07-10 14:25:01'),
-(14, 'CON000005', 48, 30, 'servicio', 'con_permanencia', 6, 50000.00, '2025-07-10', '2025-07-10', NULL, '2026-01-10', 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-10 14:44:24', '2025-07-10 14:44:24'),
-(15, 'CON000006', 49, 31, 'servicio', 'con_permanencia', 6, 50000.00, '2025-07-11', '2025-07-11', NULL, '2026-01-11', 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 14:13:42', '2025-07-11 14:13:42'),
-(16, 'CON000007', 50, 32, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 14:36:57', '2025-07-11 14:36:57'),
-(17, 'CON000008', 51, 33, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 14:43:39', '2025-07-11 14:43:39'),
-(21, 'CON000009', 55, 37, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 14:51:04', '2025-07-11 14:51:04'),
-(23, 'CON000010', 57, 39, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 15:06:37', '2025-07-11 15:06:37'),
-(24, 'CON000011', 58, 40, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 16:29:41', '2025-07-11 16:29:41'),
-(25, 'CON000012', 59, 41, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 16:48:17', '2025-07-11 16:48:17'),
-(26, 'CON000013', 60, 42, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-12', '2025-07-12', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-12 14:28:03', '2025-07-12 14:28:03'),
+(1, 'CONT-2025-000001', 28, '13', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-09', '2025-07-09', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-10 00:03:24', '2025-07-10 04:50:47'),
+(11, 'CON000002', 44, '26', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-09', '2025-07-09', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-10 04:31:41', '2025-07-10 04:50:47'),
+(12, 'CON000003', 45, '27', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-10', '2025-07-10', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-10 13:46:51', '2025-07-10 13:46:51'),
+(13, 'CON000004', 46, '28', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-10', '2025-07-10', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-10 14:25:01', '2025-07-10 14:25:01'),
+(14, 'CON000005', 48, '30', 'servicio', 'con_permanencia', 6, 50000.00, '2025-07-10', '2025-07-10', NULL, '2026-01-10', 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-10 14:44:24', '2025-07-10 14:44:24'),
+(15, 'CON000006', 49, '31', 'servicio', 'con_permanencia', 6, 50000.00, '2025-07-11', '2025-07-11', NULL, '2026-01-11', 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 14:13:42', '2025-07-11 14:13:42'),
+(16, 'CON000007', 50, '32', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 14:36:57', '2025-07-11 14:36:57'),
+(17, 'CON000008', 51, '33', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 14:43:39', '2025-07-11 14:43:39'),
+(21, 'CON000009', 55, '37', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 14:51:04', '2025-07-11 14:51:04'),
+(23, 'CON000010', 57, '39', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 15:06:37', '2025-07-11 15:06:37'),
+(24, 'CON000011', 58, '40', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 16:29:41', '2025-07-11 16:29:41'),
+(25, 'CON000012', 59, '41', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-11', '2025-07-11', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-11 16:48:17', '2025-07-11 16:48:17'),
+(26, 'CON000013', 60, '42', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-12', '2025-07-12', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-12 14:28:03', '2025-07-12 14:28:03'),
 (27, 'CONT-2025-000069-716', 69, NULL, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-14', '2025-07-14', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-14 14:20:23', '2025-07-14 14:20:23'),
 (36, 'CON000014', 79, NULL, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-14', '2025-07-14', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-14 19:30:58', '2025-07-14 19:30:58'),
 (41, 'CON000015', 84, NULL, 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-14', '2025-07-14', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, NULL, 1, '2025-07-14 19:54:10', '2025-07-14 19:54:10'),
@@ -905,19 +908,38 @@ INSERT INTO `contratos` (`id`, `numero_contrato`, `cliente_id`, `servicio_id`, `
 (59, 'CON-2025-000021', 102, NULL, 'servicio', 'con_permanencia', 0, 42016.00, '2025-07-14', '2025-07-14', NULL, '2025-07-14', 'activo', NULL, 0.00, NULL, 0, NULL, 1, '{\"sede_nombre\":\"Sede Principal\",\"direccion_sede\":\"calle 32e 11 13\",\"contacto_sede\":\"prueba PERMAMNENCIA 6\",\"telefono_sede\":\"3024773516\",\"servicios_incluidos\":\"INTERNET: Internet 50MB Empresarial ($120000.00)\",\"cantidad_servicios\":1,\"observaciones_adicionales\":\"\",\"tipo_permanencia\":\"con_permanencia\",\"meses_permanencia\":6}', NULL, '2025-07-14 22:24:22', '2025-07-14 22:24:22'),
 (60, 'CON-2025-000022', 103, NULL, 'servicio', 'con_permanencia', 6, 42016.00, '2025-07-14', '2025-07-14', NULL, '2026-01-14', 'activo', NULL, 0.00, NULL, 0, NULL, 1, '{\"sede_nombre\":\"Sede Principal\",\"direccion_sede\":\"calle 32e 11 13\",\"contacto_sede\":\"prueba 9 julio\",\"telefono_sede\":\"3024773516\",\"servicios_incluidos\":\"INTERNET: Internet 50MB ($85000.00)\",\"cantidad_servicios\":1,\"observaciones_adicionales\":\"\",\"tipo_permanencia\":\"con_permanencia\",\"meses_permanencia\":6}', NULL, '2025-07-14 22:34:59', '2025-07-14 22:34:59'),
 (61, 'CON-2025-000023', 104, NULL, 'servicio', 'sin_permanencia', 0, 84032.00, '2025-07-15', '2025-07-15', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, '{\"sede_nombre\":\"Sede Principal\",\"direccion_sede\":\"calle 32e 11 13\",\"contacto_sede\":\"prueba 15 julio\",\"telefono_sede\":\"3024773516\",\"servicios_incluidos\":\"INTERNET: Internet 30MB ($65000.00) + TELEVISION: TV Digital HD ($35000.00)\",\"cantidad_servicios\":2,\"observaciones_adicionales\":\"\",\"tipo_permanencia\":\"sin_permanencia\",\"meses_permanencia\":0}', NULL, '2025-07-15 13:45:35', '2025-07-15 13:45:35'),
-(62, 'CON-2025-000024', 105, NULL, 'servicio', 'sin_permanencia', 0, 300000.00, '2025-07-18', '2025-07-18', NULL, NULL, 'activo', NULL, 0.00, NULL, 0, NULL, 1, '{\"sede_nombre\":\"Sede Principal\",\"direccion_sede\":\"calle 32e 11 13\",\"contacto_sede\":\"prueba 18 julio\",\"telefono_sede\":\"3024773516\",\"servicios_incluidos\":\"INTERNET: Internet 10MB ($45000.00) + TELEVISION: TV Básica ($35000.00)\",\"cantidad_servicios\":2,\"observaciones_adicionales\":\"\",\"tipo_permanencia\":\"sin_permanencia\",\"meses_permanencia\":0,\"costo_instalacion_calculado\":300000}', 1, '2025-07-18 13:44:21', '2025-07-18 13:44:21');
+(62, 'CON-2025-000024', 105, NULL, 'servicio', 'sin_permanencia', 0, 300000.00, '2025-07-18', '2025-07-18', NULL, NULL, 'activo', NULL, 0.00, 'C:\\documentos\\ERP PSI\\backend\\uploads\\contratos\\contrato_CON-2025-000024_original.pdf', 0, NULL, 1, '{\"sede_nombre\":\"Sede Principal\",\"direccion_sede\":\"calle 32e 11 13\",\"contacto_sede\":\"prueba 18 julio\",\"telefono_sede\":\"3024773516\",\"servicios_incluidos\":\"INTERNET: Internet 10MB ($45000.00) + TELEVISION: TV Básica ($35000.00)\",\"cantidad_servicios\":2,\"observaciones_adicionales\":\"\",\"tipo_permanencia\":\"sin_permanencia\",\"meses_permanencia\":0,\"costo_instalacion_calculado\":300000}', 1, '2025-07-18 13:44:21', '2025-07-26 15:18:43'),
+(69, 'CON-2025-000025', 116, '105', 'servicio', 'con_permanencia', 6, 50000.00, '2025-07-18', '2025-07-18', NULL, '2026-01-14', 'activo', NULL, 0.00, 'C:\\documentos\\ERP PSI\\backend\\uploads\\contratos\\contrato_CON-2025-000025_firmado_1753543023734.pdf', 1, '2025-07-26', 1, '\n[FIRMA DIGITAL] Firmado por: 8 julio - Cédula: 47882996 - Fecha: 26/7/2025, 10:17:03 a. m. - Tipo: imagen', 1, '2025-07-18 19:16:58', '2025-07-26 15:17:03'),
+(70, 'CON-2025-000026', 117, '106', 'servicio', 'sin_permanencia', 0, 150000.00, '2025-07-18', '2025-07-18', NULL, NULL, 'activo', NULL, 0.00, 'C:\\documentos\\ERP PSI\\backend\\uploads\\contratos\\contrato_CON-2025-000026_firmado_1753542725940.pdf', 1, '2025-07-26', 1, '\n[FIRMA DIGITAL] Firmado por: prueba 18 julio 2 - Cédula: 1002451342 - Fecha: 26/7/2025, 10:12:06 a. m. - Tipo: digital', 1, '2025-07-18 19:20:45', '2025-07-26 15:12:06'),
+(72, 'CON-2025-000027', 120, '[109,110]', 'servicio', 'con_permanencia', 6, 50000.00, '2025-07-18', '2025-07-18', NULL, '2026-01-18', 'activo', NULL, 0.00, 'C:\\documentos\\ERP PSI\\backend\\uploads\\contratos\\contrato_CON-2025-000027_firmado_1753113498227.pdf', 1, '2025-07-21', 1, '{\"sede_nombre\":\"Sede Principal\",\"direccion_sede\":\"calle 32e 11 13\",\"contacto_sede\":\"18julio44\",\"telefono_sede\":\"3024773516\",\"servicios_incluidos\":\"INTERNET: Internet 10MB ($45000.00) + TELEVISION: TV Básica ($35000.00)\",\"cantidad_servicios\":2,\"observaciones_adicionales\":\"\",\"tipo_permanencia\":\"con_permanencia\",\"meses_permanencia\":6,\"costo_instalacion_calculado\":50000,\"detalle_calculo\":{\"servicios_count\":2,\"costo_instalacion_unica\":50000,\"formula\":\"Una instalación única de $50.000 para todos los servicios\"}}\n[FIRMA DIGITAL] Firmado por: 18julio44 - Cédula: 79884883 - Fecha: 21/7/2025, 10:58:18 a. m. - Tipo: digital', 1, '2025-07-18 19:46:05', '2025-07-21 15:58:18');
 
 --
 -- Disparadores `contratos`
 --
 DELIMITER $$
-CREATE TRIGGER `tr_contratos_after_insert` AFTER INSERT ON `contratos` FOR EACH ROW BEGIN
-    -- Actualizar instalaciones existentes sin contrato para este servicio
+CREATE TRIGGER `tr_contratos_after_insert_v2` AFTER INSERT ON `contratos` FOR EACH ROW BEGIN
+    -- 1. Actualizar instalaciones existentes sin contrato
     UPDATE instalaciones 
     SET contrato_id = NEW.id,
         costo_instalacion = NEW.costo_instalacion
     WHERE servicio_cliente_id = NEW.servicio_id 
     AND contrato_id IS NULL;
+    
+    -- 2. ✅ NUEVO: Actualizar campo contrato en tabla clientes
+    UPDATE clientes 
+    SET contrato = NEW.numero_contrato
+    WHERE id = NEW.cliente_id;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `tr_contratos_after_update` AFTER UPDATE ON `contratos` FOR EACH ROW BEGIN
+    -- Actualizar campo contrato en clientes si cambió el número
+    IF OLD.numero_contrato != NEW.numero_contrato THEN
+        UPDATE clientes 
+        SET contrato = NEW.numero_contrato
+        WHERE id = NEW.cliente_id;
+    END IF;
 END
 $$
 DELIMITER ;
@@ -1004,7 +1026,9 @@ INSERT INTO `detalle_facturas` (`id`, `factura_id`, `concepto_id`, `concepto_nom
 (14, 36, NULL, 'SERVICIO DE INTERNET - Internet 30MB', 1, 65000.00, 0.00, 65000.00, 0.00, 65000.00, 41),
 (15, 37, NULL, 'SERVICIO DE INTERNET - Internet 50MB', 1, 85000.00, 0.00, 85000.00, 16150.00, 101150.00, 42),
 (16, 44, NULL, 'INTERNET: Internet 10MB - Sede Principal', 1, 45000.00, 0.00, 45000.00, 0.00, 45000.00, 78),
-(17, 44, NULL, 'TELEVISION: TV Básica - Sede Principal', 1, 35000.00, 0.00, 35000.00, 6650.00, 41650.00, 79);
+(17, 44, NULL, 'TELEVISION: TV Básica - Sede Principal', 1, 35000.00, 0.00, 35000.00, 6650.00, 41650.00, 79),
+(18, 58, NULL, 'Internet 10MB - internet', 1, 45000.00, 0.00, 45000.00, 0.00, 0.00, 105),
+(19, 59, NULL, 'Internet 10MB - internet', 1, 45000.00, 0.00, 45000.00, 0.00, 0.00, 106);
 
 -- --------------------------------------------------------
 
@@ -1136,7 +1160,10 @@ INSERT INTO `facturas` (`id`, `numero_factura`, `cliente_id`, `identificacion_cl
 (51, 'FAC000041', 102, '79882547', 'prueba PERMAMNENCIA 6', '2025-07', '2025-07-14', '2025-07-19', '2025-07-14', '2025-08-13', NULL, 120000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 120000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 120000.00, 0.00, 120000.00, 'pendiente', NULL, '79882547', NULL, NULL, 'pendiente', NULL, '1', 'Servicios para Sede Principal: INTERNET: Internet 50MB Empresarial ($120000.00)', 1, '2025-07-14 22:24:22', '2025-07-14 22:24:22', NULL, 59),
 (52, 'FAC000042', 103, '79887887', 'prueba 9 julio', '2025-07', '2025-07-14', '2025-07-19', '2025-07-14', '2025-08-13', NULL, 85000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 85000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 85000.00, 0.00, 85000.00, 'pendiente', NULL, '79887887', NULL, NULL, 'pendiente', NULL, '1', 'Servicios para Sede Principal: INTERNET: Internet 50MB ($85000.00)', 1, '2025-07-14 22:34:59', '2025-07-14 22:34:59', NULL, 60),
 (53, 'FAC000043', 104, '79227887', 'prueba 15 julio', '2025-07', '2025-07-15', '2025-07-20', '2025-07-15', '2025-08-14', NULL, 65000.00, 35000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 65000.00, 35000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 6650.00, 100000.00, 6650.00, 106650.00, 'pendiente', NULL, '79227887', NULL, NULL, 'pendiente', NULL, '1', 'Servicios para Sede Principal: INTERNET: Internet 30MB ($65000.00) + TELEVISION: TV Digital HD ($35000.00)', 1, '2025-07-15 13:45:35', '2025-07-15 13:45:35', NULL, 61),
-(54, 'FAC000044', 105, '1101045348', 'prueba 18 julio', '2025-07', '2025-07-18', '2025-07-23', '2025-07-18', '2025-08-17', NULL, 45000.00, 35000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 35000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 15200.00, 80000.00, 15200.00, 95200.00, 'pendiente', NULL, '1101045348', NULL, NULL, 'pendiente', NULL, '1', 'Servicios para Sede Principal: INTERNET: Internet 10MB ($45000.00) + TELEVISION: TV Básica ($35000.00)', 1, '2025-07-18 13:44:21', '2025-07-18 13:44:21', NULL, 62);
+(54, 'FAC000044', 105, '1101045348', 'prueba 18 julio', '2025-07', '2025-07-18', '2025-07-23', '2025-07-18', '2025-08-17', NULL, 45000.00, 35000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 35000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 15200.00, 80000.00, 15200.00, 95200.00, 'pendiente', NULL, '1101045348', NULL, NULL, 'pendiente', NULL, '1', 'Servicios para Sede Principal: INTERNET: Internet 10MB ($45000.00) + TELEVISION: TV Básica ($35000.00)', 1, '2025-07-18 13:44:21', '2025-07-18 13:44:21', NULL, 62),
+(58, 'FAC000046', 116, '', '', '', '2025-07-18', '2025-08-17', NULL, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 0.00, 45000.00, 'pendiente', NULL, NULL, NULL, NULL, 'pendiente', NULL, '1', NULL, 1, '2025-07-18 19:16:59', '2025-07-18 19:16:59', NULL, NULL),
+(59, 'FAC000047', 117, '', '', '', '2025-07-18', '2025-08-17', NULL, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 0.00, 45000.00, 'pendiente', NULL, NULL, NULL, NULL, 'pendiente', NULL, '1', NULL, 1, '2025-07-18 19:20:45', '2025-07-18 19:20:45', NULL, NULL),
+(60, 'FAC000048', 120, '79884883', '18julio44', '2025-07', '2025-07-18', '2025-07-23', '2025-07-18', '2025-08-17', NULL, 45000.00, 35000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 45000.00, 35000.00, 0.00, 0.00, 0.00, 0.00, 0.00, 6650.00, 80000.00, 6650.00, 86650.00, 'pendiente', NULL, '79884883', NULL, NULL, 'pendiente', NULL, '1', 'Servicios para Sede Principal: INTERNET: Internet 10MB ($45000.00) + TELEVISION: TV Básica ($35000.00)', 1, '2025-07-18 19:46:05', '2025-07-18 19:46:05', NULL, 72);
 
 -- --------------------------------------------------------
 
@@ -1168,6 +1195,13 @@ CREATE TABLE `incidencias_servicio` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Volcado de datos para la tabla `incidencias_servicio`
+--
+
+INSERT INTO `incidencias_servicio` (`id`, `numero_incidencia`, `tipo_incidencia`, `categoria`, `fecha_inicio`, `fecha_fin`, `tiempo_duracion_minutos`, `usuarios_afectados`, `municipio_id`, `direccion`, `coordenadas_lat`, `coordenadas_lng`, `descripcion`, `causa_raiz`, `solucion_aplicada`, `mecanismo_solucion`, `estado`, `responsable_id`, `observaciones`, `created_at`, `updated_at`) VALUES
+(1, '', 'no_programado', 'fibra_cortada', '2025-08-12 14:20:00', '2025-08-13 08:34:55', 1094, 120, 6, 'fgfdgfd', 99.99999999, 999.99999999, 'fgdfgfdg', 'fdfdsf', 'sfsfsdf', 'reparacion', 'cerrado', 3, 'dfsdfsf', '2025-08-12 14:20:30', '2025-08-13 13:34:55');
+
 -- --------------------------------------------------------
 
 --
@@ -1177,7 +1211,7 @@ CREATE TABLE `incidencias_servicio` (
 CREATE TABLE `instalaciones` (
   `id` int(11) NOT NULL,
   `cliente_id` int(11) NOT NULL,
-  `servicio_cliente_id` int(11) NOT NULL,
+  `servicio_cliente_id` text DEFAULT NULL COMMENT 'ID único para un servicio o JSON array para múltiples servicios',
   `instalador_id` int(11) DEFAULT NULL,
   `fecha_programada` date NOT NULL,
   `hora_programada` time DEFAULT NULL,
@@ -1207,23 +1241,25 @@ CREATE TABLE `instalaciones` (
 --
 
 INSERT INTO `instalaciones` (`id`, `cliente_id`, `servicio_cliente_id`, `instalador_id`, `fecha_programada`, `hora_programada`, `fecha_realizada`, `hora_inicio`, `hora_fin`, `estado`, `direccion_instalacion`, `barrio`, `telefono_contacto`, `persona_recibe`, `tipo_instalacion`, `observaciones`, `equipos_instalados`, `fotos_instalacion`, `coordenadas_lat`, `coordenadas_lng`, `costo_instalacion`, `created_at`, `updated_at`, `contrato_id`, `tipo_orden`) VALUES
-(1, 1, 1, 1, '2025-06-20', '09:00:00', '2025-06-20', '09:15:00', '11:30:00', 'completada', 'Calle 15 # 23-45, Barrio Centro', 'Centro', '3001234567', 'Juan Carlos Rodríguez', 'nueva', 'Instalación exitosa. Cliente muy colaborador. Señal excelente.', '[\r\n        {\r\n            \"equipo_id\": 1,\r\n            \"equipo_codigo\": \"RTR001\",\r\n            \"equipo_nombre\": \"Router WiFi AC1200\",\r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"TPL2024001\",\r\n            \"observaciones\": \"Router principal instalado en sala\"\r\n        },\r\n        {\r\n            \"equipo_id\": 3,\r\n            \"equipo_codigo\": \"CBL001\", \r\n            \"equipo_nombre\": \"Cable UTP Cat6\",\r\n            \"cantidad\": 15,\r\n            \"numero_serie\": \"CAB-001-001\",\r\n            \"observaciones\": \"15 metros utilizados para conexión desde tap hasta router\"\r\n        }\r\n    ]', '[\r\n        {\r\n            \"url\": \"/uploads/instalaciones/1/foto1.jpg\",\r\n            \"descripcion\": \"Router instalado en sala principal\",\r\n            \"fecha\": \"2025-06-20 10:30:00\"\r\n        },\r\n        {\r\n            \"url\": \"/uploads/instalaciones/1/foto2.jpg\", \r\n            \"descripcion\": \"Conexión externa desde tap\",\r\n            \"fecha\": \"2025-06-20 11:00:00\"\r\n        }\r\n    ]', 6.26377500, -73.13758900, 25000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30', NULL, 'instalacion'),
-(2, 2, 2, 2, '2025-06-25', '14:00:00', NULL, '14:10:00', NULL, 'en_proceso', 'Carrera 10 # 45-67, Barrio Los Pinos', 'Los Pinos', '3109876543', 'María Isabel García', 'nueva', 'Instalación en progreso. Requiere conexión de fibra adicional.', '[\r\n        {\r\n            \"equipo_id\": 2,\r\n            \"equipo_codigo\": \"RTR002\",\r\n            \"equipo_nombre\": \"Router WiFi AX1800\", \r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"ASU2024001\",\r\n            \"observaciones\": \"Router de alta velocidad para plan 50MB\"\r\n        }\r\n    ]', NULL, 6.26412000, -73.13824500, 35000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30', NULL, 'instalacion'),
-(3, 3, 3, 3, '2025-06-26', '08:30:00', NULL, NULL, NULL, 'programada', 'Calle 8 # 12-34, Barrio San José', 'San José', '3201234567', 'Carlos Alberto Ruiz', 'nueva', 'Instalación combo internet + TV. Cliente requiere configuración especial para TV en 2 habitaciones.', '[\r\n        {\r\n            \"equipo_id\": 1,\r\n            \"equipo_codigo\": \"RTR001\",\r\n            \"equipo_nombre\": \"Router WiFi AC1200\",\r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"Pendiente asignación de router específico\"\r\n        },\r\n        {\r\n            \"equipo_id\": 8,\r\n            \"equipo_codigo\": \"DEC001\", \r\n            \"equipo_nombre\": \"Decodificador TDT HD\",\r\n            \"cantidad\": 2,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"2 decodificadores para habitaciones\"\r\n        },\r\n        {\r\n            \"equipo_id\": 4,\r\n            \"equipo_codigo\": \"CBL002\",\r\n            \"equipo_nombre\": \"Cable Coaxial RG6\",\r\n            \"cantidad\": 25,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"Cable para distribución de señal TV\"\r\n        }\r\n    ]', NULL, 6.26289000, -73.13542300, 45000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30', NULL, 'instalacion'),
-(9, 44, 26, NULL, '2025-07-11', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-10 04:31:41', '2025-07-10 04:50:47', 11, 'instalacion'),
-(10, 45, 27, NULL, '2025-07-12', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-10 13:46:51', '2025-07-10 13:46:51', 12, 'instalacion'),
-(11, 46, 28, NULL, '2025-07-12', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-10 14:25:01', '2025-07-10 14:25:01', 13, 'instalacion'),
-(12, 48, 30, NULL, '2025-07-12', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 50000.00, '2025-07-10 14:44:24', '2025-07-10 14:44:24', 14, 'instalacion'),
-(13, 49, 31, NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 50000.00, '2025-07-11 14:13:42', '2025-07-11 14:13:42', 15, 'instalacion'),
-(14, 50, 32, NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 14:36:58', '2025-07-11 14:36:58', 16, 'instalacion'),
-(15, 51, 33, NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 14:43:39', '2025-07-11 14:43:39', 17, 'instalacion'),
-(19, 55, 37, NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 14:51:04', '2025-07-11 14:51:04', 21, 'instalacion'),
-(21, 57, 39, NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 15:06:37', '2025-07-11 15:06:37', 23, 'instalacion'),
-(22, 58, 40, NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 16:29:41', '2025-07-11 16:29:41', 24, 'instalacion'),
-(23, 59, 41, NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 16:48:17', '2025-07-11 16:48:17', 25, 'instalacion'),
-(24, 60, 42, NULL, '2025-07-14', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-12 14:28:03', '2025-07-12 14:28:03', 26, 'instalacion'),
-(32, 79, 65, NULL, '2025-07-15', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Instalación automática generada para nuevo cliente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-14 19:30:58', '2025-07-14 19:30:58', 36, 'instalacion'),
-(37, 84, 71, NULL, '2025-07-15', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Instalación automática generada para nuevo cliente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-14 19:54:10', '2025-07-14 19:54:10', 41, 'instalacion');
+(1, 1, '1', 1, '2025-06-20', '09:00:00', '2025-06-20', '09:15:00', '11:30:00', 'completada', 'Calle 15 # 23-45, Barrio Centro', 'Centro', '3001234567', 'Juan Carlos Rodríguez', 'nueva', 'Instalación exitosa. Cliente muy colaborador. Señal excelente.', '[\r\n        {\r\n            \"equipo_id\": 1,\r\n            \"equipo_codigo\": \"RTR001\",\r\n            \"equipo_nombre\": \"Router WiFi AC1200\",\r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"TPL2024001\",\r\n            \"observaciones\": \"Router principal instalado en sala\"\r\n        },\r\n        {\r\n            \"equipo_id\": 3,\r\n            \"equipo_codigo\": \"CBL001\", \r\n            \"equipo_nombre\": \"Cable UTP Cat6\",\r\n            \"cantidad\": 15,\r\n            \"numero_serie\": \"CAB-001-001\",\r\n            \"observaciones\": \"15 metros utilizados para conexión desde tap hasta router\"\r\n        }\r\n    ]', '[\r\n        {\r\n            \"url\": \"/uploads/instalaciones/1/foto1.jpg\",\r\n            \"descripcion\": \"Router instalado en sala principal\",\r\n            \"fecha\": \"2025-06-20 10:30:00\"\r\n        },\r\n        {\r\n            \"url\": \"/uploads/instalaciones/1/foto2.jpg\", \r\n            \"descripcion\": \"Conexión externa desde tap\",\r\n            \"fecha\": \"2025-06-20 11:00:00\"\r\n        }\r\n    ]', 6.26377500, -73.13758900, 25000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30', NULL, 'instalacion'),
+(2, 2, '2', 2, '2025-06-25', '14:00:00', NULL, '14:10:00', NULL, 'en_proceso', 'Carrera 10 # 45-67, Barrio Los Pinos', 'Los Pinos', '3109876543', 'María Isabel García', 'nueva', 'Instalación en progreso. Requiere conexión de fibra adicional.', '[\r\n        {\r\n            \"equipo_id\": 2,\r\n            \"equipo_codigo\": \"RTR002\",\r\n            \"equipo_nombre\": \"Router WiFi AX1800\", \r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"ASU2024001\",\r\n            \"observaciones\": \"Router de alta velocidad para plan 50MB\"\r\n        }\r\n    ]', NULL, 6.26412000, -73.13824500, 35000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30', NULL, 'instalacion'),
+(3, 3, '3', 3, '2025-06-26', '08:30:00', NULL, NULL, NULL, 'programada', 'Calle 8 # 12-34, Barrio San José', 'San José', '3201234567', 'Carlos Alberto Ruiz', 'nueva', 'Instalación combo internet + TV. Cliente requiere configuración especial para TV en 2 habitaciones.', '[\r\n        {\r\n            \"equipo_id\": 1,\r\n            \"equipo_codigo\": \"RTR001\",\r\n            \"equipo_nombre\": \"Router WiFi AC1200\",\r\n            \"cantidad\": 1,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"Pendiente asignación de router específico\"\r\n        },\r\n        {\r\n            \"equipo_id\": 8,\r\n            \"equipo_codigo\": \"DEC001\", \r\n            \"equipo_nombre\": \"Decodificador TDT HD\",\r\n            \"cantidad\": 2,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"2 decodificadores para habitaciones\"\r\n        },\r\n        {\r\n            \"equipo_id\": 4,\r\n            \"equipo_codigo\": \"CBL002\",\r\n            \"equipo_nombre\": \"Cable Coaxial RG6\",\r\n            \"cantidad\": 25,\r\n            \"numero_serie\": \"\",\r\n            \"observaciones\": \"Cable para distribución de señal TV\"\r\n        }\r\n    ]', NULL, 6.26289000, -73.13542300, 45000.00, '2025-06-25 13:24:30', '2025-06-25 13:24:30', NULL, 'instalacion'),
+(9, 44, '26', NULL, '2025-07-11', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-10 04:31:41', '2025-07-10 04:50:47', 11, 'instalacion'),
+(10, 45, '27', NULL, '2025-07-12', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-10 13:46:51', '2025-07-10 13:46:51', 12, 'instalacion'),
+(11, 46, '28', NULL, '2025-07-12', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-10 14:25:01', '2025-07-10 14:25:01', 13, 'instalacion'),
+(12, 48, '30', NULL, '2025-07-12', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 50000.00, '2025-07-10 14:44:24', '2025-07-10 14:44:24', 14, 'instalacion'),
+(13, 49, '31', NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 50000.00, '2025-07-11 14:13:42', '2025-07-11 14:13:42', 15, 'instalacion'),
+(14, 50, '32', NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 14:36:58', '2025-07-11 14:36:58', 16, 'instalacion'),
+(15, 51, '33', NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 14:43:39', '2025-07-11 14:43:39', 17, 'instalacion'),
+(19, 55, '37', NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 14:51:04', '2025-07-11 14:51:04', 21, 'instalacion'),
+(21, 57, '39', NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 15:06:37', '2025-07-11 15:06:37', 23, 'instalacion'),
+(22, 58, '40', NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 16:29:41', '2025-07-11 16:29:41', 24, 'instalacion'),
+(23, 59, '41', NULL, '2025-07-13', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-11 16:48:17', '2025-07-11 16:48:17', 25, 'instalacion'),
+(24, 60, '42', NULL, '2025-07-14', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Orden generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-12 14:28:03', '2025-07-12 14:28:03', 26, 'instalacion'),
+(32, 79, '65', NULL, '2025-07-15', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Instalación automática generada para nuevo cliente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-14 19:30:58', '2025-07-14 19:30:58', 36, 'instalacion'),
+(37, 84, '71', NULL, '2025-07-15', NULL, NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Instalación automática generada para nuevo cliente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-14 19:54:10', '2025-07-14 19:54:10', 41, 'instalacion'),
+(41, 116, '105', NULL, '2025-07-20', '09:00:00', NULL, NULL, NULL, 'programada', NULL, NULL, NULL, NULL, 'nueva', 'Instalación generada automáticamente', NULL, NULL, NULL, NULL, 150000.00, '2025-07-18 19:16:59', '2025-07-18 19:16:59', NULL, 'instalacion'),
+(42, 117, '106', 3, '2025-07-24', '11:00:00', NULL, NULL, NULL, 'reagendada', NULL, NULL, NULL, NULL, 'nueva', 'Cliente no disponible en la fecha programada\n\nObservaciones adicionales: na', NULL, NULL, NULL, NULL, 150000.00, '2025-07-18 19:20:45', '2025-07-23 14:12:54', NULL, 'instalacion');
 
 --
 -- Disparadores `instalaciones`
@@ -1298,7 +1334,7 @@ INSERT INTO `inventario_equipos` (`id`, `codigo`, `nombre`, `tipo`, `marca`, `mo
 (3, 'CBL001', 'Cable UTP Cat6 305m', 'cable', 'Panduit', 'Cat6-305', 'PAN2024001', 'disponible', NULL, NULL, NULL, 450000.00, '2024-01-20', 'Cables y Más', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
 (4, 'CBL002', 'Cable Coaxial RG6 305m', 'cable', 'CommScope', 'RG6-305', 'CS2024001', 'disponible', NULL, NULL, NULL, 280000.00, '2024-01-25', 'Cables y Más', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
 (5, 'ANT001', 'Antena Sectorial 2.4GHz', 'antena', 'Ubiquiti', 'AM-2G15-120', 'UBI2024001', 'disponible', NULL, NULL, NULL, 85000.00, '2024-02-10', 'Wireless Solutions', 'Almacén Principal', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 15:12:48'),
-(7, 'AMP001', 'Amplificador de Señal 30dB', 'otro', 'Antronix', 'CMA2030', 'ANT2024002', 'disponible', NULL, NULL, NULL, 45000.00, '2025-06-04', 'Electrónicos del Valle', 'sangil', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-11 13:20:46'),
+(7, 'AMP001', 'Amplificador de Señal 30dB', 'otro', 'Antronix', 'CMA2030', 'ANT2024002', 'disponible', 3, '2025-08-14 09:15:40', '2025-08-14 09:16:26', 45000.00, '2025-06-04', 'Electrónicos del Valle', 'sangil', 'Almacén Principal', NULL, NULL, 'ggdgd', 'para instalacion\n--- DEVUELTO ---\nDevolución desde interfaz de gestión', '2025-06-04 15:12:48', '2025-08-14 14:16:26'),
 (8, 'DEC001', 'Decodificador TDT HD', 'decodificador', 'Samsung', 'GX-SM530SH', 'SAM2024001', 'disponible', NULL, NULL, NULL, 45000.00, '2024-03-05', 'Samsung Colombia', 'San Gil', NULL, NULL, NULL, NULL, NULL, '2025-06-04 15:12:48', '2025-06-04 19:27:17');
 
 -- --------------------------------------------------------
@@ -1322,6 +1358,14 @@ CREATE TABLE `inventario_historial` (
   `created_by` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Volcado de datos para la tabla `inventario_historial`
+--
+
+INSERT INTO `inventario_historial` (`id`, `equipo_id`, `instalador_id`, `accion`, `fecha_accion`, `ubicacion`, `coordenadas_lat`, `coordenadas_lng`, `notas`, `cliente_id`, `instalacion_id`, `created_by`) VALUES
+(1, 7, 3, 'asignado', '2025-08-14 09:15:40', 'San Gil', NULL, NULL, 'para instalacion', NULL, NULL, 1),
+(2, 7, 3, 'devuelto', '2025-08-14 09:16:26', 'Almacén Principal', NULL, NULL, 'Devolución desde interfaz de gestión', NULL, NULL, 1);
+
 -- --------------------------------------------------------
 
 --
@@ -1340,6 +1384,17 @@ CREATE TABLE `logs_sistema` (
   `user_agent` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `logs_sistema`
+--
+
+INSERT INTO `logs_sistema` (`id`, `usuario_id`, `accion`, `tabla_afectada`, `registro_id`, `datos_anteriores`, `datos_nuevos`, `ip_address`, `user_agent`, `created_at`) VALUES
+(1, 1, 'UPDATE', 'instalaciones', 42, '{\"id\":42,\"cliente_id\":117,\"servicio_cliente_id\":\"106\",\"instalador_id\":3,\"fecha_programada\":\"2025-07-20T05:00:00.000Z\",\"hora_programada\":\"09:00:00\",\"fecha_realizada\":null,\"hora_inicio\":null,\"hora_fin\":null,\"estado\":\"programada\",\"direccion_instalacion\":null,\"barrio\":null,\"telefono_contacto\":null,\"persona_recibe\":null,\"tipo_instalacion\":\"nueva\",\"observaciones\":\"Instalación generada automáticamente\",\"equipos_instalados\":null,\"fotos_instalacion\":null,\"coordenadas_lat\":null,\"coordenadas_lng\":null,\"costo_instalacion\":\"150000.00\",\"created_at\":\"2025-07-18T19:20:45.000Z\",\"updated_at\":\"2025-07-22T14:09:32.000Z\",\"contrato_id\":null,\"tipo_orden\":\"instalacion\"}', '{\"fecha_programada\":\"2025-07-24\",\"hora_programada\":\"09:00\",\"estado\":\"reagendada\",\"observaciones\":\"Solicitud del cliente\\n\\nObservaciones adicionales: na\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0', '2025-07-23 14:06:31'),
+(2, 1, 'UPDATE', 'instalaciones', 42, '{\"id\":42,\"cliente_id\":117,\"servicio_cliente_id\":\"106\",\"instalador_id\":3,\"fecha_programada\":\"2025-07-24T05:00:00.000Z\",\"hora_programada\":\"09:00:00\",\"fecha_realizada\":null,\"hora_inicio\":null,\"hora_fin\":null,\"estado\":\"reagendada\",\"direccion_instalacion\":null,\"barrio\":null,\"telefono_contacto\":null,\"persona_recibe\":null,\"tipo_instalacion\":\"nueva\",\"observaciones\":\"Solicitud del cliente\\n\\nObservaciones adicionales: na\",\"equipos_instalados\":null,\"fotos_instalacion\":null,\"coordenadas_lat\":null,\"coordenadas_lng\":null,\"costo_instalacion\":\"150000.00\",\"created_at\":\"2025-07-18T19:20:45.000Z\",\"updated_at\":\"2025-07-23T14:06:31.000Z\",\"contrato_id\":null,\"tipo_orden\":\"instalacion\"}', '{\"fecha_programada\":\"2025-07-24\",\"hora_programada\":\"11:00\",\"estado\":\"reagendada\",\"observaciones\":\"Cliente no disponible en la fecha programada\\n\\nObservaciones adicionales: na\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0', '2025-07-23 14:08:44'),
+(3, 1, 'UPDATE', 'instalaciones', 42, '{\"id\":42,\"cliente_id\":117,\"servicio_cliente_id\":\"106\",\"instalador_id\":3,\"fecha_programada\":\"2025-07-24T05:00:00.000Z\",\"hora_programada\":\"11:00:00\",\"fecha_realizada\":null,\"hora_inicio\":null,\"hora_fin\":null,\"estado\":\"reagendada\",\"direccion_instalacion\":null,\"barrio\":null,\"telefono_contacto\":null,\"persona_recibe\":null,\"tipo_instalacion\":\"nueva\",\"observaciones\":\"Cliente no disponible en la fecha programada\\n\\nObservaciones adicionales: na\",\"equipos_instalados\":null,\"fotos_instalacion\":null,\"coordenadas_lat\":null,\"coordenadas_lng\":null,\"costo_instalacion\":\"150000.00\",\"created_at\":\"2025-07-18T19:20:45.000Z\",\"updated_at\":\"2025-07-23T14:08:44.000Z\",\"contrato_id\":null,\"tipo_orden\":\"instalacion\"}', '{\"fecha_programada\":\"2025-07-24\",\"hora_programada\":\"11:00\",\"estado\":\"reagendada\",\"observaciones\":\"Cliente no disponible en la fecha programada\\n\\nObservaciones adicionales: na\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0', '2025-07-23 14:10:05'),
+(4, 1, 'UPDATE', 'instalaciones', 42, '{\"id\":42,\"cliente_id\":117,\"servicio_cliente_id\":\"106\",\"instalador_id\":3,\"fecha_programada\":\"2025-07-24T05:00:00.000Z\",\"hora_programada\":\"11:00:00\",\"fecha_realizada\":null,\"hora_inicio\":null,\"hora_fin\":null,\"estado\":\"reagendada\",\"direccion_instalacion\":null,\"barrio\":null,\"telefono_contacto\":null,\"persona_recibe\":null,\"tipo_instalacion\":\"nueva\",\"observaciones\":\"Cliente no disponible en la fecha programada\\n\\nObservaciones adicionales: na\",\"equipos_instalados\":null,\"fotos_instalacion\":null,\"coordenadas_lat\":null,\"coordenadas_lng\":null,\"costo_instalacion\":\"150000.00\",\"created_at\":\"2025-07-18T19:20:45.000Z\",\"updated_at\":\"2025-07-23T14:10:05.000Z\",\"contrato_id\":null,\"tipo_orden\":\"instalacion\"}', '{\"fecha_programada\":\"2025-07-24\",\"hora_programada\":\"11:00\",\"estado\":\"reagendada\",\"observaciones\":\"Cliente no disponible en la fecha programada\\n\\nObservaciones adicionales: na\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0', '2025-07-23 14:10:32'),
+(5, 1, 'UPDATE', 'instalaciones', 42, '{\"id\":42,\"cliente_id\":117,\"servicio_cliente_id\":\"106\",\"instalador_id\":3,\"fecha_programada\":\"2025-07-24T05:00:00.000Z\",\"hora_programada\":\"11:00:00\",\"fecha_realizada\":null,\"hora_inicio\":null,\"hora_fin\":null,\"estado\":\"reagendada\",\"direccion_instalacion\":null,\"barrio\":null,\"telefono_contacto\":null,\"persona_recibe\":null,\"tipo_instalacion\":\"nueva\",\"observaciones\":\"Cliente no disponible en la fecha programada\\n\\nObservaciones adicionales: na\",\"equipos_instalados\":null,\"fotos_instalacion\":null,\"coordenadas_lat\":null,\"coordenadas_lng\":null,\"costo_instalacion\":\"150000.00\",\"created_at\":\"2025-07-18T19:20:45.000Z\",\"updated_at\":\"2025-07-23T14:10:32.000Z\",\"contrato_id\":null,\"tipo_orden\":\"instalacion\"}', '{\"fecha_programada\":\"2025-07-24\",\"hora_programada\":\"11:00\",\"estado\":\"reagendada\",\"observaciones\":\"Cliente no disponible en la fecha programada\\n\\nObservaciones adicionales: na\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0', '2025-07-23 14:12:54');
 
 -- --------------------------------------------------------
 
@@ -1513,6 +1568,13 @@ CREATE TABLE `pqr` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Volcado de datos para la tabla `pqr`
+--
+
+INSERT INTO `pqr` (`id`, `numero_radicado`, `cliente_id`, `tipo`, `categoria`, `servicio_afectado`, `medio_recepcion`, `fecha_recepcion`, `fecha_respuesta`, `fecha_cierre`, `estado`, `prioridad`, `asunto`, `descripcion`, `respuesta`, `tiempo_respuesta_horas`, `satisfaccion_cliente`, `usuario_asignado`, `observaciones`, `created_at`, `updated_at`) VALUES
+(1, '2025000001', 120, 'reclamo', 'tecnico', '', 'presencial', '2025-08-13 15:12:52', NULL, NULL, 'abierto', 'alta', 'queja sobre la velocidad del internet', 'dsfsdgfdfsdggf', NULL, NULL, NULL, NULL, NULL, '2025-08-13 20:12:52', '2025-08-13 20:12:52');
+
 -- --------------------------------------------------------
 
 --
@@ -1617,7 +1679,11 @@ INSERT INTO `servicios_cliente` (`id`, `cliente_id`, `plan_id`, `fecha_activacio
 (95, 104, 2, '2025-07-15', NULL, 'activo', 65000.00, '{\"id\":1752587135510,\"nombre_sede\":\"Sede Principal\",\"direccion_servicio\":\"calle 32e 11 13\",\"contacto_sede\":\"prueba 15 julio\",\"telefono_sede\":\"3024773516\",\"planInternetId\":2,\"planTelevisionId\":11,\"precioPersonalizado\":false,\"precioInternetCustom\":\"\",\"precioTelevisionCustom\":\"\",\"tipoContrato\":\"sin_permanencia\",\"mesesPermanencia\":0,\"fechaActivacion\":\"2025-07-15\",\"observaciones\":\"\",\"contrato_id\":61,\"numero_contrato\":\"CON-2025-000023\"}', NULL, '2025-07-15 13:45:35', '2025-07-15 13:45:35'),
 (96, 104, 11, '2025-07-15', NULL, 'activo', 35000.00, '{\"id\":1752587135510,\"nombre_sede\":\"Sede Principal\",\"direccion_servicio\":\"calle 32e 11 13\",\"contacto_sede\":\"prueba 15 julio\",\"telefono_sede\":\"3024773516\",\"planInternetId\":2,\"planTelevisionId\":11,\"precioPersonalizado\":false,\"precioInternetCustom\":\"\",\"precioTelevisionCustom\":\"\",\"tipoContrato\":\"sin_permanencia\",\"mesesPermanencia\":0,\"fechaActivacion\":\"2025-07-15\",\"observaciones\":\"\",\"contrato_id\":61,\"numero_contrato\":\"CON-2025-000023\"}', NULL, '2025-07-15 13:45:35', '2025-07-15 13:45:35'),
 (97, 105, 1, '2025-07-18', NULL, 'activo', 45000.00, '{\"numero_contrato\":\"CON-2025-000024\",\"contrato_id\":62,\"costo_instalacion_asignado\":150000}', NULL, '2025-07-18 13:44:21', '2025-07-18 13:44:21'),
-(98, 105, 4, '2025-07-18', NULL, 'activo', 35000.00, '{\"numero_contrato\":\"CON-2025-000024\",\"contrato_id\":62,\"costo_instalacion_asignado\":150000}', NULL, '2025-07-18 13:44:21', '2025-07-18 13:44:21');
+(98, 105, 4, '2025-07-18', NULL, 'activo', 35000.00, '{\"numero_contrato\":\"CON-2025-000024\",\"contrato_id\":62,\"costo_instalacion_asignado\":150000}', NULL, '2025-07-18 13:44:21', '2025-07-18 13:44:21'),
+(105, 116, 1, '2025-07-18', NULL, 'activo', 45000.00, NULL, NULL, '2025-07-18 19:16:58', '2025-07-18 19:16:58'),
+(106, 117, 1, '2025-07-18', NULL, 'activo', 45000.00, NULL, NULL, '2025-07-18 19:20:44', '2025-07-18 19:20:44'),
+(109, 120, 1, '2025-07-18', NULL, 'activo', 45000.00, '{\"sede_nombre\":\"Sede Principal\",\"direccion_sede\":\"calle 32e 11 13\",\"tipo_contrato\":\"con_permanencia\",\"observaciones_adicionales\":\"\",\"fecha_creacion\":\"2025-07-18T19:46:05.866Z\",\"creado_desde_sede\":true,\"numero_contrato\":\"CON-2025-000027\",\"contrato_id\":72,\"costo_instalacion_compartido\":50000,\"parte_instalacion\":\"Instalación única de $50.000 compartida entre 2 servicio(s)\"}', NULL, '2025-07-18 19:46:05', '2025-07-18 19:46:05'),
+(110, 120, 4, '2025-07-18', NULL, 'activo', 35000.00, '{\"sede_nombre\":\"Sede Principal\",\"direccion_sede\":\"calle 32e 11 13\",\"tipo_contrato\":\"con_permanencia\",\"observaciones_adicionales\":\"\",\"fecha_creacion\":\"2025-07-18T19:46:05.877Z\",\"creado_desde_sede\":true,\"numero_contrato\":\"CON-2025-000027\",\"contrato_id\":72,\"costo_instalacion_compartido\":50000,\"parte_instalacion\":\"Instalación única de $50.000 compartida entre 2 servicio(s)\"}', NULL, '2025-07-18 19:46:05', '2025-07-18 19:46:05');
 
 -- --------------------------------------------------------
 
@@ -1643,7 +1709,7 @@ CREATE TABLE `sistema_usuarios` (
 --
 
 INSERT INTO `sistema_usuarios` (`id`, `email`, `password`, `nombre`, `telefono`, `rol`, `activo`, `ultimo_acceso`, `created_at`, `updated_at`) VALUES
-(1, 'admin@empresa.com', '$2b$12$8pOnup7urwhWUA7.e8VpEuDYuUiZ/gVTIf35HbnKQSWBMQeb7QXAa', 'Mateo salazar ortiz', '3007015239', 'administrador', 1, '2025-07-18 13:18:33', '2025-05-23 13:44:46', '2025-07-18 13:18:33'),
+(1, 'admin@empresa.com', '$2b$12$8pOnup7urwhWUA7.e8VpEuDYuUiZ/gVTIf35HbnKQSWBMQeb7QXAa', 'Mateo salazar ortiz', '3007015239', 'administrador', 1, '2025-08-14 13:47:32', '2025-05-23 13:44:46', '2025-08-14 13:47:32'),
 (2, 'super@empresa.com', '$2b$12$f1Vvth/hYSUD7VHtfmZKmOuNXrHowf0Fy2T7MtxdhRAZdIOQR8MCa', 'mateo salazar ortiz', '3007015239', 'supervisor', 1, '2025-06-03 16:18:19', '2025-05-30 14:32:41', '2025-06-11 13:07:30'),
 (3, 'instalador@empresa.com', '$2b$12$FCgmtglWlgNJPwNmNbX3fOp8eRnvpeaSgKdteS0mKYtKHq1/qq6Ri', 'mateo salazar ortiz', '3007015239', 'instalador', 1, '2025-06-04 16:44:35', '2025-05-30 15:00:25', '2025-07-14 16:30:32');
 
@@ -2164,9 +2230,8 @@ ALTER TABLE `contratos`
   ADD UNIQUE KEY `numero_contrato` (`numero_contrato`),
   ADD KEY `idx_cliente_contrato` (`cliente_id`),
   ADD KEY `idx_numero_contrato` (`numero_contrato`),
-  ADD KEY `idx_servicio_contrato` (`servicio_id`),
-  ADD KEY `fk_contratos_usuario` (`created_by`),
-  ADD KEY `idx_contratos_servicio_tipo` (`servicio_id`,`tipo_permanencia`);
+  ADD KEY `idx_servicio_contrato` (`servicio_id`(768)),
+  ADD KEY `fk_contratos_usuario` (`created_by`);
 
 --
 -- Indices de la tabla `cortes_servicio`
@@ -2261,8 +2326,7 @@ ALTER TABLE `instalaciones`
   ADD KEY `idx_instalador` (`instalador_id`),
   ADD KEY `idx_fecha_programada` (`fecha_programada`),
   ADD KEY `idx_estado` (`estado`),
-  ADD KEY `idx_instalaciones_contrato` (`contrato_id`),
-  ADD KEY `idx_instalaciones_servicio` (`servicio_cliente_id`);
+  ADD KEY `idx_instalaciones_contrato` (`contrato_id`);
 
 --
 -- Indices de la tabla `inventario_equipos`
@@ -2437,7 +2501,7 @@ ALTER TABLE `ciudades`
 -- AUTO_INCREMENT de la tabla `clientes`
 --
 ALTER TABLE `clientes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=106;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=121;
 
 --
 -- AUTO_INCREMENT de la tabla `clientes_inactivos`
@@ -2479,7 +2543,7 @@ ALTER TABLE `configuracion_iva`
 -- AUTO_INCREMENT de la tabla `contratos`
 --
 ALTER TABLE `contratos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=63;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=73;
 
 --
 -- AUTO_INCREMENT de la tabla `cortes_servicio`
@@ -2497,7 +2561,7 @@ ALTER TABLE `departamentos`
 -- AUTO_INCREMENT de la tabla `detalle_facturas`
 --
 ALTER TABLE `detalle_facturas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT de la tabla `equipos_perdidos`
@@ -2515,19 +2579,19 @@ ALTER TABLE `facturacion_historial`
 -- AUTO_INCREMENT de la tabla `facturas`
 --
 ALTER TABLE `facturas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=55;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=61;
 
 --
 -- AUTO_INCREMENT de la tabla `incidencias_servicio`
 --
 ALTER TABLE `incidencias_servicio`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT de la tabla `instalaciones`
 --
 ALTER TABLE `instalaciones`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=38;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
 
 --
 -- AUTO_INCREMENT de la tabla `inventario_equipos`
@@ -2539,13 +2603,13 @@ ALTER TABLE `inventario_equipos`
 -- AUTO_INCREMENT de la tabla `inventario_historial`
 --
 ALTER TABLE `inventario_historial`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT de la tabla `logs_sistema`
 --
 ALTER TABLE `logs_sistema`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT de la tabla `metricas_qos`
@@ -2575,7 +2639,7 @@ ALTER TABLE `plantillas_correo`
 -- AUTO_INCREMENT de la tabla `pqr`
 --
 ALTER TABLE `pqr`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT de la tabla `rutas_cobranza`
@@ -2593,7 +2657,7 @@ ALTER TABLE `sectores`
 -- AUTO_INCREMENT de la tabla `servicios_cliente`
 --
 ALTER TABLE `servicios_cliente`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=99;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=111;
 
 --
 -- AUTO_INCREMENT de la tabla `sistema_usuarios`
@@ -2642,7 +2706,6 @@ ALTER TABLE `clientes_inactivos`
 --
 ALTER TABLE `contratos`
   ADD CONSTRAINT `fk_contratos_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `fk_contratos_servicio` FOREIGN KEY (`servicio_id`) REFERENCES `servicios_cliente` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_contratos_usuario` FOREIGN KEY (`created_by`) REFERENCES `sistema_usuarios` (`id`) ON DELETE SET NULL;
 
 --
@@ -2689,7 +2752,6 @@ ALTER TABLE `incidencias_servicio`
 ALTER TABLE `instalaciones`
   ADD CONSTRAINT `fk_instalaciones_contrato` FOREIGN KEY (`contrato_id`) REFERENCES `contratos` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `instalaciones_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `instalaciones_ibfk_2` FOREIGN KEY (`servicio_cliente_id`) REFERENCES `servicios_cliente` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `instalaciones_ibfk_3` FOREIGN KEY (`instalador_id`) REFERENCES `sistema_usuarios` (`id`) ON DELETE SET NULL;
 
 --

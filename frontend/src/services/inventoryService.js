@@ -206,7 +206,7 @@ async getActiveInstallers() {
   async getEquipmentHistory(equipmentId) {
     try {
       const response = await apiService.get(`/inventory/equipment/${equipmentId}/history`);
-      return response.data;
+      return response;
     } catch (error) {
       console.error('Error obteniendo historial del equipo:', error);
       throw this.handleError(error);

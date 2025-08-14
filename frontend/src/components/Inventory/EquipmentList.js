@@ -231,11 +231,6 @@ const EquipmentList = ({
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStateColor(equipo.estado)}`}>
                     {inventoryService.getStateLabel(equipo.estado)}
                   </span>
-                  {equipo.dias_asignado && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      {equipo.dias_asignado} días
-                    </div>
-                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {equipo.instalador_nombre || '-'}
