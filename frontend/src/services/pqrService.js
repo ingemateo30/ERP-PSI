@@ -4,7 +4,7 @@ import authService from './authService';
 class PQRService {
     constructor() {
         // ✅ URL base dinámica desde el archivo .env (solo modificado aquí)
-        const apiBase = process.env.REACT_APP_API_URL || 'http://16.16.16.154:3000/api/v1';
+        const apiBase = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3001/';
         this.baseURL = `${apiBase.replace(/\/$/, '')}/pqr`;
     }
 
@@ -195,7 +195,7 @@ class PQRService {
     async getUsuariosDisponibles() {
         try {
             // ✅ Cambiado aquí: usar apiBase desde .env
-            const apiBase = process.env.REACT_APP_API_URL || 'http://16.16.16.154:3000/api/v1';
+            const apiBase = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3001/';
             const url = `${apiBase.replace(/\/$/, '')}/users`; // Endpoint específico para usuarios
             const response = await this.makeRequest(url);
             
@@ -229,7 +229,7 @@ class PQRService {
     async getUsuarios() {
         try {
             // ✅ Cambiado aquí: usar apiBase desde .env
-            const apiBase = process.env.REACT_APP_API_URL || 'http://16.16.16.154:3000/api/v1';
+            const apiBase = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3001/';
             const url = `${apiBase.replace(/\/$/, '')}/users`;
             return await this.makeRequest(url);
         } catch (error) {
@@ -246,7 +246,7 @@ class PQRService {
     async getClientesActivos(searchTerm = '') {
         try {
             // ✅ Cambiado aquí: usar apiBase desde .env
-            const apiBase = process.env.REACT_APP_API_URL || 'http://16.16.16.154:3000/api/v1';
+            const apiBase = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3001/';
             let url = `${apiBase.replace(/\/$/, '')}/clients`;
             
             // Agregar parámetro de búsqueda si existe
@@ -288,7 +288,7 @@ class PQRService {
     async getClientes() {
         try {
             // ✅ Cambiado aquí: usar apiBase desde .env
-            const apiBase = process.env.REACT_APP_API_URL || 'http://16.16.16.154:3000/api/v1';
+            const apiBase = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3001/';
             const url = `${apiBase.replace(/\/$/, '')}/clients`;
             return await this.makeRequest(url);
         } catch (error) {
@@ -301,7 +301,7 @@ class PQRService {
     async buscarClientes(criterio) {
         try {
             // ✅ Cambiado aquí: usar apiBase desde .env
-            const apiBase = process.env.REACT_APP_API_URL || 'http://16.16.16.154:3000/api/v1';
+            const apiBase = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3001/';
             const queryParams = new URLSearchParams();
             queryParams.append('q', criterio);
 
