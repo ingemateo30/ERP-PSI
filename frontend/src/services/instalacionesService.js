@@ -457,7 +457,7 @@ export const instalacionesService = {
     // Hacer fetch directo con manejo correcto del blob
     const token = authService.getToken();
     const response = await fetch(
-    `${process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1'}/instalaciones/${instalacionId}/pdf`,
+    `${process.env.REACT_APP_API_URL || 'http://16.16.16.154:3000/api/v1'}/instalaciones/${instalacionId}/pdf`,
     {
       method: 'GET',
       headers: {
