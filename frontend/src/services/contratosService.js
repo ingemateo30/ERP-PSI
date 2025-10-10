@@ -66,7 +66,10 @@ class ContratosService {
 
                     // CORRECCIÓN: Usar fetch directo para manejar mejor las respuestas blob
                     const token = authService.getToken();
-                    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1';
+                    const apiUrl = process.env.NODE_ENV === 'development'
+                    ? (process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1')
+                    : process.env.REACT_APP_API_URL;
+
                     const pdfUrl = `${apiUrl}/contratos/${id}/pdf`;
 
                     const pdfResponse = await fetch(pdfUrl, {
@@ -108,7 +111,10 @@ class ContratosService {
                     console.error('❌ Error generando PDF:', pdfError);
                     // CORRECCIÓN: Usar URL directa como fallback
                     const token = localStorage.getItem('token');
-                    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1';
+                    const apiUrl = process.env.NODE_ENV === 'development'
+                    ? (process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1')
+                    : process.env.REACT_APP_API_URL;
+
                     const urlPDF = `${apiUrl}/contratos/${id}/pdf`;
                     
 
@@ -144,10 +150,13 @@ class ContratosService {
             }
 
             // Construir URL base de la API
-            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1';
+            const apiUrl = process.env.NODE_ENV === 'development'
+                ? (process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1')
+                : process.env.REACT_APP_API_URL;
+
 
             // CORRECCIÓN: URL con parámetros de autenticación correctos
-            const pdfUrl = `${apiUrl}/contratos/${id}/pdf?token=${encodeURIComponent(token)}}`;
+            const pdfUrl = `${apiUrl}/contratos/${id}/pdf?token=${encodeURIComponent(token)}`;
 
             console.log('🔗 URL del PDF generada:', pdfUrl);
 
@@ -435,7 +444,10 @@ class ContratosService {
                 disponible: true, // Si llegó aquí, el PDF está disponible
                 contentType: 'application/pdf',
                 size: 0, // HEAD no retorna size en apiService
-                url: `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1'}/contratos/${id}/pdf`
+                url: `${(process.env.NODE_ENV === 'development'
+                 ? (process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1')
+                : process.env.REACT_APP_API_URL)}/contratos/${id}/pdf`
+
             };
         } catch (error) {
             console.error('❌ Error verificando PDF:', error);

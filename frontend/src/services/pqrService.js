@@ -1,10 +1,11 @@
-// frontend/src/services/pqrService.js - VERSIÓN COMPLETA CORREGIDA
+// frontend/src/services/pqrService.js - VERSIÓN COMPLETA CORREGIDA (solo URLs dinámicas)
 import authService from './authService';
 
 class PQRService {
     constructor() {
-        // URL base del servidor
-        this.baseURL = 'http://localhost:3000/api/pqr';
+        // ✅ URL base dinámica desde el archivo .env (solo modificado aquí)
+        const apiBase = process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1';
+        this.baseURL = `${apiBase.replace(/\/$/, '')}/pqr`;
     }
 
     // ==========================================
@@ -193,7 +194,9 @@ class PQRService {
     // Obtener usuarios disponibles para asignar PQRs
     async getUsuariosDisponibles() {
         try {
-            const url = 'http://localhost:3000/api/v1/users'; // Endpoint específico para usuarios
+            // ✅ Cambiado aquí: usar apiBase desde .env
+            const apiBase = process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1';
+            const url = `${apiBase.replace(/\/$/, '')}/users`; // Endpoint específico para usuarios
             const response = await this.makeRequest(url);
             
             // Asegurar estructura de respuesta consistente
@@ -225,7 +228,9 @@ class PQRService {
     // Obtener todos los usuarios del sistema
     async getUsuarios() {
         try {
-            const url = 'http://localhost:3000/api/v1/users';
+            // ✅ Cambiado aquí: usar apiBase desde .env
+            const apiBase = process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1';
+            const url = `${apiBase.replace(/\/$/, '')}/users`;
             return await this.makeRequest(url);
         } catch (error) {
             console.error('❌ Error obteniendo usuarios:', error);
@@ -240,7 +245,9 @@ class PQRService {
     // Obtener clientes activos (con búsqueda opcional)
     async getClientesActivos(searchTerm = '') {
         try {
-            let url = 'http://localhost:3000/api/v1/clients';
+            // ✅ Cambiado aquí: usar apiBase desde .env
+            const apiBase = process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1';
+            let url = `${apiBase.replace(/\/$/, '')}/clients`;
             
             // Agregar parámetro de búsqueda si existe
             if (searchTerm && searchTerm.trim() !== '') {
@@ -280,7 +287,9 @@ class PQRService {
     // Obtener todos los clientes
     async getClientes() {
         try {
-            const url = 'http://localhost:3000/api/v1/clients';
+            // ✅ Cambiado aquí: usar apiBase desde .env
+            const apiBase = process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1';
+            const url = `${apiBase.replace(/\/$/, '')}/clients`;
             return await this.makeRequest(url);
         } catch (error) {
             console.error('❌ Error obteniendo clientes:', error);
@@ -291,10 +300,12 @@ class PQRService {
     // Buscar clientes por criterio
     async buscarClientes(criterio) {
         try {
+            // ✅ Cambiado aquí: usar apiBase desde .env
+            const apiBase = process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1';
             const queryParams = new URLSearchParams();
             queryParams.append('q', criterio);
 
-            const url = `http://localhost:3000/api/v1/clients/search?${queryParams.toString()}`;
+            const url = `${apiBase.replace(/\/$/, '')}/clients/search?${queryParams.toString()}`;
             return await this.makeRequest(url);
         } catch (error) {
             console.error('❌ Error buscando clientes:', error);

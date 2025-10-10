@@ -454,15 +454,19 @@ export const instalacionesService = {
 
       console.log('🔗 Haciendo petición a:', `/api/v1/instalaciones/${instalacionId}/pdf`);
 
-      // Hacer fetch directo con manejo correcto del blob
-      const token = authService.getToken();
-      const response = await fetch(`http://localhost:3000/api/v1/instalaciones/${instalacionId}/pdf`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/pdf',
-          'Authorization': `Bearer ${token}`
-        }
-      });
+    // Hacer fetch directo con manejo correcto del blob
+    const token = authService.getToken();
+    const response = await fetch(
+    `${process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1'}/instalaciones/${instalacionId}/pdf`,
+    {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/pdf',
+        'Authorization': `Bearer ${token}`
+      }
+    }
+  );
+
 
       console.log('📊 Response status:', response.status);
 

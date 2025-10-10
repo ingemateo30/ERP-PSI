@@ -201,7 +201,7 @@ async obtenerHistorialCliente(params = {}) {
       queryParams.append('fecha_hasta', params.fecha_hasta);
     }
     
-    const baseURL = 'http://localhost:3000/api/v1';
+    const baseURL = process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1';
     const url = `${baseURL}/facturas/historial-cliente?${queryParams.toString()}`;
     
     console.log('🔍 URL final construida:', url);

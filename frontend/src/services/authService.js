@@ -1,6 +1,6 @@
 // frontend/src/services/authService.js - VERSIÓN COMPLETA INTEGRADA
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://192.168.1.10:3000/api/v1';
 
 class AuthService {
     constructor() {
