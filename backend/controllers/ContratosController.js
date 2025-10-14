@@ -9,23 +9,23 @@ const path = require('path');
 
 class ContratosController {
 
-    static async obtenerTodos(req, res) {
-        try {
-            console.log('📋 GET /contratos - Obteniendo contratos');
+static async obtenerTodos(req, res) {
+    try {
+        console.log('📋 GET /contratos - Obteniendo contratos');
 
-            const {
-                page = 1,
-                limit = 10,
-                cliente_id,
-                estado = '',
-                tipo_contrato = '',
-                search = ''
-            } = req.query;
+        const {
+            page = 1,
+            limit = 10,
+            cliente_id,
+            estado = '',
+            tipo_contrato = '',
+            search = ''
+        } = req.query;
 
-            const offset = (page - 1) * limit;
+        const offset = (page - 1) * limit;
 
-            // ✅ CONSULTA MEJORADA CON JOINS PARA TRAER LOS DATOS DEL PLAN
-            let query = `
+        // ✅ CONSULTA MEJORADA CON JOINS Y PROTECCIÓN DE NULL
+        let query = `
       SELECT 
         c.*,
         cl.nombre as cliente_nombre,
@@ -34,13 +34,13 @@ class ContratosController {
         cl.correo as cliente_email,
         cl.direccion as cliente_direccion,
         cl.estrato as cliente_estrato,
-        ps.nombre as plan_nombre,
-        ps.precio as plan_precio,
-        ps.tipo as plan_tipo,
-        ps.velocidad_bajada,
-        ps.velocidad_subida,
-        ps.canales_tv,
-        ps.descripcion as plan_descripcion
+        IFNULL(ps.nombre, '') as plan_nombre,
+        IFNULL(ps.precio, 0) as plan_precio,
+        IFNULL(ps.tipo, '') as plan_tipo,
+        IFNULL(ps.velocidad_bajada, 0) as velocidad_bajada,
+        IFNULL(ps.velocidad_subida, 0) as velocidad_subida,
+        IFNULL(ps.canales_tv, 0) as canales_tv,
+        IFNULL(ps.descripcion, '') as plan_descripcion
       FROM contratos c
       LEFT JOIN clientes cl ON c.cliente_id = cl.id
       LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
@@ -48,66 +48,68 @@ class ContratosController {
       WHERE 1=1
     `;
 
-            const params = [];
+        const params = [];
 
-            // Aplicar filtros...
-            if (cliente_id) {
-                query += ' AND c.cliente_id = ?';
-                params.push(cliente_id);
-            }
-
-            if (estado) {
-                query += ' AND c.estado = ?';
-                params.push(estado);
-            }
-
-            if (tipo_contrato) {
-                query += ' AND c.tipo_contrato = ?';
-                params.push(tipo_contrato);
-            }
-
-            if (search) {
-                query += ' AND (c.numero_contrato LIKE ? OR cl.nombre LIKE ? OR cl.identificacion LIKE ?)';
-                const searchTerm = `%${search}%`;
-                params.push(searchTerm, searchTerm, searchTerm);
-            }
-
-            // Contar total
-            const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
-            const [countResult] = await Database.query(countQuery, params);
-            const total = countResult[0]?.total || 0;
-
-            // Agregar paginación
-            query += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
-            params.push(parseInt(limit), parseInt(offset));
-
-            const contratos = await Database.query(query, params);
-
-            console.log(`✅ Encontrados ${contratos.length} contratos con datos de planes`);
-
-            res.json({
-                success: true,
-                data: {
-                    contratos,
-                    pagination: {
-                        page: parseInt(page),
-                        limit: parseInt(limit),
-                        total,
-                        totalPages: Math.ceil(total / limit)
-                    }
-                }
-            });
-
-        } catch (error) {
-            console.error('❌ Error obteniendo contratos:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error interno del servidor',
-                error: error.message
-            });
+        // Aplicar filtros
+        if (cliente_id) {
+            query += ' AND c.cliente_id = ?';
+            params.push(cliente_id);
         }
-    }
 
+        if (estado) {
+            query += ' AND c.estado = ?';
+            params.push(estado);
+        }
+
+        if (tipo_contrato) {
+            query += ' AND c.tipo_contrato = ?';
+            params.push(tipo_contrato);
+        }
+
+        if (search) {
+            query += ' AND (c.numero_contrato LIKE ? OR cl.nombre LIKE ? OR cl.identificacion LIKE ?)';
+            const searchTerm = `%${search}%`;
+            params.push(searchTerm, searchTerm, searchTerm);
+        }
+
+        // Contar total
+        const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
+        const [countResult] = await Database.query(countQuery, params);
+        const total = countResult[0]?.total || 0;
+
+        // Agregar paginación
+        query += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
+        params.push(parseInt(limit), parseInt(offset));
+
+        console.log('📌 Query final:', query);
+        console.log('📌 Params:', params);
+
+        const contratos = await Database.query(query, params);
+
+        console.log(`✅ Encontrados ${contratos.length} contratos con datos de planes`);
+
+        res.json({
+            success: true,
+            data: {
+                contratos,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    total,
+                    totalPages: Math.ceil(total / limit)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo contratos:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            error: error.message
+        });
+    }
+}
     static async obtenerPorId(req, res) {
         try {
             const { id } = req.params;
