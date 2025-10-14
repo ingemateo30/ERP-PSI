@@ -9,11 +9,11 @@ const path = require('path');
 
 class ContratosController {
 
-    static async obtenerTodos(req, res) {
+   static async obtenerTodos(req, res) {
     try {
         console.log('📋 GET /contratos - Obteniendo contratos');
 
-        const {
+        let {
             page = 1,
             limit = 10,
             cliente_id,
@@ -22,6 +22,8 @@ class ContratosController {
             search = ''
         } = req.query;
 
+        page = parseInt(page, 10);
+        limit = parseInt(limit, 10);
         const offset = (page - 1) * limit;
 
         // Query base con joins
@@ -50,7 +52,6 @@ class ContratosController {
 
         const params = [];
 
-        // Filtros opcionales
         if (cliente_id) {
             query += ' AND c.cliente_id = ?';
             params.push(cliente_id);
@@ -64,38 +65,43 @@ class ContratosController {
             params.push(tipo_contrato);
         }
         if (search) {
-            query += ' AND (c.numero_contrato LIKE ? OR cl.nombre LIKE ? OR cl.identificacion LIKE ?)';
             const searchTerm = `%${search}%`;
+            query += ' AND (c.numero_contrato LIKE ? OR cl.nombre LIKE ? OR cl.identificacion LIKE ?)';
             params.push(searchTerm, searchTerm, searchTerm);
         }
 
         // Contar total de resultados
-        const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
+        const countQuery = `
+            SELECT COUNT(*) AS total
+            FROM contratos c
+            LEFT JOIN clientes cl ON c.cliente_id = cl.id
+            LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
+            LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+            WHERE 1=1
+            ${cliente_id ? ' AND c.cliente_id = ?' : ''}
+            ${estado ? ' AND c.estado = ?' : ''}
+            ${tipo_contrato ? ' AND c.tipo_contrato = ?' : ''}
+            ${search ? ' AND (c.numero_contrato LIKE ? OR cl.nombre LIKE ? OR cl.identificacion LIKE ?)' : ''}
+        `;
+
         const [countResult] = await Database.query(countQuery, params);
         const total = countResult[0]?.total || 0;
 
-        // Agregar paginación directamente en la query
-        const limitInt = parseInt(limit);
-        const offsetInt = parseInt(offset);
-        query += ` ORDER BY c.created_at DESC LIMIT ${limitInt} OFFSET ${offsetInt}`;
+        // Paginación
+        query += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
+        params.push(limit, offset);
 
-        console.log('📌 Query final:', query);
-        console.log('📌 Params para filtros:', params);
-
-        // Ejecutar query final
         const contratos = await Database.query(query, params);
-
-        console.log(`✅ Encontrados ${contratos.length} contratos con datos de planes`);
 
         res.json({
             success: true,
             data: {
                 contratos,
                 pagination: {
-                    page: parseInt(page),
-                    limit: limitInt,
+                    page,
+                    limit,
                     total,
-                    totalPages: Math.ceil(total / limitInt)
+                    totalPages: Math.ceil(total / limit)
                 }
             }
         });
