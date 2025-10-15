@@ -406,8 +406,8 @@ static async obtenerTodas(req, res) {
         FROM facturas f
         ${whereClause}
         ORDER BY f.fecha_emision DESC
-        LIMIT ? OFFSET ?
-      `, [...queryParams, limitNum, offset]);
+        LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}
+      `, queryParams);
 
       res.json({
         success: true,
@@ -649,8 +649,8 @@ static async obtenerTodas(req, res) {
         FROM facturas f
         ${whereClause}
         ORDER BY f.fecha_vencimiento ASC
-        LIMIT ? OFFSET ?
-      `, [...queryParams, limitNum, offset]);
+        LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}
+      `, queryParams);
 
       res.json({
         success: true,
