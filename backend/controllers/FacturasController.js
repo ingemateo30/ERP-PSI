@@ -48,13 +48,50 @@ static async obtenerTodas(req, res) {
       sort_order = 'DESC'
     } = req.query;
 
-    const pageNum = parseInt(page, 10) || 1;
-    const limitNum = parseInt(limit, 10) || 20;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Construir WHERE dinámico
-    const whereConditions = ['f.activo = ?'];
-    const queryParams = ['1'];
+    console.log('📋 Obteniendo facturas con parámetros:', {
+      page: pageNum,
+      limit: limitNum,
+      fecha_desde,
+      fecha_hasta,
+      estado,
+      cliente_id,
+      numero_factura
+    });
+
+    // Verificar si existe la tabla facturas
+    let tablaExiste = true;
+    try {
+      await Database.query('SELECT 1 FROM facturas LIMIT 1');
+    } catch (error) {
+      tablaExiste = false;
+      console.log('⚠️ Tabla facturas no existe');
+    }
+
+    if (!tablaExiste) {
+      return res.json({
+        success: true,
+        data: {
+          facturas: [],
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: 0,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPrevPage: false
+          }
+        },
+        message: 'Tabla facturas no existe - retornando datos vacíos'
+      });
+    }
+
+    // ✅ Construir WHERE clause dinámicamente
+    let whereConditions = ['f.activo = ?'];
+    let queryParams = ['1'];
 
     if (fecha_desde && fecha_hasta) {
       whereConditions.push('f.fecha_emision BETWEEN ? AND ?');
@@ -76,28 +113,59 @@ static async obtenerTodas(req, res) {
       queryParams.push(`%${numero_factura}%`);
     }
 
-    const whereClause = whereConditions.length ? `WHERE ${whereConditions.join(' AND ')}` : '';
+    const whereClause = whereConditions.length > 0 ? 
+      `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    // Contar total
-    const totalResult = await Database.query(`
+    // ✅ Contar total (usa los mismos params sin LIMIT/OFFSET)
+    const countQuery = `
       SELECT COUNT(*) as total 
       FROM facturas f
       ${whereClause}
-    `, queryParams);
-
+    `;
+    
+    const totalResult = await Database.query(countQuery, queryParams);
     const total = totalResult[0]?.total || 0;
 
-    // Validar columnas de ordenamiento
+    // Validar columna de ordenamiento
     const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente', 'id'];
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // Query final: concatenar LIMIT/OFFSET directamente
-    const finalQuery = `
+    // ✅ Query principal con placeholders ? para LIMIT y OFFSET
+    const query = `
       SELECT 
-        f.*,
+        f.id,
+        f.numero_factura,
+        f.cliente_id,
+        f.identificacion_cliente,
+        f.nombre_cliente,
+        f.periodo_facturacion,
+        f.fecha_emision,
+        f.fecha_vencimiento,
+        f.fecha_desde,
+        f.fecha_hasta,
+        f.fecha_pago,
+        f.internet,
+        f.television,
+        f.saldo_anterior,
+        f.interes,
+        f.reconexion,
+        f.descuento,
+        f.varios,
+        f.publicidad,
+        f.subtotal,
+        f.iva,
+        f.total,
+        f.estado,
+        f.metodo_pago,
+        f.referencia_pago,
+        f.banco_id,
+        f.ruta,
+        f.observaciones,
+        f.created_at,
+        f.updated_at,
         DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencido,
-        CASE
+        CASE 
           WHEN f.estado = 'pagada' THEN 'Pagada'
           WHEN f.estado = 'anulada' THEN 'Anulada'
           WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' THEN 'Vencida'
@@ -106,15 +174,24 @@ static async obtenerTodas(req, res) {
       FROM facturas f
       ${whereClause}
       ORDER BY f.${sortColumn} ${sortDirection}
-      LIMIT ${limitNum} OFFSET ${offset}
+      LIMIT ? OFFSET ?
     `;
 
-    const facturas = await Database.query(finalQuery, queryParams);
+    // ✅ CRÍTICO: Agregar LIMIT y OFFSET al final del array de params
+    const finalParams = [...queryParams, parseInt(limitNum), parseInt(offset)];
 
-    // Paginación
+    console.log('🔍 Query final facturas:', query);
+    console.log('📊 Parámetros:', finalParams);
+
+    // ✅ Ejecutar con todos los parámetros
+    const facturas = await Database.query(query, finalParams);
+
+    // Calcular paginación
     const totalPages = Math.ceil(total / limitNum);
     const hasNextPage = pageNum < totalPages;
     const hasPrevPage = pageNum > 1;
+
+    console.log(`✅ Facturas obtenidas: ${facturas.length}/${total} total, página ${pageNum}/${totalPages}`);
 
     res.json({
       success: true,
@@ -123,10 +200,10 @@ static async obtenerTodas(req, res) {
         pagination: {
           page: pageNum,
           limit: limitNum,
-          total,
-          totalPages,
-          hasNextPage,
-          hasPrevPage
+          total: total,
+          totalPages: totalPages,
+          hasNextPage: hasNextPage,
+          hasPrevPage: hasPrevPage
         }
       },
       message: 'Facturas obtenidas exitosamente'
