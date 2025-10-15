@@ -48,8 +48,8 @@ class FacturasController {
       sort_order = 'DESC'
     } = req.query;
 
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 20;
     const offset = (pageNum - 1) * limitNum;
 
     console.log('📋 Obteniendo facturas con parámetros:', {
@@ -62,13 +62,13 @@ class FacturasController {
       numero_factura
     });
 
-    // Verificar si existe la tabla facturas
+    // 🔍 Verificar existencia de la tabla
     let tablaExiste = true;
     try {
       await Database.query('SELECT 1 FROM facturas LIMIT 1');
     } catch (error) {
       tablaExiste = false;
-      console.log('⚠️ Tabla facturas no existe');
+      console.warn('⚠️ Tabla facturas no existe');
     }
 
     if (!tablaExiste) {
@@ -89,9 +89,9 @@ class FacturasController {
       });
     }
 
-    // Construir WHERE clause dinámicamente
-    let whereConditions = ['f.activo = ?'];
-    let queryParams = ['1'];
+    // 🧩 Construir filtros dinámicos
+    const whereConditions = ['f.activo = 1'];
+    const queryParams = [];
 
     if (fecha_desde && fecha_hasta) {
       whereConditions.push('f.fecha_emision BETWEEN ? AND ?');
@@ -113,25 +113,22 @@ class FacturasController {
       queryParams.push(`%${numero_factura}%`);
     }
 
-    const whereClause = whereConditions.length > 0 ? 
-      `WHERE ${whereConditions.join(' AND ')}` : '';
+    const whereClause = whereConditions.length ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    // Contar total
-    const totalResult = await Database.query(`
-      SELECT COUNT(*) as total 
-      FROM facturas f
-      ${whereClause}
-    `, queryParams);
-
+    // 📊 Obtener total de registros
+    const totalResult = await Database.query(
+      `SELECT COUNT(*) as total FROM facturas f ${whereClause}`,
+      queryParams
+    );
     const total = totalResult[0]?.total || 0;
 
-    // Validar columna de ordenamiento usando columnas reales
+    // 🧭 Validar columna de ordenamiento
     const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente', 'id'];
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // ✅ SOLUCIÓN: Construir query final SIN parámetros para LIMIT/OFFSET
-    const baseQuery = `
+    // 🧾 Query principal
+    const sql = `
       SELECT 
         f.id,
         f.numero_factura,
@@ -163,28 +160,29 @@ class FacturasController {
         f.observaciones,
         f.created_at,
         f.updated_at,
-        DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencido,
+        DATEDIFF(NOW(), f.fecha_vencimiento) AS dias_vencido,
         CASE 
           WHEN f.estado = 'pagada' THEN 'Pagada'
           WHEN f.estado = 'anulada' THEN 'Anulada'
           WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' THEN 'Vencida'
           ELSE 'Pendiente'
-        END as estado_descripcion
+        END AS estado_descripcion
       FROM facturas f
       ${whereClause}
       ORDER BY f.${sortColumn} ${sortDirection}
+      LIMIT ? OFFSET ?
     `;
 
-    // Construir query final con LIMIT/OFFSET como literales
-    const finalQuery = `${baseQuery} LIMIT ${limitNum} OFFSET ${offset}`;
+    // ✅ Agregar los parámetros de LIMIT y OFFSET correctamente
+    const finalParams = [...queryParams, limitNum, offset];
 
-    console.log('🔍 Query final facturas:', finalQuery);
-    console.log('📊 Parámetros:', queryParams);
+    console.log('🔍 Query final facturas:', sql);
+    console.log('📊 Parámetros:', finalParams);
 
-    // Obtener facturas paginadas SIN parámetros para LIMIT/OFFSET
-    const facturas = await Database.query(finalQuery, queryParams);
+    // Ejecutar consulta
+    const facturas = await Database.query(sql, finalParams);
 
-    // Calcular paginación
+    // 📄 Calcular paginación
     const totalPages = Math.ceil(total / limitNum);
     const hasNextPage = pageNum < totalPages;
     const hasPrevPage = pageNum > 1;
@@ -198,10 +196,10 @@ class FacturasController {
         pagination: {
           page: pageNum,
           limit: limitNum,
-          total: total,
-          totalPages: totalPages,
-          hasNextPage: hasNextPage,
-          hasPrevPage: hasPrevPage
+          total,
+          totalPages,
+          hasNextPage,
+          hasPrevPage
         }
       },
       message: 'Facturas obtenidas exitosamente'
