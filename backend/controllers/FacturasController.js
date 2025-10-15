@@ -48,33 +48,26 @@ static async obtenerTodas(req, res) {
       sort_order = 'DESC'
     } = req.query;
 
+    // 🔹 Validar y normalizar page y limit
     const pageNum = Number(page) > 0 ? Number(page) : 1;
     const limitNum = Number(limit) > 0 ? Number(limit) : 20;
     const offset = (pageNum - 1) * limitNum;
 
-    console.log('📋 Obteniendo facturas con parámetros:', {
-      page: pageNum,
-      limit: limitNum,
-      fecha_desde,
-      fecha_hasta,
-      estado,
-      cliente_id,
-      numero_factura
-    });
-
-    // 🧩 Verificar existencia de la tabla
+    // 🔹 Revisar tabla
     try {
       await Database.query('SELECT 1 FROM facturas LIMIT 1');
-    } catch (error) {
-      console.warn('⚠️ Tabla facturas no existe o no accesible:', error.message);
+    } catch {
       return res.json({
         success: true,
-        data: { facturas: [], pagination: { page: pageNum, limit: limitNum, total: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false } },
+        data: {
+          facturas: [],
+          pagination: { page: pageNum, limit: limitNum, total: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false }
+        },
         message: 'Tabla facturas no existe o no accesible'
       });
     }
 
-    // 🧮 Construcción dinámica de filtros
+    // 🔹 Construir filtros
     const whereConditions = ['f.activo = 1'];
     const queryParams = [];
 
@@ -82,17 +75,14 @@ static async obtenerTodas(req, res) {
       whereConditions.push('f.fecha_emision BETWEEN ? AND ?');
       queryParams.push(fecha_desde, fecha_hasta);
     }
-
     if (estado) {
       whereConditions.push('f.estado = ?');
       queryParams.push(estado);
     }
-
     if (cliente_id) {
       whereConditions.push('f.cliente_id = ?');
       queryParams.push(cliente_id);
     }
-
     if (numero_factura) {
       whereConditions.push('f.numero_factura LIKE ?');
       queryParams.push(`%${numero_factura}%`);
@@ -100,19 +90,19 @@ static async obtenerTodas(req, res) {
 
     const whereClause = whereConditions.length ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    // 📊 Obtener total de registros
-    const totalResult = await Database.query(
+    // 🔹 Obtener total de registros
+    const [totalResult] = await Database.query(
       `SELECT COUNT(*) AS total FROM facturas f ${whereClause}`,
       queryParams
     );
-    const total = totalResult?.[0]?.total || 0;
+    const total = totalResult?.total || 0;
 
-    // 🧭 Validar ordenamiento
+    // 🔹 Validar ordenamiento
     const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente', 'id'];
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // 🧾 Query principal
+    // 🔹 Query principal (LIMIT y OFFSET como números, no placeholders)
     const sql = `
       SELECT 
         f.id,
@@ -123,28 +113,12 @@ static async obtenerTodas(req, res) {
         f.periodo_facturacion,
         f.fecha_emision,
         f.fecha_vencimiento,
-        f.fecha_desde,
-        f.fecha_hasta,
         f.fecha_pago,
-        f.internet,
-        f.television,
-        f.saldo_anterior,
-        f.interes,
-        f.reconexion,
-        f.descuento,
-        f.varios,
-        f.publicidad,
         f.subtotal,
         f.iva,
         f.total,
         f.estado,
         f.metodo_pago,
-        f.referencia_pago,
-        f.banco_id,
-        f.ruta,
-        f.observaciones,
-        f.created_at,
-        f.updated_at,
         DATEDIFF(NOW(), f.fecha_vencimiento) AS dias_vencido,
         CASE 
           WHEN f.estado = 'pagada' THEN 'Pagada'
@@ -155,41 +129,22 @@ static async obtenerTodas(req, res) {
       FROM facturas f
       ${whereClause}
       ORDER BY f.${sortColumn} ${sortDirection}
-      LIMIT ? OFFSET ?
+      LIMIT ${limitNum} OFFSET ${offset};
     `;
 
-    // 🧩 Agregar los parámetros de LIMIT y OFFSET
-    const finalParams = [...queryParams, limitNum, offset];
+    // 🔹 Ejecutar consulta
+    const facturas = await Database.query(sql, queryParams);
 
-    console.log('🧠 Query final:', sql);
-    console.log('📦 Parámetros finales:', finalParams);
-
-    // ⚡ Ejecutar query con validación de parámetros
-    if (finalParams.some(p => p === undefined || Number.isNaN(p))) {
-      throw new Error('Parámetros inválidos detectados en la consulta');
-    }
-
-    const facturas = await Database.query(sql, finalParams);
-
-    // 📄 Calcular paginación
+    // 🔹 Paginación
     const totalPages = Math.ceil(total / limitNum);
     const hasNextPage = pageNum < totalPages;
     const hasPrevPage = pageNum > 1;
-
-    console.log(`✅ Facturas obtenidas: ${facturas.length}/${total} (página ${pageNum}/${totalPages})`);
 
     res.json({
       success: true,
       data: {
         facturas,
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total,
-          totalPages,
-          hasNextPage,
-          hasPrevPage
-        }
+        pagination: { page: pageNum, limit: limitNum, total, totalPages, hasNextPage, hasPrevPage }
       },
       message: 'Facturas obtenidas exitosamente'
     });
@@ -203,6 +158,7 @@ static async obtenerTodas(req, res) {
     });
   }
 }
+
 
 
 
