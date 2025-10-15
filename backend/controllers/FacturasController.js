@@ -55,7 +55,7 @@ static async obtenerTodas(req, res) {
     const pageNum = Math.max(1, parseInt(page));
     const offset = (pageNum - 1) * limitNum;
 
-    // Validar columnas permitidas para ordenar
+    // ✅ Validar columnas permitidas para ordenar
     const allowedSortFields = ['id', 'fecha_emision', 'fecha_vencimiento', 'total', 'estado'];
     const sortField = allowedSortFields.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortOrder = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
@@ -119,7 +119,7 @@ static async obtenerTodas(req, res) {
       params.push(`%${numero_factura}%`);
     }
 
-    // Orden y paginación (sin placeholders en LIMIT/OFFSET)
+    // ✅ Orden y paginación sin placeholders (evita el error de MySQL)
     query += ` ORDER BY f.${sortField} ${sortOrder} LIMIT ${limitNum} OFFSET ${offset}`;
 
     console.log("📄 SQL Final Facturas:", query);
@@ -190,6 +190,7 @@ static async obtenerTodas(req, res) {
     });
   }
 }
+
 
   /**
    * Obtener una factura por ID
