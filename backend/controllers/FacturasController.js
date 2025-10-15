@@ -48,8 +48,9 @@ class FacturasController {
       sort_order = 'DESC'
     } = req.query;
 
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
+    // ✅ Conversión y validación segura
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, parseInt(limit) || 20);
     const offset = (pageNum - 1) * limitNum;
 
     console.log('📋 Obteniendo facturas con parámetros:', {
@@ -89,7 +90,9 @@ class FacturasController {
       });
     }
 
-    // Construir WHERE clause dinámicamente
+    // ==============================
+    // Construcción dinámica del WHERE
+    // ==============================
     let whereConditions = ['f.activo = ?'];
     let queryParams = ['1'];
 
@@ -113,10 +116,13 @@ class FacturasController {
       queryParams.push(`%${numero_factura}%`);
     }
 
-    const whereClause = whereConditions.length > 0 ? 
-      `WHERE ${whereConditions.join(' AND ')}` : '';
+    const whereClause = whereConditions.length > 0 
+      ? `WHERE ${whereConditions.join(' AND ')}`
+      : '';
 
-    // Contar total
+    // ==============================
+    // Conteo total
+    // ==============================
     const totalResult = await Database.query(`
       SELECT COUNT(*) as total 
       FROM facturas f
@@ -125,12 +131,19 @@ class FacturasController {
 
     const total = totalResult[0]?.total || 0;
 
-    // Validar columna de ordenamiento usando columnas reales
-    const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente', 'id'];
+    // ==============================
+    // Orden y columnas válidas
+    // ==============================
+    const validSortColumns = [
+      'fecha_emision', 'numero_factura', 'total', 'estado',
+      'fecha_vencimiento', 'nombre_cliente', 'id'
+    ];
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // ✅ SOLUCIÓN: Construir query final SIN parámetros para LIMIT/OFFSET
+    // ==============================
+    // Query principal
+    // ==============================
     const baseQuery = `
       SELECT 
         f.id,
@@ -173,23 +186,25 @@ class FacturasController {
       FROM facturas f
       ${whereClause}
       ORDER BY f.${sortColumn} ${sortDirection}
+      LIMIT ${limitNum} OFFSET ${offset}
     `;
 
-    // Construir query final con LIMIT/OFFSET como literales
-    const finalQuery = `${baseQuery} LIMIT ${limitNum} OFFSET ${offset}`;
-
-    console.log('🔍 Query final facturas:', finalQuery);
+    console.log('🔍 SQL Final:', baseQuery);
     console.log('📊 Parámetros:', queryParams);
 
-    // Obtener facturas paginadas SIN parámetros para LIMIT/OFFSET
-    const facturas = await Database.query(finalQuery, queryParams);
+    // ==============================
+    // Ejecutar consulta
+    // ==============================
+    const facturas = await Database.query(baseQuery, queryParams);
 
-    // Calcular paginación
+    // ==============================
+    // Paginación final
+    // ==============================
     const totalPages = Math.ceil(total / limitNum);
     const hasNextPage = pageNum < totalPages;
     const hasPrevPage = pageNum > 1;
 
-    console.log(`✅ Facturas obtenidas: ${facturas.length}/${total} total, página ${pageNum}/${totalPages}`);
+    console.log(`✅ Facturas obtenidas: ${facturas.length}/${total}`);
 
     res.json({
       success: true,
@@ -198,10 +213,10 @@ class FacturasController {
         pagination: {
           page: pageNum,
           limit: limitNum,
-          total: total,
-          totalPages: totalPages,
-          hasNextPage: hasNextPage,
-          hasPrevPage: hasPrevPage
+          total,
+          totalPages,
+          hasNextPage,
+          hasPrevPage
         }
       },
       message: 'Facturas obtenidas exitosamente'
@@ -216,6 +231,7 @@ class FacturasController {
     });
   }
 }
+
 
   /**
    * Obtener una factura por ID
