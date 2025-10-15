@@ -50,19 +50,14 @@ static async obtenerTodas(req, res) {
       sort_order = 'DESC'
     } = req.query;
 
-    // ✅ Validaciones seguras y numéricas
     const limitNum = Math.max(1, parseInt(limit)) || 20;
     const pageNum = Math.max(1, parseInt(page)) || 1;
     const offset = (pageNum - 1) * limitNum;
 
-    // ✅ Validar columnas de orden permitidas
     const allowedSortFields = ['id', 'fecha_emision', 'fecha_vencimiento', 'total', 'estado'];
     const sortField = allowedSortFields.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortOrder = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // ========================
-    //  Construcción del Query
-    // ========================
     let query = `
       SELECT 
         f.id,
@@ -98,7 +93,6 @@ static async obtenerTodas(req, res) {
 
     const params = [];
 
-    // ✅ Filtros opcionales
     if (fecha_desde && fecha_hasta) {
       query += ` AND f.fecha_emision BETWEEN ? AND ?`;
       params.push(fecha_desde, fecha_hasta);
@@ -119,20 +113,14 @@ static async obtenerTodas(req, res) {
       params.push(`%${numero_factura}%`);
     }
 
-    // ✅ Orden y paginación (interpolados y validados)
+    // ⚡️ AQUÍ el cambio importante
     query += ` ORDER BY f.${sortField} ${sortOrder} LIMIT ${limitNum} OFFSET ${offset}`;
 
     console.log("📄 SQL Final Facturas:", query);
     console.log("📊 Parámetros:", params);
 
-    // ========================
-    //  Ejecutar la consulta
-    // ========================
     const facturas = await Database.query(query, params);
 
-    // ========================
-    //  Total de registros
-    // ========================
     let countQuery = `
       SELECT COUNT(*) AS total 
       FROM facturas f
@@ -166,9 +154,6 @@ static async obtenerTodas(req, res) {
 
     console.log(`✅ Facturas obtenidas: ${facturas.length}/${total} total, página ${pageNum}/${totalPages}`);
 
-    // ========================
-    //  Respuesta final
-    // ========================
     return res.json({
       success: true,
       data: {
@@ -190,6 +175,7 @@ static async obtenerTodas(req, res) {
     });
   }
 }
+
 
 
 
