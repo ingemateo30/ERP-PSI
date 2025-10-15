@@ -48,8 +48,8 @@ static async obtenerTodas(req, res) {
       sort_order = 'DESC'
     } = req.query;
 
-    const pageNum = parseInt(page) || 1;
-    const limitNum = parseInt(limit) || 20;
+    const pageNum = Number(page) > 0 ? Number(page) : 1;
+    const limitNum = Number(limit) > 0 ? Number(limit) : 20;
     const offset = (pageNum - 1) * limitNum;
 
     console.log('📋 Obteniendo facturas con parámetros:', {
@@ -62,34 +62,19 @@ static async obtenerTodas(req, res) {
       numero_factura
     });
 
-    // 🔍 Verificar existencia de la tabla
-    let tablaExiste = true;
+    // 🧩 Verificar existencia de la tabla
     try {
       await Database.query('SELECT 1 FROM facturas LIMIT 1');
     } catch (error) {
-      tablaExiste = false;
-      console.warn('⚠️ Tabla facturas no existe');
-    }
-
-    if (!tablaExiste) {
+      console.warn('⚠️ Tabla facturas no existe o no accesible:', error.message);
       return res.json({
         success: true,
-        data: {
-          facturas: [],
-          pagination: {
-            page: pageNum,
-            limit: limitNum,
-            total: 0,
-            totalPages: 0,
-            hasNextPage: false,
-            hasPrevPage: false
-          }
-        },
-        message: 'Tabla facturas no existe - retornando datos vacíos'
+        data: { facturas: [], pagination: { page: pageNum, limit: limitNum, total: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false } },
+        message: 'Tabla facturas no existe o no accesible'
       });
     }
 
-    // 🧩 Construir filtros dinámicos
+    // 🧮 Construcción dinámica de filtros
     const whereConditions = ['f.activo = 1'];
     const queryParams = [];
 
@@ -117,25 +102,17 @@ static async obtenerTodas(req, res) {
 
     // 📊 Obtener total de registros
     const totalResult = await Database.query(
-      `SELECT COUNT(*) as total FROM facturas f ${whereClause}`,
+      `SELECT COUNT(*) AS total FROM facturas f ${whereClause}`,
       queryParams
     );
-    const total = totalResult[0]?.total || 0;
+    const total = totalResult?.[0]?.total || 0;
 
-    // 🧭 Validar columna de ordenamiento
-    const validSortColumns = [
-      'fecha_emision',
-      'numero_factura',
-      'total',
-      'estado',
-      'fecha_vencimiento',
-      'nombre_cliente',
-      'id'
-    ];
+    // 🧭 Validar ordenamiento
+    const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente', 'id'];
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // ✅ Query corregido (sin parámetros en LIMIT/OFFSET)
+    // 🧾 Query principal
     const sql = `
       SELECT 
         f.id,
@@ -178,21 +155,28 @@ static async obtenerTodas(req, res) {
       FROM facturas f
       ${whereClause}
       ORDER BY f.${sortColumn} ${sortDirection}
-      LIMIT ${limitNum} OFFSET ${offset};
+      LIMIT ? OFFSET ?
     `;
 
-    console.log('🔍 Query final facturas:', sql);
-    console.log('📊 Parámetros (solo filtros):', queryParams);
+    // 🧩 Agregar los parámetros de LIMIT y OFFSET
+    const finalParams = [...queryParams, limitNum, offset];
 
-    // Ejecutar sin pasar limit/offset como parámetros
-    const facturas = await Database.query(sql, queryParams);
+    console.log('🧠 Query final:', sql);
+    console.log('📦 Parámetros finales:', finalParams);
+
+    // ⚡ Ejecutar query con validación de parámetros
+    if (finalParams.some(p => p === undefined || Number.isNaN(p))) {
+      throw new Error('Parámetros inválidos detectados en la consulta');
+    }
+
+    const facturas = await Database.query(sql, finalParams);
 
     // 📄 Calcular paginación
     const totalPages = Math.ceil(total / limitNum);
     const hasNextPage = pageNum < totalPages;
     const hasPrevPage = pageNum > 1;
 
-    console.log(`✅ Facturas obtenidas: ${facturas.length}/${total} total, página ${pageNum}/${totalPages}`);
+    console.log(`✅ Facturas obtenidas: ${facturas.length}/${total} (página ${pageNum}/${totalPages})`);
 
     res.json({
       success: true,
@@ -219,6 +203,7 @@ static async obtenerTodas(req, res) {
     });
   }
 }
+
 
 
   /**
