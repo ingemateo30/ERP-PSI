@@ -34,31 +34,37 @@ class FacturasController {
    * Obtener todas las facturas con filtros y paginación
    * CORREGIDO: Usando columnas reales de la tabla facturas
    */
- static async obtenerTodas(req, res) {
+static async obtenerTodas(req, res) {
   try {
-    // ====== 1. Leer y normalizar parámetros ======
+    // ===== 1️⃣ Parámetros de query =====
     const {
       page = 1,
       limit = 20,
       fecha_desde,
       fecha_hasta,
-      estado,
+      estado, // puede ser un string o array
       cliente_id,
       numero_factura,
+      total_min,
+      total_max,
       sort_by = 'fecha_emision',
-      sort_order = 'DESC'
+      sort_order = 'DESC',
+      search
     } = req.query;
 
+    // ===== 2️⃣ Validar y normalizar =====
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
     const offset = (pageNum - 1) * limitNum;
 
-    // ====== 2. Validar columna de ordenamiento y dirección ======
-    const validSortColumns = ['fecha_emision','numero_factura','total','estado','fecha_vencimiento','nombre_cliente','id'];
+    const validSortColumns = [
+      'id','numero_factura','cliente_id','nombre_cliente',
+      'fecha_emision','fecha_vencimiento','total','estado','subtotal','iva'
+    ];
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // ====== 3. Construir WHERE dinámico ======
+    // ===== 3️⃣ Construir condiciones dinámicas =====
     const whereConditions = ['f.activo = ?'];
     const queryParams = ['1'];
 
@@ -68,8 +74,14 @@ class FacturasController {
     }
 
     if (estado) {
-      whereConditions.push('f.estado = ?');
-      queryParams.push(estado);
+      if (Array.isArray(estado)) {
+        const placeholders = estado.map(() => '?').join(',');
+        whereConditions.push(`f.estado IN (${placeholders})`);
+        queryParams.push(...estado);
+      } else {
+        whereConditions.push('f.estado = ?');
+        queryParams.push(estado);
+      }
     }
 
     if (cliente_id && !isNaN(parseInt(cliente_id, 10))) {
@@ -79,20 +91,35 @@ class FacturasController {
 
     if (numero_factura && numero_factura.trim() !== '') {
       whereConditions.push('f.numero_factura LIKE ?');
-      queryParams.push(`%${numero_factura}%`);
+      queryParams.push(`%${numero_factura.trim()}%`);
+    }
+
+    if (total_min && !isNaN(parseFloat(total_min))) {
+      whereConditions.push('f.total >= ?');
+      queryParams.push(parseFloat(total_min));
+    }
+
+    if (total_max && !isNaN(parseFloat(total_max))) {
+      whereConditions.push('f.total <= ?');
+      queryParams.push(parseFloat(total_max));
+    }
+
+    if (search && search.trim() !== '') {
+      whereConditions.push('(f.nombre_cliente LIKE ? OR f.numero_factura LIKE ?)');
+      queryParams.push(`%${search.trim()}%`, `%${search.trim()}%`);
     }
 
     const whereClause = whereConditions.length ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    // ====== 4. Contar total de registros ======
+    // ===== 4️⃣ Contar total de registros =====
     const totalResult = await Database.query(
-      'SELECT COUNT(*) as total FROM facturas f ' + whereClause,
+      `SELECT COUNT(*) as total FROM facturas f ${whereClause}`,
       queryParams
     );
     const total = totalResult[0]?.total || 0;
 
-    // ====== 5. Query principal (con parámetros seguros para LIMIT/OFFSET) ======
-    const finalQuery = `
+    // ===== 5️⃣ Query principal segura =====
+    const sql = `
       SELECT 
         f.id,
         f.numero_factura,
@@ -121,11 +148,13 @@ class FacturasController {
       LIMIT ? OFFSET ?
     `;
 
-    const facturas = await Database.query(finalQuery, [...queryParams, limitNum, offset]);
+    const finalParams = [...queryParams, limitNum, offset];
+    const facturas = await Database.query(sql, finalParams);
 
-    // ====== 6. Preparar respuesta de paginación ======
+    // ===== 6️⃣ Paginación =====
     const totalPages = Math.ceil(total / limitNum);
 
+    // ===== 7️⃣ Respuesta =====
     res.json({
       success: true,
       data: {
@@ -151,6 +180,7 @@ class FacturasController {
     });
   }
 }
+
 
   /**
    * Obtener una factura por ID
