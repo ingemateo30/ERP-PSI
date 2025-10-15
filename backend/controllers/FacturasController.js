@@ -34,7 +34,7 @@ class FacturasController {
    * Obtener todas las facturas con filtros y paginación
    * CORREGIDO: Usando columnas reales de la tabla facturas
    */
-  static async obtenerTodas(req, res) {
+static async obtenerTodas(req, res) {
   try {
     const { 
       page = 1, 
@@ -123,11 +123,19 @@ class FacturasController {
     const total = totalResult[0]?.total || 0;
 
     // 🧭 Validar columna de ordenamiento
-    const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente', 'id'];
+    const validSortColumns = [
+      'fecha_emision',
+      'numero_factura',
+      'total',
+      'estado',
+      'fecha_vencimiento',
+      'nombre_cliente',
+      'id'
+    ];
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // 🧾 Query principal
+    // ✅ Query corregido (sin parámetros en LIMIT/OFFSET)
     const sql = `
       SELECT 
         f.id,
@@ -170,17 +178,14 @@ class FacturasController {
       FROM facturas f
       ${whereClause}
       ORDER BY f.${sortColumn} ${sortDirection}
-      LIMIT ? OFFSET ?
+      LIMIT ${limitNum} OFFSET ${offset};
     `;
 
-    // ✅ Agregar los parámetros de LIMIT y OFFSET correctamente
-    const finalParams = [...queryParams, limitNum, offset];
-
     console.log('🔍 Query final facturas:', sql);
-    console.log('📊 Parámetros:', finalParams);
+    console.log('📊 Parámetros (solo filtros):', queryParams);
 
-    // Ejecutar consulta
-    const facturas = await Database.query(sql, finalParams);
+    // Ejecutar sin pasar limit/offset como parámetros
+    const facturas = await Database.query(sql, queryParams);
 
     // 📄 Calcular paginación
     const totalPages = Math.ceil(total / limitNum);
@@ -214,6 +219,7 @@ class FacturasController {
     });
   }
 }
+
 
   /**
    * Obtener una factura por ID
