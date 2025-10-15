@@ -34,10 +34,12 @@ class FacturasController {
    * Obtener todas las facturas con filtros y paginación
    * CORREGIDO: Usando columnas reales de la tabla facturas
    */
-  static async obtenerTodas(req, res) {
+static async obtenerTodas(req, res) {
   try {
-    const { 
-      page = 1, 
+    console.log("🔍 [FacturasController] Obteniendo facturas con filtros:", req.query);
+
+    const {
+      page = 1,
       limit = 20,
       fecha_desde,
       fecha_hasta,
@@ -48,90 +50,20 @@ class FacturasController {
       sort_order = 'DESC'
     } = req.query;
 
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
+    // ✅ Validaciones seguras
+    const limitNum = Math.max(1, parseInt(limit));
+    const pageNum = Math.max(1, parseInt(page));
     const offset = (pageNum - 1) * limitNum;
 
-    console.log('📋 Obteniendo facturas con parámetros:', {
-      page: pageNum,
-      limit: limitNum,
-      fecha_desde,
-      fecha_hasta,
-      estado,
-      cliente_id,
-      numero_factura
-    });
+    // Validar columnas permitidas para ordenar
+    const allowedSortFields = ['id', 'fecha_emision', 'fecha_vencimiento', 'total', 'estado'];
+    const sortField = allowedSortFields.includes(sort_by) ? sort_by : 'fecha_emision';
+    const sortOrder = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // Verificar si existe la tabla facturas
-    let tablaExiste = true;
-    try {
-      await Database.query('SELECT 1 FROM facturas LIMIT 1');
-    } catch (error) {
-      tablaExiste = false;
-      console.log('⚠️ Tabla facturas no existe');
-    }
-
-    if (!tablaExiste) {
-      return res.json({
-        success: true,
-        data: {
-          facturas: [],
-          pagination: {
-            page: pageNum,
-            limit: limitNum,
-            total: 0,
-            totalPages: 0,
-            hasNextPage: false,
-            hasPrevPage: false
-          }
-        },
-        message: 'Tabla facturas no existe - retornando datos vacíos'
-      });
-    }
-
-    // Construir WHERE clause dinámicamente
-    let whereConditions = ['f.activo = ?'];
-    let queryParams = ['1'];
-
-    if (fecha_desde && fecha_hasta) {
-      whereConditions.push('f.fecha_emision BETWEEN ? AND ?');
-      queryParams.push(fecha_desde, fecha_hasta);
-    }
-
-    if (estado) {
-      whereConditions.push('f.estado = ?');
-      queryParams.push(estado);
-    }
-
-    if (cliente_id) {
-      whereConditions.push('f.cliente_id = ?');
-      queryParams.push(cliente_id);
-    }
-
-    if (numero_factura) {
-      whereConditions.push('f.numero_factura LIKE ?');
-      queryParams.push(`%${numero_factura}%`);
-    }
-
-    const whereClause = whereConditions.length > 0 ? 
-      `WHERE ${whereConditions.join(' AND ')}` : '';
-
-    // Contar total
-    const totalResult = await Database.query(`
-      SELECT COUNT(*) as total 
-      FROM facturas f
-      ${whereClause}
-    `, queryParams);
-
-    const total = totalResult[0]?.total || 0;
-
-    // Validar columna de ordenamiento usando columnas reales
-    const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente', 'id'];
-    const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
-    const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-
-    // ✅ SOLUCIÓN: Construir query final SIN parámetros para LIMIT/OFFSET
-    const baseQuery = `
+    // ========================
+    //  Construcción del Query
+    // ========================
+    let query = `
       SELECT 
         f.id,
         f.numero_factura,
@@ -141,17 +73,7 @@ class FacturasController {
         f.periodo_facturacion,
         f.fecha_emision,
         f.fecha_vencimiento,
-        f.fecha_desde,
-        f.fecha_hasta,
         f.fecha_pago,
-        f.internet,
-        f.television,
-        f.saldo_anterior,
-        f.interes,
-        f.reconexion,
-        f.descuento,
-        f.varios,
-        f.publicidad,
         f.subtotal,
         f.iva,
         f.total,
@@ -163,55 +85,107 @@ class FacturasController {
         f.observaciones,
         f.created_at,
         f.updated_at,
-        DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencido,
-        CASE 
+        DATEDIFF(NOW(), f.fecha_vencimiento) AS dias_vencido,
+        CASE
           WHEN f.estado = 'pagada' THEN 'Pagada'
           WHEN f.estado = 'anulada' THEN 'Anulada'
           WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' THEN 'Vencida'
           ELSE 'Pendiente'
-        END as estado_descripcion
+        END AS estado_descripcion
       FROM facturas f
-      ${whereClause}
-      ORDER BY f.${sortColumn} ${sortDirection}
+      WHERE f.activo = 1
     `;
 
-    // Construir query final con LIMIT/OFFSET como literales
-    const finalQuery = `${baseQuery} LIMIT ${limitNum} OFFSET ${offset}`;
+    const params = [];
 
-    console.log('🔍 Query final facturas:', finalQuery);
-    console.log('📊 Parámetros:', queryParams);
+    // ✅ Aplicar filtros opcionales
+    if (fecha_desde && fecha_hasta) {
+      query += ` AND f.fecha_emision BETWEEN ? AND ?`;
+      params.push(fecha_desde, fecha_hasta);
+    }
 
-    // Obtener facturas paginadas SIN parámetros para LIMIT/OFFSET
-    const facturas = await Database.query(finalQuery, queryParams);
+    if (estado) {
+      query += ` AND f.estado = ?`;
+      params.push(estado);
+    }
 
-    // Calcular paginación
+    if (cliente_id) {
+      query += ` AND f.cliente_id = ?`;
+      params.push(cliente_id);
+    }
+
+    if (numero_factura) {
+      query += ` AND f.numero_factura LIKE ?`;
+      params.push(`%${numero_factura}%`);
+    }
+
+    // Orden y paginación (sin placeholders en LIMIT/OFFSET)
+    query += ` ORDER BY f.${sortField} ${sortOrder} LIMIT ${limitNum} OFFSET ${offset}`;
+
+    console.log("📄 SQL Final Facturas:", query);
+    console.log("📊 Parámetros:", params);
+
+    // ========================
+    //  Ejecutar la consulta
+    // ========================
+    const facturas = await Database.query(query, params);
+
+    // ========================
+    //  Total de registros
+    // ========================
+    let countQuery = `
+      SELECT COUNT(*) AS total 
+      FROM facturas f
+      WHERE f.activo = 1
+    `;
+    const countParams = [];
+
+    if (fecha_desde && fecha_hasta) {
+      countQuery += ` AND f.fecha_emision BETWEEN ? AND ?`;
+      countParams.push(fecha_desde, fecha_hasta);
+    }
+
+    if (estado) {
+      countQuery += ` AND f.estado = ?`;
+      countParams.push(estado);
+    }
+
+    if (cliente_id) {
+      countQuery += ` AND f.cliente_id = ?`;
+      countParams.push(cliente_id);
+    }
+
+    if (numero_factura) {
+      countQuery += ` AND f.numero_factura LIKE ?`;
+      countParams.push(`%${numero_factura}%`);
+    }
+
+    const [countResult] = await Database.query(countQuery, countParams);
+    const total = countResult?.total || 0;
     const totalPages = Math.ceil(total / limitNum);
-    const hasNextPage = pageNum < totalPages;
-    const hasPrevPage = pageNum > 1;
 
     console.log(`✅ Facturas obtenidas: ${facturas.length}/${total} total, página ${pageNum}/${totalPages}`);
 
-    res.json({
+    // ========================
+    //  Respuesta final
+    // ========================
+    return res.json({
       success: true,
       data: {
         facturas,
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total: total,
-          totalPages: totalPages,
-          hasNextPage: hasNextPage,
-          hasPrevPage: hasPrevPage
-        }
-      },
-      message: 'Facturas obtenidas exitosamente'
+        total,
+        totalPages,
+        currentPage: pageNum,
+        hasNextPage: pageNum < totalPages,
+        hasPrevPage: pageNum > 1
+      }
     });
 
   } catch (error) {
-    console.error('❌ Error obteniendo facturas:', error);
-    res.status(500).json({
+    console.error("❌ [FacturasController.obtenerTodas] Error:", error);
+    return res.status(500).json({
       success: false,
-      message: 'Error obteniendo facturas',
+      message: "Error obteniendo facturas",
       error: error.message
     });
   }
