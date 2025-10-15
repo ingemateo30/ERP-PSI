@@ -105,8 +105,8 @@ router.get('/facturas', async (req, res) => {
       FROM facturas f
       ${whereClause}
       ORDER BY f.${sortColumn} ${sortDirection}
-      LIMIT ? OFFSET ?
-    `, [...queryParams, limitNum, offset]);
+      LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}
+    `, queryParams); 
 
     res.json({
       success: true,
@@ -485,8 +485,8 @@ router.get('/vencidas', async (req, res) => {
       FROM facturas f
       ${whereClause}
       ORDER BY f.fecha_vencimiento ASC
-      LIMIT ? OFFSET ?
-    `, [...queryParams, limitNum, offset]);
+      LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}
+    `, queryParams);
 
     res.json({
       success: true,
