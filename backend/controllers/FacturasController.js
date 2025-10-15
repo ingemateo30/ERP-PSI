@@ -36,37 +36,62 @@ class FacturasController {
    */
 static async obtenerTodas(req, res) {
   try {
-    // ===== 1️⃣ Parámetros de query =====
-    const {
-      page = 1,
+    const { 
+      page = 1, 
       limit = 20,
       fecha_desde,
       fecha_hasta,
-      estado, // puede ser un string o array
+      estado,
       cliente_id,
       numero_factura,
-      total_min,
-      total_max,
       sort_by = 'fecha_emision',
-      sort_order = 'DESC',
-      search
+      sort_order = 'DESC'
     } = req.query;
 
-    // ===== 2️⃣ Validar y normalizar =====
-    const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    const validSortColumns = [
-      'id','numero_factura','cliente_id','nombre_cliente',
-      'fecha_emision','fecha_vencimiento','total','estado','subtotal','iva'
-    ];
-    const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
-    const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    console.log('📋 Obteniendo facturas con parámetros:', {
+      page: pageNum,
+      limit: limitNum,
+      fecha_desde,
+      fecha_hasta,
+      estado,
+      cliente_id,
+      numero_factura
+    });
 
-    // ===== 3️⃣ Construir condiciones dinámicas =====
-    const whereConditions = ['f.activo = ?'];
-    const queryParams = ['1'];
+    // Verificar si existe la tabla facturas
+    let tablaExiste = true;
+    try {
+      await Database.query('SELECT 1 FROM facturas LIMIT 1');
+    } catch (error) {
+      tablaExiste = false;
+      console.log('⚠️ Tabla facturas no existe');
+    }
+
+    if (!tablaExiste) {
+      return res.json({
+        success: true,
+        data: {
+          facturas: [],
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: 0,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPrevPage: false
+          }
+        },
+        message: 'Tabla facturas no existe - retornando datos vacíos'
+      });
+    }
+
+    // Construir WHERE dinámico
+    let whereConditions = ['f.activo = ?'];
+    let queryParams = [1];
 
     if (fecha_desde && fecha_hasta) {
       whereConditions.push('f.fecha_emision BETWEEN ? AND ?');
@@ -74,51 +99,32 @@ static async obtenerTodas(req, res) {
     }
 
     if (estado) {
-      if (Array.isArray(estado)) {
-        const placeholders = estado.map(() => '?').join(',');
-        whereConditions.push(`f.estado IN (${placeholders})`);
-        queryParams.push(...estado);
-      } else {
-        whereConditions.push('f.estado = ?');
-        queryParams.push(estado);
-      }
+      whereConditions.push('f.estado = ?');
+      queryParams.push(estado);
     }
 
-    if (cliente_id && !isNaN(parseInt(cliente_id, 10))) {
+    if (cliente_id) {
       whereConditions.push('f.cliente_id = ?');
-      queryParams.push(parseInt(cliente_id, 10));
+      queryParams.push(cliente_id);
     }
 
-    if (numero_factura && numero_factura.trim() !== '') {
+    if (numero_factura) {
       whereConditions.push('f.numero_factura LIKE ?');
-      queryParams.push(`%${numero_factura.trim()}%`);
-    }
-
-    if (total_min && !isNaN(parseFloat(total_min))) {
-      whereConditions.push('f.total >= ?');
-      queryParams.push(parseFloat(total_min));
-    }
-
-    if (total_max && !isNaN(parseFloat(total_max))) {
-      whereConditions.push('f.total <= ?');
-      queryParams.push(parseFloat(total_max));
-    }
-
-    if (search && search.trim() !== '') {
-      whereConditions.push('(f.nombre_cliente LIKE ? OR f.numero_factura LIKE ?)');
-      queryParams.push(`%${search.trim()}%`, `%${search.trim()}%`);
+      queryParams.push(`%${numero_factura}%`);
     }
 
     const whereClause = whereConditions.length ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    // ===== 4️⃣ Contar total de registros =====
-    const totalResult = await Database.query(
-      `SELECT COUNT(*) as total FROM facturas f ${whereClause}`,
-      queryParams
-    );
+    // Contar total de registros
+    const totalResult = await Database.query(`SELECT COUNT(*) as total FROM facturas f ${whereClause}`, queryParams);
     const total = totalResult[0]?.total || 0;
 
-    // ===== 5️⃣ Query principal segura =====
+    // Validar columna de ordenamiento
+    const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente', 'id'];
+    const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
+    const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    // Query principal
     const sql = `
       SELECT 
         f.id,
@@ -136,7 +142,7 @@ static async obtenerTodas(req, res) {
         f.estado,
         f.metodo_pago,
         DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencido,
-        CASE
+        CASE 
           WHEN f.estado = 'pagada' THEN 'Pagada'
           WHEN f.estado = 'anulada' THEN 'Anulada'
           WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' THEN 'Vencida'
@@ -148,13 +154,16 @@ static async obtenerTodas(req, res) {
       LIMIT ? OFFSET ?
     `;
 
-    const finalParams = [...queryParams, limitNum, offset];
-    const facturas = await Database.query(sql, finalParams);
+    // Ejecutar query pasando LIMIT y OFFSET como parámetros
+    const facturas = await Database.query(sql, [...queryParams, limitNum, offset]);
 
-    // ===== 6️⃣ Paginación =====
+    // Paginación
     const totalPages = Math.ceil(total / limitNum);
+    const hasNextPage = pageNum < totalPages;
+    const hasPrevPage = pageNum > 1;
 
-    // ===== 7️⃣ Respuesta =====
+    console.log(`✅ Facturas obtenidas: ${facturas.length}/${total} total, página ${pageNum}/${totalPages}`);
+
     res.json({
       success: true,
       data: {
@@ -164,8 +173,8 @@ static async obtenerTodas(req, res) {
           limit: limitNum,
           total,
           totalPages,
-          hasNextPage: pageNum < totalPages,
-          hasPrevPage: pageNum > 1
+          hasNextPage,
+          hasPrevPage
         }
       },
       message: 'Facturas obtenidas exitosamente'
