@@ -94,7 +94,7 @@ static async obtenerTodas(req, res) {
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // ✅ Construir query base con WHERE dinámico (igual que contratos)
+    // Construir query base con WHERE dinámico
     let query = `
       SELECT 
         f.id,
@@ -161,19 +161,18 @@ static async obtenerTodas(req, res) {
       params.push(`%${numero_factura}%`);
     }
 
-    // ✅ Contar total (igual que contratos)
+    // Contar total
     const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
     const totalResult = await Database.query(countQuery, params);
     const total = totalResult[0]?.total || 0;
 
-    // ✅ Agregar ordenamiento y paginación
-    query += ` ORDER BY f.${sortColumn} ${sortDirection} LIMIT ? OFFSET ?`;
-    params.push(parseInt(limitNum), parseInt(offset));
-
+    // ✅ CORRECCIÓN: Interpolar LIMIT y OFFSET directamente
+    query += ` ORDER BY f.${sortColumn} ${sortDirection} LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}`;
+    
     console.log('🔍 Query final:', query);
     console.log('📊 Parámetros:', params);
 
-    // Ejecutar query
+    // Ejecutar query (solo con los params de filtros, sin limit/offset)
     const facturas = await Database.query(query, params);
 
     // Calcular paginación
@@ -208,7 +207,6 @@ static async obtenerTodas(req, res) {
     });
   }
 }
-
 
   /**
    * Obtener una factura por ID
