@@ -34,7 +34,7 @@ class FacturasController {
    * Obtener todas las facturas con filtros y paginación
    * CORREGIDO: Usando columnas reales de la tabla facturas
    */
-static async obtenerTodas(req, res) {
+  static async obtenerTodas(req, res) {
   try {
     const { 
       page = 1, 
@@ -89,9 +89,9 @@ static async obtenerTodas(req, res) {
       });
     }
 
-    // Construir WHERE dinámico
+    // Construir WHERE clause dinámicamente
     let whereConditions = ['f.activo = ?'];
-    let queryParams = [1];
+    let queryParams = ['1'];
 
     if (fecha_desde && fecha_hasta) {
       whereConditions.push('f.fecha_emision BETWEEN ? AND ?');
@@ -113,19 +113,25 @@ static async obtenerTodas(req, res) {
       queryParams.push(`%${numero_factura}%`);
     }
 
-    const whereClause = whereConditions.length ? `WHERE ${whereConditions.join(' AND ')}` : '';
+    const whereClause = whereConditions.length > 0 ? 
+      `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    // Contar total de registros
-    const totalResult = await Database.query(`SELECT COUNT(*) as total FROM facturas f ${whereClause}`, queryParams);
+    // Contar total
+    const totalResult = await Database.query(`
+      SELECT COUNT(*) as total 
+      FROM facturas f
+      ${whereClause}
+    `, queryParams);
+
     const total = totalResult[0]?.total || 0;
 
-    // Validar columna de ordenamiento
+    // Validar columna de ordenamiento usando columnas reales
     const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente', 'id'];
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // Query principal
-    const sql = `
+    // ✅ SOLUCIÓN: Construir query final SIN parámetros para LIMIT/OFFSET
+    const baseQuery = `
       SELECT 
         f.id,
         f.numero_factura,
@@ -135,12 +141,28 @@ static async obtenerTodas(req, res) {
         f.periodo_facturacion,
         f.fecha_emision,
         f.fecha_vencimiento,
+        f.fecha_desde,
+        f.fecha_hasta,
         f.fecha_pago,
+        f.internet,
+        f.television,
+        f.saldo_anterior,
+        f.interes,
+        f.reconexion,
+        f.descuento,
+        f.varios,
+        f.publicidad,
         f.subtotal,
         f.iva,
         f.total,
         f.estado,
         f.metodo_pago,
+        f.referencia_pago,
+        f.banco_id,
+        f.ruta,
+        f.observaciones,
+        f.created_at,
+        f.updated_at,
         DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencido,
         CASE 
           WHEN f.estado = 'pagada' THEN 'Pagada'
@@ -151,13 +173,18 @@ static async obtenerTodas(req, res) {
       FROM facturas f
       ${whereClause}
       ORDER BY f.${sortColumn} ${sortDirection}
-      LIMIT ? OFFSET ?
     `;
 
-    // Ejecutar query pasando LIMIT y OFFSET como parámetros
-    const facturas = await Database.query(sql, [...queryParams, limitNum, offset]);
+    // Construir query final con LIMIT/OFFSET como literales
+    const finalQuery = `${baseQuery} LIMIT ${limitNum} OFFSET ${offset}`;
 
-    // Paginación
+    console.log('🔍 Query final facturas:', finalQuery);
+    console.log('📊 Parámetros:', queryParams);
+
+    // Obtener facturas paginadas SIN parámetros para LIMIT/OFFSET
+    const facturas = await Database.query(finalQuery, queryParams);
+
+    // Calcular paginación
     const totalPages = Math.ceil(total / limitNum);
     const hasNextPage = pageNum < totalPages;
     const hasPrevPage = pageNum > 1;
@@ -171,10 +198,10 @@ static async obtenerTodas(req, res) {
         pagination: {
           page: pageNum,
           limit: limitNum,
-          total,
-          totalPages,
-          hasNextPage,
-          hasPrevPage
+          total: total,
+          totalPages: totalPages,
+          hasNextPage: hasNextPage,
+          hasPrevPage: hasPrevPage
         }
       },
       message: 'Facturas obtenidas exitosamente'
@@ -189,7 +216,6 @@ static async obtenerTodas(req, res) {
     });
   }
 }
-
 
   /**
    * Obtener una factura por ID
