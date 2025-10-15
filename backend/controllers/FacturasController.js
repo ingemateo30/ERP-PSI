@@ -36,29 +36,53 @@ class FacturasController {
    */
 static async obtenerTodas(req, res) {
   try {
-    console.log("🔍 [FacturasController] Obteniendo facturas con filtros:", req.query);
-
-    const {
-      page = 1,
+    const { 
+      page = 1, 
       limit = 20,
       fecha_desde,
       fecha_hasta,
       estado,
       cliente_id,
       numero_factura,
-      sort_by = 'fecha_emision',
-      sort_order = 'DESC'
+      sort
     } = req.query;
 
-    const limitNum = Math.max(1, parseInt(limit)) || 20;
-    const pageNum = Math.max(1, parseInt(page)) || 1;
-    const offset = (pageNum - 1) * limitNum;
+    // Validar y convertir a números seguros
+    const limitNum = Math.max(Number(limit) || 20, 1);
+    const pageNum = Math.max(Number(page) || 1, 1);
+    const offsetNum = (pageNum - 1) * limitNum;
 
-    const allowedSortFields = ['id', 'fecha_emision', 'fecha_vencimiento', 'total', 'estado'];
-    const sortField = allowedSortFields.includes(sort_by) ? sort_by : 'fecha_emision';
-    const sortOrder = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    // Fechas por defecto (últimos 3 meses si no se envían)
+    const fechaDesde = fecha_desde || '2000-01-01';
+    const fechaHasta = fecha_hasta || '2100-12-31';
 
-    let query = `
+    // Construir cláusulas dinámicas
+    const filtros = [`f.activo = 1`, `f.fecha_emision BETWEEN ? AND ?`];
+    const params = [fechaDesde, fechaHasta];
+
+    if (estado) {
+      filtros.push('f.estado = ?');
+      params.push(estado);
+    }
+
+    if (cliente_id) {
+      filtros.push('f.cliente_id = ?');
+      params.push(cliente_id);
+    }
+
+    if (numero_factura) {
+      filtros.push('f.numero_factura LIKE ?');
+      params.push(`%${numero_factura}%`);
+    }
+
+    // Orden dinámico
+    const ordenPermitido = ['asc', 'desc'];
+    const orden = ordenPermitido.includes((sort || '').toLowerCase()) 
+      ? sort.toUpperCase() 
+      : 'DESC';
+
+    // Consulta principal
+    const query = `
       SELECT 
         f.id,
         f.numero_factura,
@@ -74,109 +98,50 @@ static async obtenerTodas(req, res) {
         f.total,
         f.estado,
         f.metodo_pago,
-        f.referencia_pago,
-        f.banco_id,
-        f.ruta,
-        f.observaciones,
-        f.created_at,
-        f.updated_at,
-        DATEDIFF(NOW(), f.fecha_vencimiento) AS dias_vencido,
-        CASE
+        DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencimiento,
+        CASE 
           WHEN f.estado = 'pagada' THEN 'Pagada'
           WHEN f.estado = 'anulada' THEN 'Anulada'
-          WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' THEN 'Vencida'
-          ELSE 'Pendiente'
-        END AS estado_descripcion
+          WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 THEN 'Vencida'
+          ELSE 'Vigente'
+        END as estado_descripcion
       FROM facturas f
-      WHERE f.activo = 1
+      WHERE ${filtros.join(' AND ')}
+      ORDER BY f.fecha_emision ${orden}
+      LIMIT CAST(${limitNum} AS UNSIGNED)
+      OFFSET CAST(${offsetNum} AS UNSIGNED)
     `;
 
-    const params = [];
+    const [facturas] = await pool.execute(query, params);
 
-    if (fecha_desde && fecha_hasta) {
-      query += ` AND f.fecha_emision BETWEEN ? AND ?`;
-      params.push(fecha_desde, fecha_hasta);
-    }
+    // Consulta total para paginación
+    const [totalRows] = await pool.execute(
+      `SELECT COUNT(*) as total FROM facturas f WHERE ${filtros.join(' AND ')}`,
+      params
+    );
 
-    if (estado) {
-      query += ` AND f.estado = ?`;
-      params.push(estado);
-    }
-
-    if (cliente_id) {
-      query += ` AND f.cliente_id = ?`;
-      params.push(cliente_id);
-    }
-
-    if (numero_factura) {
-      query += ` AND f.numero_factura LIKE ?`;
-      params.push(`%${numero_factura}%`);
-    }
-
-    // ⚡️ AQUÍ el cambio importante
-    query += ` ORDER BY f.${sortField} ${sortOrder} LIMIT ${limitNum} OFFSET ${offset}`;
-
-    console.log("📄 SQL Final Facturas:", query);
-    console.log("📊 Parámetros:", params);
-
-    const facturas = await Database.query(query, params);
-
-    let countQuery = `
-      SELECT COUNT(*) AS total 
-      FROM facturas f
-      WHERE f.activo = 1
-    `;
-    const countParams = [];
-
-    if (fecha_desde && fecha_hasta) {
-      countQuery += ` AND f.fecha_emision BETWEEN ? AND ?`;
-      countParams.push(fecha_desde, fecha_hasta);
-    }
-
-    if (estado) {
-      countQuery += ` AND f.estado = ?`;
-      countParams.push(estado);
-    }
-
-    if (cliente_id) {
-      countQuery += ` AND f.cliente_id = ?`;
-      countParams.push(cliente_id);
-    }
-
-    if (numero_factura) {
-      countQuery += ` AND f.numero_factura LIKE ?`;
-      countParams.push(`%${numero_factura}%`);
-    }
-
-    const [countResult] = await Database.query(countQuery, countParams);
-    const total = countResult?.total || 0;
+    const total = totalRows[0]?.total || 0;
     const totalPages = Math.ceil(total / limitNum);
 
-    console.log(`✅ Facturas obtenidas: ${facturas.length}/${total} total, página ${pageNum}/${totalPages}`);
-
-    return res.json({
-      success: true,
-      data: {
-        facturas,
+    res.json({
+      ok: true,
+      data: facturas,
+      pagination: {
         total,
+        page: pageNum,
         totalPages,
-        currentPage: pageNum,
-        hasNextPage: pageNum < totalPages,
-        hasPrevPage: pageNum > 1
+        limit: limitNum
       }
     });
-
   } catch (error) {
-    console.error("❌ [FacturasController.obtenerTodas] Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Error obteniendo facturas",
+    console.error('❌ Error obteniendo facturas:', error);
+    res.status(500).json({
+      ok: false,
+      message: 'Error obteniendo facturas',
       error: error.message
     });
   }
 }
-
-
 
 
   /**
