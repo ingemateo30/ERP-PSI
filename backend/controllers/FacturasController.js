@@ -89,50 +89,13 @@ static async obtenerTodas(req, res) {
       });
     }
 
-    // ✅ Construir WHERE clause dinámicamente
-    let whereConditions = ['f.activo = ?'];
-    let queryParams = ['1'];
-
-    if (fecha_desde && fecha_hasta) {
-      whereConditions.push('f.fecha_emision BETWEEN ? AND ?');
-      queryParams.push(fecha_desde, fecha_hasta);
-    }
-
-    if (estado) {
-      whereConditions.push('f.estado = ?');
-      queryParams.push(estado);
-    }
-
-    if (cliente_id) {
-      whereConditions.push('f.cliente_id = ?');
-      queryParams.push(cliente_id);
-    }
-
-    if (numero_factura) {
-      whereConditions.push('f.numero_factura LIKE ?');
-      queryParams.push(`%${numero_factura}%`);
-    }
-
-    const whereClause = whereConditions.length > 0 ? 
-      `WHERE ${whereConditions.join(' AND ')}` : '';
-
-    // ✅ Contar total (usa los mismos params sin LIMIT/OFFSET)
-    const countQuery = `
-      SELECT COUNT(*) as total 
-      FROM facturas f
-      ${whereClause}
-    `;
-    
-    const totalResult = await Database.query(countQuery, queryParams);
-    const total = totalResult[0]?.total || 0;
-
     // Validar columna de ordenamiento
     const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'nombre_cliente', 'id'];
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // ✅ Query principal con placeholders ? para LIMIT y OFFSET
-    const query = `
+    // ✅ Construir query base con WHERE dinámico (igual que contratos)
+    let query = `
       SELECT 
         f.id,
         f.numero_factura,
@@ -172,19 +135,46 @@ static async obtenerTodas(req, res) {
           ELSE 'Pendiente'
         END as estado_descripcion
       FROM facturas f
-      ${whereClause}
-      ORDER BY f.${sortColumn} ${sortDirection}
-      LIMIT ? OFFSET ?
+      WHERE f.activo = 1
     `;
 
-    // ✅ CRÍTICO: Agregar LIMIT y OFFSET al final del array de params
-    const finalParams = [...queryParams, parseInt(limitNum), parseInt(offset)];
+    const params = [];
 
-    console.log('🔍 Query final facturas:', query);
-    console.log('📊 Parámetros:', finalParams);
+    // Aplicar filtros dinámicos
+    if (fecha_desde && fecha_hasta) {
+      query += ' AND f.fecha_emision BETWEEN ? AND ?';
+      params.push(fecha_desde, fecha_hasta);
+    }
 
-    // ✅ Ejecutar con todos los parámetros
-    const facturas = await Database.query(query, finalParams);
+    if (estado) {
+      query += ' AND f.estado = ?';
+      params.push(estado);
+    }
+
+    if (cliente_id) {
+      query += ' AND f.cliente_id = ?';
+      params.push(cliente_id);
+    }
+
+    if (numero_factura) {
+      query += ' AND f.numero_factura LIKE ?';
+      params.push(`%${numero_factura}%`);
+    }
+
+    // ✅ Contar total (igual que contratos)
+    const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
+    const totalResult = await Database.query(countQuery, params);
+    const total = totalResult[0]?.total || 0;
+
+    // ✅ Agregar ordenamiento y paginación
+    query += ` ORDER BY f.${sortColumn} ${sortDirection} LIMIT ? OFFSET ?`;
+    params.push(parseInt(limitNum), parseInt(offset));
+
+    console.log('🔍 Query final:', query);
+    console.log('📊 Parámetros:', params);
+
+    // Ejecutar query
+    const facturas = await Database.query(query, params);
 
     // Calcular paginación
     const totalPages = Math.ceil(total / limitNum);
