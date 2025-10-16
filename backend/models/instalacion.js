@@ -209,10 +209,8 @@ class Instalacion {
         LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
         ${whereClause}
         ORDER BY i.fecha_programada DESC
-        LIMIT ? OFFSET ?`,
-        [...params, paginacion.limite, offset]
-      );
-
+        LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}
+      `, queryParams);
       // Parsear campos JSON
       const instalaciones = rows.map(row => {
         if (row.equipos_instalados) {

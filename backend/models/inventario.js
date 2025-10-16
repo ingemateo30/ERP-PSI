@@ -73,10 +73,12 @@ class InventoryModel {
       
       // Paginación
       if (filters.limit) {
-        const offset = filters.offset || 0;
-        query += ' LIMIT ? OFFSET ?';
-        params.push(parseInt(filters.limit), parseInt(offset));
-      }
+  const limitNum = parseInt(filters.limit) || 50;
+  const offset = parseInt(filters.offset) || 0;
+
+  // ORDER BY seguro + LIMIT + OFFSET
+  query += ` ORDER BY ${sortColumnSafe} ${sortDirectionSafe} LIMIT ${limitNum} OFFSET ${offset}`;
+} 
       
       const [equipos] = await db.execute(query, params);
       
@@ -440,7 +442,8 @@ class InventoryModel {
         LEFT JOIN clientes c ON h.cliente_id = c.id
         WHERE h.instalador_id = ?
         ORDER BY h.fecha_accion DESC
-        LIMIT ?
+        ${sortColumnSafe} ${sortDirectionSafe}
+        LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)};
       `;
       
       const [historial] = await db.execute(query, [instaladorId, limit]);
@@ -520,8 +523,8 @@ class InventoryModel {
           JOIN inventario_equipos e ON h.equipo_id = e.id
           JOIN sistema_usuarios u ON h.instalador_id = u.id
           LEFT JOIN clientes c ON h.cliente_id = c.id
-          ORDER BY h.fecha_accion DESC
-          LIMIT 10
+          ORDER BY ${sortColumnSafe} ${sortDirectionSafe} 
+          LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)};
         `
       };
       
@@ -638,8 +641,8 @@ class InventoryModel {
         FROM inventario_equipos e
         LEFT JOIN sistema_usuarios u ON e.instalador_id = u.id
         WHERE e.codigo LIKE ? OR e.numero_serie LIKE ? OR e.nombre LIKE ?
-        ORDER BY e.codigo
-        LIMIT 20
+        ORDER BY ${sortColumnSafe} ${sortDirectionSafe} 
+        LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)};
       `;
       
       const searchPattern = `%${searchTerm}%`;

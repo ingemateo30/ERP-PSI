@@ -74,9 +74,11 @@ class Factura {
       
       // Paginación
       if (filtros.limite && filtros.offset !== undefined) {
-        query += ' LIMIT ? OFFSET ?';
-        params.push(parseInt(filtros.limite), parseInt(filtros.offset));
-      }
+      const limitNum = parseInt(filtros.limite) || 10;
+      const offset = parseInt(filtros.offset) || 0;
+
+      query += ` ORDER BY ${sortColumnSafe} ${sortDirectionSafe} LIMIT ${limitNum} OFFSET ${offset}`;
+    }
       
       const connection = await pool.getConnection();
       const [filas] = await connection.execute(query, params);
@@ -536,7 +538,13 @@ class Factura {
         params.push(filtros.estado);
       }
       
-      query += ' ORDER BY f.created_at DESC LIMIT 50';
+      const limitNum = parseInt(filtros.limite) || 50;
+      const offset = parseInt(filtros.offset) || 0;
+
+      const sortColumnSafe = 'created_at';      // columna segura
+      const sortDirectionSafe = 'DESC';         // dirección segura
+
+      query += ` ORDER BY ${sortColumnSafe} ${sortDirectionSafe} LIMIT ${limitNum} OFFSET ${offset}`;
       
       const connection = await pool.getConnection();
       const [filas] = await connection.execute(query, params);
@@ -606,10 +614,11 @@ class Factura {
       query += ' ORDER BY f.fecha_vencimiento ASC';
       
       if (filtros.limite) {
-        query += ' LIMIT ?';
-        params.push(parseInt(filtros.limite));
-      }
-      
+      const limitNum = parseInt(filtros.limite);
+      const offset = parseInt(filtros.offset) || 0;
+
+      query += ` ORDER BY ${sortColumnSafe} ${sortDirectionSafe} LIMIT ${limitNum} OFFSET ${offset}`;
+    }
       const connection = await pool.getConnection();
       const [filas] = await connection.execute(query, params);
       connection.release();
