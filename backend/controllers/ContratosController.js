@@ -43,8 +43,9 @@ class ContratosController {
         ps.descripcion as plan_descripcion
       FROM contratos c
       LEFT JOIN clientes cl ON c.cliente_id = cl.id
-      LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
+      LEFT JOIN servicios_cliente sc ON FIND_IN_SET(sc.id, c.servicio_id)
       LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+
       WHERE 1=1
     `;
 
@@ -197,8 +198,9 @@ query += ` ORDER BY c.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
                     ps.canales_tv
                 FROM contratos c
                 INNER JOIN clientes cl ON c.cliente_id = cl.id
-                LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
+                LEFT JOIN servicios_cliente sc ON FIND_IN_SET(sc.id, c.servicio_id)
                 LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+
                 WHERE c.id = ? AND c.estado = 'activo'
                 LIMIT 1
             `, [id]);

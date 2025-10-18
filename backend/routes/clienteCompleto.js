@@ -545,13 +545,12 @@ router.get('/facturas/:id',
  * ============================================
  */
 
-
 router.post('/:clienteId/agregar-sede', async (req, res) => {
   try {
     const { clienteId } = req.params;
     const { sede } = req.body;
 
-    const resultado = await ClienteCompletoServiceCorrecta.agregarNuevaSedeACliente(
+    const resultado = await ClienteCompletoService.agregarNuevaSedeACliente(
       clienteId,
       sede,
       req.user?.id
@@ -576,7 +575,7 @@ router.get('/:clienteId/sedes', async (req, res) => {
   try {
     const { clienteId } = req.params;
 
-    const sedes = await ClienteCompletoServiceCorrecta.listarSedesCliente(clienteId);
+    const sedes = await ClienteCompletoService.listarSedesCliente(clienteId);
 
     res.json({
       success: true,
@@ -591,6 +590,7 @@ router.get('/:clienteId/sedes', async (req, res) => {
     });
   }
 });
+
 /**
  * @route GET /api/v1/clientes-completo/contratos
  * @desc Obtener todos los contratos generados
