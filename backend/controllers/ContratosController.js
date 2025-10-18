@@ -77,9 +77,14 @@ class ContratosController {
             const [countResult] = await Database.query(countQuery, params);
             const total = countResult[0]?.total || 0;
 
-            // Agregar paginación
-            query += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
-            params.push(parseInt(limit), parseInt(offset));
+           // Calcular paginación
+const pageNum = Math.max(1, parseInt(page) || 1);
+const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+const offsetNum = (pageNum - 1) * limitNum;
+
+// Agregar paginación correctamente
+query += ` ORDER BY c.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
+
 
             const contratos = await Database.query(query, params);
 

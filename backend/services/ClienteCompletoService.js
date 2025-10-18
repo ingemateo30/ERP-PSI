@@ -1027,19 +1027,28 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
       }
 
       // Consulta principal
-      const query = `
-        SELECT 
-          f.*,
-          c.nombre as cliente_nombre,
-          c.identificacion as cliente_identificacion,
-          c.correo as cliente_email,
-          COUNT(*) OVER() as total_registros
-        FROM facturas f
-        JOIN clientes c ON f.cliente_id = c.id
-        ${whereClause}
-        ORDER BY f.fecha_emision DESC
-        LIMIT ? OFFSET ?
-      `;
+     // Calcular paginación
+const pageNum = Math.max(1, parseInt(page) || 1);
+const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+const offsetNum = (pageNum - 1) * limitNum;
+
+// Query corregida
+const query = `
+  SELECT 
+    f.*,
+    c.nombre AS cliente_nombre,
+    c.identificacion AS cliente_identificacion,
+    c.correo AS cliente_email,
+    COUNT(*) OVER() AS total_registros
+  FROM facturas f
+  JOIN clientes c ON f.cliente_id = c.id
+  ${whereClause}
+  ORDER BY f.fecha_emision DESC
+  LIMIT ${limitNum} OFFSET ${offsetNum}
+`;
+
+// Ejecutar con los parámetros del WHERE (limit/offset ya están interpolados)
+
 
       params.push(limit, offset);
 
@@ -1246,23 +1255,33 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
         params.push(sector_id);
       }
 
-      const query = `
-        SELECT 
-          c.*,
-          ci.nombre as ciudad_nombre,
-          s.nombre as sector_nombre,
-          COUNT(sc.id) as total_servicios,
-          COUNT(CASE WHEN sc.estado = 'activo' THEN 1 END) as servicios_activos,
-          COUNT(*) OVER() as total_registros
-        FROM clientes c
-        LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
-        LEFT JOIN sectores s ON c.sector_id = s.id
-        LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id
-        ${whereClause}
-        GROUP BY c.id
-        ORDER BY c.created_at DESC
-        LIMIT ? OFFSET ?
-      `;
+   // Validar y calcular paginación (nombres únicos para evitar redeclare)
+const pageNum = Math.max(1, parseInt(page) || 1);
+const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+const offsetNum = (pageNum - 1) * limitNum;
+
+// Query sin placeholders en LIMIT/OFFSET
+const query = `
+  SELECT 
+    c.*,
+    ci.nombre AS ciudad_nombre,
+    s.nombre AS sector_nombre,
+    COUNT(sc.id) AS total_servicios,
+    COUNT(CASE WHEN sc.estado = 'activo' THEN 1 END) AS servicios_activos,
+    COUNT(*) OVER() AS total_registros
+  FROM clientes c
+  LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+  LEFT JOIN sectores s ON c.sector_id = s.id
+  LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id
+  ${whereClause}
+  GROUP BY c.id
+  ORDER BY c.created_at DESC
+  LIMIT ${limitNum} OFFSET ${offsetNum}
+`;
+
+// Ejecutar pasando solo los params de WHERE (limit/offset ya están interpolados)
+
+
 
       params.push(limit, offset);
 
