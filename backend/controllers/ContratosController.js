@@ -9,110 +9,107 @@ const path = require('path');
 
 class ContratosController {
 
-    static async obtenerTodos(req, res) {
-        try {
-            console.log('📋 GET /contratos - Obteniendo contratos');
+static async obtenerTodos(req, res) {
+    try {
+        console.log('📋 GET /contratos - Obteniendo contratos');
 
-            const {
-                page = 1,
-                limit = 10,
-                cliente_id,
-                estado = '',
-                tipo_contrato = '',
-                search = ''
-            } = req.query;
+        const {
+            page = 1,
+            limit = 10,
+            cliente_id,
+            estado = '',
+            tipo_contrato = '',
+            search = ''
+        } = req.query;
 
-            const offset = (page - 1) * limit;
+        // Validar y sanitizar paginación
+        const pageNum = Math.max(1, parseInt(page) || 1);
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+        const offsetNum = (pageNum - 1) * limitNum;
 
-            // ✅ CONSULTA MEJORADA CON JOINS PARA TRAER LOS DATOS DEL PLAN
-            let query = `
-      SELECT 
-        c.*,
-        cl.nombre as cliente_nombre,
-        cl.identificacion as cliente_identificacion,
-        cl.telefono as cliente_telefono,
-        cl.correo as cliente_email,
-        cl.direccion as cliente_direccion,
-        cl.estrato as cliente_estrato,
-        ps.nombre as plan_nombre,
-        ps.precio as plan_precio,
-        ps.tipo as plan_tipo,
-        ps.velocidad_bajada,
-        ps.velocidad_subida,
-        ps.canales_tv,
-        ps.descripcion as plan_descripcion
-      FROM contratos c
-      LEFT JOIN clientes cl ON c.cliente_id = cl.id
-      LEFT JOIN servicios_cliente sc ON FIND_IN_SET(sc.id, c.servicio_id)
-      LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+        // ✅ Query base
+        let query = `
+            SELECT 
+                c.*,
+                cl.nombre as cliente_nombre,
+                cl.identificacion as cliente_identificacion,
+                cl.telefono as cliente_telefono,
+                cl.correo as cliente_email,
+                cl.direccion as cliente_direccion,
+                cl.estrato as cliente_estrato,
+                ps.nombre as plan_nombre,
+                ps.precio as plan_precio,
+                ps.tipo as plan_tipo,
+                ps.velocidad_bajada,
+                ps.velocidad_subida,
+                ps.canales_tv,
+                ps.descripcion as plan_descripcion
+            FROM contratos c
+            LEFT JOIN clientes cl ON c.cliente_id = cl.id
+            LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
+            LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+            WHERE 1=1
+        `;
 
-      WHERE 1=1
-    `;
+        const params = [];
 
-            const params = [];
-
-            // Aplicar filtros...
-            if (cliente_id) {
-                query += ' AND c.cliente_id = ?';
-                params.push(cliente_id);
-            }
-
-            if (estado) {
-                query += ' AND c.estado = ?';
-                params.push(estado);
-            }
-
-            if (tipo_contrato) {
-                query += ' AND c.tipo_contrato = ?';
-                params.push(tipo_contrato);
-            }
-
-            if (search) {
-                query += ' AND (c.numero_contrato LIKE ? OR cl.nombre LIKE ? OR cl.identificacion LIKE ?)';
-                const searchTerm = `%${search}%`;
-                params.push(searchTerm, searchTerm, searchTerm);
-            }
-
-            // Contar total
-            const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
-            const [countResult] = await Database.query(countQuery, params);
-            const total = countResult[0]?.total || 0;
-
-           // Calcular paginación
-const pageNum = Math.max(1, parseInt(page) || 1);
-const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
-const offsetNum = (pageNum - 1) * limitNum;
-
-// Agregar paginación correctamente
-query += ` ORDER BY c.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
-
-
-            const contratos = await Database.query(query, params);
-
-            console.log(`✅ Encontrados ${contratos.length} contratos con datos de planes`);
-
-            res.json({
-                success: true,
-                data: {
-                    contratos,
-                    pagination: {
-                        page: parseInt(page),
-                        limit: parseInt(limit),
-                        total,
-                        totalPages: Math.ceil(total / limit)
-                    }
-                }
-            });
-
-        } catch (error) {
-            console.error('❌ Error obteniendo contratos:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error interno del servidor',
-                error: error.message
-            });
+        // Aplicar filtros
+        if (cliente_id) {
+            query += ' AND c.cliente_id = ?';
+            params.push(cliente_id);
         }
+
+        if (estado) {
+            query += ' AND c.estado = ?';
+            params.push(estado);
+        }
+
+        if (tipo_contrato) {
+            query += ' AND c.tipo_contrato = ?';
+            params.push(tipo_contrato);
+        }
+
+        if (search) {
+            query += ' AND (c.numero_contrato LIKE ? OR cl.nombre LIKE ? OR cl.identificacion LIKE ?)';
+            const searchTerm = `%${search}%`;
+            params.push(searchTerm, searchTerm, searchTerm);
+        }
+
+        // Contar total
+        const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
+        const [countResult] = await Database.query(countQuery, params);
+        const total = countResult[0]?.total || 0;
+
+        // ✅ SOLUCIÓN QUE FUNCIONA - Interpolación directa
+        query += ` ORDER BY c.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
+        
+        // Ejecutar SOLO con los params de filtros (sin limit/offset)
+        const contratos = await Database.query(query, params);
+
+        console.log(`✅ Encontrados ${contratos.length} contratos`);
+
+        res.json({
+            success: true,
+            data: {
+                contratos,
+                pagination: {
+                    page: pageNum,
+                    limit: limitNum,
+                    total,
+                    totalPages: Math.ceil(total / limitNum)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo contratos:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            error: error.message
+        });
     }
+}
 
     static async obtenerPorId(req, res) {
         try {
@@ -164,195 +161,173 @@ query += ` ORDER BY c.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
      * @route GET /api/v1/contratos/:id/pdf
      * @desc Generar y servir PDF del contrato - CORREGIDO
      */
-    static async generarPDF(req, res) {
-        try {
-            const { id } = req.params;
+static async generarPDF(req, res) {
+    try {
+        const { id } = req.params;
 
-            console.log(`📄 Generando PDF del contrato ID: ${id}`);
+        console.log(`📄 Generando PDF del contrato ID: ${id}`);
 
-            if (!id || isNaN(id)) {
-                return res.status(400).json({
+        if (!id || isNaN(id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'ID de contrato inválido'
+            });
+        }
+
+        // Consulta para obtener datos del contrato
+        const contratos = await Database.query(`
+            SELECT 
+                c.*,
+                cl.nombre as cliente_nombre,
+                cl.identificacion as cliente_identificacion,
+                cl.telefono as cliente_telefono,
+                cl.correo as cliente_email,
+                cl.direccion as cliente_direccion,
+                cl.barrio as cliente_barrio,
+                cl.estrato as cliente_estrato,
+                sc.plan_id,
+                ps.nombre as servicio_nombre,
+                ps.tipo as servicio_tipo,
+                ps.precio as servicio_precio,
+                ps.descripcion as servicio_descripcion,
+                ps.velocidad_bajada,
+                ps.velocidad_subida,
+                ps.canales_tv
+            FROM contratos c
+            INNER JOIN clientes cl ON c.cliente_id = cl.id
+            LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
+            LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+            WHERE c.id = ? AND c.estado = 'activo'
+            LIMIT 1
+        `, [id]);
+
+        if (!contratos || contratos.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Contrato no encontrado'
+            });
+        }
+
+        const contratoData = contratos[0];
+        console.log(`✅ Contrato encontrado: ${contratoData.numero_contrato}`);
+
+        let pdfBuffer;
+
+        // Verificar si ya existe PDF generado
+        if (contratoData.documento_pdf_path && fs.existsSync(contratoData.documento_pdf_path)) {
+            console.log('📁 Usando PDF existente:', contratoData.documento_pdf_path);
+            pdfBuffer = fs.readFileSync(contratoData.documento_pdf_path);
+        } else {
+            console.log('🔨 Generando nuevo PDF...');
+
+            // Obtener configuración de empresa
+            const empresaConfig = await Database.query(`
+                SELECT * FROM configuracion_empresa LIMIT 1
+            `);
+
+            if (!empresaConfig || empresaConfig.length === 0) {
+                return res.status(500).json({
                     success: false,
-                    message: 'ID de contrato inválido'
+                    message: 'Configuración de empresa no encontrada'
                 });
             }
 
-            // CORRECCIÓN: Usar Database.query directamente con campos correctos
-            const contratos = await Database.query(`
-                SELECT 
-                    c.*,
-                    cl.nombre as cliente_nombre,
-                    cl.identificacion as cliente_identificacion,
-                    cl.telefono as cliente_telefono,
-                    cl.correo as cliente_email,
-                    cl.direccion as cliente_direccion,
-                    cl.barrio as cliente_barrio,
-                    cl.estrato as cliente_estrato,
-                    sc.plan_id,
-                    ps.nombre as servicio_nombre,
-                    ps.tipo as servicio_tipo,
-                    ps.precio as servicio_precio,
-                    ps.descripcion as servicio_descripcion,
-                    ps.velocidad_bajada,
-                    ps.velocidad_subida,
-                    ps.canales_tv
-                FROM contratos c
-                INNER JOIN clientes cl ON c.cliente_id = cl.id
-                LEFT JOIN servicios_cliente sc ON FIND_IN_SET(sc.id, c.servicio_id)
-                LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+            const empresa = empresaConfig[0];
 
-                WHERE c.id = ? AND c.estado = 'activo'
-                LIMIT 1
-            `, [id]);
+            // Generar HTML del contrato
+            const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator');
+            const htmlContent = ContratoPDFGenerator.generarHTML(contratoData, empresa);
 
-            if (!contratos || contratos.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Contrato no encontrado'
-                });
-            }
+            // Generar PDF con Puppeteer
+            const browser = await puppeteer.launch({
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
 
-            const contratoData = contratos[0];
-            console.log(`✅ Contrato encontrado: ${contratoData.numero_contrato}`);
+            const page = await browser.newPage();
+            await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
-            let pdfBuffer;
+            pdfBuffer = await page.pdf({
+                format: 'A4',
+                margin: {
+                    top: '10mm',
+                    right: '10mm',
+                    bottom: '10mm',
+                    left: '10mm'
+                },
+                preferCSSPageSize: true,
+                displayHeaderFooter: false
+            });
 
-            // Verificar si ya existe PDF generado
-            if (contratoData.documento_pdf_path && fs.existsSync(contratoData.documento_pdf_path)) {
-                console.log('📁 Usando PDF existente:', contratoData.documento_pdf_path);
-                pdfBuffer = fs.readFileSync(contratoData.documento_pdf_path);
-            } else {
-                console.log('🔨 Generando nuevo PDF...');
+            await browser.close();
 
-                // CORRECCIÓN: Obtener configuración de empresa
-                const empresaConfig = await Database.query(`
-                    SELECT * FROM configuracion_empresa LIMIT 1
-                `);
+            // ✅ ÚNICO BLOQUE para guardar el PDF
+            try {
+                console.log('📁 Creando directorio de uploads...');
 
-                if (!empresaConfig || empresaConfig.length === 0) {
-                    return res.status(500).json({
-                        success: false,
-                        message: 'Configuración de empresa no encontrada'
-                    });
-                }
+                const uploadsDir = path.join(__dirname, '..', 'uploads', 'contratos');
+                console.log('🔍 Directorio de uploads:', uploadsDir);
 
-                const empresa = empresaConfig[0];
-
-                // Generar HTML del contrato
-                const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator');
-                const htmlContent = ContratoPDFGenerator.generarHTML(contratoData, empresa);
-
-                // Generar PDF con Puppeteer
-                const browser = await puppeteer.launch({
-                    headless: true,
-                    args: ['--no-sandbox', '--disable-setuid-sandbox']
-                });
-
-                const page = await browser.newPage();
-                await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-
-                pdfBuffer = await page.pdf({
-                    format: 'A4',
-                    margin: {
-                        top: '10mm',
-                        right: '10mm',
-                        bottom: '10mm',
-                        left: '10mm'
-                    },
-                    preferCSSPageSize: true,
-                    displayHeaderFooter: false
-                });
-
-                await browser.close();
-
-                try {
-                    console.log('📁 Creando directorio de uploads...');
-                    console.log('🔍 Directorio actual:', process.cwd());
-
-                    // Usar __dirname para una ruta más confiable
-                    const uploadsDir = path.join(__dirname, '..', 'uploads', 'contratos');
-                    console.log('🔍 Directorio de uploads:', uploadsDir);
-
-                    // Crear directorio si no existe
-                    if (!fs.existsSync(uploadsDir)) {
-                        console.log('📂 Creando directorio:', uploadsDir);
-                        fs.mkdirSync(uploadsDir, { recursive: true });
-                        console.log('✅ Directorio creado exitosamente');
-                    } else {
-                        console.log('📂 Directorio ya existe');
-                    }
-
-                    const nombrePDF = `contrato_${contratoData.numero_contrato}_original.pdf`;
-                    const rutaPDF = path.join(uploadsDir, nombrePDF);
-
-                    console.log('💾 Guardando PDF en:', rutaPDF);
-
-                    // Guardar archivo PDF
-                    fs.writeFileSync(rutaPDF, pdfBuffer);
-                    console.log('✅ PDF guardado exitosamente');
-
-                    // Actualizar ruta en base de datos usando Database.query
-                    await Database.query(`
-        UPDATE contratos SET documento_pdf_path = ? WHERE id = ?
-    `, [rutaPDF, id]);
-
-                    console.log('💾 Ruta actualizada en base de datos');
-
-                } catch (dirError) {
-                    console.error('❌ Error creando directorio o guardando archivo:', dirError);
-
-                    // Si falla, continuar sin guardar el archivo pero sí servir el PDF
-                    console.log('⚠️ Continuando sin guardar archivo físico...');
-                }
-
-                // CORRECCIÓN: Guardar PDF generado para uso futuro
-                const uploadsDir = path.join(process.cwd(), 'uploads', 'contratos');
+                // Crear directorio si no existe
                 if (!fs.existsSync(uploadsDir)) {
+                    console.log('📂 Creando directorio:', uploadsDir);
                     fs.mkdirSync(uploadsDir, { recursive: true });
+                    console.log('✅ Directorio creado exitosamente');
+                } else {
+                    console.log('📂 Directorio ya existe');
                 }
 
                 const nombrePDF = `contrato_${contratoData.numero_contrato}_original.pdf`;
                 const rutaPDF = path.join(uploadsDir, nombrePDF);
 
-                fs.writeFileSync(rutaPDF, pdfBuffer);
+                console.log('💾 Guardando PDF en:', rutaPDF);
 
-                // Actualizar ruta en base de datos usando Database.query
+                // Guardar archivo PDF
+                fs.writeFileSync(rutaPDF, pdfBuffer);
+                console.log('✅ PDF guardado exitosamente');
+
+                // Actualizar ruta en base de datos
                 await Database.query(`
                     UPDATE contratos SET documento_pdf_path = ? WHERE id = ?
                 `, [rutaPDF, id]);
 
-                console.log('💾 PDF guardado en:', rutaPDF);
-            }
+                console.log('💾 Ruta actualizada en base de datos');
 
-            console.log(`✅ PDF generado exitosamente (${pdfBuffer.length} bytes)`);
-
-            // CORRECCIÓN: Headers específicos para PDF
-            const filename = `contrato_${contratoData.numero_contrato || id}.pdf`;
-
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-            res.setHeader('Content-Length', pdfBuffer.length);
-            res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache por 1 hora
-            res.setHeader('Accept-Ranges', 'bytes');
-
-            // IMPORTANTE: Enviar directamente el buffer
-            res.end(pdfBuffer, 'binary');
-
-            console.log(`📎 PDF del contrato servido: ${filename}`);
-
-        } catch (error) {
-            console.error('❌ Error generando PDF del contrato:', error);
-
-            // CORRECCIÓN: No enviar JSON si headers ya están enviados
-            if (!res.headersSent) {
-                res.status(500).json({
-                    success: false,
-                    message: 'Error generando PDF del contrato',
-                    error: process.env.NODE_ENV === 'development' ? error.message : undefined
-                });
+            } catch (dirError) {
+                console.error('❌ Error creando directorio o guardando archivo:', dirError);
+                console.log('⚠️ Continuando sin guardar archivo físico...');
             }
         }
+
+        console.log(`✅ PDF generado exitosamente (${pdfBuffer.length} bytes)`);
+
+        // Headers para servir el PDF
+        const filename = `contrato_${contratoData.numero_contrato || id}.pdf`;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.setHeader('Accept-Ranges', 'bytes');
+
+        // Enviar el PDF
+        res.end(pdfBuffer, 'binary');
+
+        console.log(`📎 PDF del contrato servido: ${filename}`);
+
+    } catch (error) {
+        console.error('❌ Error generando PDF del contrato:', error);
+
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                message: 'Error generando PDF del contrato',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
     }
+}
+
 
 
     static async actualizarEstado(req, res) {
@@ -560,63 +535,64 @@ query += ` ORDER BY c.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
     * @route GET /api/v1/contratos/:id/verificar-pdf
     * @desc Verificar disponibilidad del PDF
     */
-    static async verificarPDF(req, res) {
-        try {
-            const { id } = req.params;
+/**
+ * @route GET /api/v1/contratos/:id/verificar-pdf
+ * @desc Verificar disponibilidad del PDF
+ */
+static async verificarPDF(req, res) {
+    try {
+        const { id } = req.params;
 
-            if (!id || isNaN(id)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'ID de contrato inválido'
-                });
-            }
-
-            const conexion = await Database.query();
-
-            const [contratos] = await conexion.execute(`
-                SELECT documento_pdf_path, numero_contrato, firmado_cliente
-                FROM contratos WHERE id = ? AND activo = 1
-            `, [id]);
-
-            conexion.release();
-
-            if (contratos.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Contrato no encontrado'
-                });
-            }
-
-            const contrato = contratos[0];
-            const pdfExiste = contrato.documento_pdf_path && fs.existsSync(contrato.documento_pdf_path);
-
-            let tamanoArchivo = 0;
-            if (pdfExiste) {
-                const stats = fs.statSync(contrato.documento_pdf_path);
-                tamanoArchivo = stats.size;
-            }
-
-            res.json({
-                success: true,
-                data: {
-                    pdf_disponible: pdfExiste,
-                    numero_contrato: contrato.numero_contrato,
-                    firmado: Boolean(contrato.firmado_cliente),
-                    ruta_archivo: contrato.documento_pdf_path,
-                    tamano_bytes: tamanoArchivo,
-                    tamano_mb: (tamanoArchivo / (1024 * 1024)).toFixed(2)
-                }
-            });
-
-        } catch (error) {
-            console.error('❌ Error verificando PDF:', error);
-            res.status(500).json({
+        if (!id || isNaN(id)) {
+            return res.status(400).json({
                 success: false,
-                message: 'Error verificando PDF',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+                message: 'ID de contrato inválido'
             });
         }
+
+        // ✅ Usar el patrón estándar de Database.query
+        const contratos = await Database.query(`
+            SELECT documento_pdf_path, numero_contrato, firmado_cliente
+            FROM contratos WHERE id = ? AND activo = 1
+        `, [id]);
+
+        if (contratos.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Contrato no encontrado'
+            });
+        }
+
+        const contrato = contratos[0];
+        const pdfExiste = contrato.documento_pdf_path && fs.existsSync(contrato.documento_pdf_path);
+
+        let tamanoArchivo = 0;
+        if (pdfExiste) {
+            const stats = fs.statSync(contrato.documento_pdf_path);
+            tamanoArchivo = stats.size;
+        }
+
+        res.json({
+            success: true,
+            data: {
+                pdf_disponible: pdfExiste,
+                numero_contrato: contrato.numero_contrato,
+                firmado: Boolean(contrato.firmado_cliente),
+                ruta_archivo: contrato.documento_pdf_path,
+                tamano_bytes: tamanoArchivo,
+                tamano_mb: (tamanoArchivo / (1024 * 1024)).toFixed(2)
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error verificando PDF:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error verificando PDF',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
+}
 }
 
 module.exports = ContratosController;
