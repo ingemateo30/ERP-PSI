@@ -1050,7 +1050,7 @@ const query = `
 // Ejecutar con los parámetros del WHERE (limit/offset ya están interpolados)
 
 
-      params.push(limit, offset);
+     
 
       console.log('🔍 Query facturas generadas:', query);
       console.log('🔍 Parámetros:', params);
@@ -1283,7 +1283,7 @@ const query = `
 
 
 
-      params.push(limit, offset);
+      
 
       const [clientes] = await conexion.execute(query, params);
       const totalRegistros = clientes.length > 0 ? clientes[0].total_registros : 0;
