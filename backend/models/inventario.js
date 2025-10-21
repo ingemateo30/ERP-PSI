@@ -1,12 +1,8 @@
-// backend/models/inventory.js
+// backend/models/inventario.js - VERSIÓN FINAL COMPLETAMENTE CORREGIDA
 
 const db = require('../config/database');
 
 class InventoryModel {
-  
-  // ==========================================
-  // MÉTODOS PARA GESTIÓN DE EQUIPOS
-  // ==========================================
   
   /**
    * Obtener todos los equipos con filtros
@@ -40,7 +36,6 @@ class InventoryModel {
       
       const params = [];
       
-      // Aplicar filtros
       if (filters.tipo) {
         query += ' AND e.tipo = ?';
         params.push(filters.tipo);
@@ -66,23 +61,23 @@ class InventoryModel {
         query += ' AND e.estado = "disponible"';
       }
       
-      // Ordenamiento
-      const orderBy = filters.orderBy || 'e.updated_at';
-      const orderDirection = filters.orderDirection || 'DESC';
+      // ✅ Ordenamiento seguro
+      const allowedOrderBy = ['e.codigo', 'e.nombre', 'e.tipo', 'e.estado', 'e.created_at', 'e.updated_at'];
+      const orderBy = allowedOrderBy.includes(filters.orderBy) ? filters.orderBy : 'e.updated_at';
+      const orderDirection = filters.orderDirection === 'ASC' ? 'ASC' : 'DESC';
       query += ` ORDER BY ${orderBy} ${orderDirection}`;
       
-      // Paginación
+      // ✅ Paginación segura con parámetros preparados
       if (filters.limit) {
-  const limitNum = parseInt(filters.limit) || 50;
-  const offset = parseInt(filters.offset) || 0;
-
-  // ORDER BY seguro + LIMIT + OFFSET
-  query += ` ORDER BY ${sortColumnSafe} ${sortDirectionSafe} LIMIT ${limitNum} OFFSET ${offset}`;
-} 
+        const limitNum = parseInt(filters.limit) || 50;
+        const offset = parseInt(filters.offset) || 0;
+        query += ` LIMIT ? OFFSET ?`;
+        params.push(limitNum, offset);
+      }
       
       const [equipos] = await db.execute(query, params);
       
-      // Obtener total para paginación
+      // Obtener total
       let totalQuery = `
         SELECT COUNT(*) as total
         FROM inventario_equipos e
@@ -130,14 +125,11 @@ class InventoryModel {
         }
       };
     } catch (error) {
-      console.error('Error obteniendo equipos:', error);
+      console.error('❌ Error en getAll:', error);
       throw error;
     }
   }
   
-  /**
-   * Obtener equipo por ID
-   */
   static async getById(id) {
     try {
       const query = `
@@ -161,14 +153,11 @@ class InventoryModel {
       const [equipos] = await db.execute(query, [id]);
       return equipos[0];
     } catch (error) {
-      console.error('Error obteniendo equipo por ID:', error);
+      console.error('❌ Error en getById:', error);
       throw error;
     }
   }
   
-  /**
-   * Crear nuevo equipo
-   */
   static async create(equipoData, userId) {
     try {
       const query = `
@@ -202,14 +191,11 @@ class InventoryModel {
         estado: equipoData.estado || 'disponible'
       };
     } catch (error) {
-      console.error('Error creando equipo:', error);
+      console.error('❌ Error en create:', error);
       throw error;
     }
   }
   
-  /**
-   * Actualizar equipo
-   */
   static async update(id, equipoData, userId) {
     try {
       const query = `
@@ -239,17 +225,13 @@ class InventoryModel {
       await db.execute(query, params);
       return await this.getById(id);
     } catch (error) {
-      console.error('Error actualizando equipo:', error);
+      console.error('❌ Error en update:', error);
       throw error;
     }
   }
   
-  /**
-   * Eliminar equipo
-   */
   static async delete(id) {
     try {
-      // Verificar que el equipo no esté asignado
       const equipo = await this.getById(id);
       if (!equipo) {
         throw new Error('Equipo no encontrado');
@@ -264,18 +246,11 @@ class InventoryModel {
       
       return { success: true };
     } catch (error) {
-      console.error('Error eliminando equipo:', error);
+      console.error('❌ Error en delete:', error);
       throw error;
     }
   }
   
-  // ==========================================
-  // MÉTODOS PARA GESTIÓN DE ASIGNACIONES
-  // ==========================================
-  
-  /**
-   * Asignar equipo a instalador
-   */
   static async assignToInstaller(equipoId, instaladorId, assignmentData, userId) {
     try {
       await db.execute('CALL AsignarEquipoInstalador(?, ?, ?, ?, ?)', [
@@ -288,14 +263,11 @@ class InventoryModel {
       
       return await this.getById(equipoId);
     } catch (error) {
-      console.error('Error asignando equipo:', error);
+      console.error('❌ Error en assignToInstaller:', error);
       throw error;
     }
   }
   
-  /**
-   * Devolver equipo
-   */
   static async returnEquipment(equipoId, returnData, userId) {
     try {
       await db.execute('CALL DevolverEquipo(?, ?, ?, ?)', [
@@ -307,14 +279,11 @@ class InventoryModel {
       
       return await this.getById(equipoId);
     } catch (error) {
-      console.error('Error devolviendo equipo:', error);
+      console.error('❌ Error en returnEquipment:', error);
       throw error;
     }
   }
   
-  /**
-   * Marcar equipo como instalado
-   */
   static async markAsInstalled(equipoId, installationData, userId) {
     try {
       const query = `
@@ -336,7 +305,6 @@ class InventoryModel {
         equipoId
       ]);
       
-      // Registrar en historial
       const historialQuery = `
         INSERT INTO inventario_historial (
           equipo_id, instalador_id, accion, ubicacion, 
@@ -359,14 +327,11 @@ class InventoryModel {
       
       return await this.getById(equipoId);
     } catch (error) {
-      console.error('Error marcando equipo como instalado:', error);
+      console.error('❌ Error en markAsInstalled:', error);
       throw error;
     }
   }
   
-  /**
-   * Obtener equipos asignados a un instalador
-   */
   static async getByInstaller(instaladorId, estado = null) {
     try {
       let query = `
@@ -388,18 +353,11 @@ class InventoryModel {
       const [equipos] = await db.execute(query, params);
       return equipos;
     } catch (error) {
-      console.error('Error obteniendo equipos por instalador:', error);
+      console.error('❌ Error en getByInstaller:', error);
       throw error;
     }
   }
   
-  // ==========================================
-  // MÉTODOS PARA HISTORIAL
-  // ==========================================
-  
-  /**
-   * Obtener historial de un equipo
-   */
   static async getHistory(equipoId) {
     try {
       const query = `
@@ -420,14 +378,11 @@ class InventoryModel {
       const [historial] = await db.execute(query, [equipoId]);
       return historial;
     } catch (error) {
-      console.error('Error obteniendo historial del equipo:', error);
+      console.error('❌ Error en getHistory:', error);
       throw error;
     }
   }
   
-  /**
-   * Obtener historial de un instalador
-   */
   static async getInstallerHistory(instaladorId, limit = 50) {
     try {
       const query = `
@@ -442,96 +397,94 @@ class InventoryModel {
         LEFT JOIN clientes c ON h.cliente_id = c.id
         WHERE h.instalador_id = ?
         ORDER BY h.fecha_accion DESC
-        ${sortColumnSafe} ${sortDirectionSafe}
-        LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)};
+        LIMIT ?
       `;
       
-      const [historial] = await db.execute(query, [instaladorId, limit]);
+      const [historial] = await db.execute(query, [instaladorId, parseInt(limit)]);
       return historial;
     } catch (error) {
-      console.error('Error obteniendo historial del instalador:', error);
+      console.error('❌ Error en getInstallerHistory:', error);
       throw error;
     }
   }
   
-  // ==========================================
-  // MÉTODOS PARA ESTADÍSTICAS Y REPORTES
-  // ==========================================
-  
-  /**
-   * Obtener estadísticas del inventario
-   */
   static async getStats() {
     try {
-      const queries = {
-        general: `
-          SELECT 
-            COUNT(*) as total_equipos,
-            COUNT(CASE WHEN estado = 'disponible' THEN 1 END) as disponibles,
-            COUNT(CASE WHEN estado = 'asignado' THEN 1 END) as asignados,
-            COUNT(CASE WHEN estado = 'instalado' THEN 1 END) as instalados,
-            COUNT(CASE WHEN estado = 'dañado' THEN 1 END) as dañados,
-            COUNT(CASE WHEN estado = 'perdido' THEN 1 END) as perdidos,
-            COUNT(CASE WHEN estado = 'mantenimiento' THEN 1 END) as en_mantenimiento,
-            SUM(CASE WHEN precio_compra IS NOT NULL THEN precio_compra ELSE 0 END) as valor_total_inventario
-          FROM inventario_equipos
-        `,
-        
-        por_tipo: `
-          SELECT 
-            tipo,
-            COUNT(*) as cantidad,
-            COUNT(CASE WHEN estado = 'disponible' THEN 1 END) as disponibles,
-            COUNT(CASE WHEN estado = 'asignado' THEN 1 END) as asignados,
-            COUNT(CASE WHEN estado = 'instalado' THEN 1 END) as instalados
-          FROM inventario_equipos
-          GROUP BY tipo
-          ORDER BY cantidad DESC
-        `,
-        
-        por_instalador: `
-          SELECT 
-            u.id,
-            u.nombre,
-            u.telefono,
-            COUNT(e.id) as equipos_asignados,
-            COUNT(CASE WHEN e.estado = 'asignado' THEN 1 END) as equipos_pendientes,
-            COUNT(CASE WHEN e.estado = 'instalado' THEN 1 END) as equipos_instalados,
-            AVG(CASE 
-              WHEN e.fecha_asignacion IS NOT NULL AND e.fecha_devolucion IS NULL 
-              THEN DATEDIFF(NOW(), e.fecha_asignacion)
-              WHEN e.fecha_asignacion IS NOT NULL AND e.fecha_devolucion IS NOT NULL 
-              THEN DATEDIFF(e.fecha_devolucion, e.fecha_asignacion)
-              ELSE NULL 
-            END) as promedio_dias_asignacion
-          FROM sistema_usuarios u
-          LEFT JOIN inventario_equipos e ON u.id = e.instalador_id
-          WHERE u.rol = 'instalador' AND u.activo = 1
-          GROUP BY u.id, u.nombre, u.telefono
-          ORDER BY equipos_asignados DESC
-        `,
-        
-        movimientos_recientes: `
-          SELECT 
-            h.fecha_accion,
-            h.accion,
-            e.codigo,
-            e.nombre as equipo_nombre,
-            u.nombre as instalador_nombre,
-            c.nombre as cliente_nombre
-          FROM inventario_historial h
-          JOIN inventario_equipos e ON h.equipo_id = e.id
-          JOIN sistema_usuarios u ON h.instalador_id = u.id
-          LEFT JOIN clientes c ON h.cliente_id = c.id
-          ORDER BY ${sortColumnSafe} ${sortDirectionSafe} 
-          LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)};
-        `
-      };
+      console.log('📊 getStats - Obteniendo estadísticas...');
       
-      const [generalStats] = await db.execute(queries.general);
-      const [tipoStats] = await db.execute(queries.por_tipo);
-      const [instaladorStats] = await db.execute(queries.por_instalador);
-      const [movimientosRecientes] = await db.execute(queries.movimientos_recientes);
+      // Query general
+      const generalQuery = `
+        SELECT 
+          COUNT(*) as total_equipos,
+          COUNT(CASE WHEN estado = 'disponible' THEN 1 END) as disponibles,
+          COUNT(CASE WHEN estado = 'asignado' THEN 1 END) as asignados,
+          COUNT(CASE WHEN estado = 'instalado' THEN 1 END) as instalados,
+          COUNT(CASE WHEN estado = 'dañado' THEN 1 END) as dañados,
+          COUNT(CASE WHEN estado = 'perdido' THEN 1 END) as perdidos,
+          COUNT(CASE WHEN estado = 'mantenimiento' THEN 1 END) as en_mantenimiento,
+          SUM(CASE WHEN precio_compra IS NOT NULL THEN precio_compra ELSE 0 END) as valor_total_inventario
+        FROM inventario_equipos
+      `;
+      
+      // Query por tipo
+      const tipoQuery = `
+        SELECT 
+          tipo,
+          COUNT(*) as cantidad,
+          COUNT(CASE WHEN estado = 'disponible' THEN 1 END) as disponibles,
+          COUNT(CASE WHEN estado = 'asignado' THEN 1 END) as asignados,
+          COUNT(CASE WHEN estado = 'instalado' THEN 1 END) as instalados
+        FROM inventario_equipos
+        GROUP BY tipo
+        ORDER BY cantidad DESC
+      `;
+      
+      // Query por instalador
+      const instaladorQuery = `
+        SELECT 
+          u.id,
+          u.nombre,
+          u.telefono,
+          COUNT(e.id) as equipos_asignados,
+          COUNT(CASE WHEN e.estado = 'asignado' THEN 1 END) as equipos_pendientes,
+          COUNT(CASE WHEN e.estado = 'instalado' THEN 1 END) as equipos_instalados,
+          AVG(CASE 
+            WHEN e.fecha_asignacion IS NOT NULL AND e.fecha_devolucion IS NULL 
+            THEN DATEDIFF(NOW(), e.fecha_asignacion)
+            WHEN e.fecha_asignacion IS NOT NULL AND e.fecha_devolucion IS NOT NULL 
+            THEN DATEDIFF(e.fecha_devolucion, e.fecha_asignacion)
+            ELSE NULL 
+          END) as promedio_dias_asignacion
+        FROM sistema_usuarios u
+        LEFT JOIN inventario_equipos e ON u.id = e.instalador_id
+        WHERE u.rol = 'instalador' AND u.activo = 1
+        GROUP BY u.id, u.nombre, u.telefono
+        ORDER BY equipos_asignados DESC
+      `;
+      
+      // Query movimientos recientes
+      const movimientosQuery = `
+        SELECT 
+          h.fecha_accion,
+          h.accion,
+          e.codigo,
+          e.nombre as equipo_nombre,
+          u.nombre as instalador_nombre,
+          c.nombre as cliente_nombre
+        FROM inventario_historial h
+        JOIN inventario_equipos e ON h.equipo_id = e.id
+        JOIN sistema_usuarios u ON h.instalador_id = u.id
+        LEFT JOIN clientes c ON h.cliente_id = c.id
+        ORDER BY h.fecha_accion DESC
+        LIMIT 10
+      `;
+      
+      const [generalStats] = await db.execute(generalQuery);
+      const [tipoStats] = await db.execute(tipoQuery);
+      const [instaladorStats] = await db.execute(instaladorQuery);
+      const [movimientosRecientes] = await db.execute(movimientosQuery);
+      
+      console.log('✅ getStats - Estadísticas obtenidas exitosamente');
       
       return {
         general: generalStats[0],
@@ -540,14 +493,12 @@ class InventoryModel {
         movimientos_recientes: movimientosRecientes
       };
     } catch (error) {
-      console.error('Error obteniendo estadísticas:', error);
+      console.error('❌ Error en getStats:', error);
+      console.error('❌ Detalles:', error.message);
       throw error;
     }
   }
   
-  /**
-   * Obtener equipos disponibles para asignación
-   */
   static async getAvailableEquipment(tipo = null) {
     try {
       let query = `
@@ -568,22 +519,17 @@ class InventoryModel {
       const [equipos] = await db.execute(query, params);
       return equipos;
     } catch (error) {
-      console.error('Error obteniendo equipos disponibles:', error);
+      console.error('❌ Error en getAvailableEquipment:', error);
       throw error;
     }
   }
   
-  /**
-   * Obtener instaladores activos
-   */
-   static async getActiveInstallers() {
+  static async getActiveInstallers() {
     try {
-      // ✅ USANDO LA MISMA CONSULTA QUE FUNCIONA EN INCIDENCIAS
-      // pero manteniendo los campos adicionales que necesita inventario
       const query = `
         SELECT 
           u.id,
-          u.nombre as nombre,
+          u.nombre,
           u.telefono,
           u.email,
           u.rol,
@@ -596,21 +542,15 @@ class InventoryModel {
       `;
       
       const [instaladores] = await db.execute(query);
-      
       console.log(`✅ Instaladores activos encontrados: ${instaladores.length}`);
-      console.log('👥 Lista de instaladores:', instaladores.map(i => ({ id: i.id, nombre: i.nombre })));
       
       return instaladores;
     } catch (error) {
-      console.error('❌ Error obteniendo instaladores activos:', error);
-      console.error('❌ Detalles del error:', error.message);
+      console.error('❌ Error en getActiveInstallers:', error);
       throw error;
     }
   }
   
-  /**
-   * Verificar disponibilidad de código
-   */
   static async checkCodeAvailability(codigo, excludeId = null) {
     try {
       let query = 'SELECT id FROM inventario_equipos WHERE codigo = ?';
@@ -624,14 +564,11 @@ class InventoryModel {
       const [result] = await db.execute(query, params);
       return result.length === 0;
     } catch (error) {
-      console.error('Error verificando disponibilidad de código:', error);
+      console.error('❌ Error en checkCodeAvailability:', error);
       throw error;
     }
   }
   
-  /**
-   * Buscar equipos por código o número de serie
-   */
   static async search(searchTerm) {
     try {
       const query = `
@@ -641,22 +578,19 @@ class InventoryModel {
         FROM inventario_equipos e
         LEFT JOIN sistema_usuarios u ON e.instalador_id = u.id
         WHERE e.codigo LIKE ? OR e.numero_serie LIKE ? OR e.nombre LIKE ?
-        ORDER BY ${sortColumnSafe} ${sortDirectionSafe} 
-        LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)};
+        ORDER BY e.nombre
+        LIMIT 50
       `;
       
       const searchPattern = `%${searchTerm}%`;
       const [equipos] = await db.execute(query, [searchPattern, searchPattern, searchPattern]);
       return equipos;
     } catch (error) {
-      console.error('Error buscando equipos:', error);
+      console.error('❌ Error en search:', error);
       throw error;
     }
   }
   
-  /**
-   * Obtener reporte de equipos por rango de fechas
-   */
   static async getReportByDateRange(startDate, endDate, tipo = null) {
     try {
       let query = `
@@ -686,14 +620,11 @@ class InventoryModel {
       const [movimientos] = await db.execute(query, params);
       return movimientos;
     } catch (error) {
-      console.error('Error obteniendo reporte por fechas:', error); 
-      throw error ;
+      console.error('❌ Error en getReportByDateRange:', error);
+      throw error;
     }
   }
   
-  /**
-   * Actualizar ubicación de equipo (para instaladores móviles)
-   */
   static async updateLocation(equipoId, locationData, userId) {
     try {
       const query = `
@@ -714,14 +645,11 @@ class InventoryModel {
       
       return await this.getById(equipoId);
     } catch (error) {
-      console.error('Error actualizando ubicación:', error);
+      console.error('❌ Error en updateLocation:', error);
       throw error;
     }
   }
   
-  /**
-   * Obtener tipos de equipos únicos
-   */
   static async getTypes() {
     try {
       const query = `
@@ -734,14 +662,11 @@ class InventoryModel {
       const [tipos] = await db.execute(query);
       return tipos;
     } catch (error) {
-      console.error('Error obteniendo tipos de equipos:', error);
+      console.error('❌ Error en getTypes:', error);
       throw error;
     }
   }
   
-  /**
-   * Obtener marcas únicas por tipo
-   */
   static async getBrandsByType(tipo) {
     try {
       const query = `
@@ -755,7 +680,7 @@ class InventoryModel {
       const [marcas] = await db.execute(query, [tipo]);
       return marcas;
     } catch (error) {
-      console.error('Error obteniendo marcas por tipo:', error);
+      console.error('❌ Error en getBrandsByType:', error);
       throw error;
     }
   }
