@@ -19,7 +19,7 @@ export const instalacionesService = {
   async getInstalaciones(params = {}) {
     try {
       console.log('📡 Obteniendo instalaciones con parámetros:', params);
-      const response = await apiService.get(`${API_BASE}`, { params });
+      const response = await apiService.get(`${API_BASE}`,  params );
 
       console.log('📥 RESPUESTA COMPLETA DEL API:', response);
 
