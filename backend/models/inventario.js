@@ -68,12 +68,13 @@ class InventoryModel {
       query += ` ORDER BY ${orderBy} ${orderDirection}`;
       
       // ✅ Paginación segura con parámetros preparados
-      if (filters.limit) {
-        const limitNum = parseInt(filters.limit) || 50;
-        const offset = parseInt(filters.offset) || 0;
-        query += ` LIMIT ${limitNum} OFFSET ${offset}`;
-        // No se necesita push de parámetros
-      }
+     if (filters.limit) {
+    const limitNum = parseInt(filters.limit) || 50;
+    const page = parseInt(filters.page) || 1;
+    const offset = (page - 1) * limitNum;
+    query += ` LIMIT ${limitNum} OFFSET ${offset}`;
+    // No se necesita push de parámetros
+}
       const [equipos] = await db.execute(query, params);
       
       // Obtener total
