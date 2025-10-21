@@ -178,7 +178,7 @@ class ContratosService {
 
             console.log(`📄 Generando PDF del contrato ID: ${id}`);
 
-            const response = await apiService.request(`${API_BASE}/${id}/pdf`, {
+            const blob = await apiService.request(`${API_BASE}/${id}/pdf`, {
                 responseType: 'blob',
                 headers: {
                     'Accept': 'application/pdf'
@@ -186,19 +186,14 @@ class ContratosService {
             });
 
             // Validación del blob
-            if (!response.data || response.data.size === 0) {
+            if (!blob || blob.size === 0) {
                 throw new Error('El PDF generado está vacío');
             }
 
-            // Verificar que es realmente un PDF
-            const contentType = response.headers?.['content-type'] || '';
-            if (!contentType.includes('application/pdf')) {
-                console.warn('⚠️ Tipo de contenido inesperado:', contentType);
-            }
 
             if (download) {
                 // Crear enlace de descarga automática
-                const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+                const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
                 link.setAttribute('download', `contrato_${id}.pdf`);
@@ -209,7 +204,7 @@ class ContratosService {
             }
 
             console.log('✅ PDF generado exitosamente');
-            return response;
+            return blob;
         } catch (error) {
             console.error('❌ Error generando PDF:', error);
             throw this.handleError(error);
@@ -433,7 +428,7 @@ class ContratosService {
             console.log(`🔍 Verificando disponibilidad del PDF para contrato ID: ${id}`);
 
             // CORRECCIÓN: Usar apiService con tu ruta original en lugar de fetch directo
-            const response = await apiService.request(`${API_BASE}/${id}/pdf`, {
+           const blob = await apiService.request(`${API_BASE}/${id}/pdf`, {
                 method: 'HEAD'
             });
 
