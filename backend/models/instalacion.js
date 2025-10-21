@@ -194,23 +194,21 @@ class Instalacion {
       // Calcular paginación
       const offset = (paginacion.pagina - 1) * paginacion.limite;
 
-      // Obtener registros paginados
-      const [rows] = await connection.execute(
-        `SELECT 
-          i.*,
-          c.identificacion as cliente_identificacion,
-          c.nombre as cliente_nombre,
-          c.telefono as cliente_telefono,
-          u.nombre as instalador_nombre,
-          ci.nombre as ciudad_nombre
-        FROM instalaciones i
-        INNER JOIN clientes c ON i.cliente_id = c.id
-        LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
-        LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
-        ${whereClause}
-        ORDER BY i.fecha_programada DESC
-        LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}
-      `, queryParams);
+     const [rows] = await connection.execute(
+    `SELECT 
+        i.*,
+        c.identificacion as cliente_identificacion,
+        c.nombre as cliente_nombre,
+        u.nombre as instalador_nombre,
+        ci.nombre as ciudad_nombre
+    FROM instalaciones i
+    INNER JOIN clientes c ON i.cliente_id = c.id
+    LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
+    LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+    ${whereClause}
+    ORDER BY i.fecha_programada DESC 
+    LIMIT ${parseInt(paginacion.limite)} OFFSET ${parseInt(offset)}
+  `, params);
       // Parsear campos JSON
       const instalaciones = rows.map(row => {
         if (row.equipos_instalados) {
