@@ -63,29 +63,28 @@ class ApiService {
                               contentType.includes('image/') || 
                               contentType.includes('application/octet-stream') ||
                               options.responseType === 'blob';
-
-        if (isBinaryResponse) {
-            console.log('📄 ApiService - Respuesta binaria detectada:', contentType);
-            
-            if (!response.ok) {
-                // Para respuestas binarias con error, intentar leer como texto
-                const errorText = await response.text();
-                console.error('❌ ApiService - Error en respuesta binaria:', errorText);
-                throw new Error(errorText || `Error ${response.status}: ${response.statusText}`);
-            }
-            
-            // CORRECCIÓN: Retornar blob para respuestas binarias
-            const blob = await response.blob();
-            console.log('✅ ApiService - Blob recibido, tamaño:', blob.size, 'tipo:', blob.type);
-            
-            // VALIDACIÓN: Verificar que el blob no esté vacío
-            if (blob.size < 100) { // Un PDF válido debe tener al menos 100 bytes
-                console.error('❌ ApiService - Blob demasiado pequeño:', blob.size);
-                throw new Error('El archivo descargado está vacío o es inválido');
-            }
-            
-            return blob;
-        }
+if (isBinaryResponse) {
+    console.log('📄 ApiService - Respuesta binaria detectada:', contentType);
+    
+    // Leer el blob primero (solo se puede leer una vez)
+    const blob = await response.blob();
+    
+    // Luego verificar si hay error
+    if (!response.ok) {
+        console.error('❌ ApiService - Error en respuesta binaria, status:', response.status);
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+    
+    console.log('✅ ApiService - Blob recibido, tamaño:', blob.size, 'tipo:', blob.type);
+    
+    // VALIDACIÓN: Verificar que el blob no esté vacío
+    if (blob.size < 100) { // Un PDF válido debe tener al menos 100 bytes
+        console.error('❌ ApiService - Blob demasiado pequeño:', blob.size);
+        throw new Error('El archivo descargado está vacío o es inválido');
+    }
+    
+    return blob;
+}
 
         // Para respuestas JSON normales
         if (!response.ok) {
