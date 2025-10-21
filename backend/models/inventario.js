@@ -686,8 +686,8 @@ class InventoryModel {
       const [movimientos] = await db.execute(query, params);
       return movimientos;
     } catch (error) {
-      console.error('Error obteniendo reporte por fechas:', error);
-      throw error;
+      console.error('Error obteniendo reporte por fechas:', error); 
+      throw error ;
     }
   }
   
