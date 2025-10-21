@@ -773,7 +773,8 @@ router.get('/:id/pdf', async (req, res) => {
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
                 '--disable-web-security'
-            ]
+            ],
+            executablePath: '/usr/bin/google-chrome',
         });
 
         const page = await browser.newPage();
