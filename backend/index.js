@@ -254,20 +254,20 @@ try {
   // CORREGIDO: Rutas de reportes regulatorios
   console.log('📊 Cargando rutas de reportes regulatorios...');
   const reportesRegulatoriosRoutes = require('./routes/reportesRegulatorios');
-  app.use('/api/reportes-regulatorios', reportesRegulatoriosRoutes);
-  console.log('✅ Rutas de reportes regulatorios cargadas: /api/reportes-regulatorios');
+  app.use('/api/v1/reportes-regulatorios', reportesRegulatoriosRoutes);
+  console.log('✅ Rutas de reportes regulatorios cargadas: /api/v1/reportes-regulatorios');
 
   // Rutas de PQR
   console.log('📝 Cargando rutas de PQR...');
   const pqrRoutes = require('./routes/pqr');
-  app.use('/api/pqr', pqrRoutes);
-  console.log('✅ Rutas de PQR cargadas: /api/pqr');
+  app.use('/api/v1/pqr', pqrRoutes);
+  console.log('✅ Rutas de PQR cargadas: /api/v1/pqr');
 
   // Rutas de incidencias
   console.log('🚨 Cargando rutas de incidencias...');
   const incidenciasRoutes = require('./routes/incidencias');
-  app.use('/api/incidencias', incidenciasRoutes);
-  console.log('✅ Rutas de incidencias cargadas: /api/incidencias');
+  app.use('/api/v1/incidencias', incidenciasRoutes);
+  console.log('✅ Rutas de incidencias cargadas: /api/v1/incidencias');
 
   //rutas de instalaciones
   console.log('🔧 Cargando rutas de instalaciones...');
