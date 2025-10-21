@@ -207,11 +207,10 @@ class IncidenciasController {
       }
 
       // Ordenar y paginar
-      query += ' ORDER BY i.fecha_inicio DESC';
-      
+      // ✅ DESPUÉS:
       const offset = (page - 1) * limit;
-      query += ' LIMIT ? OFFSET ?';
-      queryParams.push(parseInt(limit), parseInt(offset));
+      query += ` LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`;
+     
 
       const incidencias = await this.db.query(query, queryParams);
 
