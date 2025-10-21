@@ -67,16 +67,17 @@ class InventoryModel {
       const orderDirection = filters.orderDirection === 'ASC' ? 'ASC' : 'DESC';
       query += ` ORDER BY ${orderBy} ${orderDirection}`;
       
-      // ✅ Paginación segura con parámetros preparados
-     if (filters.limit) {
-    const limitNum = parseInt(filters.limit) || 50;
-    const page = parseInt(filters.page) || 1;
+    // Definir limitNum y page FUERA del if
+const limitNum = parseInt(filters.limit) || 50;
+const page = parseInt(filters.page) || 1;
+
+// ✅ Paginación segura con parámetros preparados
+if (filters.limit) {
     const offset = (page - 1) * limitNum;
     query += ` LIMIT ${limitNum} OFFSET ${offset}`;
-    // No se necesita push de parámetros
 }
-      const [equipos] = await db.execute(query, params);
-      
+
+const [equipos] = await db.execute(query, params);    
       // Obtener total
       let totalQuery = `
         SELECT COUNT(*) as total
