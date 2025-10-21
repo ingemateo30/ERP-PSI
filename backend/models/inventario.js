@@ -71,10 +71,9 @@ class InventoryModel {
       if (filters.limit) {
         const limitNum = parseInt(filters.limit) || 50;
         const offset = parseInt(filters.offset) || 0;
-        query += ` LIMIT ? OFFSET ?`;
-        params.push(limitNum, offset);
+        query += ` LIMIT ${limitNum} OFFSET ${offset}`;
+        // No se necesita push de parámetros
       }
-      
       const [equipos] = await db.execute(query, params);
       
       // Obtener total
@@ -119,9 +118,9 @@ class InventoryModel {
         equipos,
         pagination: {
           total,
-          page: filters.page || 1,
-          limit: filters.limit || total,
-          pages: filters.limit ? Math.ceil(total / filters.limit) : 1
+          page: parseInt(filters.page) || 1,
+          limit: limitNum,
+          pages: Math.ceil(total / limitNum)
         }
       };
     } catch (error) {
@@ -383,7 +382,7 @@ class InventoryModel {
     }
   }
   
-  static async getInstallerHistory(instaladorId, limit = 50) {
+static async getInstallerHistory(instaladorId, limit = 50) {
     try {
       const query = `
         SELECT 
@@ -397,10 +396,10 @@ class InventoryModel {
         LEFT JOIN clientes c ON h.cliente_id = c.id
         WHERE h.instalador_id = ?
         ORDER BY h.fecha_accion DESC
-        LIMIT ?
+        LIMIT ${parseInt(limit)}
       `;
       
-      const [historial] = await db.execute(query, [instaladorId, parseInt(limit)]);
+      const [historial] = await db.execute(query, [instaladorId]);
       return historial;
     } catch (error) {
       console.error('❌ Error en getInstallerHistory:', error);
