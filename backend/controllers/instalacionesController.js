@@ -132,9 +132,9 @@ class InstalacionesController {
             const offset = (pageNum - 1) * limitNum;
             const totalPages = Math.ceil(total / limitNum);
 
-            // Query con paginación
-            const selectQuery = `
-      SELECT 
+           // ✅ DESPUÉS:
+const selectQuery = `
+      SELECT
         i.*,
         c.nombre as cliente_nombre,
         c.identificacion as cliente_identificacion,
@@ -145,11 +145,10 @@ class InstalacionesController {
         ps.precio as plan_precio
       ${baseQuery}
       ORDER BY i.created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${limitNum} OFFSET ${offset}
     `;
-
-            const instalaciones = await Database.query(selectQuery, [...params, limitNum, offset]);
-
+const instalaciones = await Database.query(selectQuery, params);
+            
             console.log('📋 Instalaciones obtenidas:', instalaciones.length);
             console.log('📋 Primera instalación:', instalaciones[0] || 'Ninguna');
 
