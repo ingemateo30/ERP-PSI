@@ -62,18 +62,15 @@ class ServicePlansController {
       query += ` ORDER BY p.${ordenFinal} ASC, p.nombre ASC`;
 
       // Paginación
-      if (limit && limit !== 'all') {
-        const limite = parseInt(limit);
-        const offset = (parseInt(page) - 1) * limite;
-
-        query += ' LIMIT ?';
-        params.push(parseInt(limite));
-
-        if (offset) {
-          query += ' OFFSET ?';
-          params.push(parseInt(offset));
-        }
-      }
+      // ✅ DESPUÉS:
+if (limit && limit !== 'all') {
+  const limite = parseInt(limit);
+  const offset = (parseInt(page) - 1) * limite;
+  query += ` LIMIT ${limite}`;
+  if (offset) {
+    query += ` OFFSET ${offset}`;
+  }
+}
 
       console.log('📊 Query ejecutada:', query);
       console.log('📊 Parámetros:', params);
