@@ -129,11 +129,11 @@ router.get('/', requireRole('administrador', 'supervisor', 'instalador'), async 
 
         const [{ total }] = await db.query(countQuery, countParams);
 
-        // Agregar ordenamiento y paginación a la consulta principal
+       // ✅ DESPUÉS:
         query += ' ORDER BY i.fecha_inicio DESC';
         const offset = (parseInt(page) - 1) * parseInt(limit);
-        query += ' LIMIT ? OFFSET ?';
-        queryParams.push(parseInt(limit), offset);
+        query += ` LIMIT ${parseInt(limit)} OFFSET ${offset}`;
+
 
         const incidencias = await db.query(query, queryParams);
 
