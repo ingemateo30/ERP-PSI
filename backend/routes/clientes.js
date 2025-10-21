@@ -195,8 +195,7 @@ router.get('/inactivos',
   requireRole('supervisor', 'administrador'),
   async (req, res) => {
     try {
-      const { page = 1, limit = 10, search = '' } = req.query;
-      const offset = (page - 1) * limit;
+      
 
       console.log('📋 Obteniendo clientes inactivos:', { page, limit, search });
 
@@ -213,15 +212,23 @@ router.get('/inactivos',
       }
 
       // Query para obtener clientes inactivos
-      const query = `
-        SELECT 
-          ci.*,
-          DATEDIFF(NOW(), ci.fecha_inactivacion) as dias_inactivo
-        FROM clientes_inactivos ci
-        ${whereClause}
-        ORDER BY ci.fecha_inactivacion DESC
-        LIMIT ? OFFSET ?
-      `;
+      // ✅ DESPUÉS:
+const { page = 1, limit = 10, search = '' } = req.query;
+const limitNum = parseInt(limit);
+const pageNum = parseInt(page);
+const offset = (pageNum - 1) * limitNum;
+
+// ... más abajo ...
+
+const query = `
+  SELECT
+    ci.*,
+    DATEDIFF(NOW(), ci.fecha_inactivacion) as dias_inactivo
+  FROM clientes_inactivos ci
+  ${whereClause}
+  ORDER BY ci.fecha_inactivacion DESC
+  LIMIT ${limitNum} OFFSET ${offset}
+`;
 
       const countQuery = `
         SELECT COUNT(*) as total

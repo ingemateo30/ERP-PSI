@@ -60,12 +60,12 @@ class ConceptoFacturacion {
             // Ordenamiento
             query += ' ORDER BY tipo ASC, CAST(codigo AS UNSIGNED) ASC, codigo ASC';
             
-            // Paginación
-            if (filters.limit) {
-                const offset = ((filters.page || 1) - 1) * filters.limit;
-                query += ' LIMIT ? OFFSET ?';
-                params.push(filters.limit, offset);
-            }
+            // ✅ DESPUÉS:
+if (filters.limit) {
+    const limitNum = parseInt(filters.limit);
+    const offset = ((filters.page || 1) - 1) * limitNum;
+    query += ` LIMIT ${limitNum} OFFSET ${offset}`;
+}
             
             console.log('📝 Query SQL:', query);
             console.log('📊 Parámetros:', params);
