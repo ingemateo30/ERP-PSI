@@ -32,7 +32,8 @@ class PlantillasCorreoController {
             // Preparar respuesta con paginación
             const response = {
                 success: true,
-                message: result.plantillas,
+                data: result.plantillas,
+                message: 'Plantillas obtenidas correctamente',
                 pagination: null
             };
 
