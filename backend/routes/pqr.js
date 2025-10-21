@@ -75,12 +75,11 @@ router.get('/', async (req, res) => {
         const [countResult] = await db.query(countQuery, params);
         const total = countResult.total;
         
-        // Agregar ordenamiento y paginación
-        query += ' ORDER BY p.fecha_recepcion DESC';
-        const offset = (page - 1) * limit;
-        query += ' LIMIT ? OFFSET ?';
-        params.push(parseInt(limit), parseInt(offset));
-        
+       // ✅ DESPUÉS:
+query += ' ORDER BY p.fecha_recepcion DESC';
+const offset = (page - 1) * limit;
+query += ` LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`;
+// NO agregues limit y offset a params
         const pqrs = await db.query(query, params);
         
         res.json({
