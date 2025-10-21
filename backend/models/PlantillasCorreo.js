@@ -42,13 +42,11 @@ class PlantillasCorreo {
             // Ordenamiento
             query += ` ORDER BY tipo ASC, titulo ASC`;
 
-            // Paginación
             if (filters.limit) {
-                const offset = filters.page ? (filters.page - 1) * filters.limit : 0;
-                query += ` LIMIT ? OFFSET ?`;
-                params.push(parseInt(filters.limit), offset);
-            }
+    const offset = filters.page ? (filters.page - 1) * filters.limit : 0;
+    query += ` LIMIT ${parseInt(filters.limit)} OFFSET ${parseInt(offset)}`;
 
+}
             console.log('🔍 Query plantillas:', query);
             console.log('📋 Parámetros:', params);
 
