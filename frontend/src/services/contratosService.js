@@ -60,7 +60,7 @@ class ContratosService {
             const response = await apiService.get(`${API_BASE}/${id}/abrir-firma`);
 
             // Si la respuesta es exitosa, generar el PDF directamente con apiService
-            if (response.success && response.data) {
+            if (response.success && response.data ) {
                 try {
                     console.log('📄 Descargando PDF del contrato...');
 
