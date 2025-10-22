@@ -1,6 +1,6 @@
 // frontend/src/services/authService.js - VERSIÓN COMPLETA INTEGRADA
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3001';
 
 class AuthService {
     constructor() {
