@@ -13,17 +13,7 @@ try {
 } catch (error) {
   console.error('❌ Error cargando ClienteController:', error.message);
   // Crear controlador dummy temporal
-  ClienteController = {
-    obtenerTodos: (req, res) => res.status(501).json({ success: false, message: 'Controlador no disponible' }),
-    exportarClientes: (req, res) => res.status(501).json({ success: false, message: 'Exportación no disponible' }),
-    obtenerEstadisticas: (req, res) => res.status(501).json({ success: false, message: 'Estadísticas no disponibles' }),
-    buscar: (req, res) => res.status(501).json({ success: false, message: 'Búsqueda no disponible' }),
-    obtenerPorIdentificacion: (req, res) => res.status(501).json({ success: false, message: 'Método no disponible' }),
-    obtenerPorId: (req, res) => res.status(501).json({ success: false, message: 'Método no disponible' }),
-    crear: (req, res) => res.status(501).json({ success: false, message: 'Creación no disponible' }),
-    actualizar: (req, res) => res.status(501).json({ success: false, message: 'Actualización no disponible' }),
-    eliminar: (req, res) => res.status(501).json({ success: false, message: 'Eliminación no disponible' })
-  };
+ 
 }
 
 // Importar middleware de autenticación con manejo de errores
