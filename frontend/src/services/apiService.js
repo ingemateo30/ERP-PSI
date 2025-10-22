@@ -89,16 +89,15 @@ class ApiService {
 
         // Para respuestas JSON normales
         if (!response.ok) {
-            let errorMessage;
-            try {
-                const errorData = await response.json();
-                errorMessage = errorData.message || `Error ${response.status}: ${response.statusText}`;
-            } catch (parseError) {
-                const errorText = await response.text();
-                errorMessage = errorText || `Error ${response.status}: ${response.statusText}`;
-            }
-            throw new Error(errorMessage);
-        }
+    let errorMessage;
+    try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || `Error ${response.status}: ${response.statusText}`;
+    } catch (parseError) {
+        errorMessage = `Error ${response.status}: ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
+}
 
         // Intentar parsear como JSON
         try {
