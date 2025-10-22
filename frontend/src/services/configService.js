@@ -2,9 +2,7 @@
 
   import authService from './authService';
 
-  const API_BASE_URL = process.env.NODE_ENV === 'development'
-    ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1')
-    : process.env.REACT_APP_API_URL;
+  const API_BASE_URL = 'http://45.173.69.5:3000/api/v1';
 
 
   class ConfigService {
