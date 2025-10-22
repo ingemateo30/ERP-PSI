@@ -87,17 +87,6 @@ class ApiService {
     return blob;
 }
 
-        // Para respuestas JSON normales
-        if (!response.ok) {
-    let errorMessage;
-    try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || `Error ${response.status}: ${response.statusText}`;
-    } catch (parseError) {
-        errorMessage = `Error ${response.status}: ${response.statusText}`;
-    }
-    throw new Error(errorMessage);
-}
 
        // Para respuestas JSON normales
 if (!response.ok) {
