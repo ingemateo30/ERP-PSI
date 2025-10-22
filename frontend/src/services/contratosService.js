@@ -67,7 +67,7 @@ class ContratosService {
                     // CORRECCIÓN: Usar fetch directo para manejar mejor las respuestas blob
                     const token = authService.getToken();
                     const apiUrl = process.env.NODE_ENV === 'development'
-                    ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3001')
+                    ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1')
                     : process.env.REACT_APP_API_URL;
 
                     const pdfUrl = `${apiUrl}/contratos/${id}/pdf`;
@@ -112,7 +112,7 @@ class ContratosService {
                     // CORRECCIÓN: Usar URL directa como fallback
                     const token = localStorage.getItem('token');
                     const apiUrl = process.env.NODE_ENV === 'development'
-                    ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3001')
+                    ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1')
                     : process.env.REACT_APP_API_URL;
 
                     const urlPDF = `${apiUrl}/contratos/${id}/pdf`;
@@ -151,7 +151,7 @@ class ContratosService {
 
             // Construir URL base de la API
             const apiUrl = process.env.NODE_ENV === 'development'
-                ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3001')
+                ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1')
                 : process.env.REACT_APP_API_URL;
 
 
@@ -440,7 +440,7 @@ class ContratosService {
                 contentType: 'application/pdf',
                 size: 0, // HEAD no retorna size en apiService
                 url: `${(process.env.NODE_ENV === 'development'
-                 ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3001')
+                 ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1')
                 : process.env.REACT_APP_API_URL)}/contratos/${id}/pdf`
 
             };
