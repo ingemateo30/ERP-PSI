@@ -7,7 +7,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/a
 
 class ReportesService {
   constructor() {
-    this.baseURL = `${API_BASE_URL}/api/v1/reportes-regulatorios`;
+    this.baseURL = `${API_BASE_URL}/reportes-regulatorios`;
   }
 
   // Realizar petición HTTP básica (copiado de configService.js que funciona)
