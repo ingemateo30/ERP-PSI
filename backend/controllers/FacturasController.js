@@ -814,12 +814,14 @@ static async obtenerTodas(req, res) {
   }
 
   static async verPDF(req, res) {
-    res.status(501).json({ success: false, message: 'Visualización de PDF en desarrollo' });
-  }
+  // Redirigir a generarPDF
+  return this.generarPDF(req, res);
+}
 
   static async duplicar(req, res) {
-    res.status(501).json({ success: false, message: 'Duplicación de facturas en desarrollo' });
-  }
+  // Redirigir a duplicarFactura si existe
+  return this.duplicarFactura(req, res);
+}
 }
 
 console.log('✅ FacturasController configurado correctamente con Database.query');
