@@ -65,47 +65,50 @@ class ApiService {
                               options.responseType === 'blob';
 
         if (isBinaryResponse) {
-    console.log('📄 ApiService - Respuesta binaria detectada:', contentType);
-    
-    // Leer el blob primero (solo se puede leer una vez)
-    const blob = await response.blob();
-    
-    // Luego verificar si hay error
-    if (!response.ok) {
-        console.error('❌ ApiService - Error en respuesta binaria, status:', response.status);
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-    
-    console.log('✅ ApiService - Blob recibido, tamaño:', blob.size, 'tipo:', blob.type);
-    
-    // VALIDACIÓN: Verificar que el blob no esté vacío
-    if (blob.size < 100) { // Un PDF válido debe tener al menos 100 bytes
-        console.error('❌ ApiService - Blob demasiado pequeño:', blob.size);
-        throw new Error('El archivo descargado está vacío o es inválido');
-    }
-    
-    return blob;
-}
+            console.log('📄 ApiService - Respuesta binaria detectada:', contentType);
+            
+            if (!response.ok) {
+                // Para respuestas binarias con error, intentar leer como texto
+                const errorText = await response.text();
+                console.error('❌ ApiService - Error en respuesta binaria:', errorText);
+                throw new Error(errorText || `Error ${response.status}: ${response.statusText}`);
+            }
+            
+            // CORRECCIÓN: Retornar blob para respuestas binarias
+            const blob = await response.blob();
+            console.log('✅ ApiService - Blob recibido, tamaño:', blob.size, 'tipo:', blob.type);
+            
+            // VALIDACIÓN: Verificar que el blob no esté vacío
+            if (blob.size < 100) { // Un PDF válido debe tener al menos 100 bytes
+                console.error('❌ ApiService - Blob demasiado pequeño:', blob.size);
+                throw new Error('El archivo descargado está vacío o es inválido');
+            }
+            
+            return blob;
+        }
 
+        // Para respuestas JSON normales
+        if (!response.ok) {
+            let errorMessage;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.message || `Error ${response.status}: ${response.statusText}`;
+            } catch (parseError) {
+                const errorText = await response.text();
+                errorMessage = errorText || `Error ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
+        }
 
-       // Para respuestas JSON normales
-if (!response.ok) {
-    // Leer el response UNA SOLA VEZ
-    const text = await response.text();
-    let errorMessage;
-    try {
-        const errorData = JSON.parse(text);
-        errorMessage = errorData.message || errorData.error || `Error ${response.status}: ${response.statusText}`;
-    } catch (parseError) {
-        errorMessage = text || `Error ${response.status}: ${response.statusText}`;
-    }
-    throw new Error(errorMessage);
-}
-
-// Si todo está bien, parsear respuesta exitosa
-const data = await response.json();
-console.log('✅ ApiService - Respuesta JSON exitosa');
-return data;
+        // Intentar parsear como JSON
+        try {
+            const data = await response.json();
+            console.log('✅ ApiService - Respuesta JSON exitosa');
+            return data;
+        } catch (parseError) {
+            console.warn('⚠️ ApiService - No se pudo parsear JSON, retornando texto');
+            return await response.text();
+        }
 
     } catch (error) {
         console.error('❌ ApiService - Error en petición:', error);
