@@ -141,7 +141,7 @@ class ClienteController {
 
       if (format === 'csv') {
         // Exportar como CSV
-        const csv = this.convertirACSV(datosExportacion);
+        const csv = ClienteController.convertirACSV(datosExportacion);
         const fechaActual = new Date().toISOString().split('T')[0];
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
