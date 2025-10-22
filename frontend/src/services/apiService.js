@@ -99,15 +99,24 @@ class ApiService {
     throw new Error(errorMessage);
 }
 
-        // Intentar parsear como JSON
-        try {
-            const data = await response.json();
-            console.log('✅ ApiService - Respuesta JSON exitosa');
-            return data;
-        } catch (parseError) {
-            console.warn('⚠️ ApiService - No se pudo parsear JSON, retornando texto');
-            return await response.text();
-        }
+       // Para respuestas JSON normales
+if (!response.ok) {
+    // Leer el response UNA SOLA VEZ
+    const text = await response.text();
+    let errorMessage;
+    try {
+        const errorData = JSON.parse(text);
+        errorMessage = errorData.message || errorData.error || `Error ${response.status}: ${response.statusText}`;
+    } catch (parseError) {
+        errorMessage = text || `Error ${response.status}: ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
+}
+
+// Si todo está bien, parsear respuesta exitosa
+const data = await response.json();
+console.log('✅ ApiService - Respuesta JSON exitosa');
+return data;
 
     } catch (error) {
         console.error('❌ ApiService - Error en petición:', error);
