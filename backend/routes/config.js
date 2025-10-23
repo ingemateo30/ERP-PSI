@@ -1397,45 +1397,50 @@ router.get('/banks', requireRole('administrador', 'supervisor'), async (req, res
 // ==========================================
 
 // ✅ PLANES DE SERVICIO MEJORADOS 
-router.get('/service-plans', requireRole('administrador', 'supervisor'), async (req, res) => {
+// PUT /api/v1/config/banks/:id - Actualizar banco
+router.put('/banks/:id', requireRole('administrador'), async (req, res) => {
   try {
-    console.log('🔄 Backend: GET /config/service-plans');
-    console.log('📊 Backend: Query params:', req.query);
-
-    const { activo, orden } = req.query;
+    const { id } = req.params;
+    const { nombre, codigo, activo } = req.body;
     
-    let query = 'SELECT * FROM planes_servicio WHERE 1 = 1';
-    const params = [];
+    await Database.query(
+      'UPDATE bancos SET nombre = ?, codigo = ?, activo = ? WHERE id = ?',
+      [nombre, codigo, activo, id]
+    );
     
-    // Filtro por activo
-    if (activo !== undefined) {
-      query += ' AND activo = ?';
-      params.push(activo === 'true' || activo === '1' ? 1 : 0);
-    }
-    
-    // Ordenamiento
-    if (orden === 'orden_visualizacion') {
-      query += ' ORDER BY orden_visualizacion ASC, nombre ASC';
-    } else {
-      query += ' ORDER BY codigo ASC';
-    }
-
-    const planes = await Database.query(query, params);
-
-    console.log('📊 Backend: Planes encontrados:', planes.length);
-
     res.json({
       success: true,
-      data: planes,
-      total: planes.length,
-      message: 'Planes obtenidos exitosamente'
+      message: 'Banco actualizado exitosamente'
     });
-
   } catch (error) {
-    console.error('❌ Backend: Error en /service-plans:', error);
+    console.error('❌ Error actualizando banco:', error);
     res.status(500).json({
       success: false,
-      message: 'Error obteniendo planes de servicio',
+      message: 'Error actualizando banco',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/v1/config/banks/:id/toggle - Cambiar estado
+router.post('/banks/:id/toggle', requireRole('administrador'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await Database.query(
+      'UPDATE bancos SET activo = NOT activo WHERE id = ?',
+      [id]
+    );
+    
+    res.json({
+      success: true,
+      message: 'Estado del banco actualizado'
+    });
+  } catch (error) {
+    console.error('❌ Error cambiando estado:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error cambiando estado',
       error: error.message
     });
   }
