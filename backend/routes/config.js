@@ -1396,49 +1396,126 @@ router.get('/banks', requireRole('administrador', 'supervisor'), async (req, res
 
 // ==========================================
 
-// ==========================================
-// ✅ PLANES DE SERVICIO
-// ==========================================
-
-router.get('/service-plans', requireRole('administrador', 'supervisor'), async (req, res) => {
+// ✅ PLANES DE SERVICIO MEJORADOS 
+// PUT /api/v1/config/banks/:id - Actualizar banco
+// PUT /api/v1/config/banks/:id - Actualizar banco
+router.put('/banks/:id', requireRole('administrador'), async (req, res) => {
   try {
-    console.log('🔄 Backend: GET /config/service-plans');
-    console.log('📊 Backend: Query params:', req.query);
-
-    const { activo, orden } = req.query;
+    console.log('🏦 PUT /config/banks/:id');
+    console.log('📊 Body recibido:', req.body);
     
-    let query = 'SELECT * FROM planes_servicio WHERE 1 = 1';
-    const params = [];
+    const { id } = req.params;
+    const { nombre, codigo, activo } = req.body;
     
-    // Filtro por activo
-    if (activo !== undefined) {
-      query += ' AND activo = ?';
-      params.push(activo === 'true' || activo === '1' ? 1 : 0);
+    // Validar campos obligatorios
+    if (!nombre || codigo === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faltan campos requeridos (nombre, codigo)'
+      });
     }
     
-    // Ordenamiento
-    if (orden === 'orden_visualizacion') {
-      query += ' ORDER BY orden_visualizacion ASC, nombre ASC';
+    // Si activo no viene, obtener el valor actual
+    let activoValue;
+    if (activo === undefined) {
+      const [bancoActual] = await Database.query(
+        'SELECT activo FROM bancos WHERE id = ?',
+        [id]
+      );
+      activoValue = bancoActual ? bancoActual.activo : 1;
     } else {
-      query += ' ORDER BY codigo ASC';
+      activoValue = activo ? 1 : 0;
     }
-
-    const planes = await Database.query(query, params);
-
-    console.log('📊 Backend: Planes encontrados:', planes.length);
-
+    
+    console.log('Actualizando con valores:', { nombre, codigo, activoValue, id });
+    
+    await Database.query(
+      'UPDATE bancos SET nombre = ?, codigo = ?, activo = ? WHERE id = ?',
+      [nombre, codigo || '', activoValue, id]
+    );
+    
     res.json({
       success: true,
-      data: planes,
-      total: planes.length,
-      message: 'Planes obtenidos exitosamente'
+      message: 'Banco actualizado exitosamente'
     });
-
   } catch (error) {
-    console.error('❌ Backend: Error en /service-plans:', error);
+    console.error('❌ Error actualizando banco:', error);
     res.status(500).json({
       success: false,
-      message: 'Error obteniendo planes de servicio',
+      message: 'Error actualizando banco',
+      error: error.message
+    });
+  }
+});
+// POST /api/v1/config/banks - Crear banco
+router.post('/banks', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🏦 POST /config/banks');
+    console.log('📊 Body recibido:', req.body);
+    
+    const { nombre, codigo, activo = true } = req.body;
+    
+    if (!nombre || !codigo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faltan campos requeridos (nombre, codigo)'
+      });
+    }
+    
+    const result = await Database.query(
+      'INSERT INTO bancos (nombre, codigo, activo) VALUES (?, ?, ?)',
+      [nombre, codigo, activo ? 1 : 0]
+    );
+    
+    const [newBank] = await Database.query(
+      'SELECT * FROM bancos WHERE id = ?',
+      [result.insertId]
+    );
+    
+    res.json({
+      success: true,
+      message: 'Banco creado exitosamente',
+      data: newBank
+    });
+  } catch (error) {
+    console.error('❌ Error creando banco:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creando banco',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/v1/config/banks/:id/toggle - Cambiar estado
+router.post('/banks/:id/toggle', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🔄 POST /config/banks/:id/toggle');
+    
+    const { id } = req.params;
+    
+    await Database.query(
+      'UPDATE bancos SET activo = NOT activo WHERE id = ?',
+      [id]
+    );
+    
+    const [banco] = await Database.query(
+      'SELECT * FROM bancos WHERE id = ?',
+      [id]
+    );
+    
+    console.log('✅ Banco actualizado:', banco);
+    
+    res.json({
+      success: true,
+      message: 'Estado del banco actualizado',
+      data: banco
+    });
+  } catch (error) {
+    console.error('❌ Error cambiando estado:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error cambiando estado',
       error: error.message
     });
   }
@@ -1873,45 +1950,7 @@ router.delete('/service-plans/:id', requireRole('administrador'), async (req, re
     });
   }
 });
-// POST /api/v1/config/banks - Crear banco
-router.post('/banks', requireRole('administrador'), async (req, res) => {
-  try {
-    console.log('🏦 POST /config/banks');
-    console.log('📊 Body recibido:', req.body);
-    
-    const { nombre, codigo, activo = true } = req.body;
-    
-    if (!nombre || !codigo) {
-      return res.status(400).json({
-        success: false,
-        message: 'Faltan campos requeridos (nombre, codigo)'
-      });
-    }
-    
-    const result = await Database.query(
-      'INSERT INTO bancos (nombre, codigo, activo) VALUES (?, ?, ?)',
-      [nombre, codigo, activo ? 1 : 0]
-    );
-    
-    const [newBank] = await Database.query(
-      'SELECT * FROM bancos WHERE id = ?',
-      [result.insertId]
-    );
-    
-    res.json({
-      success: true,
-      message: 'Banco creado exitosamente',
-      data: newBank
-    });
-  } catch (error) {
-    console.error('❌ Error creando banco:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error creando banco',
-      error: error.message
-    });
-  }
-});
+
 router.patch('/service-plans/:id/toggle-status', requireRole('administrador'), async (req, res) => {
   try {
     const { id } = req.params;
