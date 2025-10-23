@@ -1397,21 +1397,32 @@ router.get('/banks', requireRole('administrador', 'supervisor'), async (req, res
 // ==========================================
 
 // ✅ PLANES DE SERVICIO MEJORADOS 
-router.get('/service-plans', async (req, res) => {
+router.get('/service-plans', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('🔄 Backend: GET /config/service-plans');
     console.log('📊 Backend: Query params:', req.query);
 
-    const { Database } = require('../models/Database');
+    const { activo, orden } = req.query;
+    
+    let query = 'SELECT * FROM planes_servicio WHERE 1 = 1';
+    const params = [];
+    
+    // Filtro por activo
+    if (activo !== undefined) {
+      query += ' AND activo = ?';
+      params.push(activo === 'true' || activo === '1' ? 1 : 0);
+    }
+    
+    // Ordenamiento
+    if (orden === 'orden_visualizacion') {
+      query += ' ORDER BY orden_visualizacion ASC, nombre ASC';
+    } else {
+      query += ' ORDER BY codigo ASC';
+    }
 
-    const planes = await Database.query(`
-      SELECT * FROM planes_servicio 
-      WHERE 1 = 1 
-      ORDER BY codigo
-    `);
+    const planes = await Database.query(query, params);
 
     console.log('📊 Backend: Planes encontrados:', planes.length);
-    console.log('📊 Backend: Primer plan:', planes[0]);
 
     res.json({
       success: true,
@@ -1429,7 +1440,6 @@ router.get('/service-plans', async (req, res) => {
     });
   }
 });
-
 
 router.get('/service-plans/stats', requireRole('supervisor', 'administrador'), async (req, res) => {
   try {
