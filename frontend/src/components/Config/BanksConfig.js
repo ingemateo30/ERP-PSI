@@ -130,7 +130,7 @@ const BanksConfig = () => {
       }
       
       setShowModal(false);
-      setFormData({ codigo: '', nombre: '' });
+      setFormData({ codigo: bank.codigo, nombre: bank.nombre, activo: bank.activo });
       setEditingBank(null);
       
     } catch (err) {
