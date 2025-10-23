@@ -1403,9 +1403,17 @@ router.put('/banks/:id', requireRole('administrador'), async (req, res) => {
     const { id } = req.params;
     const { nombre, codigo, activo } = req.body;
     
+    // Validar que no haya undefined
+    if (!nombre || codigo === undefined || activo === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faltan campos requeridos (nombre, codigo, activo)'
+      });
+    }
+    
     await Database.query(
       'UPDATE bancos SET nombre = ?, codigo = ?, activo = ? WHERE id = ?',
-      [nombre, codigo, activo, id]
+      [nombre, codigo || '', activo ? 1 : 0, id]
     );
     
     res.json({
@@ -1432,9 +1440,15 @@ router.post('/banks/:id/toggle', requireRole('administrador'), async (req, res) 
       [id]
     );
     
+    const [banco] = await Database.query(
+      'SELECT * FROM bancos WHERE id = ?',
+      [id]
+    );
+    
     res.json({
       success: true,
-      message: 'Estado del banco actualizado'
+      message: 'Estado del banco actualizado',
+      data: banco
     });
   } catch (error) {
     console.error('❌ Error cambiando estado:', error);
@@ -1445,7 +1459,6 @@ router.post('/banks/:id/toggle', requireRole('administrador'), async (req, res) 
     });
   }
 });
-
 router.get('/service-plans/stats', requireRole('supervisor', 'administrador'), async (req, res) => {
   try {
     const stats = await Database.query(`
