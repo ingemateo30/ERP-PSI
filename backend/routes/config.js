@@ -1943,11 +1943,19 @@ router.put('/company', requireRole('administrador'), async (req, res) => {
       const updateValues = [];
 
       Object.keys(configData).forEach(key => {
-        if (configData[key] !== undefined && key !== 'id') {
-          updateFields.push(`${key} = ?`);
-          updateValues.push(configData[key]);
-        }
-      });
+  if (configData[key] !== undefined && key !== 'id' && key !== 'updated_at') {
+    updateFields.push(`${key} = ?`);
+    // Convertir fechas ISO a formato MySQL
+    if (key === 'fecha_actualizacion' && configData[key]) {
+      const date = new Date(configData[key]);
+      updateValues.push(date.toISOString().slice(0, 19).replace('T', ' '));
+    } else {
+      updateValues.push(configData[key]);
+    }
+  }
+});
+// Agregar updated_at al final
+updateFields.push('updated_at = NOW()');
 
       if (updateFields.length === 0) {
         return res.status(400).json({
@@ -1957,8 +1965,7 @@ router.put('/company', requireRole('administrador'), async (req, res) => {
       }
 
       updateValues.push(existingConfig.id);
-      const query = `UPDATE configuracion_empresa SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`;
-
+      const query = `UPDATE configuracion_empresa SET ${updateFields.join(', ')} WHERE id = ?`;
       await Database.query(query, updateValues);
     } else {
       // Crear nueva configuración
