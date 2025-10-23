@@ -1398,22 +1398,40 @@ router.get('/banks', requireRole('administrador', 'supervisor'), async (req, res
 
 // ✅ PLANES DE SERVICIO MEJORADOS 
 // PUT /api/v1/config/banks/:id - Actualizar banco
+// PUT /api/v1/config/banks/:id - Actualizar banco
 router.put('/banks/:id', requireRole('administrador'), async (req, res) => {
   try {
+    console.log('🏦 PUT /config/banks/:id');
+    console.log('📊 Body recibido:', req.body);
+    
     const { id } = req.params;
     const { nombre, codigo, activo } = req.body;
     
-    // Validar que no haya undefined
-    if (!nombre || codigo === undefined || activo === undefined) {
+    // Validar campos obligatorios
+    if (!nombre || codigo === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'Faltan campos requeridos (nombre, codigo, activo)'
+        message: 'Faltan campos requeridos (nombre, codigo)'
       });
     }
     
+    // Si activo no viene, obtener el valor actual
+    let activoValue;
+    if (activo === undefined) {
+      const [bancoActual] = await Database.query(
+        'SELECT activo FROM bancos WHERE id = ?',
+        [id]
+      );
+      activoValue = bancoActual ? bancoActual.activo : 1;
+    } else {
+      activoValue = activo ? 1 : 0;
+    }
+    
+    console.log('Actualizando con valores:', { nombre, codigo, activoValue, id });
+    
     await Database.query(
       'UPDATE bancos SET nombre = ?, codigo = ?, activo = ? WHERE id = ?',
-      [nombre, codigo || '', activo ? 1 : 0, id]
+      [nombre, codigo || '', activoValue, id]
     );
     
     res.json({
@@ -1433,6 +1451,8 @@ router.put('/banks/:id', requireRole('administrador'), async (req, res) => {
 // POST /api/v1/config/banks/:id/toggle - Cambiar estado
 router.post('/banks/:id/toggle', requireRole('administrador'), async (req, res) => {
   try {
+    console.log('🔄 POST /config/banks/:id/toggle');
+    
     const { id } = req.params;
     
     await Database.query(
@@ -1444,6 +1464,8 @@ router.post('/banks/:id/toggle', requireRole('administrador'), async (req, res) 
       'SELECT * FROM bancos WHERE id = ?',
       [id]
     );
+    
+    console.log('✅ Banco actualizado:', banco);
     
     res.json({
       success: true,
