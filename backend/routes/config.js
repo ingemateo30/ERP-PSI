@@ -1486,6 +1486,41 @@ router.post('/banks', requireRole('administrador'), async (req, res) => {
     });
   }
 });
+// DELETE /api/v1/config/banks/:id - Eliminar banco
+router.delete('/banks/:id', requireRole('administrador'), async (req, res) => {
+  try {
+    console.log('🗑️ DELETE /config/banks/:id');
+    
+    const { id } = req.params;
+    
+    // Verificar si el banco tiene pagos asociados
+    const [pagos] = await Database.query(
+      'SELECT COUNT(*) as total FROM pagos WHERE banco_id = ?',
+      [id]
+    );
+    
+    if (pagos && pagos.total > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `No se puede eliminar. El banco tiene ${pagos.total} pago(s) asociado(s)`
+      });
+    }
+    
+    await Database.query('DELETE FROM bancos WHERE id = ?', [id]);
+    
+    res.json({
+      success: true,
+      message: 'Banco eliminado exitosamente'
+    });
+  } catch (error) {
+    console.error('❌ Error eliminando banco:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error eliminando banco',
+      error: error.message
+    });
+  }
+});
 
 // POST /api/v1/config/banks/:id/toggle - Cambiar estado
 router.post('/banks/:id/toggle', requireRole('administrador'), async (req, res) => {
