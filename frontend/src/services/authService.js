@@ -4,7 +4,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/a
 
 class AuthService {
     constructor() {
-        this.baseURL = `${API_BASE_URL}/api/v1/auth`;
+        this.baseURL = `${API_BASE_URL}/auth`;
     }
 
     // Obtener token del localStorage
