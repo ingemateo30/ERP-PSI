@@ -133,7 +133,7 @@ router.get('/historial-cliente', async (req, res) => {
       FROM facturas f
       INNER JOIN clientes c ON f.cliente_id = c.id
       ${whereClause}
-      ORDER BY f.fecha_emision DESC, f.id DESC:
+      ORDER BY f.fecha_emision DESC, f.id DESC
       LIMIT ${parseInt(limit)} OFFSET ${offset}
       `, params);
 
