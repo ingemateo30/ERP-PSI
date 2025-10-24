@@ -6,7 +6,17 @@ const { Database } = require('../models/Database');
 const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    // Validar formato correcto del header
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Formato de autorización inválido. Se esperaba "Bearer <token>".',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({
@@ -17,8 +27,33 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Verificar el token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          success: false,
+          message: 'Token expirado',
+          timestamp: new Date().toISOString()
+        });
+      }
+      return res.status(401).json({
+        success: false,
+        message: 'Token inválido',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Verificar que el token tenga un userId válido
+    if (!decoded || !decoded.userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token sin información de usuario',
+        timestamp: new Date().toISOString()
+      });
+    }
+
     // Verificar que el usuario aún existe y está activo
     const [user] = await Database.query(
       'SELECT id, email, nombre, rol, activo FROM sistema_usuarios WHERE id = ? AND activo = 1',
@@ -44,26 +79,9 @@ const authenticateToken = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Error en autenticación:', error);
-    
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token inválido',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token expirado',
-        timestamp: new Date().toISOString()
-      });
-    }
-
     return res.status(500).json({
       success: false,
-      message: 'Error de autenticación',
+      message: 'Error interno de autenticación',
       timestamp: new Date().toISOString()
     });
   }
@@ -102,7 +120,6 @@ const optionalAuth = async (req, res, next) => {
 
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
       const [user] = await Database.query(
         'SELECT id, email, nombre, rol, activo FROM sistema_usuarios WHERE id = ? AND activo = 1',
         [decoded.userId]
@@ -118,10 +135,9 @@ const optionalAuth = async (req, res, next) => {
       }
     }
   } catch (error) {
-    // En autenticación opcional, no fallar si hay error
     console.log('Token opcional inválido o expirado');
   }
-  
+
   next();
 };
 
