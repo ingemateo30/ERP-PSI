@@ -715,29 +715,47 @@ static async obtenerTodas(req, res) {
       res.status(500).json({ success: false, message: 'Error validando número de factura', error: error.message });
     }
   }
-
   static async generarNumeroFactura(req, res) {
     try {
+      // Obtener la última factura registrada (sin importar si está activa o no)
       const ultimaFactura = await Database.query(`
-        SELECT numero_factura FROM facturas WHERE activo = 1 ORDER BY id DESC LIMIT 1
+        SELECT numero_factura 
+        FROM facturas 
+        ORDER BY id DESC 
+        LIMIT 1
       `);
-      
+
+      // Si no hay facturas, empezamos desde 1
       let proximoNumero = 1;
-      if (ultimaFactura.length > 0) {
+
+      // Si existe al menos una factura previa, extraemos su número final
+      if (ultimaFactura.length > 0 && ultimaFactura[0].numero_factura) {
         const match = ultimaFactura[0].numero_factura.match(/(\d+)$/);
-        if (match) proximoNumero = parseInt(match[1]) + 1;
+        if (match) {
+          proximoNumero = parseInt(match[1], 10) + 1;
+        }
       }
-      
+
+      // Generar nuevo número con formato FAC000001
       const nuevoNumero = `FAC${proximoNumero.toString().padStart(6, '0')}`;
+
+      // Responder con el nuevo número generado
       res.json({
         success: true,
         data: { numero_factura: nuevoNumero, consecutivo: proximoNumero },
-        message: 'Número de factura generado'
+        message: 'Número de factura generado correctamente'
       });
+
     } catch (error) {
-      res.status(500).json({ success: false, message: 'Error generando número de factura', error: error.message });
+      console.error('❌ Error generando número de factura:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error generando número de factura',
+        error: error.message
+      });
     }
   }
+
 
   // Métodos no implementados que devuelven 501
   static async probarPDF(req, res) {
