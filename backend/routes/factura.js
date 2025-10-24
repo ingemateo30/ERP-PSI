@@ -8,12 +8,28 @@ const { validarCrearFactura, validarActualizarFactura, validarPagarFactura } = r
 const { body, validationResult } = require('express-validator');
 
 
-// Middleware de autenticación para todas las rutas
-router.use(authenticateToken);
+import express from 'express';
+import { authenticateToken, requireRole } from '../middleware/auth.js';
+import FacturasController from '../controllers/FacturasController.js';
+
 
 // ==========================================
-// RUTAS PÚBLICAS (LECTURA)
+// RUTAS PÚBLICAS (SIN TOKEN)
 // ==========================================
+
+/**
+ * @route GET /api/v1/facturas/test-pdf
+ * @desc Probar generación de PDF
+ * @access Público (solo para pruebas locales)
+ */
+router.get('/test-pdf', FacturasController.probarPDF);
+
+// ==========================================
+// RUTAS PROTEGIDAS (CON TOKEN)
+// ==========================================
+
+// Aplica autenticación a todas las rutas desde aquí en adelante
+router.use(authenticateToken);
 
 /**
  * @route GET /api/v1/facturas
@@ -44,18 +60,12 @@ router.get('/stats', FacturasController.obtenerEstadisticas);
 router.get('/vencidas', FacturasController.obtenerVencidas);
 
 /**
- * @route GET /api/v1/facturas/test-pdf
- * @desc Probar generación de PDF
- * @access Autenticado
- */
-router.get('/test-pdf', FacturasController.probarPDF);
-
-/**
  * @route GET /api/v1/facturas/generar-numero
  * @desc Generar siguiente número de factura
  * @access Administrador, Supervisor
  */
-router.get('/generar-numero', 
+router.get(
+  '/generar-numero',
   requireRole('administrador', 'supervisor'),
   FacturasController.generarNumeroFactura
 );
@@ -79,6 +89,10 @@ router.get('/numero/:numero', FacturasController.obtenerPorNumero);
  * @desc Obtener historial completo de facturación de un cliente
  * @access Autenticado
  */
+router.get('/historial-cliente', FacturasController.obtenerHistorialCliente);
+
+export default router;
+
 router.get('/historial-cliente', async (req, res) => {
   try {
     const { 
