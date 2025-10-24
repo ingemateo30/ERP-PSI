@@ -1521,7 +1521,47 @@ router.delete('/banks/:id', requireRole('administrador'), async (req, res) => {
     });
   }
 });
+// ==========================================
+// ✅ PLANES DE SERVICIO
+// ==========================================
 
+// GET /api/v1/config/service-plans - Listar planes
+router.get('/service-plans', requireRole('administrador', 'supervisor'), async (req, res) => {
+  try {
+    console.log('🔄 Backend: GET /config/service-plans');
+    const { activo, orden } = req.query;
+    
+    let query = 'SELECT * FROM planes_servicio WHERE 1 = 1';
+    const params = [];
+    
+    if (activo !== undefined) {
+      query += ' AND activo = ?';
+      params.push(activo === 'true' || activo === '1' ? 1 : 0);
+    }
+    
+    if (orden === 'orden_visualizacion') {
+      query += ' ORDER BY orden_visualizacion ASC, nombre ASC';
+    } else {
+      query += ' ORDER BY codigo ASC';
+    }
+
+    const planes = await Database.query(query, params);
+
+    res.json({
+      success: true,
+      data: planes,
+      total: planes.length,
+      message: 'Planes obtenidos exitosamente'
+    });
+  } catch (error) {
+    console.error('❌ Backend: Error en /service-plans:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error obteniendo planes de servicio',
+      error: error.message
+    });
+  }
+});
 // POST /api/v1/config/banks/:id/toggle - Cambiar estado
 router.post('/banks/:id/toggle', requireRole('administrador'), async (req, res) => {
   try {
