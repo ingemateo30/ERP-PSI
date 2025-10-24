@@ -9,46 +9,44 @@ const { body, validationResult } = require('express-validator');
 
 
 // Middleware de autenticación para todas las rutas
-
+router.use(authenticateToken);
 
 // ==========================================
 // RUTAS PÚBLICAS (LECTURA)
 // ==========================================
-
-import { authenticateToken, requireRole } from '../middleware/auth.js'; // asegúrate de tener esto arriba
 
 /**
  * @route GET /api/v1/facturas
  * @desc Obtener todas las facturas con filtros y paginación MEJORADOS
  * @access Autenticado
  */
-router.get('/', authenticateToken, FacturasController.obtenerTodas);
+router.get('/', FacturasController.obtenerTodas);
 
 /**
  * @route GET /api/v1/facturas/search
  * @desc Buscar facturas con diferentes criterios
  * @access Autenticado
  */
-router.get('/search', authenticateToken, FacturasController.buscar);
+router.get('/search', FacturasController.buscar);
 
 /**
  * @route GET /api/v1/facturas/stats
  * @desc Obtener estadísticas de facturas
  * @access Autenticado
  */
-router.get('/stats', authenticateToken, FacturasController.obtenerEstadisticas);
+router.get('/stats', FacturasController.obtenerEstadisticas);
 
 /**
  * @route GET /api/v1/facturas/vencidas
  * @desc Obtener facturas vencidas
  * @access Autenticado
  */
-router.get('/vencidas', authenticateToken, FacturasController.obtenerVencidas);
+router.get('/vencidas', FacturasController.obtenerVencidas);
 
 /**
  * @route GET /api/v1/facturas/test-pdf
  * @desc Probar generación de PDF
- * @access Público (solo pruebas)
+ * @access Autenticado
  */
 router.get('/test-pdf', FacturasController.probarPDF);
 
@@ -57,9 +55,7 @@ router.get('/test-pdf', FacturasController.probarPDF);
  * @desc Generar siguiente número de factura
  * @access Administrador, Supervisor
  */
-router.get(
-  '/generar-numero',
-  authenticateToken,
+router.get('/generar-numero', 
   requireRole('administrador', 'supervisor'),
   FacturasController.generarNumeroFactura
 );
@@ -69,15 +65,14 @@ router.get(
  * @desc Validar si existe factura con número específico
  * @access Autenticado
  */
-router.get('/validate/:numero', authenticateToken, FacturasController.validarNumeroFactura);
+router.get('/validate/:numero', FacturasController.validarNumeroFactura);
 
 /**
  * @route GET /api/v1/facturas/numero/:numero
  * @desc Obtener factura por número
  * @access Autenticado
  */
-router.get('/numero/:numero', authenticateToken, FacturasController.obtenerPorNumero);
-
+router.get('/numero/:numero', FacturasController.obtenerPorNumero);
 
 /**
  * @route GET /api/v1/facturas/historial-cliente
