@@ -8,8 +8,14 @@ const { validarCrearFactura, validarActualizarFactura, validarPagarFactura } = r
 const { body, validationResult } = require('express-validator');
 
 
-// Middleware de autenticación para todas las rutas
-router.use(authenticateToken);
+// Middleware de autenticación para todas las rutas EXCEPTO la lista general de facturas
+router.use((req, res, next) => {
+  // Permitir acceso público solo a la ruta GET / (lista de facturas)
+  if (req.method === 'GET' && req.path === '/') {
+    return next(); // no requiere token
+  }
+  authenticateToken(req, res, next);
+});
 
 // ==========================================
 // RUTAS PÚBLICAS (LECTURA)
