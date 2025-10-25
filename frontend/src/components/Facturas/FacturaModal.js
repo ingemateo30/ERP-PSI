@@ -291,42 +291,35 @@ setErrors(prev => {
   // ==========================================
   // VALIDACIONES
   // ==========================================
-  const validarFormulario = useCallback(() => {
-    const nuevosErrores = {};
-
-    // Validaciones básicas
-    if (!formData.numero_factura.trim()) {
-      nuevosErrores.numero_factura = 'Número de factura es requerido';
+const validarFormulario = () => {
+  const nuevosErrores = {};
+  // Validaciones básicas
+  if (!formData.numero_factura.trim()) {
+    nuevosErrores.numero_factura = 'Número de factura es requerido';
+  }
+  if (!formData.cliente_id) {
+    nuevosErrores.cliente_id = 'Debe seleccionar un cliente';
+  }
+  if (!formData.fecha_emision) {
+    nuevosErrores.fecha_emision = 'Fecha de emisión es requerida';
+  }
+  if (!formData.fecha_vencimiento) {
+    nuevosErrores.fecha_vencimiento = 'Fecha de vencimiento es requerida';
+  }
+  // Validar que fecha de vencimiento sea posterior a emisión
+  if (formData.fecha_emision && formData.fecha_vencimiento) {
+    if (new Date(formData.fecha_vencimiento) <= new Date(formData.fecha_emision)) {
+      nuevosErrores.fecha_vencimiento = 'Fecha de vencimiento debe ser posterior a la emisión';
     }
-
-    if (!formData.cliente_id) {
-      nuevosErrores.cliente_id = 'Debe seleccionar un cliente';
-    }
-
-    if (!formData.fecha_emision) {
-      nuevosErrores.fecha_emision = 'Fecha de emisión es requerida';
-    }
-
-    if (!formData.fecha_vencimiento) {
-      nuevosErrores.fecha_vencimiento = 'Fecha de vencimiento es requerida';
-    }
-
-    // Validar que fecha de vencimiento sea posterior a emisión
-    if (formData.fecha_emision && formData.fecha_vencimiento) {
-      if (new Date(formData.fecha_vencimiento) <= new Date(formData.fecha_emision)) {
-        nuevosErrores.fecha_vencimiento = 'Fecha de vencimiento debe ser posterior a la emisión';
-      }
-    }
-
-    // Validar totales
-    const total = parseFloat(formData.total) || 0;
-    if (total <= 0) {
-      nuevosErrores.total = 'El total debe ser mayor a 0';
-    }
-
-    setErrors(nuevosErrores);
-    return Object.keys(nuevosErrores).length === 0;
-  }, []);
+  }
+  // Validar totales
+  const total = parseFloat(formData.total) || 0;
+  if (total <= 0) {
+    nuevosErrores.total = 'El total debe ser mayor a 0';
+  }
+  setErrors(nuevosErrores);
+  return Object.keys(nuevosErrores).length === 0;
+}; // SIN useCallback
 
   // ==========================================
   // GUARDAR FACTURA
