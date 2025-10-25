@@ -762,22 +762,339 @@ static async obtenerTodas(req, res) {
     res.status(501).json({ success: false, message: 'Generación de PDF no disponible' });
   }
 
-  static async crear(req, res) {
-    res.status(501).json({ success: false, message: 'Método de creación de facturas en desarrollo' });
-  }
+static async crear(req, res) {
+  try {
+    const {
+      numero_factura,
+      cliente_id,
+      periodo_facturacion,
+      fecha_emision,
+      fecha_vencimiento,
+      fecha_desde,
+      fecha_hasta,
+      subtotal,
+      impuestos,
+      descuentos,
+      total,
+      observaciones,
+      items = []
+    } = req.body;
 
-  static async actualizar(req, res) {
-    res.status(501).json({ success: false, message: 'Método de actualización de facturas en desarrollo' });
-  }
+    console.log('📝 Creando factura:', { numero_factura, cliente_id, total });
 
-  static async marcarComoPagada(req, res) {
-    res.status(501).json({ success: false, message: 'Método de pago de facturas en desarrollo' });
-  }
+    // Obtener información del cliente
+    const [cliente] = await Database.query(
+      'SELECT * FROM clientes WHERE id = ?',
+      [cliente_id]
+    );
 
-  static async anular(req, res) {
-    res.status(501).json({ success: false, message: 'Método de anulación de facturas en desarrollo' });
-  }
+    if (!cliente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cliente no encontrado'
+      });
+    }
 
+    // Crear la factura
+    const resultado = await Database.query(`
+      INSERT INTO facturas (
+        numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
+        periodo_facturacion, fecha_emision, fecha_vencimiento,
+        fecha_desde, fecha_hasta,
+        subtotal, iva, total, estado, observaciones, activo
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?, 1)
+    `, [
+      numero_factura,
+      cliente_id,
+      cliente.identificacion,
+      cliente.nombre,
+      periodo_facturacion,
+      fecha_emision,
+      fecha_vencimiento,
+      fecha_desde,
+      fecha_hasta,
+      subtotal,
+      impuestos,
+      total,
+      observaciones
+    ]);
+
+    const facturaId = resultado.insertId;
+
+    // Insertar items si existen
+    if (items && items.length > 0) {
+      for (const item of items) {
+        await Database.query(`
+          INSERT INTO detalle_facturas (
+            factura_id, concepto_nombre, cantidad, precio_unitario,
+            descuento, subtotal, iva, total
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          facturaId,
+          item.descripcion || item.concepto_nombre,
+          item.cantidad || 1,
+          item.precio_unitario || 0,
+          item.descuento || 0,
+          item.subtotal || 0,
+          item.iva || 0,
+          item.total || 0
+        ]);
+      }
+    }
+
+    console.log('✅ Factura creada exitosamente:', facturaId);
+
+    res.status(201).json({
+      success: true,
+      message: 'Factura creada exitosamente',
+      data: {
+        id: facturaId,
+        numero_factura
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error creando factura:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creando factura',
+      error: error.message
+    });
+  }
+}
+
+static async actualizar(req, res) {
+  try {
+    const { id } = req.params;
+    const {
+      fecha_emision,
+      fecha_vencimiento,
+      fecha_desde,
+      fecha_hasta,
+      subtotal,
+      impuestos,
+      descuentos,
+      total,
+      observaciones,
+      estado,
+      metodo_pago,
+      referencia_pago
+    } = req.body;
+
+    console.log('✏️ Actualizando factura:', id);
+
+    // Verificar que existe
+    const [facturaExistente] = await Database.query(
+      'SELECT * FROM facturas WHERE id = ? AND activo = 1',
+      [id]
+    );
+
+    if (!facturaExistente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Factura no encontrada'
+      });
+    }
+
+    // Actualizar factura
+    await Database.query(`
+      UPDATE facturas SET
+        fecha_emision = COALESCE(?, fecha_emision),
+        fecha_vencimiento = COALESCE(?, fecha_vencimiento),
+        fecha_desde = ?,
+        fecha_hasta = ?,
+        subtotal = COALESCE(?, subtotal),
+        iva = COALESCE(?, iva),
+        total = COALESCE(?, total),
+        observaciones = ?,
+        estado = COALESCE(?, estado),
+        metodo_pago = ?,
+        referencia_pago = ?,
+        updated_at = NOW()
+      WHERE id = ?
+    `, [
+      fecha_emision,
+      fecha_vencimiento,
+      fecha_desde,
+      fecha_hasta,
+      subtotal,
+      impuestos,
+      total,
+      observaciones,
+      estado,
+      metodo_pago,
+      referencia_pago,
+      id
+    ]);
+
+    console.log('✅ Factura actualizada:', id);
+
+    res.json({
+      success: true,
+      message: 'Factura actualizada exitosamente',
+      data: { id }
+    });
+
+  } catch (error) {
+    console.error('❌ Error actualizando factura:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error actualizando factura',
+      error: error.message
+    });
+  }
+}
+static async marcarComoPagada(req, res) {
+  try {
+    const { id } = req.params;
+    const {
+      metodo_pago,
+      referencia_pago,
+      fecha_pago,
+      monto_pagado,
+      banco_id
+    } = req.body;
+
+    console.log('💰 Marcando factura como pagada:', id);
+
+    // Verificar que existe
+    const [factura] = await Database.query(
+      'SELECT * FROM facturas WHERE id = ? AND activo = 1',
+      [id]
+    );
+
+    if (!factura) {
+      return res.status(404).json({
+        success: false,
+        message: 'Factura no encontrada'
+      });
+    }
+
+    if (factura.estado === 'pagada') {
+      return res.status(400).json({
+        success: false,
+        message: 'La factura ya está pagada'
+      });
+    }
+
+    // Actualizar factura
+    await Database.query(`
+      UPDATE facturas SET
+        estado = 'pagada',
+        fecha_pago = ?,
+        metodo_pago = ?,
+        referencia_pago = ?,
+        banco_id = ?,
+        updated_at = NOW()
+      WHERE id = ?
+    `, [
+      fecha_pago || new Date().toISOString().split('T')[0],
+      metodo_pago || 'efectivo',
+      referencia_pago,
+      banco_id,
+      id
+    ]);
+
+    // Registrar pago si existe tabla pagos
+    try {
+      await Database.query(`
+        INSERT INTO pagos (
+          factura_id, fecha_pago, valor_pagado, metodo_pago,
+          referencia_pago, banco_id, usuario_registro, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+      `, [
+        id,
+        fecha_pago || new Date().toISOString().split('T')[0],
+        monto_pagado || factura.total,
+        metodo_pago || 'efectivo',
+        referencia_pago,
+        banco_id,
+        req.user?.id
+      ]);
+    } catch (error) {
+      console.log('⚠️ No se pudo registrar en tabla pagos:', error.message);
+    }
+
+    console.log('✅ Factura marcada como pagada:', id);
+
+    res.json({
+      success: true,
+      message: 'Factura marcada como pagada exitosamente',
+      data: { id, estado: 'pagada' }
+    });
+
+  } catch (error) {
+    console.error('❌ Error marcando factura como pagada:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error marcando factura como pagada',
+      error: error.message
+    });
+  }
+}
+static async anular(req, res) {
+  try {
+    const { id } = req.params;
+    const { motivo_anulacion } = req.body;
+
+    console.log('🚫 Anulando factura:', id);
+
+    // Verificar que existe
+    const [factura] = await Database.query(
+      'SELECT * FROM facturas WHERE id = ? AND activo = 1',
+      [id]
+    );
+
+    if (!factura) {
+      return res.status(404).json({
+        success: false,
+        message: 'Factura no encontrada'
+      });
+    }
+
+    if (factura.estado === 'anulada') {
+      return res.status(400).json({
+        success: false,
+        message: 'La factura ya está anulada'
+      });
+    }
+
+    if (factura.estado === 'pagada') {
+      return res.status(400).json({
+        success: false,
+        message: 'No se puede anular una factura pagada'
+      });
+    }
+
+    // Anular factura
+    await Database.query(`
+      UPDATE facturas SET
+        estado = 'anulada',
+        observaciones = CONCAT(COALESCE(observaciones, ''), '\n\nANULADA: ', ?),
+        updated_at = NOW()
+      WHERE id = ?
+    `, [
+      motivo_anulacion || 'Sin motivo especificado',
+      id
+    ]);
+
+    console.log('✅ Factura anulada:', id);
+
+    res.json({
+      success: true,
+      message: 'Factura anulada exitosamente',
+      data: { id, estado: 'anulada' }
+    });
+
+  } catch (error) {
+    console.error('❌ Error anulando factura:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error anulando factura',
+      error: error.message
+    });
+  }
+}
   static async obtenerDetalles(req, res) {
     return FacturasController.obtenerPorId(req, res);
   }
