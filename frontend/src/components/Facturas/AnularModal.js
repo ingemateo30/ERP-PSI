@@ -8,7 +8,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 
-const AnularModal = ({ isOpen, onClose, onConfirmar, factura, loading, error }) => {
+const AnularModal = ({ isOpen, onClose, onAnular, factura, loading, error }) => {
   const [motivo, setMotivo] = useState('');
   const [motivoDetallado, setMotivoDetallado] = useState('');
   const [confirmacion, setConfirmacion] = useState('');
@@ -97,7 +97,7 @@ const AnularModal = ({ isOpen, onClose, onConfirmar, factura, loading, error }) 
       : `${motivosPredefinidos.find(m => m.value === motivo)?.label}: ${motivoDetallado}`;
     
     try {
-      await onConfirmar(motivoCompleto);
+      await onAnular(motivoCompleto);
     } catch (error) {
       console.error('Error al anular factura:', error);
     }

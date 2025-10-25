@@ -11,7 +11,7 @@ import {
   X
 } from 'lucide-react';
 
-const PagoModal = ({ isOpen, onClose, onConfirmar, factura, loading, error }) => {
+const PagoModal = ({ isOpen, onClose, onPagar, factura, loading, error }) => {
   const [datosPago, setDatosPago] = useState({
     valor_pagado: '',
     metodo_pago: 'efectivo',
@@ -141,7 +141,7 @@ const PagoModal = ({ isOpen, onClose, onConfirmar, factura, loading, error }) =>
     };
     
     try {
-      await onConfirmar(datosParaEnvio);
+      await onPagar(datosParaEnvio);
     } catch (error) {
       console.error('Error al procesar pago:', error);
     }
