@@ -1785,23 +1785,28 @@ router.post('/service-plans', requireRole('administrador'), async (req, res) => 
     }
 
     // Insertar plan
-    const resultado = await Database.query(`
-      INSERT INTO planes_servicio (
-        codigo, nombre, tipo, precio, precio_internet, precio_television,
-        velocidad_subida, velocidad_bajada, canales_tv, descripcion,
-        precio_instalacion, requiere_instalacion, segmento, tecnologia,
-        permanencia_meses, descuento_combo, conceptos_incluidos, 
-        orden_visualizacion, promocional, fecha_inicio_promocion, 
-        fecha_fin_promocion, aplica_iva, activo
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-    `, [
-      codigo, nombre, tipo, precio, precioInternetFinal, precioTelevisionFinal,
-      velocidad_subida, velocidad_bajada, canales_tv, descripcion,
-      precio_instalacion, requiere_instalacion, segmento, tecnologia,
-      permanencia_meses, descuento_combo, JSON.stringify(conceptosIncluidos),
-      orden_visualizacion, promocional, fecha_inicio_promocion,
-      fecha_fin_promocion, aplica_iva
-    ]);
+// Insertar plan
+const resultado = await Database.query(`
+  INSERT INTO planes_servicio (
+    codigo, nombre, tipo, precio, precio_internet, precio_television,
+    velocidad_subida, velocidad_bajada, canales_tv, descripcion,
+    requiere_instalacion, segmento, tecnologia,
+    permanencia_minima_meses, descuento_combo, 
+    orden_visualizacion, promocional, fecha_inicio_promocion, 
+    fecha_fin_promocion, aplica_iva, activo,
+    costo_instalacion_permanencia, costo_instalacion_sin_permanencia,
+    aplica_permanencia
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+`, [
+  codigo, nombre, tipo, precio, precioInternetFinal, precioTelevisionFinal,
+  velocidad_subida, velocidad_bajada, canales_tv, descripcion,
+  requiere_instalacion, segmento, tecnologia,
+  permanencia_meses || 6, descuento_combo,
+  orden_visualizacion, promocional, fecha_inicio_promocion,
+  fecha_fin_promocion, aplica_iva,
+  precio_instalacion || 50000, precio_instalacion || 150000,
+  permanencia_meses > 0 ? 1 : 0
+]);
 
     res.status(201).json({
       success: true,
