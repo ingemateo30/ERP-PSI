@@ -242,13 +242,16 @@ useEffect(() => {
   }));
 
   // Limpiar error si existe
-  if (errors[campo]) {
-    setErrors(prev => ({
-      ...prev,
-      [campo]: null
-    }));
+// Limpiar error si existe
+setErrors(prev => {
+  if (prev[campo]) {
+    const newErrors = { ...prev };
+    delete newErrors[campo];
+    return newErrors;
   }
-}, [errors]);
+  return prev;
+});
+}, []); // Sin dependencias para evitar re-renders// Sin dependencias para evitar re-renders
   const seleccionarCliente = useCallback((cliente) => {
     console.log('👤 [FacturaModal] Cliente seleccionado:', cliente);
     
@@ -373,14 +376,14 @@ useEffect(() => {
 });
       } else {
         // CREAR NUEVA FACTURA
-        response = await fetch('/api/v1/facturas', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(datosParaEnvio)
-        });
+        response = await fetch('http://45.173.69.5:3000/api/v1/facturas', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${authService.getToken()}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(datosParaEnvio)
+});
       }
 
       const resultado = await response.json();
