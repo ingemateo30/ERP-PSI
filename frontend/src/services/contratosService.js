@@ -307,50 +307,49 @@ class ContratosService {
     }
 
     /**
-     * Actualizar contrato existente
-     */
-    async actualizar(id, datosContrato) {
-        try {
-            if (!id || isNaN(id)) {
-                throw new Error('ID de contrato inválido');
-            }
-
-            console.log(`📝 Actualizando contrato ID: ${id}`);
-
-            const response = await apiService.put(`${API_BASE}/${id}`, datosContrato);
-
-            console.log('✅ Contrato actualizado exitosamente');
-            return response;
-        } catch (error) {
-            console.error('❌ Error actualizando contrato:', error);
-            throw this.handleError(error);
+ * Actualizar contrato existente
+ */
+async actualizar(id, datosContrato) {
+    try {
+        if (!id || isNaN(id)) {
+            throw new Error('ID de contrato inválido');
         }
+
+        console.log(`📝 Actualizando contrato ID: ${id}`);
+
+        const response = await apiService.put(`${API_BASE}/${id}`, datosContrato);
+
+        console.log('✅ Contrato actualizado exitosamente');
+        return response;
+    } catch (error) {
+        console.error('❌ Error actualizando contrato:', error);
+        throw this.handleError(error);
     }
+}
 
-    /**
-     * Cambiar estado del contrato
-     */
-    async cambiarEstado(id, nuevoEstado, observaciones = '') {
-        try {
-            if (!id || isNaN(id)) {
-                throw new Error('ID de contrato inválido');
-            }
-
-            console.log(`🔄 Cambiando estado del contrato ID: ${id} a ${nuevoEstado}`);
-
-            const response = await apiService.put(`${API_BASE}/${id}/estado`, {
-                estado: nuevoEstado,
-                observaciones
-            });
-
-            console.log('✅ Estado del contrato actualizado exitosamente');
-            return response;
-        } catch (error) {
-            console.error('❌ Error cambiando estado del contrato:', error);
-            throw this.handleError(error);
+/**
+ * Cambiar estado del contrato
+ */
+async cambiarEstado(id, nuevoEstado, observaciones = '') {
+    try {
+        if (!id || isNaN(id)) {
+            throw new Error('ID de contrato inválido');
         }
-    }
 
+        console.log(`🔄 Cambiando estado del contrato ID: ${id} a ${nuevoEstado}`);
+
+        const response = await apiService.put(`${API_BASE}/${id}/estado`, {
+            estado: nuevoEstado,
+            observaciones
+        });
+
+        console.log('✅ Estado del contrato actualizado exitosamente');
+        return response;
+    } catch (error) {
+        console.error('❌ Error cambiando estado del contrato:', error);
+        throw this.handleError(error);
+    }
+}
     /**
      * Eliminar/anular contrato
      */
@@ -507,7 +506,10 @@ class ContratosService {
             return new Error(error.message || 'Error desconocido');
         }
     }
+
 }
+
+
 
 // Exportar instancia única del servicio
 export default new ContratosService();
