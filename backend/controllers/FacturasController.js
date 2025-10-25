@@ -858,58 +858,28 @@ static async duplicar(req, res) {
       SELECT * FROM detalle_facturas WHERE factura_id = ?
     `, [id]);
     
-    // 3. Generar nuevo número de factura (temporal - se actualizará después)
+    // 3. Generar nuevo número de factura (temporal)
     const nuevoNumero = `TEMP-${Date.now()}`;
     
-    // 4. Crear nueva factura
+    // 4. Crear nueva factura (simplificada con columnas esenciales)
     const nuevaFactura = await Database.query(`
       INSERT INTO facturas (
         numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
         periodo_facturacion, fecha_emision, fecha_vencimiento,
-        fecha_desde, fecha_hasta,
-        internet, television, saldo_anterior, interes, reconexion,
-        descuento, varios, publicidad,
-        s_internet, s_television, s_interes, s_reconexion,
-        s_descuento, s_varios, s_publicidad, s_iva,
-        subtotal, iva, total, estado, metodo_pago,
-        ruta, resolucion, observaciones, contrato_id
-      ) VALUES (
-        ?, ?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY),
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?
-      )
+        internet, television, subtotal, iva, total, estado, observaciones
+      ) VALUES (?, ?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), ?, ?, ?, ?, ?, 'pendiente', ?)
     `, [
       nuevoNumero,
       facturaOriginal.cliente_id,
       facturaOriginal.identificacion_cliente,
       facturaOriginal.nombre_cliente,
       facturaOriginal.periodo_facturacion,
-      facturaOriginal.fecha_desde,
-      facturaOriginal.fecha_hasta,
       facturaOriginal.internet || 0,
       facturaOriginal.television || 0,
-      0, // saldo_anterior en 0 para nueva factura
-      facturaOriginal.interes || 0,
-      facturaOriginal.reconexion || 0,
-      facturaOriginal.descuento || 0,
-      facturaOriginal.varios || 0,
-      facturaOriginal.publicidad || 0,
-      facturaOriginal.s_internet || 0,
-      facturaOriginal.s_television || 0,
-      facturaOriginal.s_interes || 0,
-      facturaOriginal.s_reconexion || 0,
-      facturaOriginal.s_descuento || 0,
-      facturaOriginal.s_varios || 0,
-      facturaOriginal.s_publicidad || 0,
-      facturaOriginal.s_iva || 0,
       facturaOriginal.subtotal,
       facturaOriginal.iva || 0,
       facturaOriginal.total,
-      facturaOriginal.metodo_pago || 'efectivo',
-      facturaOriginal.ruta,
-      facturaOriginal.resolucion,
-      `Duplicado de ${facturaOriginal.numero_factura}`,
-      facturaOriginal.contrato_id
+      `Duplicado de ${facturaOriginal.numero_factura}`
     ]);
     
     const nuevaFacturaId = nuevaFactura.insertId;
