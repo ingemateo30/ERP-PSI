@@ -185,11 +185,13 @@ router.get('/inactivos',
   requireRole('supervisor', 'administrador'),
   async (req, res) => {
     try {
+      const { page = 1, limit = 10, search = '' } = req.query;
+      const limitNum = parseInt(limit);
+      const pageNum = parseInt(page);
+      const offset = (pageNum - 1) * limitNum;
       
+      console.log('📋 Obteniendo clientes inactivos:', { page: pageNum, limit: limitNum, search });
 
-      console.log('📋 Obteniendo clientes inactivos:', { page, limit, search });
-
-      // Importar pool si no tienes Database
       const pool = require('../config/database');
 
       let whereClause = '';
@@ -202,12 +204,7 @@ router.get('/inactivos',
       }
 
       // Query para obtener clientes inactivos
-      // ✅ DESPUÉS:
-const { page = 1, limit = 10, search = '' } = req.query;
-const limitNum = parseInt(limit);
-const pageNum = parseInt(page);
-const offset = (pageNum - 1) * limitNum;
-
+      // ... continúa con el resto de tu código
 // ... más abajo ...
 
 const query = `
