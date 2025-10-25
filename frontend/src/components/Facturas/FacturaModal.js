@@ -326,7 +326,7 @@ setErrors(prev => {
 
     setErrors(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
-  }, [formData]);
+  }, []);
 
   // ==========================================
   // GUARDAR FACTURA
@@ -409,7 +409,7 @@ setErrors(prev => {
     } finally {
       setLoading(false);
     }
-  }, [formData, esEdicion, factura, validarFormulario, onSuccess]);
+  }, [esEdicion, factura, onSuccess]); // Removido formData y validarFormulario
 
   // ==========================================
   // CERRAR MODAL
