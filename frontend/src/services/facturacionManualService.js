@@ -417,56 +417,55 @@ async obtenerHistorialCliente(params = {}) {
         throw new Error('ID de factura inválido');
       }
       
-      const response = await apiService.getBlob(`${API_BASE}/${id}/pdf`);
+const blob = await apiService.getBlob(`${API_BASE}/${id}/pdf`);
       
-      if (download && response.data) {
-        // Crear enlace de descarga
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `factura_${id}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-      }
-      
-      console.log('✅ PDF generado exitosamente');
-      return response;
-    } catch (error) {
-      console.error('❌ Error generando PDF:', error);
-      throw this.handleError(error);
-    }
-  },
+if (download && blob) {
+  // Crear enlace de descarga
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `Factura_${id}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
 
-  /**
-   * Ver PDF en navegador
-   * Endpoint: GET /api/v1/facturas/:id/ver-pdf
-   */
-  async verPDF(id) {
-    try {
-      console.log(`👁️ Visualizando PDF para factura ID: ${id}`);
-      
-      if (!id || isNaN(id)) {
-        throw new Error('ID de factura inválido');
-      }
-      
-      const response = await apiService.getBlob(`${API_BASE}/${id}/ver-pdf`);
-      
-      if (response.data) {
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        window.open(url, '_blank');
-        // No revocamos la URL inmediatamente para permitir la visualización
-        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
-      }
-      
-      return response;
-    } catch (error) {
-      console.error('❌ Error visualizando PDF:', error);
-      throw this.handleError(error);
-    }
-  },
+console.log('✅ PDF generado exitosamente');
+return blob;
+} catch (error) {
+  console.error('❌ Error generando PDF:', error);
+  throw this.handleError(error);
+}
+},
 
+/**
+ * Ver PDF en navegador
+ * Endpoint: GET /api/v1/facturas/:id/ver-pdf
+ */
+async verPDF(id) {
+try {
+  console.log(`👁️ Visualizando PDF para factura ID: ${id}`);
+  
+  if (!id || isNaN(id)) {
+    throw new Error('ID de factura inválido');
+  }
+  
+  const blob = await apiService.getBlob(`${API_BASE}/${id}/ver-pdf`);
+  
+  if (blob) {
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    // Revocar URL después de un delay para permitir la apertura
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  }
+  
+  return blob;
+} catch (error) {
+  console.error('❌ Error visualizando PDF:', error);
+  throw this.handleError(error);
+}
+},
   // ==========================================
   // UTILIDADES DE FACTURACIÓN
   // ==========================================
