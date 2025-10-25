@@ -417,12 +417,7 @@ async obtenerHistorialCliente(params = {}) {
         throw new Error('ID de factura inválido');
       }
       
-      const response = await apiService.get(`${API_BASE}/${id}/pdf`, {
-        responseType: 'blob',
-        headers: {
-          'Accept': 'application/pdf'
-        }
-      });
+      const response = await apiService.getBlob(`${API_BASE}/${id}/pdf`);
       
       if (download && response.data) {
         // Crear enlace de descarga
@@ -456,9 +451,7 @@ async obtenerHistorialCliente(params = {}) {
         throw new Error('ID de factura inválido');
       }
       
-      const response = await apiService.get(`${API_BASE}/${id}/ver-pdf`, {
-        responseType: 'blob'
-      });
+      const response = await apiService.getBlob(`${API_BASE}/${id}/ver-pdf`);
       
       if (response.data) {
         const url = window.URL.createObjectURL(new Blob([response.data]));
