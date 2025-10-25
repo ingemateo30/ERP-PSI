@@ -138,30 +138,36 @@ const FacturaModal = ({
   // GENERAR NÚMERO DE FACTURA
   // ==========================================
   const generarNumeroFactura = useCallback(async () => {
-    if (esEdicion) return; // No generar nuevo número en edición
+  if (esEdicion) return; // No generar nuevo número en edición
+  
+  try {
+    console.log('🔢 [FacturaModal] Generando número de factura...');
     
-    try {
-      const response = await fetch('/api/v1/facturas/generar-numero', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data?.numero_factura) {
-          setFormData(prev => ({
-            ...prev,
-            numero_factura: data.data.numero_factura
-          }));
-        }
+    const response = await fetch('http://45.173.69.5:3000/api/v1/facturas/generar-numero', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
       }
-    } catch (error) {
-      console.error('❌ [FacturaModal] Error generando número:', error);
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ [FacturaModal] Respuesta recibida:', data);
+      
+      if (data.success && data.data?.numero_factura) {
+        console.log('✅ [FacturaModal] Número generado:', data.data.numero_factura);
+        setFormData(prev => ({
+          ...prev,
+          numero_factura: data.data.numero_factura
+        }));
+      }
+    } else {
+      console.error('❌ [FacturaModal] Error en respuesta:', response.status);
     }
-  }, [esEdicion]);
-
+  } catch (error) {
+    console.error('❌ [FacturaModal] Error generando número:', error);
+  }
+}, [esEdicion]);
   // ==========================================
   // BÚSQUEDA DE CLIENTES
   // ==========================================
