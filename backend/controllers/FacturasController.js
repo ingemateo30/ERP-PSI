@@ -866,11 +866,11 @@ static async duplicar(req, res) {
       ) VALUES (?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), ?, ?, ?, 'borrador', ?, ?)
     `, [
       facturaOriginal.cliente_id,
-      facturaOriginal.tipo_factura,
-      facturaOriginal.subtotal,
-      facturaOriginal.impuestos,
-      facturaOriginal.total,
-      facturaOriginal.metodo_pago,
+      facturaOriginal.tipo_factura || 'manual',
+      facturaOriginal.subtotal || 0,
+      facturaOriginal.impuestos || 0,
+      facturaOriginal.total || 0,
+      facturaOriginal.metodo_pago || 'efectivo',
       `Duplicado de factura #${facturaOriginal.numero_factura || id}`
     ]);
     
@@ -880,16 +880,20 @@ static async duplicar(req, res) {
     for (const item of items) {
       await Database.query(`
         INSERT INTO detalle_facturas (
-          factura_id, descripcion, cantidad, precio_unitario, subtotal, impuesto, total
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          factura_id, concepto_id, concepto_nombre, cantidad, 
+          precio_unitario, descuento, subtotal, iva, total, servicio_cliente_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         nuevaFacturaId,
-        item.descripcion,
-        item.cantidad,
+        item.concepto_id || null,
+        item.concepto_nombre,
+        item.cantidad || 1,
         item.precio_unitario,
+        item.descuento || 0,
         item.subtotal,
-        item.impuesto,
-        item.total
+        item.iva || 0,
+        item.total,
+        item.servicio_cliente_id || null
       ]);
     }
     
