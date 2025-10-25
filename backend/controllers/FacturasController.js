@@ -831,13 +831,88 @@ static async obtenerTodas(req, res) {
     }
   }
 
-  static async verPDF (req, res)  {
-    res.status(501).json({ success: false, message: 'Visualización de PDF en desarrollo' });
-  }
+static async verPDF(req, res) {
+  return FacturasController.generarPDF(req, res);
+}
 
   static async duplicar(req, res) {
-    res.status(501).json({ success: false, message: 'Duplicación de facturas en desarrollo' });
+  try {
+    const { id } = req.params;
+    
+    console.log('📋 Duplicando factura:', id);
+    
+    // 1. Obtener factura original
+    const [facturaOriginal] = await Database.query(`
+      SELECT * FROM facturas WHERE id = ?
+    `, [id]);
+    
+    if (!facturaOriginal) {
+      return res.status(404).json({
+        success: false,
+        message: 'Factura no encontrada'
+      });
+    }
+    
+    // 2. Obtener items de la factura original
+    const items = await Database.query(`
+      SELECT * FROM factura_items WHERE factura_id = ?
+    `, [id]);
+    
+    // 3. Crear nueva factura con número nuevo
+    const nuevaFactura = await Database.query(`
+      INSERT INTO facturas (
+        cliente_id, tipo_factura, fecha_emision, fecha_vencimiento,
+        subtotal, impuestos, total, estado, metodo_pago, notas
+      ) VALUES (?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), ?, ?, ?, 'borrador', ?, ?)
+    `, [
+      facturaOriginal.cliente_id,
+      facturaOriginal.tipo_factura,
+      facturaOriginal.subtotal,
+      facturaOriginal.impuestos,
+      facturaOriginal.total,
+      facturaOriginal.metodo_pago,
+      `Duplicado de factura #${facturaOriginal.numero_factura || id}`
+    ]);
+    
+    const nuevaFacturaId = nuevaFactura.insertId;
+    
+    // 4. Duplicar items
+    for (const item of items) {
+      await Database.query(`
+        INSERT INTO factura_items (
+          factura_id, descripcion, cantidad, precio_unitario, subtotal, impuesto, total
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [
+        nuevaFacturaId,
+        item.descripcion,
+        item.cantidad,
+        item.precio_unitario,
+        item.subtotal,
+        item.impuesto,
+        item.total
+      ]);
+    }
+    
+    console.log('✅ Factura duplicada exitosamente:', nuevaFacturaId);
+    
+    res.json({
+      success: true,
+      message: 'Factura duplicada exitosamente',
+      data: {
+        id: nuevaFacturaId,
+        factura_original: id
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error duplicando factura:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error duplicando factura',
+      error: error.message
+    });
   }
+}
 }
 
 console.log('✅ FacturasController configurado correctamente con Database.query');
