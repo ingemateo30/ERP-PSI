@@ -1,4 +1,5 @@
 // frontend/src/components/Facturas/FacturaModal.js - COMPLETAMENTE CORREGIDO
+import authService from '../../services/authService';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   X, 
@@ -144,11 +145,11 @@ const FacturaModal = ({
     console.log('🔢 [FacturaModal] Generando número de factura...');
     
     const response = await fetch('http://45.173.69.5:3000/api/v1/facturas/generar-numero', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      }
-    });
+  headers: {
+    'Authorization': `Bearer ${authService.getToken()}`,
+    'Content-Type': 'application/json'
+  }
+});
     
     if (response.ok) {
       const data = await response.json();
