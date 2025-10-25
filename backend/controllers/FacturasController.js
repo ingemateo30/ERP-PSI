@@ -897,36 +897,36 @@ static async actualizar(req, res) {
     }
 
     // Actualizar factura
-    await Database.query(`
-      UPDATE facturas SET
-        fecha_emision = COALESCE(?, fecha_emision),
-        fecha_vencimiento = COALESCE(?, fecha_vencimiento),
-        fecha_desde = ?,
-        fecha_hasta = ?,
-        subtotal = COALESCE(?, subtotal),
-        iva = COALESCE(?, iva),
-        total = COALESCE(?, total),
-        observaciones = ?,
-        estado = COALESCE(?, estado),
-        metodo_pago = ?,
-        referencia_pago = ?,
-        updated_at = NOW()
-      WHERE id = ?
-    `, [
-      fecha_emision,
-      fecha_vencimiento,
-      fecha_desde,
-      fecha_hasta,
-      subtotal,
-      impuestos,
-      total,
-      observaciones,
-      estado,
-      metodo_pago,
-      referencia_pago,
-      id
-    ]);
-
+    // Actualizar factura
+await Database.query(`
+  UPDATE facturas SET
+    fecha_emision = COALESCE(?, fecha_emision),
+    fecha_vencimiento = COALESCE(?, fecha_vencimiento),
+    fecha_desde = ?,
+    fecha_hasta = ?,
+    subtotal = COALESCE(?, subtotal),
+    iva = COALESCE(?, iva),
+    total = COALESCE(?, total),
+    observaciones = ?,
+    estado = COALESCE(?, estado),
+    metodo_pago = ?,
+    referencia_pago = ?,
+    updated_at = NOW()
+  WHERE id = ?
+`, [
+  fecha_emision || null,
+  fecha_vencimiento || null,
+  fecha_desde || null,
+  fecha_hasta || null,
+  subtotal || null,
+  impuestos || null,
+  total || null,
+  observaciones || null,
+  estado || null,
+  metodo_pago || null,
+  referencia_pago || null,
+  id
+]);
     console.log('✅ Factura actualizada:', id);
 
     res.json({
