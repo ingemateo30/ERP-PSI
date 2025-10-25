@@ -835,7 +835,7 @@ static async verPDF(req, res) {
   return FacturasController.generarPDF(req, res);
 }
 
-  static async duplicar(req, res) {
+static async duplicar(req, res) {
   try {
     const { id } = req.params;
     
@@ -855,7 +855,7 @@ static async verPDF(req, res) {
     
     // 2. Obtener items de la factura original
     const items = await Database.query(`
-      SELECT * FROM factura_items WHERE factura_id = ?
+      SELECT * FROM detalle_facturas WHERE factura_id = ?
     `, [id]);
     
     // 3. Crear nueva factura con número nuevo
@@ -879,7 +879,7 @@ static async verPDF(req, res) {
     // 4. Duplicar items
     for (const item of items) {
       await Database.query(`
-        INSERT INTO factura_items (
+        INSERT INTO detalle_facturas (
           factura_id, descripcion, cantidad, precio_unitario, subtotal, impuesto, total
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `, [
