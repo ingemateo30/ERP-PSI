@@ -205,45 +205,50 @@ const FacturaModal = ({
   }, []);
 
   // Debounce para búsqueda de clientes
-  useEffect(() => {
+useEffect(() => {
+  if (!esEdicion && busquedaCliente && busquedaCliente.trim().length >= 3) {
     const timer = setTimeout(() => {
-      if (busquedaCliente && !esEdicion) {
-        buscarClientes(busquedaCliente);
-      }
-    }, 300);
+      buscarClientes(busquedaCliente);
+    }, 500);
 
     return () => clearTimeout(timer);
-  }, [busquedaCliente, buscarClientes, esEdicion]);
-
+  }
+}, [busquedaCliente, esEdicion]);
   // ==========================================
   // MANEJO DE FORMULARIO
   // ==========================================
-  const handleInputChange = useCallback((campo, valor) => {
-    setFormData(prev => ({
+ const handleInputChange = useCallback((campo, valor) => {
+  setFormData(prev => {
+    const newData = {
       ...prev,
       [campo]: valor
-    }));
-
-    // Marcar campo como tocado
-    setTouched(prev => ({
-      ...prev,
-      [campo]: true
-    }));
-
-    // Limpiar error si existe
-    if (errors[campo]) {
-      setErrors(prev => ({
-        ...prev,
-        [campo]: null
-      }));
-    }
-
-    // Recalcular totales automáticamente
+    };
+    
+    // Recalcular totales inmediatamente si es un campo numérico
     if (['subtotal', 'impuestos', 'descuentos'].includes(campo)) {
-      setTimeout(() => recalcularTotales(), 100);
+      const subtotal = parseFloat(newData.subtotal) || 0;
+      const impuestos = parseFloat(newData.impuestos) || 0;
+      const descuentos = parseFloat(newData.descuentos) || 0;
+      newData.total = (subtotal + impuestos - descuentos).toString();
     }
-  }, [errors]);
+    
+    return newData;
+  });
 
+  // Marcar campo como tocado
+  setTouched(prev => ({
+    ...prev,
+    [campo]: true
+  }));
+
+  // Limpiar error si existe
+  if (errors[campo]) {
+    setErrors(prev => ({
+      ...prev,
+      [campo]: null
+    }));
+  }
+}, [errors]);
   const seleccionarCliente = useCallback((cliente) => {
     console.log('👤 [FacturaModal] Cliente seleccionado:', cliente);
     
