@@ -978,23 +978,24 @@ static async marcarComoPagada(req, res) {
     }
 
     // Actualizar factura
-    await Database.query(`
-      UPDATE facturas SET
-        estado = 'pagada',
-        fecha_pago = ?,
-        metodo_pago = ?,
-        referencia_pago = ?,
-        banco_id = ?,
-        updated_at = NOW()
-      WHERE id = ?
-    `, [
-      fecha_pago || new Date().toISOString().split('T')[0],
-      metodo_pago || 'efectivo',
-      referencia_pago,
-      banco_id,
-      id
-    ]);
-
+   await Database.query(`
+  UPDATE facturas SET
+    estado = 'pagada',
+    fecha_pago = ?,
+    metodo_pago = ?,
+    referencia_pago = ?,
+    banco_id = ?,
+    updated_at = NOW()
+  WHERE id = ?
+`, [
+  id,
+  fecha_pago || new Date().toISOString().split('T')[0],
+  monto_pagado || factura.total,
+  metodo_pago || 'efectivo',
+  referencia_pago || null,
+  banco_id || null,
+  req.user?.id || null
+]);
     // Registrar pago si existe tabla pagos
     try {
       await Database.query(`
