@@ -344,21 +344,22 @@ setErrors(prev => {
     try {
       // Preparar datos para envío
       const datosParaEnvio = {
-        numero_factura: formData.numero_factura.trim(),
-        cliente_id: parseInt(formData.cliente_id),
-        fecha_emision: formData.fecha_emision,
-        fecha_vencimiento: formData.fecha_vencimiento,
-        periodo_desde: formData.periodo_desde || null,
-        periodo_hasta: formData.periodo_hasta || null,
-        subtotal: parseFloat(formData.subtotal) || 0,
-        impuestos: parseFloat(formData.impuestos) || 0,
-        descuentos: parseFloat(formData.descuentos) || 0,
-        total: parseFloat(formData.total) || 0,
-        observaciones: formData.observaciones.trim(),
-        items: formData.items.filter(item => 
-          item.descripcion && item.cantidad > 0 && item.precio_unitario > 0
-        )
-      };
+  numero_factura: formData.numero_factura.trim(),
+  cliente_id: parseInt(formData.cliente_id),
+  periodo_facturacion: formData.fecha_emision ? formData.fecha_emision.substring(0, 7) : new Date().toISOString().substring(0, 7), // YYYY-MM
+  fecha_emision: formData.fecha_emision,
+  fecha_vencimiento: formData.fecha_vencimiento,
+  fecha_desde: formData.periodo_desde || null,
+  fecha_hasta: formData.periodo_hasta || null,
+  subtotal: parseFloat(formData.subtotal) || 0,
+  impuestos: parseFloat(formData.impuestos) || 0,
+  descuentos: parseFloat(formData.descuentos) || 0,
+  total: parseFloat(formData.total) || 0,
+  observaciones: formData.observaciones.trim(),
+  items: formData.items.filter(item => 
+    item.descripcion && item.cantidad > 0 && item.precio_unitario > 0
+  )
+};
 
       console.log('💾 [FacturaModal] Guardando factura:', { esEdicion, datos: datosParaEnvio });
 
