@@ -182,9 +182,9 @@ const FacturaModal = ({
     try {
       setLoadingClientes(true);
       
-      const response = await fetch(`/api/v1/clientes/search?q=${encodeURIComponent(termino)}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      const response = await fetch(`http://45.173.69.5:3000/api/v1/clients/search?q=${encodeURIComponent(termino)}`, {
+  headers: {
+    'Authorization': `Bearer ${authService.getToken()}`,
           'Content-Type': 'application/json'
         }
       });
