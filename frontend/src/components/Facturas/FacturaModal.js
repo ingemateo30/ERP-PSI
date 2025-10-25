@@ -363,14 +363,14 @@ useEffect(() => {
       
       if (esEdicion) {
         // ACTUALIZAR FACTURA EXISTENTE
-        response = await fetch(`/api/v1/facturas/${factura.id}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(datosParaEnvio)
-        });
+        response = await fetch(`http://45.173.69.5:3000/api/v1/facturas/${factura.id}`, {
+  method: 'PUT',
+  headers: {
+    'Authorization': `Bearer ${authService.getToken()}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(datosParaEnvio)
+});
       } else {
         // CREAR NUEVA FACTURA
         response = await fetch('/api/v1/facturas', {
