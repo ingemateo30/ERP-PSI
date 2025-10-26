@@ -201,35 +201,42 @@ const InstalacionesManagement = () => {
     setInstalacionSeleccionada(null);
   };
 
-  const handleGuardarInstalacion = async (datosInstalacion) => {
-    try {
-      setProcesando(true);
-      let response;
-
-      if (modalModo === 'crear') {
-        response = await instalacionesService.createInstalacion(datosInstalacion);
-        setSuccess('Instalación creada exitosamente');
-      } else if (modalModo === 'editar') {
-        response = await instalacionesService.updateInstalacion(
-          instalacionSeleccionada.id,
-          datosInstalacion
-        );
-        setSuccess('Instalación actualizada exitosamente');
-      }
-
-      if (response.success) {
-        cargarDatos();
-        cargarEstadisticas();
-        cerrarModal();
-      }
-    } catch (error) {
-      console.error('❌ Error guardando instalación:', error);
-      setError(`Error guardando instalación: ${error.message}`);
-    } finally {
-      setProcesando(false);
+const handleGuardarInstalacion = async (datosInstalacion) => {
+  try {
+    setProcesando(true);
+    let response;
+    
+    if (modalModo === 'crear') {
+      response = await instalacionesService.createInstalacion(datosInstalacion);
+      setSuccess('Instalación creada exitosamente');
+    } else if (modalModo === 'editar') {
+      response = await instalacionesService.updateInstalacion(
+        instalacionSeleccionada.id,
+        datosInstalacion
+      );
+      setSuccess('Instalación actualizada exitosamente');
     }
-  };
-
+    
+    if (response.success) {
+      cargarDatos();
+      cargarEstadisticas();
+      cerrarModal();
+    }
+  } catch (error) {
+    console.error('❌ Error guardando instalación:', error);
+    
+    // Mostrar mensaje amigable según el tipo de error
+    if (error.message && error.message.includes('Ya existe una instalación pendiente')) {
+      setError('⚠️ Este servicio ya tiene una instalación pendiente. Por favor, completa o cancela la instalación existente antes de crear una nueva.');
+    } else if (error.message) {
+      setError(`Error: ${error.message}`);
+    } else {
+      setError('Ocurrió un error desconocido al guardar la instalación.');
+    }
+  } finally {
+    setProcesando(false);
+  }
+};
   // ARREGLADO: Función de ver detalles
   const verDetalles = (instalacion) => {
     console.log('👁️ Viendo detalles de instalación:', instalacion.id);
