@@ -50,7 +50,7 @@ class InstalacionesController {
 
             if (busqueda.trim()) {
                 whereClause += ` AND (
-        CONCAT(c.nombres, ' ', c.apellidos) LIKE ? OR
+        c.nombre LIKE ? OR
         c.identificacion LIKE ? OR
         i.direccion_instalacion LIKE ? OR
         i.telefono_contacto LIKE ?
@@ -109,10 +109,10 @@ class InstalacionesController {
                 const exportQuery = `
         SELECT 
           i.*,
-          CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
-          c.identificacion as cliente_identificacion,
-          c.telefono as cliente_telefono,
-          CONCAT(u.nombres, ' ', u.apellidos) as instalador_nombre
+          c.nombre as cliente_nombre,
+c.identificacion as cliente_identificacion,
+c.telefono as cliente_telefono,
+u.nombre as instalador_nombre
         ${baseQuery}
         ORDER BY i.created_at DESC
       `;
@@ -377,7 +377,7 @@ const instalaciones = await Database.query(selectQuery, params);
             // Validar instalador si se proporciona
             if (instalador_id) {
                 const [instalador] = await connection.query(
-                    `SELECT id, nombres, apellidos FROM sistema_usuarios 
+                    `SELECT id, nombre FROM sistema_usuarios
            WHERE id = ? AND rol IN ('instalador', 'supervisor')`,
                     [instalador_id]
                 );
