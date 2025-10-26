@@ -438,7 +438,27 @@ export const instalacionesService = {
   // ==========================================
   // ESTADÍSTICAS Y REPORTES (ARREGLADOS)
   // ==========================================
+async getClientes(params = {}) {
+    try {
+        console.log('📋 Obteniendo clientes');
+        const response = await apiService.get('/clients', params);
+        return response;
+    } catch (error) {
+        console.error('❌ Error obteniendo clientes:', error);
+        throw error;
+    }
+},
 
+async getClienteById(id) {
+    try {
+        console.log(`📋 Obteniendo cliente ID: ${id}`);
+        const response = await apiService.get(`/clients/${id}`);
+        return response;
+    } catch (error) {
+        console.error('❌ Error obteniendo cliente:', error);
+        throw error;
+    }
+},
   async generarOrdenServicioPDF(instalacionId) {
     try {
       console.log('📄 Servicio: Generando orden de servicio PDF para instalación:', instalacionId);
