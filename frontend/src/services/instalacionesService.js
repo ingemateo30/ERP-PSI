@@ -346,95 +346,86 @@ export const instalacionesService = {
    * ARREGLADO: Obtener equipos disponibles para instalación
    */
   async getEquiposDisponibles() {
-    try {
-      console.log('📦 Obteniendo equipos disponibles');
+  try {
+    console.log('📦 Obteniendo equipos disponibles');
+    const response = await apiService.get('/inventory/available');
 
-      let response;
-      try {
-        response = await apiService.get(`${API_BASE}/equipos/disponibles`);
-      } catch (error) {
-        // Endpoint alternativo
-        response = await apiService.get('/inventory', {
-          params: { estado: 'disponible', activo: 1 }
-        });
-      }
-
-      if (response.success) {
-        return {
-          success: true,
-          equipos: response.data || response.equipos || []
-        };
-      }
-
-      throw new Error(response.message || 'Error obteniendo equipos');
-    } catch (error) {
-      console.error('❌ Error obteniendo equipos:', error);
+    if (response.success) {
       return {
-        success: false,
-        equipos: [],
-        message: error.message
+        success: true,
+        equipos: response.data || response.equipos || []
       };
     }
-  },
 
-  /**
-   * ARREGLADO: Buscar clientes para instalaciones
-   */
-  async buscarClientes(termino = '') {
-    try {
-      console.log('🔍 Buscando clientes con término:', termino);
-      const response = await apiService.get('/clients', {
-        params: {
-          busqueda: termino,
-          limit: 50,
-          activo: 1
-        }
-      });
+    throw new Error(response.message || 'Error obteniendo equipos');
+  } catch (error) {
+    console.error('❌ Error obteniendo equipos:', error);
+    return {
+      success: false,
+      equipos: [],
+      message: error.message
+    };
+  }
+},
 
-      if (response.success) {
-        return {
-          success: true,
-          clientes: response.data || response.clientes || []
-        };
-      }
+/**
+ * ARREGLADO: Buscar clientes para instalaciones
+ */
+async buscarClientes(termino = '') {
+  try {
+    console.log('🔍 Buscando clientes con término:', termino);
+    const response = await apiService.get('/clients', {
+      busqueda: termino,
+      limit: 50,
+      activo: 1
+    });
 
-      throw new Error(response.message || 'Error buscando clientes');
-    } catch (error) {
-      console.error('❌ Error buscando clientes:', error);
+    if (response.success) {
       return {
-        success: false,
-        clientes: [],
-        message: error.message
+        success: true,
+        clientes: response.data || response.clientes || []
       };
     }
-  },
 
-  /**
-   * ARREGLADO: Obtener servicios de un cliente
-   */
-  async getServiciosCliente(clienteId) {
-    try {
-      console.log('🔍 Obteniendo servicios del cliente:', clienteId);
-      const response = await apiService.get(`/clients/${clienteId}/services`);
+    throw new Error(response.message || 'Error buscando clientes');
+  } catch (error) {
+    console.error('❌ Error buscando clientes:', error);
+    return {
+      success: false,
+      clientes: [],
+      message: error.message
+    };
+  }
+},
 
-      if (response.success) {
-        return {
-          success: true,
-          servicios: response.data || response.servicios || []
-        };
-      }
+/**
+ * ARREGLADO: Obtener servicios de un cliente
+ */
+async getServiciosCliente(clienteId) {
+  try {
+    console.log('🔍 Obteniendo servicios del cliente:', clienteId);
+    // Cambiar ruta a la correcta del backend
+    const response = await apiService.get(`/clients/${clienteId}`);
 
-      throw new Error(response.message || 'Error obteniendo servicios del cliente');
-    } catch (error) {
-      console.error('❌ Error obteniendo servicios del cliente:', error);
+    if (response.success && response.data) {
+      // Extraer servicios del objeto cliente
+      const servicios = response.data.servicios || [];
       return {
-        success: false,
-        servicios: [],
-        message: error.message
+        success: true,
+        servicios: servicios
       };
     }
-  },
 
+    throw new Error(response.message || 'Error obteniendo servicios del cliente');
+  } catch (error) {
+    console.error('❌ Error obteniendo servicios del cliente:', error);
+    return {
+      success: false,
+      servicios: [],
+      message: error.message
+    };
+  }
+},
   // ==========================================
   // ESTADÍSTICAS Y REPORTES (ARREGLADOS)
   // ==========================================
