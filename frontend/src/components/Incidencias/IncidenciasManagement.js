@@ -818,35 +818,35 @@ const IncidenciaModal = ({ incidencia, onClose, onSave }) => {
                                 <option value="otros">Otros</option>
                             </select>
                         </div>
+{/* Fecha Inicio */}
+<div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+        Fecha y Hora de Inicio
+        <span className="text-xs text-gray-500 ml-2">(Haga clic para seleccionar)</span>
+    </label>
+    <input
+        type="datetime-local"
+        value={formData.fecha_inicio}
+        onChange={(e) => handleChange('fecha_inicio', e.target.value)}
+        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+    />
+</div>
 
-                        {/* Fecha Inicio */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Fecha y Hora de Inicio
-                            </label>
-                            <input
-                                type="datetime-local"
-                                value={formData.fecha_inicio}
-                                onChange={(e) => handleChange('fecha_inicio', e.target.value)}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-
-                        {/* Fecha Fin (solo para edición) */}
-                        {incidencia && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Fecha y Hora de Fin
-                                </label>
-                                <input
-                                    type="datetime-local"
-                                    value={formData.fecha_fin || ''}
-                                    onChange={(e) => handleChange('fecha_fin', e.target.value)}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
-                        )}
-
+{/* Fecha Fin (solo para edición) */}
+{incidencia && (
+    <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+            Fecha y Hora de Fin
+            <span className="text-xs text-gray-500 ml-2">(Haga clic para seleccionar)</span>
+        </label>
+        <input
+            type="datetime-local"
+            value={formData.fecha_fin || ''}
+            onChange={(e) => handleChange('fecha_fin', e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+    </div>
+)}
                         {/* Usuarios Afectados */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -895,33 +895,47 @@ const IncidenciaModal = ({ incidencia, onClose, onSave }) => {
                         </div>
 
                         {/* Coordenadas */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Latitud
-                            </label>
-                            <input
-                                type="number"
-                                step="0.000001"
-                                value={formData.coordenadas_lat}
-                                onChange={(e) => handleChange('coordenadas_lat', e.target.value)}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Ej: 4.711"
-                            />
-                        </div>
+<div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+        Latitud
+    </label>
+    <input
+        type="number"
+        step="0.00000001"
+        min="-90"
+        max="90"
+        value={formData.coordenadas_lat}
+        onChange={(e) => {
+            const value = e.target.value;
+            if (value === '' || (parseFloat(value) >= -90 && parseFloat(value) <= 90)) {
+                handleChange('coordenadas_lat', value);
+            }
+        }}
+        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        placeholder="Ej: 6.25184 (entre -90 y 90)"
+    />
+</div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Longitud
-                            </label>
-                            <input
-                                type="number"
-                                step="0.000001"
-                                value={formData.coordenadas_lng}
-                                onChange={(e) => handleChange('coordenadas_lng', e.target.value)}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Ej: -74.072"
-                            />
-                        </div>
+<div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+        Longitud
+    </label>
+    <input
+        type="number"
+        step="0.00000001"
+        min="-180"
+        max="180"
+        value={formData.coordenadas_lng}
+        onChange={(e) => {
+            const value = e.target.value;
+            if (value === '' || (parseFloat(value) >= -180 && parseFloat(value) <= 180)) {
+                handleChange('coordenadas_lng', value);
+            }
+        }}
+        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        placeholder="Ej: -75.56359 (entre -180 y 180)"
+    />
+</div>
 
                         {/* Responsable */}
                         <div>
