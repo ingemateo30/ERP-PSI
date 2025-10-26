@@ -566,7 +566,7 @@ static async verificarPDF(req, res) {
         }
 
         const contrato = contratos[0];
-        const pdfExiste = contrato.documento_pdf_path && fs.existsSync(contrato.documento_pdf_path);
+        const pdfExiste  =  contrato.documento_pdf_path && fs.existsSync(contrato.documento_pdf_path);
 
         let tamanoArchivo = 0;
         if (pdfExiste) {
