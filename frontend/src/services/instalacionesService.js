@@ -345,54 +345,48 @@ export const instalacionesService = {
   /**
    * ARREGLADO: Obtener equipos disponibles para instalación
    */
-  async getEquiposDisponibles() {
-  try {
-    console.log('📦 Obteniendo equipos disponibles');
-    const response = await apiService.get('/inventory/available');
-    console.log('📦 Respuesta equipos:', response);
-
-    // Manejar diferentes formatos de respuesta
-    const equipos = response.data?.equipos || response.data || response.equipos || [];
-    
-    return {
-      success: true,
-      equipos: Array.isArray(equipos) ? equipos : []
-    };
-  } catch (error) {
-    console.error('❌ Error obteniendo equipos:', error);
-    return {
-      success: false,
-      equipos: [],
-      message: error.message
-    };
-  }
+async getClientes(params = {}) {
+    try {
+        console.log('📋 Obteniendo clientes con params:', params);
+        const response = await apiService.get('/clients', params);
+        console.log('📋 Respuesta completa clientes:', response);
+        
+        const clientes = response.data?.clientes || response.data || response.clientes || [];
+        console.log('📋 Clientes extraídos:', clientes);
+        
+        return {
+            success: true,
+            clientes: Array.isArray(clientes) ? clientes : []
+        };
+    } catch (error) {
+        console.error('❌ Error obteniendo clientes:', error);
+        return {
+            success: false,
+            clientes: []
+        };
+    }
 },
 
-async buscarClientes(termino = '') {
-  try {
-    console.log('🔍 Buscando clientes con término:', termino);
-    const response = await apiService.get('/clients', {
-      busqueda: termino,
-      limit: 50,
-      activo: 1
-    });
-    console.log('🔍 Respuesta clientes:', response);
-
-    // Manejar diferentes formatos de respuesta
-    const clientes = response.data?.clientes || response.data || response.clientes || [];
-    
-    return {
-      success: true,
-      clientes: Array.isArray(clientes) ? clientes : []
-    };
-  } catch (error) {
-    console.error('❌ Error buscando clientes:', error);
-    return {
-      success: false,
-      clientes: [],
-      message: error.message
-    };
-  }
+async getInstaladores() {
+    try {
+        console.log('👷 Obteniendo instaladores');
+        const response = await apiService.get('/users', { rol: 'instalador' });
+        console.log('👷 Respuesta completa instaladores:', response);
+        
+        const instaladores = response.data?.users || response.data || response.users || [];
+        console.log('👷 Instaladores extraídos:', instaladores);
+        
+        return {
+            success: true,
+            instaladores: Array.isArray(instaladores) ? instaladores : []
+        };
+    } catch (error) {
+        console.error('❌ Error obteniendo instaladores:', error);
+        return {
+            success: false,
+            instaladores: []
+        };
+    }
 },
 /**
  * ARREGLADO: Obtener servicios de un cliente
