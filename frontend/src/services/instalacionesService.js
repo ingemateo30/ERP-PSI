@@ -349,15 +349,15 @@ export const instalacionesService = {
   try {
     console.log('📦 Obteniendo equipos disponibles');
     const response = await apiService.get('/inventory/available');
+    console.log('📦 Respuesta equipos:', response);
 
-    if (response.success) {
-      return {
-        success: true,
-        equipos: response.data || response.equipos || []
-      };
-    }
-
-    throw new Error(response.message || 'Error obteniendo equipos');
+    // Manejar diferentes formatos de respuesta
+    const equipos = response.data?.equipos || response.data || response.equipos || [];
+    
+    return {
+      success: true,
+      equipos: Array.isArray(equipos) ? equipos : []
+    };
   } catch (error) {
     console.error('❌ Error obteniendo equipos:', error);
     return {
@@ -368,9 +368,6 @@ export const instalacionesService = {
   }
 },
 
-/**
- * ARREGLADO: Buscar clientes para instalaciones
- */
 async buscarClientes(termino = '') {
   try {
     console.log('🔍 Buscando clientes con término:', termino);
@@ -379,15 +376,15 @@ async buscarClientes(termino = '') {
       limit: 50,
       activo: 1
     });
+    console.log('🔍 Respuesta clientes:', response);
 
-    if (response.success) {
-      return {
-        success: true,
-        clientes: response.data || response.clientes || []
-      };
-    }
-
-    throw new Error(response.message || 'Error buscando clientes');
+    // Manejar diferentes formatos de respuesta
+    const clientes = response.data?.clientes || response.data || response.clientes || [];
+    
+    return {
+      success: true,
+      clientes: Array.isArray(clientes) ? clientes : []
+    };
   } catch (error) {
     console.error('❌ Error buscando clientes:', error);
     return {
@@ -397,7 +394,6 @@ async buscarClientes(termino = '') {
     };
   }
 },
-
 /**
  * ARREGLADO: Obtener servicios de un cliente
  */
