@@ -197,7 +197,7 @@ static async generarPDF(req, res) {
             INNER JOIN clientes cl ON c.cliente_id = cl.id
             LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
             LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-            WHERE c.id = ? AND c.estado = 'activo'
+            WHERE c.id = ? AND c.estado IN ('activo', 'suspendido', 'terminado')
             LIMIT 1
         `, [id]);
 
