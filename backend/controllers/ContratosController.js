@@ -333,30 +333,41 @@ static async generarPDF(req, res) {
 
 
     static async actualizarEstado(req, res) {
-        try {
-            const { id } = req.params;
-            const { estado, observaciones } = req.body;
+    try {
+        const { id } = req.params;
+        const estado = req.body.estado || req.body;
+        const observaciones = req.body.observaciones || '';
 
-            await Database.query(
-                'UPDATE contratos SET estado = ?, observaciones = ?, updated_at = NOW() WHERE id = ?',
-                [estado, observaciones, id]
-            );
+        // Validar que el estado sea un string válido
+        const estadosValidos = ['activo', 'suspendido', 'terminado', 'anulado', 'cancelado'];
+        const estadoFinal = typeof estado === 'string' ? estado : estado.estado;
 
-            res.json({
-                success: true,
-                message: 'Estado actualizado exitosamente'
-            });
-
-        } catch (error) {
-            console.error('❌ Error actualizando estado:', error);
-            res.status(500).json({
+        if (!estadosValidos.includes(estadoFinal)) {
+            return res.status(400).json({
                 success: false,
-                message: 'Error interno del servidor',
-                error: error.message
+                message: `Estado inválido. Debe ser uno de: ${estadosValidos.join(', ')}`
             });
         }
-    }
 
+        await Database.query(
+            'UPDATE contratos SET estado = ?, observaciones = ?, updated_at = NOW() WHERE id = ?',
+            [estadoFinal, observaciones, id]
+        );
+
+        res.json({
+            success: true,
+            message: 'Estado actualizado exitosamente'
+        });
+
+    } catch (error) {
+        console.error('❌ Error actualizando estado:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            error: error.message
+        });
+    }
+}
     static async obtenerEstadisticas(req, res) {
         try {
             const estadisticas = await Database.query(`
