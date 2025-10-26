@@ -186,7 +186,12 @@ const HistorialFacturacionCliente = ({ clienteId, clienteNombre }) => {
 
   const descargarFactura = async (facturaId) => {
     try {
-      const response = await fetch(`/api/v1/facturas/${facturaId}/pdf`);
+      const API_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
+const response = await fetch(`${API_URL}/facturas/${facturaId}/pdf`, {
+  headers: {
+    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+  }
+});
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);

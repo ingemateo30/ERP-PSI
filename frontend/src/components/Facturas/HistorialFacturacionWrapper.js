@@ -537,40 +537,33 @@ const cargarFacturasCliente = async () => {
     };
 
     const descargarFactura = async (facturaId) => {
-        try {
-            const endpoints = [
-                `/api/v1/facturas/${facturaId}/pdf`,
-                `/api/v1/facturacion/facturas/${facturaId}/pdf`
-            ];
-
-            for (const endpoint of endpoints) {
-                try {
-                    const response = await fetch(endpoint);
-                    if (response.ok) {
-                        const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.style.display = 'none';
-                        a.href = url;
-                        a.download = `factura_${facturaId}.pdf`;
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        document.body.removeChild(a);
-                        return;
-                    }
-                } catch (error) {
-                    console.log(`Error en ${endpoint}:`, error.message);
-                }
+    try {
+        const API_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
+        const response = await fetch(`${API_URL}/facturas/${facturaId}/pdf`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
             }
+        });
 
-            alert('No se pudo descargar la factura. Funcionalidad en desarrollo.');
-        } catch (error) {
-            console.error('Error descargando factura:', error);
-            alert('Error descargando factura');
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `factura_${facturaId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } else {
+            alert('No se pudo descargar la factura.');
         }
-    };
-
+    } catch (error) {
+        console.error('Error descargando factura:', error);
+        alert('Error descargando factura');
+    }
+};
     // ==========================================
     // RENDERIZADO PRINCIPAL
     // ==========================================
