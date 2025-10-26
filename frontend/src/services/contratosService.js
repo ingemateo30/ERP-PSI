@@ -306,207 +306,203 @@ class ContratosService {
         }
     }
 
-    /**
-     * Actualizar contrato existente
-     */
-    async actualizar(id, datosContrato) {
-        try {
-            if (!id || isNaN(id)) {
-                throw new Error('ID de contrato inválido');
-            }
-
-            console.log(`📝 Actualizando contrato ID: ${id}`);
-
-            const response = await apiService.put(`${API_BASE}/${id}`, datosContrato);
-
-            console.log('✅ Contrato actualizado exitosamente');
-            return response;
-        } catch (error) {
-            console.error('❌ Error actualizando contrato:', error);
-            throw this.handleError(error);
+   /**
+ * Actualizar contrato existente
+ */
+async actualizar(id, datosContrato) {
+    try {
+        if (!id || isNaN(id)) {
+            throw new Error('ID de contrato inválido');
         }
+
+        console.log(`📝 Actualizando contrato ID: ${id}`);
+
+        const response = await apiService.put(`${API_BASE}/${id}`, datosContrato);
+
+        console.log('✅ Contrato actualizado exitosamente');
+        return response;
+    } catch (error) {
+        console.error('❌ Error actualizando contrato:', error);
+        throw this.handleError(error);
     }
+}
 
-    /**
-     * Cambiar estado del contrato
-     */
-    async cambiarEstado(id, nuevoEstado, observaciones = '') {
-        try {
-            if (!id || isNaN(id)) {
-                throw new Error('ID de contrato inválido');
-            }
-
-            console.log(`🔄 Cambiando estado del contrato ID: ${id} a ${nuevoEstado}`);
-
-            const response = await apiService.put(`${API_BASE}/${id}/estado`, {
-                estado: nuevoEstado,
-                observaciones
-            });
-
-            console.log('✅ Estado del contrato actualizado exitosamente');
-            return response;
-        } catch (error) {
-            console.error('❌ Error cambiando estado del contrato:', error);
-            throw this.handleError(error);
+/**
+ * Cambiar estado del contrato
+ */
+async cambiarEstado(id, nuevoEstado, observaciones = '') {
+    try {
+        if (!id || isNaN(id)) {
+            throw new Error('ID de contrato inválido');
         }
+
+        console.log(`🔄 Cambiando estado del contrato ID: ${id} a ${nuevoEstado}`);
+
+        const response = await apiService.put(`${API_BASE}/${id}/estado`, {
+            estado: nuevoEstado,
+            observaciones
+        });
+
+        console.log('✅ Estado del contrato actualizado exitosamente');
+        return response;
+    } catch (error) {
+        console.error('❌ Error cambiando estado del contrato:', error);
+        throw this.handleError(error);
     }
+}
 
-    /**
-     * Eliminar/anular contrato
-     */
-    async eliminar(id, motivo = '') {
-        try {
-            if (!id || isNaN(id)) {
-                throw new Error('ID de contrato inválido');
-            }
+/**
+ * Actualizar estado del contrato (alias de cambiarEstado)
+ */
+async actualizarEstado(id, nuevoEstado, observaciones = '') {
+    return this.cambiarEstado(id, nuevoEstado, observaciones);
+}
 
-            console.log(`🗑️ Eliminando contrato ID: ${id}`);
-
-            const response = await apiService.delete(`${API_BASE}/${id}`, {
-                data: { motivo }
-            });
-
-            console.log('✅ Contrato eliminado exitosamente');
-            return response;
-        } catch (error) {
-            console.error('❌ Error eliminando contrato:', error);
-            throw this.handleError(error);
+/**
+ * Eliminar/anular contrato
+ */
+async eliminar(id, motivo = '') {
+    try {
+        if (!id || isNaN(id)) {
+            throw new Error('ID de contrato inválido');
         }
+
+        console.log(`🗑️ Eliminando contrato ID: ${id}`);
+
+        const response = await apiService.delete(`${API_BASE}/${id}`, {
+            data: { motivo }
+        });
+
+        console.log('✅ Contrato eliminado exitosamente');
+        return response;
+    } catch (error) {
+        console.error('❌ Error eliminando contrato:', error);
+        throw this.handleError(error);
     }
+}
 
-    /**
-     * Obtener estadísticas de contratos
-     */
-    async obtenerEstadisticas(filtros = {}) {
-        try {
-            console.log('📊 Obteniendo estadísticas de contratos');
+/**
+ * Obtener estadísticas de contratos
+ */
+async obtenerEstadisticas(filtros = {}) {
+    try {
+        console.log('📊 Obteniendo estadísticas de contratos');
 
-            const response = await apiService.get(`${API_BASE}/stats`, filtros);
+        const response = await apiService.get(`${API_BASE}/stats`, filtros);
 
-            console.log('✅ Estadísticas obtenidas exitosamente');
-            return response;
-        } catch (error) {
-            console.error('❌ Error obteniendo estadísticas:', error);
-            throw this.handleError(error);
+        console.log('✅ Estadísticas obtenidas exitosamente');
+        return response;
+    } catch (error) {
+        console.error('❌ Error obteniendo estadísticas:', error);
+        throw this.handleError(error);
+    }
+}
+
+/**
+ * Obtener contratos próximos a vencer
+ */
+async obtenerProximosAVencer(dias = 30) {
+    try {
+        console.log(`⏰ Obteniendo contratos próximos a vencer en ${dias} días`);
+
+        const fechaLimite = new Date();
+        fechaLimite.setDate(fechaLimite.getDate() + dias);
+
+        const params = {
+            estado: 'activo',
+            fecha_vencimiento_hasta: fechaLimite.toISOString().split('T')[0]
+        };
+
+        return await this.obtenerTodos(params);
+    } catch (error) {
+        console.error('❌ Error obteniendo contratos próximos a vencer:', error);
+        throw this.handleError(error);
+    }
+}
+
+/**
+ * Verificar disponibilidad de PDF
+ */
+async verificarPDF(id) {
+    try {
+        if (!id || isNaN(id)) {
+            throw new Error('ID de contrato inválido');
         }
+
+        console.log(`🔍 Verificando disponibilidad del PDF para contrato ID: ${id}`);
+
+        const blob = await apiService.request(`${API_BASE}/${id}/pdf`, {
+            method: 'HEAD'
+        });
+
+        console.log('✅ PDF verificado exitosamente');
+
+        return {
+            disponible: true,
+            contentType: 'application/pdf',
+            size: 0,
+            url: `${(process.env.NODE_ENV === 'development'
+             ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1')
+            : process.env.REACT_APP_API_URL)}/contratos/${id}/pdf`
+        };
+    } catch (error) {
+        console.error('❌ Error verificando PDF:', error);
+
+        return {
+            disponible: false,
+            error: error.message
+        };
     }
+}
 
-    /**
-     * Obtener contratos próximos a vencer
-     */
-    async obtenerProximosAVencer(dias = 30) {
-        try {
-            console.log(`⏰ Obteniendo contratos próximos a vencer en ${dias} días`);
+/**
+ * Exportar contratos a Excel
+ */
+async exportarExcel(filtros = {}) {
+    try {
+        console.log('📊 Exportando contratos a Excel');
 
-            // Calcular fecha límite
-            const fechaLimite = new Date();
-            fechaLimite.setDate(fechaLimite.getDate() + dias);
+        const response = await apiService.get(`${API_BASE}/exportar`, {
+            params: filtros,
+            responseType: 'blob'
+        });
 
-            const params = {
-                estado: 'activo',
-                fecha_vencimiento_hasta: fechaLimite.toISOString().split('T')[0]
-            };
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `contratos_${new Date().toISOString().split('T')[0]}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
 
-            return await this.obtenerTodos(params);
-        } catch (error) {
-            console.error('❌ Error obteniendo contratos próximos a vencer:', error);
-            throw this.handleError(error);
-        }
+        console.log('✅ Contratos exportados exitosamente');
+        return response;
+    } catch (error) {
+        console.error('❌ Error exportando contratos:', error);
+        throw this.handleError(error);
     }
+}
 
-    /**
-     * Verificar disponibilidad de PDF
-     */
-    // Mantén tu método verificarPDF con la ruta original, solo cambia fetch por apiService:
+/**
+ * Manejo centralizado de errores
+ */
+handleError(error) {
+    if (error.response) {
+        const message = error.response.data?.message || error.response.statusText || 'Error del servidor';
+        const status = error.response.status;
 
-    async verificarPDF(id) {
-        try {
-            if (!id || isNaN(id)) {
-                throw new Error('ID de contrato inválido');
-            }
+        console.error(`❌ Error ${status}:`, message);
 
-            console.log(`🔍 Verificando disponibilidad del PDF para contrato ID: ${id}`);
-
-            // CORRECCIÓN: Usar apiService con tu ruta original en lugar de fetch directo
-           const blob = await apiService.request(`${API_BASE}/${id}/pdf`, {
-                method: 'HEAD'
-            });
-
-            console.log('✅ PDF verificado exitosamente');
-
-            // Mantener la misma estructura de respuesta que tenías
-            return {
-                disponible: true, // Si llegó aquí, el PDF está disponible
-                contentType: 'application/pdf',
-                size: 0, // HEAD no retorna size en apiService
-                url: `${(process.env.NODE_ENV === 'development'
-                 ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1')
-                : process.env.REACT_APP_API_URL)}/contratos/${id}/pdf`
-
-            };
-        } catch (error) {
-            console.error('❌ Error verificando PDF:', error);
-
-            // Mantener la misma estructura de error que tenías
-            return {
-                disponible: false,
-                error: error.message
-            };
-        }
+        return new Error(`Error ${status}: ${message}`);
+    } else if (error.request) {
+        console.error('❌ Error de red:', error.request);
+        return new Error('Error de conexión con el servidor');
+    } else {
+        console.error('❌ Error de configuración:', error.message);
+        return new Error(error.message || 'Error desconocido');
     }
-
-    /**
-     * Exportar contratos a Excel
-     */
-    async exportarExcel(filtros = {}) {
-        try {
-            console.log('📊 Exportando contratos a Excel');
-
-            const response = await apiService.get(`${API_BASE}/exportar`, {
-                params: filtros,
-                responseType: 'blob'
-            });
-
-            // Crear descarga automática
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `contratos_${new Date().toISOString().split('T')[0]}.xlsx`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-
-            console.log('✅ Contratos exportados exitosamente');
-            return response;
-        } catch (error) {
-            console.error('❌ Error exportando contratos:', error);
-            throw this.handleError(error);
-        }
-    }
-
-    /**
-     * Manejo centralizado de errores
-     */
-    handleError(error) {
-        if (error.response) {
-            // Error de respuesta del servidor
-            const message = error.response.data?.message || error.response.statusText || 'Error del servidor';
-            const status = error.response.status;
-
-            console.error(`❌ Error ${status}:`, message);
-
-            return new Error(`Error ${status}: ${message}`);
-        } else if (error.request) {
-            // Error de red
-            console.error('❌ Error de red:', error.request);
-            return new Error('Error de conexión con el servidor');
-        } else {
-            // Error de configuración
-            console.error('❌ Error de configuración:', error.message);
-            return new Error(error.message || 'Error desconocido');
-        }
-    }
+}
 }
 
 // Exportar instancia única del servicio
