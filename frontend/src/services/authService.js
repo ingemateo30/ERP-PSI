@@ -102,67 +102,70 @@ class AuthService {
         }
     }
 
-    async login(email, password) {
-        try {
-            console.log('🚀 FRONTEND - Iniciando login con:', email);
+async login(email, password) {
+    try {
+        console.log('🚀 FRONTEND - Iniciando login con:', email);
 
-            const data = await this.makeRequest(`${this.baseURL}/login`, {
-                method: 'POST',
-                body: JSON.stringify({ email, password }),
-            });
+        const data = await this.makeRequest(`${this.baseURL}/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+        });
 
-            console.log('📦 FRONTEND - Login data recibida:', data);
-            console.log('🔍 FRONTEND - Verificando data.success:', data.success);
-            console.log('🔍 FRONTEND - Verificando data.data:', data.data);
+        console.log('📦 FRONTEND - Login data recibida:', data);
+        console.log('🔍 FRONTEND - Verificando data.success:', data.success);
+        console.log('🔍 FRONTEND - Verificando data.data:', data.data);
 
-            if (!data.success) {
-                console.error('❌ FRONTEND - Login no exitoso:', data.message);
-                throw new Error(data.message || 'Login falló');
-            }
-
-            if (!data.data) {
-                console.error('❌ FRONTEND - No hay data en respuesta');
-                throw new Error('Respuesta de login inválida: falta data');
-            }
-
-            console.log('🔍 FRONTEND - data.data:', data.data);
-            const { user, tokens } = data.data;
-            console.log('🔍 FRONTEND - user extraído:', user);
-            console.log('🔍 FRONTEND - tokens extraído:', tokens);
-
-            if (!tokens || !tokens.accessToken) {
-                console.error('❌ FRONTEND - No hay tokens o accessToken');
-                throw new Error('Respuesta de login inválida: falta token de acceso');
-            }
-
-            if (!user || !user.id) {
-                console.error('❌ FRONTEND - No hay user o user.id');
-                throw new Error('Respuesta de login inválida: falta información del usuario');
-            }
-
-            console.log('✅ FRONTEND - Guardando token:', tokens.accessToken.substring(0, 20) + '...');
-            this.setToken(tokens.accessToken);
-
-            const normalizedUser = {
-                id: user.id,
-                email: user.email,
-                nombre: user.nombre,
-                telefono: user.telefono,
-                role: user.rol,
-                rol: user.rol,
-                activo: user.activo || true,
-                ultimo_acceso: user.ultimo_acceso
-            };
-
-            console.log('✅ FRONTEND - Guardando usuario:', normalizedUser);
-            this.setUser(normalizedUser);
-
-            return data;
-        } catch (error) {
-            console.error('❌ FRONTEND - Error completo en login:', error);
-            throw new Error(error.message || 'Error al iniciar sesión');
+        if (!data.success) {
+            console.error('❌ FRONTEND - Login no exitoso:', data.message);
+            throw new Error(data.message || 'Login falló');
         }
+
+        if (!data.data) {
+            console.error('❌ FRONTEND - No hay data en respuesta');
+            throw new Error('Respuesta de login inválida: falta data');
+        }
+
+        console.log('🔍 FRONTEND - data.data:', data.data);
+        const { user, tokens } = data.data;
+        console.log('🔍 FRONTEND - user extraído:', user);
+        console.log('🔍 FRONTEND - tokens extraído:', tokens);
+
+        if (!tokens || !tokens.accessToken) {
+            console.error('❌ FRONTEND - No hay tokens o accessToken');
+            throw new Error('Respuesta de login inválida: falta token de acceso');
+        }
+
+        if (!user || !user.id) {
+            console.error('❌ FRONTEND - No hay user o user.id');
+            throw new Error('Respuesta de login inválida: falta información del usuario');
+        }
+
+        console.log('✅ FRONTEND - Guardando token:', tokens.accessToken.substring(0, 20) + '...');
+        this.setToken(tokens.accessToken);
+
+        const normalizedUser = {
+            id: user.id,
+            email: user.email,
+            nombre: user.nombre,
+            telefono: user.telefono,
+            role: user.rol,
+            rol: user.rol,
+            activo: user.activo || true,
+            ultimo_acceso: user.ultimo_acceso
+        };
+
+        console.log('✅ FRONTEND - Guardando usuario:', normalizedUser);
+        this.setUser(normalizedUser);
+
+        return data;
+    } catch (error) {
+        console.error('❌ FRONTEND - Error completo en login:', error);
+        throw new Error(error.message || 'Error al iniciar sesión');
     }
+}
 
     // Registrar usuario
     async register(userData) {
