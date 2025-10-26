@@ -298,23 +298,24 @@ export const instalacionesService = {
   },
 
   async getEquiposDisponibles() {
-    try {
-      console.log('📦 Obteniendo equipos disponibles');
-      const response = await apiService.get('/inventory/available');
-      console.log('📦 Respuesta equipos:', response);
+  try {
+    console.log('📦 Obteniendo equipos disponibles');
+    const response = await apiService.get('/inventory/available');
+    console.log('📦 Respuesta equipos:', response);
 
-      const equipos = response.data?.equipos || response.data || response.equipos || [];
-      
-      return {
-        success: true,
-        equipos: Array.isArray(equipos) ? equipos : []
-      };
-    } catch (error) {
-      console.error('❌ Error obteniendo equipos:', error);
-      return { success: false, equipos: [] };
-    }
-  },
-
+    // CORRECCIÓN: Los equipos están en message, no en data
+    const equipos = response.message || response.data?.equipos || response.data || response.equipos || [];
+    console.log('📦 Equipos extraídos:', equipos);
+    
+    return {
+      success: true,
+      equipos: Array.isArray(equipos) ? equipos : []
+    };
+  } catch (error) {
+    console.error('❌ Error obteniendo equipos:', error);
+    return { success: false, equipos: [] };
+  }
+},
   async getServiciosCliente(clienteId) {
     try {
       console.log('🔍 Obteniendo servicios del cliente:', clienteId);
