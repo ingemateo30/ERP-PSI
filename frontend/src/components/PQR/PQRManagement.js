@@ -515,7 +515,7 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
         asunto: '',
         descripcion: '',
         prioridad: 'media',
-        servicio_afectado: 'ninguno'
+        servicio_afectado: 'internet'
     });
     const [loading, setLoading] = useState(false);
     const [clientes, setClientes] = useState([]);
@@ -534,7 +534,7 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                 asunto: pqr.asunto || '',
                 descripcion: pqr.descripcion || '',
                 prioridad: pqr.prioridad || 'media',
-                servicio_afectado: pqr.servicio_afectado || 'ninguno',
+                servicio_afectado: pqr.servicio_afectado || 'internet',
                 estado: pqr.estado || 'abierto',
                 respuesta: pqr.respuesta || '',
                 usuario_asignado: pqr.usuario_asignado || '',

@@ -205,7 +205,7 @@ router.post('/', async (req, res) => {
             cliente_id,
             tipo,
             categoria,
-            servicio_afectado = 'ninguno',
+            servicio_afectado = 'internet',
             medio_recepcion,
             asunto,
             descripcion,
