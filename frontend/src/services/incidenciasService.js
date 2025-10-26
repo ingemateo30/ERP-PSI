@@ -428,6 +428,74 @@ class IncidenciasService {
             version: '1.0.0'
         };
     }
+    /**
+ * Exportar incidencias a CSV
+ */
+exportarCSV(data, filename) {
+    try {
+        console.log('📊 Exportando incidencias a CSV:', data.length, 'registros');
+        
+        if (!data || data.length === 0) {
+            throw new Error('No hay datos para exportar');
+        }
+
+        // Definir columnas
+        const headers = [
+            'Número',
+            'Tipo',
+            'Estado',
+            'Municipio',
+            'Descripción',
+            'Usuarios Afectados',
+            'Responsable',
+            'Fecha Inicio',
+            'Fecha Fin',
+            'Duración (horas)',
+            'Coordenadas'
+        ];
+
+        // Convertir datos a filas CSV
+        const rows = data.map(inc => [
+            inc.numero_incidencia || '',
+            inc.tipo_incidencia || '',
+            inc.estado || '',
+            inc.municipio_nombre || '',
+            inc.descripcion || '',
+            inc.usuarios_afectados || '0',
+            inc.responsable_nombre || 'Sin asignar',
+            inc.fecha_inicio ? new Date(inc.fecha_inicio).toLocaleString() : '',
+            inc.fecha_fin ? new Date(inc.fecha_fin).toLocaleString() : '',
+            inc.duracion_horas || '',
+            (inc.coordenadas_lat && inc.coordenadas_lng) ? `${inc.coordenadas_lat}, ${inc.coordenadas_lng}` : ''
+        ]);
+
+        // Crear contenido CSV
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        // Crear blob y descargar
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log('✅ CSV de incidencias exportado exitosamente');
+        return { success: true };
+        
+    } catch (error) {
+        console.error('❌ Error exportando CSV de incidencias:', error);
+        throw error;
+    }
+}
 }
 
 // Exportar una instancia única del servicio
