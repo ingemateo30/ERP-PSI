@@ -225,7 +225,7 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
   } catch (error) {
     console.error('❌ Error guardando instalación:', error);
     
-    // Mostrar mensaje amigable según el tipo de error
+    // Mostrar mensaje amigable
     if (error.message && error.message.includes('Ya existe una instalación pendiente')) {
       setError('⚠️ Este servicio ya tiene una instalación pendiente. Por favor, completa o cancela la instalación existente antes de crear una nueva.');
     } else if (error.message) {
@@ -233,6 +233,9 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
     } else {
       setError('Ocurrió un error desconocido al guardar la instalación.');
     }
+    
+    // RE-LANZAR el error para que lo capture onSubmit
+    throw error;
   } finally {
     setProcesando(false);
   }
