@@ -213,6 +213,15 @@ const InstalacionModal = ({
       await onGuardar(formData);
     } catch (error) {
       console.error('❌ Error en submit:', error);
+      
+      // Mostrar mensaje amigable según el tipo de error
+      if (error.message && error.message.includes('Ya existe una instalación pendiente')) {
+        alert('⚠️ Este servicio ya tiene una instalación pendiente.\n\nPor favor, completa o cancela la instalación existente antes de crear una nueva.');
+      } else if (error.message) {
+        alert(`❌ Error al guardar la instalación:\n\n${error.message}`);
+      } else {
+        alert('❌ Ocurrió un error desconocido al guardar la instalación.');
+      }
     } finally {
       setProcesando(false);
     }
@@ -239,7 +248,6 @@ const InstalacionModal = ({
 
     return errores;
   };
-
   // ==========================================
   // FUNCIONES DE UTILIDAD
   // ==========================================
