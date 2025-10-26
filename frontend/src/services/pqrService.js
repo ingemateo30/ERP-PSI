@@ -192,39 +192,41 @@ class PQRService {
     // ==========================================
 
     // Obtener usuarios disponibles para asignar PQRs
-    async getUsuariosDisponibles() {
-        try {
-            // ✅ Cambiado aquí: usar apiBase desde .env
-            const apiBase = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
-            const url = `${apiBase.replace(/\/$/, '')}/users`; // Endpoint específico para usuarios
-            const response = await this.makeRequest(url);
+   async getUsuariosDisponibles() {
+    try {
+        const apiBase = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
+        const url = `${apiBase.replace(/\/$/, '')}/users`;
+        const response = await this.makeRequest(url);
+        
+        console.log('👥 Respuesta usuarios PQR:', response);
+        
+        if (response && response.success) {
+            // El backend devuelve usuarios en message.users
+            const usuarios = response.message?.users || response.data?.users || response.usuarios || response.data || [];
+            console.log('👥 Usuarios extraídos:', usuarios);
             
-            // Asegurar estructura de respuesta consistente
-            if (response && response.success) {
-                return {
-                    success: true,
-                    usuarios: response.usuarios || response.data || []
-                };
-            }
-            
-            // Si no tiene la estructura esperada, adaptarla
             return {
                 success: true,
-                usuarios: Array.isArray(response) ? response : []
-            };
-            
-        } catch (error) {
-            console.error('❌ Error obteniendo usuarios disponibles:', error);
-            
-            // Retornar estructura consistente en caso de error
-            return {
-                success: false,
-                usuarios: [],
-                error: error.message
+                usuarios: Array.isArray(usuarios) ? usuarios : []
             };
         }
+        
+        // Si no tiene la estructura esperada, adaptarla
+        return {
+            success: true,
+            usuarios: Array.isArray(response) ? response : []
+        };
+        
+    } catch (error) {
+        console.error('❌ Error obteniendo usuarios disponibles:', error);
+        
+        return {
+            success: false,
+            usuarios: [],
+            error: error.message
+        };
     }
-
+}
     // Obtener todos los usuarios del sistema
     async getUsuarios() {
         try {
