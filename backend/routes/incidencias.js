@@ -422,7 +422,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
     try {
         console.log('➕ POST /api/incidencias - Creando incidencia');
-
+        
         const {
             tipo,
             titulo,
@@ -435,7 +435,7 @@ router.post('/', requireRole('administrador', 'supervisor', 'instalador'), async
             responsable_id,
             observaciones
         } = req.body;
-
+        
         // Validaciones básicas
         if (!tipo || !titulo || !descripcion || !municipio_id) {
             return res.status(400).json({
@@ -443,9 +443,27 @@ router.post('/', requireRole('administrador', 'supervisor', 'instalador'), async
                 message: 'Campos requeridos: tipo, titulo, descripcion, municipio_id'
             });
         }
-
+        
+        // Generar número único de incidencia
+        const year = new Date().getFullYear();
+        const lastIncidencia = await db.query(
+            'SELECT numero_incidencia FROM incidencias_servicio WHERE numero_incidencia LIKE ? ORDER BY id DESC LIMIT 1',
+            [`INC-${year}%`]
+        );
+        
+        let numeroIncidencia;
+        if (lastIncidencia.length > 0) {
+            const lastNumber = parseInt(lastIncidencia[0].numero_incidencia.split('-')[2]);
+            numeroIncidencia = `INC-${year}-${String(lastNumber + 1).padStart(6, '0')}`;
+        } else {
+            numeroIncidencia = `INC-${year}-000001`;
+        }
+        
+        console.log('📝 Número de incidencia generado:', numeroIncidencia);
+        
         const result = await db.query(`
             INSERT INTO incidencias_servicio (
+                numero_incidencia,
                 tipo_incidencia,
                 descripcion,
                 municipio_id,
@@ -458,8 +476,9 @@ router.post('/', requireRole('administrador', 'supervisor', 'instalador'), async
                 estado,
                 fecha_inicio,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'reportado', NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reportado', NOW(), NOW())
         `, [
+            numeroIncidencia,
             tipo,
             descripcion,
             municipio_id,
@@ -470,15 +489,15 @@ router.post('/', requireRole('administrador', 'supervisor', 'instalador'), async
             responsable_id || null,
             observaciones || null
         ]);
-
+        
         console.log(`✅ Incidencia creada con ID: ${result.insertId}`);
-
+        
         res.status(201).json({
             success: true,
-            data: { id: result.insertId },
+            data: { id: result.insertId, numero_incidencia: numeroIncidencia },
             message: 'Incidencia creada exitosamente'
         });
-
+        
     } catch (error) {
         console.error('❌ Error creando incidencia:', error);
         res.status(500).json({
