@@ -527,6 +527,74 @@ class PQRService {
         const prioridadObj = prioridades.find(p => p.value === prioridad);
         return prioridadObj ? prioridadObj.color : 'gray';
     }
+    /**
+ * Exportar PQRs a CSV
+ */
+exportarCSV(data, filename) {
+    try {
+        console.log('📊 Exportando a CSV:', data.length, 'registros');
+        
+        if (!data || data.length === 0) {
+            throw new Error('No hay datos para exportar');
+        }
+
+        // Definir columnas
+        const headers = [
+            'Número Radicado',
+            'Cliente',
+            'Tipo',
+            'Categoría',
+            'Estado',
+            'Prioridad',
+            'Fecha Recepción',
+            'Asunto',
+            'Descripción',
+            'Respuesta',
+            'Usuario Asignado'
+        ];
+
+        // Convertir datos a filas CSV
+        const rows = data.map(pqr => [
+            pqr.numero_radicado || '',
+            pqr.cliente_nombre || '',
+            pqr.tipo || '',
+            pqr.categoria || '',
+            pqr.estado || '',
+            pqr.prioridad || '',
+            pqr.fecha_recepcion ? new Date(pqr.fecha_recepcion).toLocaleDateString() : '',
+            pqr.asunto || '',
+            pqr.descripcion || '',
+            pqr.respuesta || '',
+            pqr.usuario_asignado_nombre || ''
+        ]);
+
+        // Crear contenido CSV
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        // Crear blob y descargar
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log('✅ CSV exportado exitosamente');
+        return { success: true };
+        
+    } catch (error) {
+        console.error('❌ Error exportando CSV:', error);
+        throw error;
+    }
+}
 }
 
 // Exportar instancia única del servicio
