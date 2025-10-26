@@ -351,9 +351,6 @@ async cambiarEstado(id, nuevoEstado, observaciones = '') {
     }
 }
 
-/**
- * Actualizar estado del contrato (alias de cambiarEstado)
- */
 async actualizarEstado(id, nuevoEstado, observaciones = '') {
     return this.cambiarEstado(id, nuevoEstado, observaciones);
 }
@@ -379,6 +376,10 @@ async eliminar(id, motivo = '') {
         console.error('❌ Error eliminando contrato:', error);
         throw this.handleError(error);
     }
+}
+
+async anularContrato(id, motivo = '') {
+    return this.eliminar(id, motivo);
 }
 
 /**
