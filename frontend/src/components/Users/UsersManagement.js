@@ -139,6 +139,63 @@ const UsersManagement = () => {
         setStatsLoading(false);
     }
 };
+const handleExportarCSV = () => {
+    try {
+        console.log('📊 Exportando usuarios a CSV:', users.length, 'registros');
+        
+        if (!users || users.length === 0) {
+            alert('No hay datos para exportar');
+            return;
+        }
+
+        // Definir columnas
+        const headers = [
+            'Nombre',
+            'Email',
+            'Teléfono',
+            'Rol',
+            'Estado',
+            'Último Acceso',
+            'Fecha Creación'
+        ];
+
+        // Convertir datos a filas CSV
+        const rows = users.map(user => [
+            user.nombre || '',
+            user.email || '',
+            user.telefono || '',
+            user.rol || '',
+            user.activo ? 'Activo' : 'Inactivo',
+            user.ultimo_acceso ? new Date(user.ultimo_acceso).toLocaleString() : 'Nunca',
+            user.created_at ? new Date(user.created_at).toLocaleDateString() : ''
+        ]);
+
+        // Crear contenido CSV
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        // Crear blob y descargar
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', `usuarios_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log('✅ CSV exportado exitosamente');
+        
+    } catch (error) {
+        console.error('❌ Error exportando CSV:', error);
+        alert('Error al exportar: ' + error.message);
+    }
+};
 
     const handleSearch = (searchParams) => {
         console.log('🔍 Aplicando nuevos filtros:', searchParams);
