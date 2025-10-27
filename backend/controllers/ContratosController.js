@@ -60,15 +60,14 @@ static async obtenerTodos(req, res) {
             params.push(cliente_id);
         }
 
-        // Filtro especial para firma de contratos (prioridad sobre estado)
-        if (para_firma === 'true' || para_firma === true) {
-            console.log('🖊️ Filtrando contratos para firma (solo activos con PDF)');
-            query += ' AND c.estado = ? AND c.pdf_path IS NOT NULL';
-            params.push('activo');
-        } else if (estado) {
+        if (estado) {
             query += ' AND c.estado = ?';
             params.push(estado);
         }
+        if (para_firma === 'true' || para_firma === true) {
+    query += ' AND c.estado = ? AND c.pdf_path IS NOT NULL';
+    params.push('activo');
+}
 
         if (tipo_contrato) {
             query += ' AND c.tipo_contrato = ?';
