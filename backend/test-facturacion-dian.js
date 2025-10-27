@@ -7,7 +7,7 @@
 // UBICACIÓN: backend/test-facturacion-dian.js
 // EJECUTAR: node test-facturacion-dian.js
 // =========================================
-
+require('dotenv').config();
 const crypto = require('crypto');
 const { Database } = require('./models/Database');
 
