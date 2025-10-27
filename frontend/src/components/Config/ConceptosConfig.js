@@ -111,13 +111,19 @@ const ConceptosConfig = () => {
   const loadStats = async () => {
     try {
       const response = await configService.getConceptosStats();
-      if (response && response.success) {
-        setStats(response.data);
+      if (response && response.success && response.data) {
+        const { general, por_tipo } = response.data;
+        setStats({
+          total_conceptos: general.total_general || 0,
+          conceptos_activos: general.activos_general || 0,
+          conceptos_inactivos: general.inactivos_general || 0,
+          tipos: por_tipo ? por_tipo.length : 0
+        });
       }
     } catch (err) {
       console.warn('⚠️ Error cargando estadísticas:', err);
     }
-  };
+};
 
   // Filtrar conceptos
   const filteredConceptos = useMemo(() => {
