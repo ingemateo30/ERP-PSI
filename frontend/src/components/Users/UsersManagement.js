@@ -434,7 +434,7 @@ const handleExportarCSV = () => {
                     {/* Actions */}
                     <div className="flex gap-2">
                         <button
-                            onClick={() => alert('Funcionalidad de exportar en desarrollo')}
+                            onClick={handleExportarCSV}
                             className="flex items-center px-3 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                         >
                             <Download size={16} className="mr-2" />
