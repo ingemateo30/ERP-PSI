@@ -127,48 +127,49 @@ class ReportesRegulatoriosController {
     }
 
     // Reporte de Planes Tarifarios (Res. 6333 - T.1.2)
-    async generarReportePlanesTarifarios(req, res) {
-        try {
-            const { anno, semestre } = req.query;
-            
-            const query = `
-                SELECT 
-                    ? as ANNO,
-                    ? as SEMESTRE,
-                    ps.codigo as CODIGO_PLAN,
-                    ps.nombre as NOMBRE_PLAN,
-                    c.ciudad_id as ID_MUNICIPIO,
-                    CASE 
-                        WHEN c.estrato IN ('1','2','3') THEN 1
-                        ELSE 2
-                    END as ID_SEGMENTO_PLANES,
-                    ROUND(ps.precio * (1 + cfg.porcentaje_iva/100), 2) as VALOR_PLAN_IMPUESTOS,
-                    ps.precio as VALOR_PLAN,
-                    CASE ps.tipo
-                        WHEN 'internet' THEN 1
-                        WHEN 'television' THEN 2
-                        WHEN 'combo' THEN 3
-                    END as ID_MODALIDAD_PLAN,
-                    DATE_FORMAT(ps.created_at, '%Y-%m-%d') as FECHA_INICIO,
-                    NULL as FECHA_FIN,
-                    CASE WHEN ps.tipo IN ('combo') THEN 'SI' ELSE 'NO' END as TIENE_TELEFONIA_FIJA,
-                    CASE WHEN ps.tipo IN ('combo') THEN ps.codigo ELSE NULL END as CODIGO_PLAN_TEL_FIJA,
-                    CASE WHEN ps.tipo IN ('combo') THEN 0 ELSE NULL END as TARIFA_TELEFONIA_FIJA,
-                    CASE WHEN ps.tipo IN ('combo') THEN 0 ELSE NULL END as CANTIDAD_MINUTOS,
-                    CASE WHEN ps.tipo IN ('internet', 'combo') THEN 'SI' ELSE 'NO' END as TIENE_INTERNET_FIJO,
-                    CASE WHEN ps.tipo IN ('internet', 'combo') THEN ps.codigo ELSE NULL END as CODIGO_PLAN_INT_FI,
-                    CASE WHEN ps.tipo IN ('internet', 'combo') THEN ps.precio ELSE NULL END as TARIFA_MENSUAL_INTERNET,
-                    ps.velocidad_bajada as VELOCIDAD_OFRECIDA_BAJADA,
-                    ps.velocidad_subida as VELOCIDAD_OFRECIDA_SUBIDA,
-                    1 as ID_TECNOLOGIA
-                FROM planes_servicio ps
-                CROSS JOIN configuracion_empresa cfg
-                LEFT JOIN servicios_cliente sc ON ps.id = sc.plan_id
-                LEFT JOIN clientes c ON sc.cliente_id = c.id
-                WHERE ps.activo = 1
-                GROUP BY ps.id, c.ciudad_id
-                ORDER BY ps.codigo, c.ciudad_id
-            `;
+async generarReportePlanesTarifarios(req, res) {
+    try {
+        const { anno, semestre } = req.query;
+        
+        const query = `
+            SELECT 
+                ? as ANNO,
+                ? as SEMESTRE,
+                ps.codigo as CODIGO_PLAN,
+                ps.nombre as NOMBRE_PLAN,
+                c.ciudad_id as ID_MUNICIPIO,
+                CASE 
+                    WHEN c.estrato IN ('1','2','3') THEN 1
+                    ELSE 2
+                END as ID_SEGMENTO_PLANES,
+                ROUND(ps.precio * (1 + cfg.porcentaje_iva/100), 2) as VALOR_PLAN_IMPUESTOS,
+                ps.precio as VALOR_PLAN,
+                CASE ps.tipo
+                    WHEN 'internet' THEN 1
+                    WHEN 'television' THEN 2
+                    WHEN 'combo' THEN 3
+                END as ID_MODALIDAD_PLAN,
+                DATE_FORMAT(ps.created_at, '%Y-%m-%d') as FECHA_INICIO,
+                NULL as FECHA_FIN,
+                CASE WHEN ps.tipo IN ('combo') THEN 'SI' ELSE 'NO' END as TIENE_TELEFONIA_FIJA,
+                CASE WHEN ps.tipo IN ('combo') THEN ps.codigo ELSE NULL END as CODIGO_PLAN_TEL_FIJA,
+                CASE WHEN ps.tipo IN ('combo') THEN 0 ELSE NULL END as TARIFA_TELEFONIA_FIJA,
+                CASE WHEN ps.tipo IN ('combo') THEN 0 ELSE NULL END as CANTIDAD_MINUTOS,
+                CASE WHEN ps.tipo IN ('internet', 'combo') THEN 'SI' ELSE 'NO' END as TIENE_INTERNET_FIJO,
+                CASE WHEN ps.tipo IN ('internet', 'combo') THEN ps.codigo ELSE NULL END as CODIGO_PLAN_INT_FI,
+                CASE WHEN ps.tipo IN ('internet', 'combo') THEN ps.precio ELSE NULL END as TARIFA_MENSUAL_INTERNET,
+                ps.velocidad_bajada as VELOCIDAD_OFRECIDA_BAJADA,
+                ps.velocidad_subida as VELOCIDAD_OFRECIDA_SUBIDA,
+                1 as ID_TECNOLOGIA
+            FROM planes_servicio ps
+            CROSS JOIN configuracion_empresa cfg
+            LEFT JOIN servicios_cliente sc ON ps.id = sc.plan_id
+            LEFT JOIN clientes c ON sc.cliente_id = c.id
+            WHERE ps.activo = 1
+            GROUP BY ps.id, ps.codigo, ps.nombre, ps.precio, ps.tipo, ps.created_at, 
+                     ps.velocidad_bajada, ps.velocidad_subida, c.ciudad_id, c.estrato, cfg.porcentaje_iva
+            ORDER BY ps.codigo, c.ciudad_id
+        `;
             
             const datos = await this.db.query(query, [anno, semestre]);
             
