@@ -19,7 +19,12 @@ const ConceptosConfig = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({
+    total_conceptos: 0,
+    conceptos_activos: 0,
+    conceptos_inactivos: 0,
+    tipos: 0
+});
   
   // Estados para filtros y búsqueda
   const [searchTerm, setSearchTerm] = useState('');
