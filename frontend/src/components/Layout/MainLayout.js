@@ -116,7 +116,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     {
       icon: <CreditCard size={22} />,
       label: 'Pagos',
-      path: '/pagos',
+      path: '/cruce-pagos',
       permission: 'administrador'
     }
   ];
