@@ -112,6 +112,12 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       label: 'Historial Facturas',
       path: '/historial-facturas',
       permission: 'supervisor'
+    },
+    {
+      icon: <DollarSign size={22} />,
+      label: 'Cruce de Pagos',
+      path: '/cruce-pagos',
+      permission: 'administrador'
     }
   ];
 

@@ -39,6 +39,7 @@ const HistorialFacturacionCliente = lazy(() => import('./components/Facturas/His
 const VisorFirmaPDF = lazy(() => import('./components/Contratos/VisorFirmaPDF'));
 const FirmaContratosWrapper = lazy(() => import('./components/Contratos/FirmaContratosWrapper'));
 const HistorialFacturacionWrapper = lazy(() => import('./components/Facturas/HistorialFacturacionWrapper'));
+const CrucePagosBancarios = lazy(() => import('./components/Facturas/CrucePagosBancarios'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -350,6 +351,16 @@ function App() {
                       <HistorialFacturacionWrapper />
                     </MainLayout>
                   </ ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cruce-pagos"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Cruce de Pagos Bancarios" subtitle="Registrar pagos de facturas">
+                      <CrucePagosBancarios />
+                    </MainLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route

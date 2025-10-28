@@ -62,7 +62,7 @@ const CrucePagosBancarios = () => {
         const response = await apiService.get(`/facturacion/facturas?${params}`);
         
         if (response && response.success) {
-            setFacturasPendientes(response.data || []);
+            const facturas = Array.isArray(response.data) ? response.data : (response.data?.facturas || response.data?.data || []); setFacturasPendientes(facturas);
         }
     } catch (error) {
         console.error('Error cargando facturas:', error);
