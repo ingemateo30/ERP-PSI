@@ -127,7 +127,7 @@ static async obtenerTodos(req, res) {
           cl.nombre as cliente_nombre,
           cl.identificacion as cliente_identificacion,
           cl.telefono as cliente_telefono,
-          cl.email as cliente_email,
+          cl.correo as cliente_email,
           cl.direccion as cliente_direccion,
           cl.estrato as cliente_estrato
         FROM contratos c
