@@ -273,28 +273,42 @@ const FirmaContratosWrapper = () => {
     };
 
     const descargarContrato = async (contratoId) => {
-        try {
-            const response = await fetch(`/api/v1/contratos/${contratoId}/pdf`);
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `contrato_${contratoId}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            } else {
-                alert('Error al descargar el contrato');
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://45.173.69.5:3000/api/v1/contratos/${contratoId}/pdf`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
             }
-        } catch (error) {
-            console.error('Error descargando contrato:', error);
-            alert('Error al descargar el contrato');
+        });
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            
+            // Verificar que el blob no esté vacío
+            if (blob.size === 0) {
+                alert('El PDF está vacío. Verifica que el contrato tenga un PDF generado.');
+                return;
+            }
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `contrato_${contratoId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } else {
+            const errorText = await response.text();
+            console.error('Error del servidor:', errorText);
+            alert('Error al descargar el contrato: ' + response.statusText);
         }
-    };
-
+    } catch (error) {
+        console.error('Error descargando contrato:', error);
+        alert('Error al descargar el contrato: ' + error.message);
+    }
+};
     const handleBusquedaChange = (e) => {
         const valor = e.target.value;
         setBusquedaContrato(valor);
