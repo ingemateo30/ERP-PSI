@@ -114,9 +114,9 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       permission: 'supervisor'
     },
     {
-      icon: <DollarSign size={22} />,
-      label: 'Cruce de Pagos',
-      path: '/cruce-pagos',
+      icon: <CreditCard size={22} />,
+      label: 'Pagos',
+      path: '/pagos',
       permission: 'administrador'
     }
   ];
