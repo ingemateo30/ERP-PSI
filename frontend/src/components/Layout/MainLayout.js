@@ -104,21 +104,16 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     {
       icon: <CreditCard size={22} />,
       label: 'Pagos',
-      path: '/pagos',
-      permission: 'supervisor'
+      path: '/cruce-pagos',
+      permission: 'administrador'
     },
     {
       icon: <FileText size={22} />,
       label: 'Historial Facturas',
       path: '/historial-facturas',
       permission: 'supervisor'
-    },
-    {
-      icon: <CreditCard size={22} />,
-      label: 'Pagos',
-      path: '/cruce-pagos',
-      permission: 'administrador'
     }
+    
   ];
 
   // GRUPO 3: SERVICIOS Y OPERACIONES
