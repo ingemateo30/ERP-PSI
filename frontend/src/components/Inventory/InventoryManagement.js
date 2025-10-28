@@ -118,7 +118,51 @@ const InventoryManagement = () => {
       // No mostrar error por estadísticas, es opcional
     }
   };
+ // Exportar equipos a CSV
+  const handleExportarCSV = () => {
+    try {
+      console.log('📊 Exportando equipos a CSV:', equipos.length, 'registros');
+      
+      if (!equipos || equipos.length === 0) {
+        alert('No hay datos para exportar');
+        return;
+      }
 
+      const headers = ['Tipo', 'Marca', 'Modelo', 'Serie', 'MAC', 'Estado', 'Asignado a', 'Cliente', 'Ubicación', 'Fecha Ingreso', 'Observaciones'];
+      const rows = equipos.map(equipo => [
+        equipo.tipo || '',
+        equipo.marca || '',
+        equipo.modelo || '',
+        equipo.numero_serie || '',
+        equipo.mac_address || '',
+        equipo.estado || '',
+        equipo.instalador_nombre || '',
+        equipo.cliente_nombre || '',
+        equipo.ubicacion || '',
+        equipo.fecha_ingreso ? new Date(equipo.fecha_ingreso).toLocaleDateString() : '',
+        equipo.observaciones || ''
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.setAttribute('href', URL.createObjectURL(blob));
+      link.setAttribute('download', `inventario_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('✅ CSV exportado exitosamente');
+    } catch (error) {
+      console.error('❌ Error exportando CSV:', error);
+      alert('Error al exportar: ' + error.message);
+    }
+  };
   // Manejar cambios en filtros
   const handleFilterChange = (newFilters) => {
     setFilters({
@@ -296,8 +340,9 @@ const InventoryManagement = () => {
       <div className="bg-white rounded-lg shadow-md p-6">
         <EquipmentFilters
           filters={filters}
-          onFilterChange={handleFilterChange}
-          userRole={user.rol}
+  onFilterChange={handleFilterChange}
+  userRole={user.rol}
+  onExport={handleExportarCSV}
         />
       </div>
 

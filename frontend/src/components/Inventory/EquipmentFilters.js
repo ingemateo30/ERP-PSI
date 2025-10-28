@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import inventoryService from '../../services/inventoryService';
 
-const EquipmentFilters = ({ filters, onFilterChange, userRole }) => {
+const EquipmentFilters = ({ filters, onFilterChange, userRole, onExport }) => {
   const [instaladores, setInstaladores] = useState([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -211,6 +211,7 @@ const EquipmentFilters = ({ filters, onFilterChange, userRole }) => {
           {/* Exportar (solo para supervisores y administradores) */}
           {userRole !== 'instalador' && (
             <button
+               onClick={onExport}
               className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
               title="Exportar datos"
             >
