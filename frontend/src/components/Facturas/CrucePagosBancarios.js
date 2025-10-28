@@ -1,5 +1,6 @@
 // frontend/src/components/Facturas/CrucePagosBancarios.js
 import React, { useState, useEffect } from 'react';
+import apiService from '../../services/apiService'; // ← AGREGAR ESTA LÍNEA
 import {
     DollarSign,
     Calendar,
@@ -48,35 +49,27 @@ const CrucePagosBancarios = () => {
         cargarFacturasPendientes();
     }, [filtros]);
 
-    const cargarFacturasPendientes = async () => {
-        try {
-            setLoading(true);
-            const token = localStorage.getItem('token');
-            const params = new URLSearchParams({
-                estado: 'pendiente',
-                fecha_inicio: filtros.fecha_inicio,
-                fecha_fin: filtros.fecha_fin,
-                ...(filtros.busqueda && { search: filtros.busqueda })
-            });
+   const cargarFacturasPendientes = async () => {
+    try {
+        setLoading(true);
+        const params = new URLSearchParams({
+            estado: 'pendiente',
+            fecha_inicio: filtros.fecha_inicio,
+            fecha_fin: filtros.fecha_fin,
+            ...(filtros.busqueda && { search: filtros.busqueda })
+        });
 
-            const response = await fetch(`http://45.173.69.5:3000/api/v1/facturacion/facturas?${params}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const data = await response.json();
-            if (data.success) {
-                setFacturasPendientes(data.data || []);
-            }
-        } catch (error) {
-            console.error('Error cargando facturas:', error);
-        } finally {
-            setLoading(false);
+        const response = await apiService.get(`/facturacion/facturas?${params}`);
+        
+        if (response && response.success) {
+            setFacturasPendientes(response.data || []);
         }
-    };
-
+    } catch (error) {
+        console.error('Error cargando facturas:', error);
+    } finally {
+        setLoading(false);
+    }
+};
     const abrirModalCruce = (factura) => {
         setFacturaSeleccionada(factura);
         setDatosPago({
@@ -89,40 +82,29 @@ const CrucePagosBancarios = () => {
         });
         setMostrarModalCruce(true);
     };
+const cruzarPago = async () => {
+    try {
+        const response = await apiService.post(`/facturacion/facturas/${facturaSeleccionada.id}/pagar`, {
+            valor_pagado: parseFloat(datosPago.monto),
+            metodo_pago: datosPago.metodo_pago,
+            referencia_pago: datosPago.referencia,
+            fecha_pago: datosPago.fecha_pago,
+            observaciones: datosPago.observaciones,
+            banco_id: datosPago.banco_id
+        });
 
-    const cruzarPago = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`http://45.173.69.5:3000/api/v1/facturacion/facturas/${facturaSeleccionada.id}/pagar`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    valor_pagado: parseFloat(datosPago.monto),
-                    metodo_pago: datosPago.metodo_pago,
-                    referencia_pago: datosPago.referencia,
-                    fecha_pago: datosPago.fecha_pago,
-                    observaciones: datosPago.observaciones,
-                    banco_id: datosPago.banco_id
-                })
-            });
-
-            const data = await response.json();
-            if (data.success) {
-                alert('Pago cruzado exitosamente');
-                setMostrarModalCruce(false);
-                cargarFacturasPendientes();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        } catch (error) {
-            console.error('Error cruzando pago:', error);
-            alert('Error al cruzar el pago');
+        if (response && response.success) {
+            alert('Pago cruzado exitosamente');
+            setMostrarModalCruce(false);
+            cargarFacturasPendientes();
+        } else {
+            alert('Error: ' + (response?.message || 'Error desconocido'));
         }
-    };
-
+    } catch (error) {
+        console.error('Error cruzando pago:', error);
+        alert('Error al cruzar el pago: ' + error.message);
+    }
+};
     const exportarPorBanco = async (bancoId) => {
         try {
             const banco = bancos.find(b => b.id === bancoId);
