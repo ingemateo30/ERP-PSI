@@ -148,29 +148,34 @@ const FirmaContratosWrapper = () => {
     };
 
     const verDetalleContrato = async (contrato) => {
-        try {
-            setLoading(true);
-
-            const response = await fetch(`/api/v1/contratos/${contrato.id}`);
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    setContratoSeleccionado(data.data);
-                } else {
-                    setContratoSeleccionado(contrato);
-                }
+    try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://45.173.69.5:3000/api/v1/contratos/${contrato.id}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+                setContratoSeleccionado(data.data);
             } else {
                 setContratoSeleccionado(contrato);
             }
-        } catch (error) {
-            console.error('Error cargando detalle:', error);
+        } else {
+            console.warn('Error obteniendo detalle, usando datos básicos');
             setContratoSeleccionado(contrato);
-        } finally {
-            setLoading(false);
         }
-    };
-
+    } catch (error) {
+        console.error('Error cargando detalle:', error);
+        setContratoSeleccionado(contrato);
+    } finally {
+        setLoading(false);
+    }
+};
     const iniciarFirmaContrato = (contrato) => {
         console.log('📝 Iniciando proceso de firma digital para contrato:', contrato.id);
         setContratoParaFirmar(contrato);
@@ -275,7 +280,8 @@ const FirmaContratosWrapper = () => {
     const descargarContrato = async (contratoId) => {
     try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://45.173.69.5:3000/api/v1/contratos/${contratoId}/pdf`, {
+        // Cambiar de /pdf a /descargar-pdf para servir el archivo firmado
+        const response = await fetch(`http://45.173.69.5:3000/api/v1/contratos/${contratoId}/descargar-pdf`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -284,7 +290,6 @@ const FirmaContratosWrapper = () => {
         if (response.ok) {
             const blob = await response.blob();
             
-            // Verificar que el blob no esté vacío
             if (blob.size === 0) {
                 alert('El PDF está vacío. Verifica que el contrato tenga un PDF generado.');
                 return;
