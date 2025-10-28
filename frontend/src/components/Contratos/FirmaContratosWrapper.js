@@ -1,6 +1,7 @@
 // frontend/src/components/Contratos/FirmaContratosWrapper.js
 // Wrapper completo para la firma de contratos que funciona independientemente
-
+import apiService from '../../services/apiService';
+import contratosService from '../../services/contratosService';
 import React, { useState, useEffect } from 'react';
 import {
     Search, FileText, AlertCircle, X, Eye, PenTool, CheckCircle, Clock,
@@ -150,23 +151,11 @@ const FirmaContratosWrapper = () => {
     const verDetalleContrato = async (contrato) => {
     try {
         setLoading(true);
-        const token = localStorage.getItem('token');
-        const response = await fetch(`http://45.173.69.5:3000/api/v1/contratos/${contrato.id}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        const response = await apiService.get(`/contratos/${contrato.id}`);
         
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-                setContratoSeleccionado(data.data);
-            } else {
-                setContratoSeleccionado(contrato);
-            }
+        if (response && response.success && response.data) {
+            setContratoSeleccionado(response.data);
         } else {
-            console.warn('Error obteniendo detalle, usando datos básicos');
             setContratoSeleccionado(contrato);
         }
     } catch (error) {
@@ -279,36 +268,25 @@ const FirmaContratosWrapper = () => {
 
     const descargarContrato = async (contratoId) => {
     try {
-        const token = localStorage.getItem('token');
-        // Cambiar de /pdf a /descargar-pdf para servir el archivo firmado
-        const response = await fetch(`http://45.173.69.5:3000/api/v1/contratos/${contratoId}/descargar-pdf`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+        const response = await apiService.request(`/contratos/${contratoId}/descargar-pdf`, {
+            responseType: 'blob'
         });
         
-        if (response.ok) {
-            const blob = await response.blob();
-            
-            if (blob.size === 0) {
-                alert('El PDF está vacío. Verifica que el contrato tenga un PDF generado.');
-                return;
-            }
-            
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = `contrato_${contratoId}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        } else {
-            const errorText = await response.text();
-            console.error('Error del servidor:', errorText);
-            alert('Error al descargar el contrato: ' + response.statusText);
+        if (!response || response.size === 0) {
+            alert('El PDF está vacío. Verifica que el contrato tenga un PDF generado.');
+            return;
         }
+        
+        const url = window.URL.createObjectURL(response);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `contrato_${contratoId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
     } catch (error) {
         console.error('Error descargando contrato:', error);
         alert('Error al descargar el contrato: ' + error.message);
