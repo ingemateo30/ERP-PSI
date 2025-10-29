@@ -15,7 +15,7 @@
  *   ...
  * ]
  */
-
+import './App.css';
 import api from './apiService'; // tu wrapper axios central
 
 export async function getCalendarEvents(params = {}) {
@@ -86,20 +86,22 @@ export async function getCalendarEvents(params = {}) {
         if (titleParts.length === 0) titleParts.push(`Instalación ${id}`);
 
         return {
-          id,
-          title: titleParts.join(' — '),
-          start,
-          end: start,
-          backgroundColor: color,
-          borderColor: color,
-          textColor: '#fff',
-          extendedProps: {
-            ...it,
-            cliente_nombre: clienteNombre,
-            instalador_nombre: instaladorNombre,
-            hora_programada: hora,
-          },
-        };
+  id,
+  title: titleParts.join(' — '),
+  start,
+  end: start,
+  allDay: true, // <-- hace que sea todo el día y no muestre la hora
+  backgroundColor: color,
+  borderColor: color,
+  textColor: '#fff',
+  extendedProps: {
+    ...it,
+    cliente_nombre: clienteNombre,
+    instalador_nombre: instaladorNombre,
+    hora_programada: hora,
+  },
+};
+
       });
 
       // Filtramos los nulls

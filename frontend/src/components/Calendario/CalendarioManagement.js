@@ -7,6 +7,9 @@ import esLocale from '@fullcalendar/core/locales/es';
 import { getCalendarEvents } from '../../services/calendarService';
 import { format } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
+import 'tailwindcss/tailwind.css';
+import './App.css';
+
 
 const CalendarioManagement = () => {
   const [events, setEvents] = useState([]);
@@ -91,7 +94,8 @@ const CalendarioManagement = () => {
   height="78vh"
   nowIndicator={true}
   eventDisplay="block"
-  dayMaxEventRows={false} // Mostrar todos los eventos con scroll si hay muchos
+  dayMaxEventRows={false}
+  dayCellClassNames="fc-day-cell-scroll" // Mostrar todos los eventos con scroll si hay muchos
 />
 
         )}

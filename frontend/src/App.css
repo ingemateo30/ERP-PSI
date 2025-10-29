@@ -51,3 +51,8 @@
   background-color: rgba(0,0,0,0.2);
   border-radius: 3px;
 }
+/* scroll interno para los días del calendario */
+.fc-daygrid-day.fc-day-cell-scroll {
+  max-height: 150px; /* altura máxima de la celda, ajusta a tu gusto */
+  overflow-y: auto;
+}
