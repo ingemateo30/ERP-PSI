@@ -4,8 +4,8 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import esLocale from '@fullcalendar/core/locales/es';
-import { getCalendarEvents } from '../../services/calendarService'; // path corregido
-import api from '../../services/apiService'; // path corregido
+import { getCalendarEvents } from '../../services/calendarService';
+import api from '../../services/apiService';
 import { format } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
 import 'tailwindcss/tailwind.css';
@@ -28,7 +28,7 @@ const CalendarioManagement = () => {
       // Contratos activos
       let contractEvents = [];
       try {
-        const res = await api.get('/api/v1/contratos?activo=1');
+        const res = await api.get('/contratos', { params: { activo: 1 } });
         const contratos = res?.data?.rows || res?.data || [];
         contractEvents = contratos.map(c => ({
           id: `contrato-${c.id}`,
@@ -47,7 +47,9 @@ const CalendarioManagement = () => {
       // Facturación electrónica (mes a mes)
       let invoiceEvents = [];
       try {
-        const res = await api.get('/api/v1/facturas?estado=pending,pagada,vencida');
+        const res = await api.get('/facturas', {
+          params: { estado: 'pending,pagada,vencida' }
+        });
         const facturas = res?.data?.rows || res?.data || [];
         invoiceEvents = facturas.map(f => ({
           id: `factura-${f.id}`,
@@ -65,7 +67,6 @@ const CalendarioManagement = () => {
 
       // Combinar todos los eventos
       setEvents([...instalEvents, ...contractEvents, ...invoiceEvents]);
-
     } catch (err) {
       console.error('Error cargando eventos del calendario', err);
       setError('No se pudieron cargar los eventos del calendario. Revisa el backend o la conexión.');
