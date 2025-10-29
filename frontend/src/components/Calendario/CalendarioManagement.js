@@ -1,4 +1,3 @@
-// frontend/src/components/Calendario/CalendarioManagement.js
 import React, { useEffect, useState, useCallback } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -21,11 +20,13 @@ const CalendarioManagement = () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('🔄 Cargando eventos del calendario...');
 
-      // Instalaciones
+      // 1️⃣ Instalaciones
       const instalEvents = await getCalendarEvents({ limit: 10000 });
+      console.log('📌 Instalaciones recibidas:', instalEvents);
 
-      // Contratos activos
+      // 2️⃣ Contratos activos
       let contractEvents = [];
       try {
         const res = await api.get('/contratos?activo=1');
@@ -34,21 +35,30 @@ const CalendarioManagement = () => {
           : Array.isArray(res?.data)
           ? res.data
           : [];
-        contractEvents = contratos.map(c => ({
-          id: `contrato-${c.id}`,
-          title: `Contrato: ${c.numero_contrato}`,
-          start: c.fecha_fin || c.fecha_vencimiento_permanencia || c.fecha_inicio,
-          allDay: true,
-          backgroundColor: '#8B5CF6',
-          borderColor: '#8B5CF6',
-          textColor: '#fff',
-          extendedProps: c,
-        }));
+        console.log('📌 Contratos recibidos:', contratos);
+
+        contractEvents = contratos.map(c => {
+          const startDate = c.fecha_inicio || new Date().toISOString();
+          const endDate = c.fecha_fin || c.fecha_vencimiento_permanencia || startDate;
+          console.log(`➡️ Contrato ${c.numero_contrato}: start=${startDate}, end=${endDate}`);
+
+          return {
+            id: `contrato-${c.id}`,
+            title: `Contrato: ${c.numero_contrato}`,
+            start: startDate,
+            end: endDate,
+            allDay: true,
+            backgroundColor: '#8B5CF6', // morado
+            borderColor: '#8B5CF6',
+            textColor: '#fff',
+            extendedProps: c,
+          };
+        });
       } catch (err) {
-        console.warn('No se pudieron cargar contratos para el calendario', err);
+        console.warn('❌ No se pudieron cargar contratos para el calendario', err);
       }
 
-      // Facturación electrónica
+      // 3️⃣ Facturación electrónica
       let invoiceEvents = [];
       try {
         const res = await api.get('/facturas?estado=pending,pagada,vencida');
@@ -57,24 +67,33 @@ const CalendarioManagement = () => {
           : Array.isArray(res?.data)
           ? res.data
           : [];
-        invoiceEvents = facturas.map(f => ({
-          id: `factura-${f.id}`,
-          title: `Factura: ${f.numero_factura || f.id}`,
-          start: f.fecha_emision || f.fecha || new Date().toISOString(),
-          allDay: true,
-          backgroundColor: '#F59E0B',
-          borderColor: '#F59E0B',
-          textColor: '#fff',
-          extendedProps: f,
-        }));
+        console.log('📌 Facturas recibidas:', facturas);
+
+        invoiceEvents = facturas.map(f => {
+          const invoiceDate = f.fecha_emision || f.fecha || new Date().toISOString();
+          console.log(`➡️ Factura ${f.numero_factura || f.id}: fecha=${invoiceDate}`);
+
+          return {
+            id: `factura-${f.id}`,
+            title: `Factura: ${f.numero_factura || f.id}`,
+            start: invoiceDate,
+            allDay: true,
+            backgroundColor: '#F59E0B', // naranja
+            borderColor: '#F59E0B',
+            textColor: '#fff',
+            extendedProps: f,
+          };
+        });
       } catch (err) {
-        console.warn('No se pudieron cargar facturas para el calendario', err);
+        console.warn('❌ No se pudieron cargar facturas para el calendario', err);
       }
 
-      // Combinar todos los eventos
-      setEvents([...instalEvents, ...contractEvents, ...invoiceEvents]);
+      // 4️⃣ Combinar todos los eventos
+      const combinedEvents = [...instalEvents, ...contractEvents, ...invoiceEvents];
+      setEvents(combinedEvents);
+      console.log('✅ Eventos combinados cargados:', combinedEvents);
     } catch (err) {
-      console.error('Error cargando eventos del calendario', err);
+      console.error('❌ Error cargando eventos del calendario', err);
       setError('No se pudieron cargar los eventos del calendario. Revisa el backend o la conexión.');
     } finally {
       setLoading(false);
