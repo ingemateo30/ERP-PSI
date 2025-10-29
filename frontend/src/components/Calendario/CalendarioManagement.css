@@ -1,30 +1,23 @@
-/* Altura fija de todas las celdas del mes */
+/* Altura fija de las celdas */
 .fc-daygrid-day {
-  height: 120px !important;
-  min-height: 120px !important;
-  max-height: 120px !important;
-  display: flex;
-  flex-direction: column;
+  height: 120px;
+  min-height: 120px;
+  max-height: 120px;
+  position: relative;
 }
 
 /* Contenedor de eventos con scroll */
-.fc-daygrid-day .fc-daygrid-day-events {
-  flex: 1 1 auto; /* ocupa el espacio disponible de la celda */
-  overflow-y: auto;
+.fc-day-cell-scroll .fc-daygrid-day-events {
   max-height: 100%;
+  overflow-y: auto;
   padding-right: 2px; /* espacio para scrollbar */
 }
 
 /* Scroll estético */
-.fc-daygrid-day .fc-daygrid-day-events::-webkit-scrollbar {
+.fc-day-cell-scroll .fc-daygrid-day-events::-webkit-scrollbar {
   width: 6px;
 }
-.fc-daygrid-day .fc-daygrid-day-events::-webkit-scrollbar-thumb {
+.fc-day-cell-scroll .fc-daygrid-day-events::-webkit-scrollbar-thumb {
   background-color: rgba(0,0,0,0.2);
   border-radius: 3px;
-}
-
-/* Mantener el encabezado de fecha en la parte superior */
-.fc-daygrid-day .fc-daygrid-day-top {
-  flex-shrink: 0;
 }
