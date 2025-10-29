@@ -106,12 +106,9 @@ export async function getCalendarEvents(params = {}) {
       console.warn('calendarService: fallo en', url, err.message);
       lastError = err;
     }
-  }
-  const res = await api.get(url);
-const payload = res?.data ?? res;
-
-console.log("📦 Respuesta completa del backend calendario:", payload); // 👈 AGREGA ESTA LÍNEA
-
+  
+}
+  
 
   // Si ninguna ruta respondió correctamente
   throw lastError ?? new Error('No se encontraron endpoints válidos para instalaciones.');
