@@ -1,0 +1,20 @@
+/* Calendario: scroll vertical en días con muchos eventos */
+.fc .fc-daygrid-day-events {
+  max-height: 120px; /* ajusta según la altura que quieras */
+  overflow-y: auto;
+}
+
+/* Scroll más estético (opcional) */
+.fc .fc-daygrid-day-events::-webkit-scrollbar {
+  width: 6px;
+}
+
+.fc .fc-daygrid-day-events::-webkit-scrollbar-thumb {
+  background-color: rgba(0,0,0,0.2);
+  border-radius: 3px;
+}
+/* scroll interno para los días del calendario */
+.fc-daygrid-day.fc-day-cell-scroll {
+  max-height: 150px; /* altura máxima de la celda, ajusta a tu gusto */
+  overflow-y: auto;
+}

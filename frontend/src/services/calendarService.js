@@ -15,7 +15,6 @@
  *   ...
  * ]
  */
-import '../../App.css';
 
 import api from './apiService'; // tu wrapper axios central
 
