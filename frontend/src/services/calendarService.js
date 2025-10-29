@@ -34,7 +34,7 @@ export async function getCalendarEvents(params = {}) {
   try {
     const instalaciones = await api.get('/instalaciones', { params });
     const items = instalaciones?.data?.instalaciones || instalaciones?.data || [];
-    
+
     const instalacionEvents = items.map(it => {
       const id = it.id ?? it._id;
       const fecha = it.fecha_programada ?? it.fecha;
@@ -43,7 +43,6 @@ export async function getCalendarEvents(params = {}) {
 
       const start = fecha.split('T')[0] + 'T' + hora;
 
-      // Color por estado
       const estado = (it.estado || '').toLowerCase();
       const color = estado === 'completada' ? '#10B981'
         : estado === 'cancelada' ? '#EF4444'
@@ -83,7 +82,7 @@ export async function getCalendarEvents(params = {}) {
   try {
     const resContratos = await api.get('/contratos', { params: { activo: 1 } });
     const contratos = resContratos?.data?.contratos || resContratos?.data || [];
-    
+
     const contratosEvents = contratos.map(c => {
       if (!c.fecha_fin) return null;
       return {
@@ -113,7 +112,6 @@ export async function getCalendarEvents(params = {}) {
     const facturacionEvents = facturas.map(f => {
       if (!f.fecha) return null;
 
-      // Suponemos facturación recurrente mensual
       const fechaInicio = parseISO(f.fecha);
       const fechaFin = addMonths(fechaInicio, 1);
 
