@@ -1,33 +1,23 @@
-/* Altura fija para todas las celdas del mes */
+/* Altura fija de las celdas */
 .fc-daygrid-day {
-  height: 120px;   /* altura fija de la celda */
+  height: 120px;
   min-height: 120px;
   max-height: 120px;
   position: relative;
 }
 
-/* Scroll interno para días con muchos eventos */
-.fc-daygrid-day.fc-day-cell-scroll,
-.fc-daygrid-day.fc-day-cell-scroll .fc-event-container {
+/* Contenedor de eventos con scroll */
+.fc-day-cell-scroll .fc-daygrid-day-events {
   max-height: 100%;
   overflow-y: auto;
   padding-right: 2px; /* espacio para scrollbar */
 }
 
-/* Contenedor de eventos dentro de la celda */
-.fc .fc-daygrid-day-events {
-  max-height: 100%; /* ocupa toda la celda */
-  overflow-y: auto;
-}
-
-/* Scroll más estético */
-.fc .fc-daygrid-day-events::-webkit-scrollbar,
-.fc-daygrid-day.fc-day-cell-scroll .fc-event-container::-webkit-scrollbar {
+/* Scroll estético */
+.fc-day-cell-scroll .fc-daygrid-day-events::-webkit-scrollbar {
   width: 6px;
 }
-
-.fc .fc-daygrid-day-events::-webkit-scrollbar-thumb,
-.fc-daygrid-day.fc-day-cell-scroll .fc-event-container::-webkit-scrollbar-thumb {
+.fc-day-cell-scroll .fc-daygrid-day-events::-webkit-scrollbar-thumb {
   background-color: rgba(0,0,0,0.2);
   border-radius: 3px;
 }

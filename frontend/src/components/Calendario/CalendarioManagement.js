@@ -95,9 +95,10 @@ const CalendarioManagement = () => {
   height="78vh"
   nowIndicator={true}
   eventDisplay="block"
-  dayMaxEventRows={false}
-  dayCellClassNames="fc-day-cell-scroll" // Mostrar todos los eventos con scroll si hay muchos
+  dayMaxEventRows={false} // evita que la celda se expanda
+  dayCellClassNames="fc-day-cell-scroll" // clase para aplicar scroll interno
 />
+
 
         )}
       </div>
