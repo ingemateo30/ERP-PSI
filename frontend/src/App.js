@@ -6,7 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/Layout/MainLayout';
 import { Loader2 } from 'lucide-react';
-
+import CalendarioManagement from './components/Calendario/CalendarioManagement';
 // Lazy loading de componentes principales
 const LoginComponent = lazy(() => import('./components/Login'));
 const SimpleDashboard = lazy(() => import('./components/SimpleDashboard'));
@@ -40,7 +40,7 @@ const VisorFirmaPDF = lazy(() => import('./components/Contratos/VisorFirmaPDF'))
 const FirmaContratosWrapper = lazy(() => import('./components/Contratos/FirmaContratosWrapper'));
 const HistorialFacturacionWrapper = lazy(() => import('./components/Facturas/HistorialFacturacionWrapper'));
 const CrucePagosBancarios = lazy(() => import('./components/Facturas/CrucePagosBancarios'));
-
+<Route path="/calendar" element={<ProtectedRoute><CalendarioManagement /></ProtectedRoute>} />
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
