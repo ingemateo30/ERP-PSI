@@ -78,21 +78,22 @@ const CalendarioManagement = () => {
           </div>
         ) : (
           <FullCalendar
-            plugins={[dayGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth',
-            }}
-            locale={esLocale}
-            events={events}
-            eventClick={handleEventClick}
-            height="78vh"
-            nowIndicator={true}
-            eventDisplay="block"
-            dayMaxEventRows={3}
-          />
+  plugins={[dayGridPlugin, interactionPlugin]}
+  initialView="dayGridMonth"
+  headerToolbar={{
+    left: 'prev,next today',
+    center: 'title',
+    right: 'dayGridMonth',
+  }}
+  locale={esLocale}
+  events={events}
+  eventClick={handleEventClick}
+  height="78vh"
+  nowIndicator={true}
+  eventDisplay="block"
+  dayMaxEventRows={false} // Mostrar todos los eventos con scroll si hay muchos
+/>
+
         )}
       </div>
 
