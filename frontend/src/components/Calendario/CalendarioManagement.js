@@ -28,8 +28,12 @@ const CalendarioManagement = () => {
       // Contratos activos
       let contractEvents = [];
       try {
-        const res = await api.get('/contratos', { params: { activo: 1 } });
-        const contratos = res?.data?.rows || res?.data || [];
+        const res = await api.get('/contratos?activo=1'); // ✅ pasar params directo
+        const contratos = Array.isArray(res?.data?.rows)
+          ? res.data.rows
+          : Array.isArray(res?.data)
+          ? res.data
+          : [];
         contractEvents = contratos.map(c => ({
           id: `contrato-${c.id}`,
           title: `Contrato: ${c.numero_contrato}`,
@@ -44,13 +48,15 @@ const CalendarioManagement = () => {
         console.warn('No se pudieron cargar contratos para el calendario', err);
       }
 
-      // Facturación electrónica (mes a mes)
+      // Facturación electrónica
       let invoiceEvents = [];
       try {
-        const res = await api.get('/facturas', {
-          params: { estado: 'pending,pagada,vencida' }
-        });
-        const facturas = res?.data?.rows || res?.data || [];
+        const res = await api.get('/facturas?estado=pending,pagada,vencida');
+        const facturas = Array.isArray(res?.data?.rows)
+          ? res.data.rows
+          : Array.isArray(res?.data)
+          ? res.data
+          : [];
         invoiceEvents = facturas.map(f => ({
           id: `factura-${f.id}`,
           title: `Factura: ${f.numero_factura || f.id}`,
@@ -158,12 +164,12 @@ const CalendarioManagement = () => {
             </div>
 
             <div className="mt-4 text-sm text-gray-700 space-y-2">
-              {selected.extendedProps.cliente_nombre && <div><strong>Cliente:</strong> {selected.extendedProps.cliente_nombre}</div>}
-              {selected.extendedProps.direccion_instalacion && <div><strong>Dirección:</strong> {selected.extendedProps.direccion_instalacion}</div>}
-              {selected.extendedProps.instalador_nombre && <div><strong>Instalador:</strong> {selected.extendedProps.instalador_nombre}</div>}
-              {selected.extendedProps.telefono_contacto && <div><strong>Teléfono:</strong> {selected.extendedProps.telefono_contacto}</div>}
-              {selected.extendedProps.tipo_instalacion && <div><strong>Tipo:</strong> {selected.extendedProps.tipo_instalacion}</div>}
-              {selected.extendedProps.estado && <div><strong>Estado:</strong> {selected.extendedProps.estado}</div>}
+              {selected.extended?.cliente_nombre && <div><strong>Cliente:</strong> {selected.extended.cliente_nombre}</div>}
+              {selected.extended?.direccion_instalacion && <div><strong>Dirección:</strong> {selected.extended.direccion_instalacion}</div>}
+              {selected.extended?.instalador_nombre && <div><strong>Instalador:</strong> {selected.extended.instalador_nombre}</div>}
+              {selected.extended?.telefono_contacto && <div><strong>Teléfono:</strong> {selected.extended.telefono_contacto}</div>}
+              {selected.extended?.tipo_instalacion && <div><strong>Tipo:</strong> {selected.extended.tipo_instalacion}</div>}
+              {selected.extended?.estado && <div><strong>Estado:</strong> {selected.extended.estado}</div>}
             </div>
 
             <div className="mt-6 flex justify-end">
