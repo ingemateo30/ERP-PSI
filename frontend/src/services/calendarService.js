@@ -1,121 +1,140 @@
+// frontend/src/services/calendarService.js
 import api from './apiService';
-import { formatISO, addMonths, isAfter, parseISO } from 'date-fns';
+import { addMonths, parseISO, formatISO } from 'date-fns';
 
-/* ==============================
-   Función principal: solo se toca contratos y facturación
-============================== */
+/**
+ * Servicio que obtiene todos los eventos del calendario:
+ * - Instalaciones (ya existente)
+ * - Contratos: fecha de finalización
+ * - Facturación electrónica mensual
+ *
+ * Devuelve array FullCalendar:
+ * [
+ *   {
+ *     id,
+ *     title,
+ *     start,
+ *     end,
+ *     allDay,
+ *     backgroundColor,
+ *     borderColor,
+ *     textColor,
+ *     extendedProps: { ... },
+ *   },
+ *   ...
+ * ]
+ */
+
 export async function getCalendarEvents(params = {}) {
-  // 1️⃣ Eventos de instalaciones: dejamos exactamente como estaba
-  const instalaciones = await import('./calendarService').then(m => m.getInstalacionesEvents(params));
+  const allEvents = [];
 
-  // 2️⃣ Eventos de contratos
-  let contratos = [];
+  // -------------------
+  // 1️⃣ Instalaciones
+  // -------------------
   try {
-    const res = await api.get('/contratos?activo=1');
-    const items = Array.isArray(res.data) ? res.data : res.data?.contratos || [];
+    const instalaciones = await api.get('/instalaciones', { params });
+    const items = instalaciones?.data?.instalaciones || instalaciones?.data || [];
+    
+    const instalacionEvents = items.map(it => {
+      const id = it.id ?? it._id;
+      const fecha = it.fecha_programada ?? it.fecha;
+      const hora = it.hora_programada ?? '08:00:00';
+      if (!fecha) return null;
 
-    contratos = items.flatMap((c) => {
-      if (!c.fecha_fin) return [];
+      const start = fecha.split('T')[0] + 'T' + hora;
 
-      const fechaFin = parseISO(c.fecha_fin);
-      const start = formatISO(fechaFin);
+      // Color por estado
+      const estado = (it.estado || '').toLowerCase();
+      const color = estado === 'completada' ? '#10B981'
+        : estado === 'cancelada' ? '#EF4444'
+        : estado === 'reagendada' ? '#F59E0B'
+        : estado === 'en_proceso' ? '#6366F1'
+        : '#2563EB';
 
-      return [
-        {
-          id: `contrato-${c.id}`,
-          title: `Contrato ${c.numero_contrato}`,
-          start,
-          end: start,
-          allDay: true,
-          backgroundColor: '#3B82F6',
-          borderColor: '#3B82F6',
-          textColor: '#fff',
-          extendedProps: {
-            tipo: 'contrato',
-            cliente_id: c.cliente_id,
-            estado: c.estado,
-            fecha_fin: c.fecha_fin,
-          },
-        },
-        // 🔄 Agregar facturación mensual recurrente hasta la fecha de fin del contrato
-        ...generateMonthlyInvoices(c),
-      ];
-    });
-  } catch (err) {
-    console.warn('No se pudieron cargar contratos para el calendario', err);
-  }
+      const clienteNombre = it.cliente_nombre ?? (it.cliente?.nombre || it.cliente);
+      const instaladorNombre = it.instalador_nombre ?? (it.instalador?.nombre || it.instalador);
 
-  // 3️⃣ Eventos de facturas sueltas
-  let facturas = [];
-  try {
-    const res = await api.get('/facturas?estado=pendiente,pagada,vencida');
-    const items = Array.isArray(res.data) ? res.data : res.data?.facturas || [];
-
-    facturas = items.map((f) => {
-      if (!f.fecha_vencimiento) return null;
-      const start = formatISO(parseISO(f.fecha_vencimiento));
-
-      let color = '#2563EB';
-      if (f.estado === 'vencida') color = '#EF4444';
-      else if (f.estado === 'pagada') color = '#10B981';
-      else if (f.estado === 'pendiente') color = '#F59E0B';
+      const titleParts = [];
+      if (clienteNombre) titleParts.push(clienteNombre);
+      if (it.tipo_instalacion) titleParts.push(it.tipo_instalacion);
+      if (!titleParts.length) titleParts.push(`Instalación ${id}`);
 
       return {
-        id: `factura-${f.id}`,
-        title: `Factura ${f.numero_factura}`,
+        id,
+        title: titleParts.join(' — '),
         start,
         end: start,
         allDay: true,
         backgroundColor: color,
         borderColor: color,
         textColor: '#fff',
-        extendedProps: {
-          tipo: 'factura',
-          cliente_id: f.cliente_id,
-          estado: f.estado,
-          fecha_emision: f.fecha_emision,
-          fecha_vencimiento: f.fecha_vencimiento,
-        },
+        extendedProps: { ...it, cliente_nombre: clienteNombre, instalador_nombre: instaladorNombre, hora_programada: hora },
       };
     }).filter(Boolean);
+
+    allEvents.push(...instalacionEvents);
   } catch (err) {
-    console.warn('No se pudieron cargar facturas para el calendario', err);
+    console.warn('No se pudieron cargar instalaciones', err);
   }
 
-  return [...instalaciones, ...contratos, ...facturas];
-}
+  // -------------------
+  // 2️⃣ Contratos
+  // -------------------
+  try {
+    const resContratos = await api.get('/contratos', { params: { activo: 1 } });
+    const contratos = resContratos?.data?.contratos || resContratos?.data || [];
+    
+    const contratosEvents = contratos.map(c => {
+      if (!c.fecha_fin) return null;
+      return {
+        id: `contrato-${c.id}`,
+        title: `Fin contrato ${c.numero_contrato}`,
+        start: c.fecha_fin,
+        allDay: true,
+        backgroundColor: '#8B5CF6', // morado
+        borderColor: '#8B5CF6',
+        textColor: '#fff',
+        extendedProps: { ...c, tipo: 'contrato' },
+      };
+    }).filter(Boolean);
 
-/* ==============================
-   Función auxiliar: genera facturas recurrentes mes a mes
-============================== */
-function generateMonthlyInvoices(contrato) {
-  const { fecha_inicio, fecha_fin, numero_contrato, cliente_id } = contrato;
-  if (!fecha_inicio || !fecha_fin) return [];
-
-  const invoices = [];
-  let current = parseISO(fecha_inicio);
-  const end = parseISO(fecha_fin);
-
-  while (isAfter(end, current) || +current === +end) {
-    invoices.push({
-      id: `facturacion-${numero_contrato}-${formatISO(current, { representation: 'date' })}`,
-      title: `Facturación ${numero_contrato}`,
-      start: formatISO(current),
-      end: formatISO(current),
-      allDay: true,
-      backgroundColor: '#F59E0B', // naranja para facturas recurrentes
-      borderColor: '#F59E0B',
-      textColor: '#fff',
-      extendedProps: {
-        tipo: 'facturacion_recurrente',
-        cliente_id,
-        contrato_id: contrato.id,
-      },
-    });
-    current = addMonths(current, 1); // siguiente mes
+    allEvents.push(...contratosEvents);
+  } catch (err) {
+    console.warn('No se pudieron cargar contratos', err);
   }
 
-  return invoices;
+  // -------------------
+  // 3️⃣ Facturación electrónica mensual
+  // -------------------
+  try {
+    const resFacturas = await api.get('/facturas', { params: { estado: 'pending,pagada,vencida' } });
+    const facturas = resFacturas?.data?.facturas || resFacturas?.data || [];
+
+    const facturacionEvents = facturas.map(f => {
+      if (!f.fecha) return null;
+
+      // Suponemos facturación recurrente mensual
+      const fechaInicio = parseISO(f.fecha);
+      const fechaFin = addMonths(fechaInicio, 1);
+
+      return {
+        id: `factura-${f.id}`,
+        title: `Factura ${f.numero || f.id}`,
+        start: formatISO(fechaInicio, { representation: 'date' }),
+        allDay: true,
+        backgroundColor: '#FBBF24', // amarillo
+        borderColor: '#FBBF24',
+        textColor: '#000',
+        extendedProps: { ...f, tipo: 'factura' },
+      };
+    }).filter(Boolean);
+
+    allEvents.push(...facturacionEvents);
+  } catch (err) {
+    console.warn('No se pudieron cargar facturas', err);
+  }
+
+  return allEvents;
 }
 
 export default { getCalendarEvents };
