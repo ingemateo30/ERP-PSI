@@ -22,11 +22,11 @@ const CalendarioManagement = () => {
       setError(null);
       console.log('🔄 Cargando eventos del calendario...');
 
-      // 1️⃣ Instalaciones
-      const instalEvents = await getCalendarEvents({ limit: 10000 });
-      console.log('📌 Instalaciones recibidas:', instalEvents);
+      // 1️⃣ Cargar instalaciones, contratos y facturas desde calendarService
+      const baseEvents = await getCalendarEvents({ limit: 10000 });
+      console.log('📌 Eventos base recibidos:', baseEvents);
 
-      // 2️⃣ Contratos activos
+      // 2️⃣ Verificar si los contratos activos traen correctamente las fechas
       let contractEvents = [];
       try {
         const res = await api.get('/contratos?activo=1');
@@ -40,25 +40,29 @@ const CalendarioManagement = () => {
         contractEvents = contratos.map(c => {
           const startDate = c.fecha_inicio || new Date().toISOString();
           const endDate = c.fecha_fin || c.fecha_vencimiento_permanencia || startDate;
-          console.log(`➡️ Contrato ${c.numero_contrato}: start=${startDate}, end=${endDate}`);
 
           return {
             id: `contrato-${c.id}`,
-            title: `Contrato: ${c.numero_contrato}`,
+            title: `Contrato #${c.numero_contrato || c.id}`,
             start: startDate,
             end: endDate,
             allDay: true,
             backgroundColor: '#8B5CF6', // morado
             borderColor: '#8B5CF6',
             textColor: '#fff',
-            extendedProps: c,
+            extendedProps: {
+              ...c,
+              tipo_evento: 'Contrato',
+              cliente_nombre: c.cliente?.nombre || c.cliente_nombre || 'Sin cliente',
+              estado: c.estado || 'Activo',
+            },
           };
         });
       } catch (err) {
-        console.warn('❌ No se pudieron cargar contratos para el calendario', err);
+        console.warn('❌ Error cargando contratos:', err);
       }
 
-      // 3️⃣ Facturación electrónica
+      // 3️⃣ Cargar facturas
       let invoiceEvents = [];
       try {
         const res = await api.get('/facturas?estado=pending,pagada,vencida');
@@ -71,30 +75,34 @@ const CalendarioManagement = () => {
 
         invoiceEvents = facturas.map(f => {
           const invoiceDate = f.fecha_emision || f.fecha || new Date().toISOString();
-          console.log(`➡️ Factura ${f.numero_factura || f.id}: fecha=${invoiceDate}`);
 
           return {
             id: `factura-${f.id}`,
-            title: `Factura: ${f.numero_factura || f.id}`,
+            title: `Factura #${f.numero_factura || f.id}`,
             start: invoiceDate,
             allDay: true,
             backgroundColor: '#F59E0B', // naranja
             borderColor: '#F59E0B',
             textColor: '#fff',
-            extendedProps: f,
+            extendedProps: {
+              ...f,
+              tipo_evento: 'Factura',
+              estado: f.estado || 'Pendiente',
+              cliente_nombre: f.cliente?.nombre || f.cliente_nombre || 'Sin cliente',
+            },
           };
         });
       } catch (err) {
-        console.warn('❌ No se pudieron cargar facturas para el calendario', err);
+        console.warn('❌ Error cargando facturas:', err);
       }
 
-      // 4️⃣ Combinar todos los eventos
-      const combinedEvents = [...instalEvents, ...contractEvents, ...invoiceEvents];
+      // 4️⃣ Unir todos los eventos (instalaciones, contratos, facturas)
+      const combinedEvents = [...baseEvents, ...contractEvents, ...invoiceEvents];
       setEvents(combinedEvents);
       console.log('✅ Eventos combinados cargados:', combinedEvents);
     } catch (err) {
-      console.error('❌ Error cargando eventos del calendario', err);
-      setError('No se pudieron cargar los eventos del calendario. Revisa el backend o la conexión.');
+      console.error('❌ Error general cargando el calendario:', err);
+      setError('No se pudieron cargar los eventos. Revisa el backend o la conexión.');
     } finally {
       setLoading(false);
     }
@@ -110,6 +118,7 @@ const CalendarioManagement = () => {
       id: ev.id,
       title: ev.title,
       start: ev.start,
+      end: ev.end,
       extended: ev.extendedProps || {},
     });
   };
@@ -120,9 +129,9 @@ const CalendarioManagement = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">📅 Calendario de Instalaciones</h1>
+          <h1 className="text-2xl font-bold text-gray-900">📅 Calendario General</h1>
           <p className="text-sm text-gray-600 mt-1">
-            Vista mensual de instalaciones, contratos y facturación electrónica.
+            Instalaciones, contratos y facturación electrónica en una sola vista.
           </p>
         </div>
         <div>
@@ -163,8 +172,7 @@ const CalendarioManagement = () => {
             height="78vh"
             nowIndicator={true}
             eventDisplay="block"
-            dayMaxEventRows={false}
-            dayCellClassNames="fc-day-cell-scroll"
+            dayMaxEventRows={true}
           />
         )}
       </div>
@@ -176,19 +184,34 @@ const CalendarioManagement = () => {
               <div>
                 <h2 className="text-lg font-semibold">{selected.title}</h2>
                 <p className="text-sm text-gray-500">
-                  {selected.start ? format(new Date(selected.start), "PPPP 'a las' p") : 'Fecha no disponible'}
+                  {selected.start ? format(new Date(selected.start), "PPPP") : 'Fecha no disponible'}
+                  {selected.end && selected.start !== selected.end && (
+                    <> — hasta {format(new Date(selected.end), "PPPP")}</>
+                  )}
                 </p>
               </div>
               <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">✕</button>
             </div>
 
             <div className="mt-4 text-sm text-gray-700 space-y-2">
-              {selected.extended?.cliente_nombre && <div><strong>Cliente:</strong> {selected.extended.cliente_nombre}</div>}
-              {selected.extended?.direccion_instalacion && <div><strong>Dirección:</strong> {selected.extended.direccion_instalacion}</div>}
-              {selected.extended?.instalador_nombre && <div><strong>Instalador:</strong> {selected.extended.instalador_nombre}</div>}
-              {selected.extended?.telefono_contacto && <div><strong>Teléfono:</strong> {selected.extended.telefono_contacto}</div>}
-              {selected.extended?.tipo_instalacion && <div><strong>Tipo:</strong> {selected.extended.tipo_instalacion}</div>}
-              {selected.extended?.estado && <div><strong>Estado:</strong> {selected.extended.estado}</div>}
+              {selected.extended?.tipo_evento && (
+                <div><strong>Tipo:</strong> {selected.extended.tipo_evento}</div>
+              )}
+              {selected.extended?.cliente_nombre && (
+                <div><strong>Cliente:</strong> {selected.extended.cliente_nombre}</div>
+              )}
+              {selected.extended?.direccion_instalacion && (
+                <div><strong>Dirección:</strong> {selected.extended.direccion_instalacion}</div>
+              )}
+              {selected.extended?.instalador_nombre && (
+                <div><strong>Instalador:</strong> {selected.extended.instalador_nombre}</div>
+              )}
+              {selected.extended?.telefono_contacto && (
+                <div><strong>Teléfono:</strong> {selected.extended.telefono_contacto}</div>
+              )}
+              {selected.extended?.estado && (
+                <div><strong>Estado:</strong> {selected.extended.estado}</div>
+              )}
             </div>
 
             <div className="mt-6 flex justify-end">
