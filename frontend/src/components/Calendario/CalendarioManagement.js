@@ -22,100 +22,57 @@ const CalendarioManagement = () => {
       setLoading(true);
       setError(null);
 
-      // =========================
-      // INSTALACIONES
-      // =========================
-      let instalEvents = [];
+      // Instalaciones
+      const instalEvents = await getCalendarEvents({ limit: 10000 });
+
+      // Contratos activos
+      let contractEvents = [];
       try {
-        const res = await getCalendarEvents({ limit: 10000 });
-        instalEvents = Array.isArray(res) ? res.map(i => ({
-          id: `instalacion-${i.id}`,
-          title: `Instalación: ${i.tipo_instalacion || 'No especificado'}`,
-          start: i.fecha || new Date().toISOString(),
+        const res = await api.get('/contratos?activo=1');
+        const contratos = Array.isArray(res?.data?.rows)
+          ? res.data.rows
+          : Array.isArray(res?.data)
+          ? res.data
+          : [];
+        contractEvents = contratos.map(c => ({
+          id: `contrato-${c.id}`,
+          title: `Contrato: ${c.numero_contrato}`,
+          start: c.fecha_fin || c.fecha_vencimiento_permanencia || c.fecha_inicio,
           allDay: true,
           backgroundColor: '#8B5CF6',
           borderColor: '#8B5CF6',
           textColor: '#fff',
-          extendedProps: {
-            cliente_nombre: i.cliente_nombre || 'No disponible',
-            direccion_instalacion: i.direccion_instalacion || 'No disponible',
-            instalador_nombre: i.instalador_nombre || 'No disponible',
-            telefono_contacto: i.telefono_contacto || 'No disponible',
-            tipo_instalacion: i.tipo_instalacion || 'No disponible',
-            estado: i.estado || 'No disponible',
-            ...i
-          }
-        })) : [];
-      } catch (err) {
-        console.warn('No se pudieron cargar instalaciones para el calendario', err);
-      }
-
-      // =========================
-      // CONTRATOS ACTIVOS
-      // =========================
-      let contractEvents = [];
-      try {
-        const res = await api.get('/api/v1/contratos?activo=1');
-        const contratos = Array.isArray(res?.data?.rows) ? res.data.rows : Array.isArray(res?.data) ? res.data : [];
-        const hoy = new Date();
-        contractEvents = contratos
-          .filter(c => new Date(c.fecha_fin || c.fecha_vencimiento_permanencia || c.fecha_inicio) >= hoy)
-          .map(c => ({
-            id: `contrato-${c.id}`,
-            title: `Contrato: ${c.numero_contrato || c.id}`,
-            start: c.fecha_fin || c.fecha_vencimiento_permanencia || c.fecha_inicio,
-            allDay: true,
-            backgroundColor: '#3B82F6', // azul
-            borderColor: '#3B82F6',
-            textColor: '#fff',
-            extendedProps: {
-              cliente_nombre: c.cliente_nombre || 'No disponible',
-              direccion_instalacion: c.direccion_instalacion || 'No disponible',
-              instalador_nombre: c.instalador_nombre || 'No disponible',
-              telefono_contacto: c.telefono_contacto || 'No disponible',
-              tipo_instalacion: c.tipo_instalacion || 'No disponible',
-              estado: c.estado || 'No disponible',
-              ...c
-            }
-          }));
+          extendedProps: c,
+        }));
       } catch (err) {
         console.warn('No se pudieron cargar contratos para el calendario', err);
       }
 
-      // =========================
-      // FACTURAS ELECTRÓNICAS
-      // =========================
+      // Facturación electrónica
       let invoiceEvents = [];
       try {
-        const res = await api.get('/api/v1/facturas?estado=pending,pagada,vencida');
-        const facturas = Array.isArray(res?.data?.rows) ? res.data.rows : Array.isArray(res?.data) ? res.data : [];
+        const res = await api.get('/facturas?estado=pending,pagada,vencida');
+        const facturas = Array.isArray(res?.data?.rows)
+          ? res.data.rows
+          : Array.isArray(res?.data)
+          ? res.data
+          : [];
         invoiceEvents = facturas.map(f => ({
           id: `factura-${f.id}`,
           title: `Factura: ${f.numero_factura || f.id}`,
           start: f.fecha_emision || f.fecha || new Date().toISOString(),
           allDay: true,
-          backgroundColor: '#F59E0B', // naranja
+          backgroundColor: '#F59E0B',
           borderColor: '#F59E0B',
           textColor: '#fff',
-          extendedProps: {
-            cliente_nombre: f.cliente_nombre || 'No disponible',
-            direccion_instalacion: f.direccion_instalacion || 'No disponible',
-            instalador_nombre: f.instalador_nombre || 'No disponible',
-            telefono_contacto: f.telefono_contacto || 'No disponible',
-            tipo_instalacion: f.tipo_instalacion || 'No disponible',
-            estado: f.estado || 'No disponible',
-            ...f
-          }
+          extendedProps: f,
         }));
       } catch (err) {
         console.warn('No se pudieron cargar facturas para el calendario', err);
       }
 
-      // =========================
-      // COMBINAR TODOS LOS EVENTOS
-      // =========================
+      // Combinar todos los eventos
       setEvents([...instalEvents, ...contractEvents, ...invoiceEvents]);
-
     } catch (err) {
       console.error('Error cargando eventos del calendario', err);
       setError('No se pudieron cargar los eventos del calendario. Revisa el backend o la conexión.');
@@ -134,7 +91,7 @@ const CalendarioManagement = () => {
       id: ev.id,
       title: ev.title,
       start: ev.start,
-      extended: ev.extendedProps || {}
+      extended: ev.extendedProps || {},
     });
   };
 
@@ -179,7 +136,7 @@ const CalendarioManagement = () => {
             headerToolbar={{
               left: 'prev,next today',
               center: 'title',
-              right: 'dayGridMonth'
+              right: 'dayGridMonth',
             }}
             locale={esLocale}
             events={events}
@@ -207,12 +164,12 @@ const CalendarioManagement = () => {
             </div>
 
             <div className="mt-4 text-sm text-gray-700 space-y-2">
-              <div><strong>Cliente:</strong> {selected.extended.cliente_nombre || 'No disponible'}</div>
-              <div><strong>Dirección:</strong> {selected.extended.direccion_instalacion || 'No disponible'}</div>
-              <div><strong>Instalador:</strong> {selected.extended.instalador_nombre || 'No disponible'}</div>
-              <div><strong>Teléfono:</strong> {selected.extended.telefono_contacto || 'No disponible'}</div>
-              <div><strong>Tipo:</strong> {selected.extended.tipo_instalacion || 'No disponible'}</div>
-              <div><strong>Estado:</strong> {selected.extended.estado || 'No disponible'}</div>
+              {selected.extended?.cliente_nombre && <div><strong>Cliente:</strong> {selected.extended.cliente_nombre}</div>}
+              {selected.extended?.direccion_instalacion && <div><strong>Dirección:</strong> {selected.extended.direccion_instalacion}</div>}
+              {selected.extended?.instalador_nombre && <div><strong>Instalador:</strong> {selected.extended.instalador_nombre}</div>}
+              {selected.extended?.telefono_contacto && <div><strong>Teléfono:</strong> {selected.extended.telefono_contacto}</div>}
+              {selected.extended?.tipo_instalacion && <div><strong>Tipo:</strong> {selected.extended.tipo_instalacion}</div>}
+              {selected.extended?.estado && <div><strong>Estado:</strong> {selected.extended.estado}</div>}
             </div>
 
             <div className="mt-6 flex justify-end">
