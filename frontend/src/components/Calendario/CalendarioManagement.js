@@ -22,11 +22,11 @@ const CalendarioManagement = () => {
       setError(null);
       console.log('🔄 Cargando eventos del calendario...');
 
-      // 1️⃣ Cargar instalaciones, contratos y facturas desde calendarService
+      // 1️⃣ Instalaciones
       const baseEvents = await getCalendarEvents({ limit: 10000 });
-      console.log('📌 Eventos base recibidos:', baseEvents);
+      console.log('📌 Instalaciones recibidas:', baseEvents);
 
-      // 2️⃣ Verificar si los contratos activos traen correctamente las fechas
+      // 2️⃣ Contratos
       let contractEvents = [];
       try {
         const res = await api.get('/contratos?activo=1');
@@ -35,7 +35,6 @@ const CalendarioManagement = () => {
           : Array.isArray(res?.data)
           ? res.data
           : [];
-        console.log('📌 Contratos recibidos:', contratos);
 
         contractEvents = contratos.map(c => {
           const startDate = c.fecha_inicio || new Date().toISOString();
@@ -54,7 +53,10 @@ const CalendarioManagement = () => {
               ...c,
               tipo_evento: 'Contrato',
               cliente_nombre: c.cliente?.nombre || c.cliente_nombre || 'Sin cliente',
+              direccion_instalacion: c.direccion || c.direccion_instalacion || 'Sin dirección',
+              telefono_contacto: c.telefono || 'No disponible',
               estado: c.estado || 'Activo',
+              valor: c.valor_total || c.valor_mensual || null,
             },
           };
         });
@@ -62,7 +64,7 @@ const CalendarioManagement = () => {
         console.warn('❌ Error cargando contratos:', err);
       }
 
-      // 3️⃣ Cargar facturas
+      // 3️⃣ Facturas electrónicas
       let invoiceEvents = [];
       try {
         const res = await api.get('/facturas?estado=pending,pagada,vencida');
@@ -71,7 +73,6 @@ const CalendarioManagement = () => {
           : Array.isArray(res?.data)
           ? res.data
           : [];
-        console.log('📌 Facturas recibidas:', facturas);
 
         invoiceEvents = facturas.map(f => {
           const invoiceDate = f.fecha_emision || f.fecha || new Date().toISOString();
@@ -81,14 +82,17 @@ const CalendarioManagement = () => {
             title: `Factura #${f.numero_factura || f.id}`,
             start: invoiceDate,
             allDay: true,
-            backgroundColor: '#F59E0B', // naranja
-            borderColor: '#F59E0B',
+            backgroundColor:
+              f.estado === 'vencida' ? '#EF4444' : f.estado === 'pagada' ? '#10B981' : '#F59E0B',
+            borderColor:
+              f.estado === 'vencida' ? '#EF4444' : f.estado === 'pagada' ? '#10B981' : '#F59E0B',
             textColor: '#fff',
             extendedProps: {
               ...f,
-              tipo_evento: 'Factura',
-              estado: f.estado || 'Pendiente',
+              tipo_evento: 'Factura electrónica',
               cliente_nombre: f.cliente?.nombre || f.cliente_nombre || 'Sin cliente',
+              estado: f.estado || 'Pendiente',
+              valor_total: f.total || f.valor || 0,
             },
           };
         });
@@ -96,7 +100,7 @@ const CalendarioManagement = () => {
         console.warn('❌ Error cargando facturas:', err);
       }
 
-      // 4️⃣ Unir todos los eventos (instalaciones, contratos, facturas)
+      // 4️⃣ Combinar todo
       const combinedEvents = [...baseEvents, ...contractEvents, ...invoiceEvents];
       setEvents(combinedEvents);
       console.log('✅ Eventos combinados cargados:', combinedEvents);
@@ -131,7 +135,7 @@ const CalendarioManagement = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">📅 Calendario General</h1>
           <p className="text-sm text-gray-600 mt-1">
-            Instalaciones, contratos y facturación electrónica en una sola vista.
+            Visualiza instalaciones, contratos y facturación electrónica en un solo calendario.
           </p>
         </div>
         <div>
@@ -211,6 +215,9 @@ const CalendarioManagement = () => {
               )}
               {selected.extended?.estado && (
                 <div><strong>Estado:</strong> {selected.extended.estado}</div>
+              )}
+              {selected.extended?.valor && (
+                <div><strong>Valor:</strong> ${selected.extended.valor.toLocaleString()}</div>
               )}
             </div>
 
