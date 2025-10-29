@@ -35,6 +35,7 @@ export async function getCalendarEvents(params = {}) {
       const res = await api.get(url);
       const payload = res?.data ?? res;
       console.log("📦 Respuesta completa del backend calendario:", payload);
+
       const items =
         payload?.instalaciones ||
         payload?.rows ||
@@ -47,13 +48,14 @@ export async function getCalendarEvents(params = {}) {
       const mapped = items.map((it) => {
         const id = it.id ?? it.instalacion_id ?? it._id;
         const fecha = it.fecha_programada ?? it.fecha ?? it.date;
-        const hora = it.hora_programada ?? it.hora ?? it.time;
+        const hora = it.hora_programada ?? it.hora ?? null;
 
-        // Si no hay fecha, no se puede mostrar el evento
         if (!fecha) return null;
 
-        const timePart = hora ? (hora.length === 8 ? hora : hora + ':00') : '08:00:00';
-        const start = `${fecha}T${timePart}`;
+        // ✅ Start ISO correcto
+        const start = hora
+          ? fecha.split('T')[0] + 'T' + hora // si hay hora definida
+          : fecha; // si no hay hora, usar la fecha completa tal cual
 
         // 🟩 Color por estado
         const estado = typeof it.estado === 'string' ? it.estado.toLowerCase() : '';
@@ -107,9 +109,7 @@ export async function getCalendarEvents(params = {}) {
       console.warn('calendarService: fallo en', url, err.message);
       lastError = err;
     }
-  
-}
-  
+  }
 
   // Si ninguna ruta respondió correctamente
   throw lastError ?? new Error('No se encontraron endpoints válidos para instalaciones.');
