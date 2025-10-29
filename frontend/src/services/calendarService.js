@@ -1,132 +1,104 @@
 // frontend/src/services/calendarService.js
 import api from './apiService';
-import { formatISO } from 'date-fns';
+import { formatISO, addDays } from 'date-fns';
 
-export async function getCalendarEvents(params = {}) {
-  const qs = new URLSearchParams(params).toString();
-  const tryUrls = [
-    `/instalaciones${qs ? '?' + qs : ''}`,
-    `/instalaciones/calendario${qs ? '?' + qs : ''}`,
-    `/api/v1/instalaciones${qs ? '?' + qs : ''}`,
-    `/api/v1/instalaciones/calendario${qs ? '?' + qs : ''}`,
-  ];
-
-  let allEvents = [];
-  let lastError = null;
-
-  // 1️⃣ Traemos las instalaciones
-  for (const url of tryUrls) {
-    try {
-      const res = await api.get(url);
-      const payload = res?.data ?? res;
-      const items =
-        payload?.instalaciones ||
-        payload?.rows ||
-        payload?.data ||
-        (Array.isArray(payload) ? payload : []);
-      if (!Array.isArray(items) || items.length === 0) continue;
-
-      const mapped = items.map((it) => {
-        const id = it.id ?? it.instalacion_id ?? it._id;
-        const fecha = it.fecha_programada ?? it.fecha ?? it.date;
-        const hora = it.hora_programada ?? it.hora ?? null;
-        if (!fecha) return null;
-
-        const start = fecha
-          ? fecha.split('T')[0] + 'T' + (hora || '08:00:00')
-          : null;
-
-        const estado = (it.estado || '').toLowerCase();
-        const color =
-          estado === 'completada'
-            ? '#10B981'
-            : estado === 'cancelada'
-            ? '#EF4444'
-            : estado === 'reagendada'
-            ? '#F59E0B'
-            : estado === 'en_proceso'
-            ? '#6366F1'
-            : '#2563EB';
-
-        const clienteNombre =
-          it.cliente_nombre ?? (it.cliente && (it.cliente.nombre || it.cliente)) ?? null;
-        const instaladorNombre =
-          it.instalador_nombre ?? (it.instalador && (it.instalador.nombre || it.instalador)) ?? null;
-
-        const titleParts = [];
-        if (clienteNombre) titleParts.push(String(clienteNombre));
-        if (it.tipo_instalacion) titleParts.push(String(it.tipo_instalacion));
-        if (titleParts.length === 0) titleParts.push(`Instalación ${id}`);
-
-        return {
-          id,
-          title: titleParts.join(' — '),
-          start,
-          end: start,
-          allDay: true,
-          backgroundColor: color,
-          borderColor: color,
-          textColor: '#fff',
-          extendedProps: { ...it, cliente_nombre: clienteNombre, instalador_nombre: instaladorNombre, hora_programada: hora },
-        };
-      });
-
-      allEvents = allEvents.concat(mapped.filter(Boolean));
-      break; // si uno funciona, no probamos las otras URLs
-    } catch (err) {
-      console.warn('calendarService: fallo en', url, err.message);
-      lastError = err;
-    }
-  }
-
-  // 2️⃣ Traemos los contratos activos para marcar su fecha de fin
+/**
+ * Convierte contratos activos en eventos de calendario.
+ * Solo toma fecha_fin y puede marcar un color fijo (ej: azul).
+ */
+async function getContractEvents(params = {}) {
   try {
-    const resContratos = await api.get('/contratos?activo=1');
-    const contratos = resContratos?.data?.rows ?? resContratos?.data ?? [];
-    contratos.forEach((c) => {
-      if (!c.fecha_fin) return;
+    const res = await api.get('/contratos?activo=1');
+    const items = Array.isArray(res.data)
+      ? res.data
+      : res.data?.contratos || [];
 
-      allEvents.push({
+    return items.map((c) => {
+      const start = c.fecha_fin ? formatISO(new Date(c.fecha_fin)) : null;
+      if (!start) return null;
+
+      return {
         id: `contrato-${c.id}`,
-        title: `Contrato ${c.numero_contrato} vence`,
-        start: formatISO(new Date(c.fecha_fin), { representation: 'date' }),
-        allDay: true,
-        backgroundColor: '#FBBF24', // amarillo
-        borderColor: '#FBBF24',
-        textColor: '#000',
-        extendedProps: { tipo: 'contrato', contrato: c },
-      });
-    });
-  } catch (err) {
-    console.warn('No se pudieron cargar contratos para el calendario', err.message);
-  }
-
-  // 3️⃣ Traemos facturas para marcar días de facturación electrónica
-  try {
-    const resFacturas = await api.get('/facturas?estado=pending,pagada,vencida');
-    const facturas = resFacturas?.data?.rows ?? resFacturas?.data ?? [];
-    facturas.forEach((f) => {
-      const fecha = f.fecha_vencimiento ?? f.fecha_emision;
-      if (!fecha) return;
-
-      allEvents.push({
-        id: `factura-${f.id}`,
-        title: `Facturación ${f.numero_factura}`,
-        start: formatISO(new Date(fecha), { representation: 'date' }),
+        title: `Contrato ${c.numero_contrato}`,
+        start,
+        end: start,
         allDay: true,
         backgroundColor: '#3B82F6', // azul
         borderColor: '#3B82F6',
         textColor: '#fff',
-        extendedProps: { tipo: 'factura', factura: f },
-      });
-    });
+        extendedProps: {
+          tipo: 'contrato',
+          cliente_id: c.cliente_id,
+          estado: c.estado,
+          fecha_fin: c.fecha_fin,
+        },
+      };
+    }).filter(Boolean);
   } catch (err) {
-    console.warn('No se pudieron cargar facturas para el calendario', err.message);
+    console.warn('No se pudieron cargar contratos para el calendario', err);
+    return [];
   }
+}
 
-  if (allEvents.length === 0) throw lastError ?? new Error('No se encontraron eventos válidos.');
+/**
+ * Convierte facturas pendientes/pagadas/vencidas en eventos de calendario.
+ * Se puede usar fecha_vencimiento como start y marcar color por estado.
+ */
+async function getInvoiceEvents(params = {}) {
+  try {
+    const res = await api.get('/facturas?estado=pending,pagada,vencida');
+    const items = Array.isArray(res.data)
+      ? res.data
+      : res.data?.facturas || [];
 
-  return allEvents;
+    return items.map((f) => {
+      const start = f.fecha_vencimiento ? formatISO(new Date(f.fecha_vencimiento)) : null;
+      if (!start) return null;
+
+      let color = '#2563EB'; // azul por defecto
+      if (f.estado === 'vencida') color = '#EF4444';
+      else if (f.estado === 'pagada') color = '#10B981';
+      else if (f.estado === 'pendiente') color = '#F59E0B';
+
+      return {
+        id: `factura-${f.id}`,
+        title: `Factura ${f.numero_factura}`,
+        start,
+        end: start,
+        allDay: true,
+        backgroundColor: color,
+        borderColor: color,
+        textColor: '#fff',
+        extendedProps: {
+          tipo: 'factura',
+          cliente_id: f.cliente_id,
+          estado: f.estado,
+          fecha_emision: f.fecha_emision,
+          fecha_vencimiento: f.fecha_vencimiento,
+        },
+      };
+    }).filter(Boolean);
+  } catch (err) {
+    console.warn('No se pudieron cargar facturas para el calendario', err);
+    return [];
+  }
+}
+
+/**
+ * Función principal que obtiene todos los eventos para FullCalendar
+ */
+export async function getCalendarEvents(params = {}) {
+  // Primero obtenemos instalaciones (ya tu código existente)
+  const instalaciones = await import('./calendarServiceInstalaciones').then(m => m.getCalendarEvents(params));
+
+  // Luego contratos
+  const contratos = await getContractEvents(params);
+
+  // Luego facturas
+  const facturas = await getInvoiceEvents(params);
+
+  // Combinamos todos los eventos
+  return [...instalaciones, ...contratos, ...facturas];
 }
 
 export default { getCalendarEvents };
