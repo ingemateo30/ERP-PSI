@@ -53,10 +53,9 @@ export async function getCalendarEvents(params = {}) {
         if (!fecha) return null;
 
         // ✅ Start ISO correcto
-        const start = hora
-          ? fecha.split('T')[0] + 'T' + hora // si hay hora definida
-          : fecha; // si no hay hora, usar la fecha completa tal cual
-
+        const start = fecha
+  ? fecha.split('T')[0] + 'T' + (hora || '08:00:00')
+  : null;
         // 🟩 Color por estado
         const estado = typeof it.estado === 'string' ? it.estado.toLowerCase() : '';
         const color =
