@@ -3,7 +3,6 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import esLocale from '@fullcalendar/core/locales/es';
-import { getCalendarEvents } from '../../services/calendarService';
 import api from '../../services/apiService';
 import { format } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
@@ -22,88 +21,156 @@ const CalendarioManagement = () => {
       setError(null);
       console.log('🔄 Cargando eventos del calendario...');
 
-      // 1️⃣ Instalaciones
-      const baseEvents = await getCalendarEvents({ limit: 10000 });
-      console.log('📌 Instalaciones recibidas:', baseEvents);
+      const allEvents = [];
 
-      // 2️⃣ Contratos
-      let contractEvents = [];
+      // 1️⃣ INSTALACIONES
       try {
-        const res = await api.get('/contratos?activo=1');
-        const contratos = Array.isArray(res?.data?.rows)
-          ? res.data.rows
-          : Array.isArray(res?.data)
-          ? res.data
-          : [];
+        const resInstalaciones = await api.get('/instalaciones', { params: { limit: 10000 } });
+        console.log('📦 Respuesta instalaciones:', resInstalaciones.data);
+        
+        const instalaciones = resInstalaciones?.data?.instalaciones || 
+                             resInstalaciones?.data?.rows || 
+                             resInstalaciones?.data || [];
 
-        contractEvents = contratos.map(c => {
-          const startDate = c.fecha_inicio || new Date().toISOString();
-          const endDate = c.fecha_fin || c.fecha_vencimiento_permanencia || startDate;
+        const instalacionEvents = instalaciones.map(it => {
+          const id = it.id ?? it._id;
+          const fecha = it.fecha_programada ?? it.fecha;
+          const hora = it.hora_programada ?? '08:00:00';
+          
+          if (!fecha) return null;
+
+          const start = fecha.split('T')[0] + 'T' + hora;
+          const estado = (it.estado || '').toLowerCase();
+          
+          const color = estado === 'completada' ? '#10B981'
+            : estado === 'cancelada' ? '#EF4444'
+            : estado === 'reagendada' ? '#F59E0B'
+            : estado === 'en_proceso' ? '#6366F1'
+            : '#2563EB';
+
+          const clienteNombre = it.cliente_nombre ?? (it.cliente?.nombre || it.cliente);
+          const instaladorNombre = it.instalador_nombre ?? (it.instalador?.nombre || it.instalador);
+
+          const titleParts = [];
+          if (clienteNombre) titleParts.push(clienteNombre);
+          if (it.tipo_instalacion) titleParts.push(it.tipo_instalacion);
+          if (!titleParts.length) titleParts.push(`Instalación ${id}`);
 
           return {
-            id: `contrato-${c.id}`,
-            title: `Contrato #${c.numero_contrato || c.id}`,
-            start: startDate,
-            end: endDate,
+            id: `instalacion-${id}`,
+            title: titleParts.join(' — '),
+            start,
+            end: start,
             allDay: true,
-            backgroundColor: '#8B5CF6', // morado
-            borderColor: '#8B5CF6',
+            backgroundColor: color,
+            borderColor: color,
             textColor: '#fff',
             extendedProps: {
-              ...c,
-              tipo_evento: 'Contrato',
-              cliente_nombre: c.cliente?.nombre || c.cliente_nombre || 'Sin cliente',
-              direccion_instalacion: c.direccion || c.direccion_instalacion || 'Sin dirección',
-              telefono_contacto: c.telefono || 'No disponible',
-              estado: c.estado || 'Activo',
-              valor: c.valor_total || c.valor_mensual || null,
+              ...it,
+              tipo_evento: 'Instalación',
+              cliente_nombre: clienteNombre,
+              instalador_nombre: instaladorNombre,
+              hora_programada: hora,
+              direccion_instalacion: it.direccion || it.direccion_instalacion,
+              telefono_contacto: it.telefono || it.telefono_contacto,
             },
           };
-        });
+        }).filter(Boolean);
+
+        allEvents.push(...instalacionEvents);
+        console.log('✅ Instalaciones cargadas:', instalacionEvents.length);
       } catch (err) {
-        console.warn('❌ Error cargando contratos:', err);
+        console.error('❌ Error cargando instalaciones:', err);
       }
 
-      // 3️⃣ Facturas electrónicas
-      let invoiceEvents = [];
+      // 2️⃣ CONTRATOS - Fecha de finalización
       try {
-        const res = await api.get('/facturas?estado=pending,pagada,vencida');
-        const facturas = Array.isArray(res?.data?.rows)
-          ? res.data.rows
-          : Array.isArray(res?.data)
-          ? res.data
-          : [];
+        const resContratos = await api.get('/contratos', { params: { activo: 1 } });
+        console.log('📦 Respuesta contratos:', resContratos.data);
+        
+        const contratos = resContratos?.data?.contratos || 
+                         resContratos?.data?.rows || 
+                         resContratos?.data || [];
 
-        invoiceEvents = facturas.map(f => {
-          const invoiceDate = f.fecha_emision || f.fecha || new Date().toISOString();
+        const contratosEvents = contratos
+          .filter(c => c.fecha_fin || c.fecha_vencimiento_permanencia)
+          .map(c => {
+            const fechaFin = c.fecha_fin || c.fecha_vencimiento_permanencia;
+            
+            return {
+              id: `contrato-${c.id}`,
+              title: `📄 Vence Contrato #${c.numero_contrato || c.id}`,
+              start: fechaFin.split('T')[0],
+              allDay: true,
+              backgroundColor: '#8B5CF6',
+              borderColor: '#8B5CF6',
+              textColor: '#fff',
+              extendedProps: {
+                ...c,
+                tipo_evento: 'Vencimiento de Contrato',
+                cliente_nombre: c.cliente?.nombre || c.cliente_nombre || 'Sin cliente',
+                direccion_instalacion: c.direccion || c.direccion_instalacion || 'Sin dirección',
+                telefono_contacto: c.telefono || c.telefono_contacto,
+                estado: c.estado || 'Activo',
+                valor: c.valor_total || c.valor_mensual || null,
+              },
+            };
+          });
 
-          return {
-            id: `factura-${f.id}`,
-            title: `Factura #${f.numero_factura || f.id}`,
-            start: invoiceDate,
-            allDay: true,
-            backgroundColor:
-              f.estado === 'vencida' ? '#EF4444' : f.estado === 'pagada' ? '#10B981' : '#F59E0B',
-            borderColor:
-              f.estado === 'vencida' ? '#EF4444' : f.estado === 'pagada' ? '#10B981' : '#F59E0B',
-            textColor: '#fff',
-            extendedProps: {
-              ...f,
-              tipo_evento: 'Factura electrónica',
-              cliente_nombre: f.cliente?.nombre || f.cliente_nombre || 'Sin cliente',
-              estado: f.estado || 'Pendiente',
-              valor_total: f.total || f.valor || 0,
-            },
-          };
-        });
+        allEvents.push(...contratosEvents);
+        console.log('✅ Contratos cargados:', contratosEvents.length);
       } catch (err) {
-        console.warn('❌ Error cargando facturas:', err);
+        console.error('❌ Error cargando contratos:', err);
       }
 
-      // 4️⃣ Combinar todo
-      const combinedEvents = [...baseEvents, ...contractEvents, ...invoiceEvents];
-      setEvents(combinedEvents);
-      console.log('✅ Eventos combinados cargados:', combinedEvents);
+      // 3️⃣ FACTURACIÓN ELECTRÓNICA - Fecha de emisión
+      try {
+        const resFacturas = await api.get('/facturas', { params: { estado: 'pending,pagada,vencida' } });
+        console.log('📦 Respuesta facturas:', resFacturas.data);
+        
+        const facturas = resFacturas?.data?.facturas || 
+                        resFacturas?.data?.rows || 
+                        resFacturas?.data || [];
+
+        const facturasEvents = facturas
+          .filter(f => f.fecha_emision || f.fecha)
+          .map(f => {
+            const fechaEmision = f.fecha_emision || f.fecha;
+            const estado = (f.estado || 'pending').toLowerCase();
+            
+            const color = estado === 'vencida' ? '#EF4444' 
+              : estado === 'pagada' ? '#10B981' 
+              : '#F59E0B';
+
+            return {
+              id: `factura-${f.id}`,
+              title: `💳 Factura #${f.numero_factura || f.numero || f.id}`,
+              start: fechaEmision.split('T')[0],
+              allDay: true,
+              backgroundColor: color,
+              borderColor: color,
+              textColor: '#fff',
+              extendedProps: {
+                ...f,
+                tipo_evento: 'Factura Electrónica',
+                cliente_nombre: f.cliente?.nombre || f.cliente_nombre || 'Sin cliente',
+                estado: estado === 'pending' ? 'Pendiente' 
+                  : estado === 'pagada' ? 'Pagada' 
+                  : estado === 'vencida' ? 'Vencida' 
+                  : estado,
+                valor: f.total || f.valor_total || f.valor || 0,
+              },
+            };
+          });
+
+        allEvents.push(...facturasEvents);
+        console.log('✅ Facturas cargadas:', facturasEvents.length);
+      } catch (err) {
+        console.error('❌ Error cargando facturas:', err);
+      }
+
+      setEvents(allEvents);
+      console.log('✅ Total eventos combinados:', allEvents.length);
     } catch (err) {
       console.error('❌ Error general cargando el calendario:', err);
       setError('No se pudieron cargar los eventos. Revisa el backend o la conexión.');
@@ -135,7 +202,7 @@ const CalendarioManagement = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">📅 Calendario General</h1>
           <p className="text-sm text-gray-600 mt-1">
-            Visualiza instalaciones, contratos y facturación electrónica en un solo calendario.
+            Visualiza instalaciones, vencimientos de contratos y facturación electrónica.
           </p>
         </div>
         <div>
@@ -145,6 +212,33 @@ const CalendarioManagement = () => {
           >
             🔄 Actualizar
           </button>
+        </div>
+      </div>
+
+      {/* Leyenda de colores */}
+      <div className="mb-4 bg-white rounded-lg shadow p-4">
+        <h3 className="text-sm font-semibold text-gray-700 mb-2">Leyenda:</h3>
+        <div className="flex flex-wrap gap-4 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#2563EB' }}></div>
+            <span>Instalación Programada</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#10B981' }}></div>
+            <span>Completada / Pagada</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#8B5CF6' }}></div>
+            <span>Vencimiento Contrato</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#F59E0B' }}></div>
+            <span>Factura Pendiente</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#EF4444' }}></div>
+            <span>Cancelada / Vencida</span>
+          </div>
         </div>
       </div>
 
@@ -181,6 +275,7 @@ const CalendarioManagement = () => {
         )}
       </div>
 
+      {/* Modal de detalles */}
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 px-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-xl p-6">
@@ -188,41 +283,74 @@ const CalendarioManagement = () => {
               <div>
                 <h2 className="text-lg font-semibold">{selected.title}</h2>
                 <p className="text-sm text-gray-500">
-                  {selected.start ? format(new Date(selected.start), "PPPP") : 'Fecha no disponible'}
+                  {selected.start ? format(new Date(selected.start), "PPPP", { locale: require('date-fns/locale/es') }) : 'Fecha no disponible'}
                   {selected.end && selected.start !== selected.end && (
-                    <> — hasta {format(new Date(selected.end), "PPPP")}</>
+                    <> — hasta {format(new Date(selected.end), "PPPP", { locale: require('date-fns/locale/es') })}</>
                   )}
                 </p>
               </div>
-              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">✕</button>
+              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
             </div>
 
             <div className="mt-4 text-sm text-gray-700 space-y-2">
               {selected.extended?.tipo_evento && (
-                <div><strong>Tipo:</strong> {selected.extended.tipo_evento}</div>
+                <div>
+                  <strong>Tipo:</strong> {selected.extended.tipo_evento}
+                </div>
               )}
               {selected.extended?.cliente_nombre && (
-                <div><strong>Cliente:</strong> {selected.extended.cliente_nombre}</div>
+                <div>
+                  <strong>Cliente:</strong> {selected.extended.cliente_nombre}
+                </div>
               )}
               {selected.extended?.direccion_instalacion && (
-                <div><strong>Dirección:</strong> {selected.extended.direccion_instalacion}</div>
+                <div>
+                  <strong>Dirección:</strong> {selected.extended.direccion_instalacion}
+                </div>
               )}
               {selected.extended?.instalador_nombre && (
-                <div><strong>Instalador:</strong> {selected.extended.instalador_nombre}</div>
+                <div>
+                  <strong>Instalador:</strong> {selected.extended.instalador_nombre}
+                </div>
               )}
               {selected.extended?.telefono_contacto && (
-                <div><strong>Teléfono:</strong> {selected.extended.telefono_contacto}</div>
+                <div>
+                  <strong>Teléfono:</strong> {selected.extended.telefono_contacto}
+                </div>
+              )}
+              {selected.extended?.hora_programada && (
+                <div>
+                  <strong>Hora:</strong> {selected.extended.hora_programada}
+                </div>
               )}
               {selected.extended?.estado && (
-                <div><strong>Estado:</strong> {selected.extended.estado}</div>
+                <div>
+                  <strong>Estado:</strong> 
+                  <span className={`ml-2 px-2 py-1 rounded text-xs ${
+                    selected.extended.estado === 'Completada' || selected.extended.estado === 'Pagada' 
+                      ? 'bg-green-100 text-green-800'
+                      : selected.extended.estado === 'Cancelada' || selected.extended.estado === 'Vencida'
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {selected.extended.estado}
+                  </span>
+                </div>
               )}
               {selected.extended?.valor && (
-                <div><strong>Valor:</strong> ${selected.extended.valor.toLocaleString()}</div>
+                <div>
+                  <strong>Valor:</strong> ${Number(selected.extended.valor).toLocaleString('es-CO')}
+                </div>
               )}
             </div>
 
             <div className="mt-6 flex justify-end">
-              <button onClick={closeModal} className="px-4 py-2 bg-gray-200 rounded mr-2">Cerrar</button>
+              <button 
+                onClick={closeModal} 
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded transition"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
