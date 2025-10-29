@@ -5,6 +5,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import esLocale from '@fullcalendar/core/locales/es';
 import api from '../../services/apiService';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { AlertTriangle } from 'lucide-react';
 import 'tailwindcss/tailwind.css';
 import './CalendarioManagement.css';
@@ -283,9 +284,9 @@ const CalendarioManagement = () => {
               <div>
                 <h2 className="text-lg font-semibold">{selected.title}</h2>
                 <p className="text-sm text-gray-500">
-                  {selected.start ? format(new Date(selected.start), "PPPP", { locale: require('date-fns/locale/es') }) : 'Fecha no disponible'}
+                  {selected.start ? format(new Date(selected.start), "PPPP", { locale: es }) : 'Fecha no disponible'}
                   {selected.end && selected.start !== selected.end && (
-                    <> — hasta {format(new Date(selected.end), "PPPP", { locale: require('date-fns/locale/es') })}</>
+                    <> — hasta {format(new Date(selected.end), "PPPP", { locale: es })}</>
                   )}
                 </p>
               </div>
