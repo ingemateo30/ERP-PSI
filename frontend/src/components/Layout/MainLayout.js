@@ -140,7 +140,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       icon: <Calendar size={22} />,
       label: 'Calendario',
       path: '/calendar',
-      permission: null
+      permission: 'supervisor,administrador'
     }
   ];
 

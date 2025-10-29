@@ -464,15 +464,16 @@ function App() {
               />
 
               <Route
-                path="/calendar"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout title="Calendario" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Calendario" />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
+  path="/calendar"
+  element={
+    <ProtectedRoute>
+      <MainLayout title="Calendario" subtitle="Agenda y gestión de eventos">
+        <CalendarioManagement />
+      </MainLayout>
+    </ProtectedRoute>
+  }
+/>
+
 
               {/* ================================ */}
               {/* RUTAS DE ADMINISTRACIÓN */}
