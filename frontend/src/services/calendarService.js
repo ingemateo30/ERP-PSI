@@ -34,6 +34,7 @@ export async function getCalendarEvents(params = {}) {
     try {
       const res = await api.get(url);
       const payload = res?.data ?? res;
+      console.log("📦 Respuesta completa del backend calendario:", payload);
       const items =
         payload?.instalaciones ||
         payload?.rows ||
