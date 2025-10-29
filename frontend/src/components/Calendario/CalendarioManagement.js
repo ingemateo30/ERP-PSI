@@ -1,145 +1,117 @@
-// frontend/src/components/Calendario/CalendarioManagement.js
-import React, { useEffect, useState, useCallback } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import esLocale from '@fullcalendar/core/locales/es';
-import { getCalendarEvents } from '../../services/calendarService';
-import { format } from 'date-fns';
-import { AlertTriangle } from 'lucide-react';
-import 'tailwindcss/tailwind.css';
-import './CalendarioManagement.css';
+// frontend/src/services/calendarService.js
+import api from './apiService';
+import { formatISO, addMonths, isAfter, parseISO } from 'date-fns';
+import { getInstalacionesEvents } from './calendarServiceInstalaciones'; // Tu servicio original de instalaciones
 
+export async function getCalendarEvents(params = {}) {
+  // 1️⃣ Eventos de instalaciones: dejamos exactamente como estaba
+  const instalaciones = await getInstalacionesEvents(params);
 
+  // 2️⃣ Eventos de contratos y facturación recurrente
+  let contratos = [];
+  try {
+    const res = await api.get('/contratos?activo=1');
+    const items = Array.isArray(res.data) ? res.data : res.data?.contratos || [];
 
-const CalendarioManagement = () => {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selected, setSelected] = useState(null); // evento seleccionado para modal
+    contratos = items.flatMap((c) => {
+      if (!c.fecha_fin) return [];
 
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const items = await getCalendarEvents({ limit: 10000 }); // pide muchos por si acaso
-      setEvents(items);
-    } catch (err) {
-      console.error('Error cargando eventos del calendario', err);
-      setError('No se pudieron cargar los eventos del calendario. Revisa el backend o la conexión.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      const fechaFin = parseISO(c.fecha_fin);
+      const start = formatISO(fechaFin);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleEventClick = (clickInfo) => {
-    const ev = clickInfo.event;
-    setSelected({
-      id: ev.id,
-      title: ev.title,
-      start: ev.start,
-      extended: ev.extendedProps || {},
+      return [
+        {
+          id: `contrato-${c.id}`,
+          title: `Contrato ${c.numero_contrato}`,
+          start,
+          end: start,
+          allDay: true,
+          backgroundColor: '#3B82F6',
+          borderColor: '#3B82F6',
+          textColor: '#fff',
+          extendedProps: {
+            tipo: 'contrato',
+            cliente_id: c.cliente_id,
+            estado: c.estado,
+            fecha_fin: c.fecha_fin,
+          },
+        },
+        ...generateMonthlyInvoices(c),
+      ];
     });
-  };
+  } catch (err) {
+    console.warn('No se pudieron cargar contratos para el calendario', err);
+  }
 
-  const closeModal = () => setSelected(null);
+  // 3️⃣ Eventos de facturas sueltas
+  let facturas = [];
+  try {
+    const res = await api.get('/facturas?estado=pendiente,pagada,vencida');
+    const items = Array.isArray(res.data) ? res.data : res.data?.facturas || [];
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">📅 Calendario de Instalaciones</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Vista mensual de instalaciones programadas (solo lectura). Haz click en un evento para ver detalles.
-          </p>
-        </div>
-        <div>
-          <button
-            onClick={load}
-            className="px-3 py-2 bg-white border border-gray-200 rounded-md text-sm text-gray-700 hover:bg-gray-50"
-          >
-            🔄 Actualizar
-          </button>
-        </div>
-      </div>
+    facturas = items.map((f) => {
+      if (!f.fecha_vencimiento) return null;
+      const start = formatISO(parseISO(f.fecha_vencimiento));
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 flex items-center">
-          <AlertTriangle className="w-5 h-5 mr-2" />
-          <div>{error}</div>
-        </div>
-      )}
+      let color = '#2563EB';
+      if (f.estado === 'vencida') color = '#EF4444';
+      else if (f.estado === 'pagada') color = '#10B981';
+      else if (f.estado === 'pendiente') color = '#F59E0B';
 
-      <div className="bg-white rounded-lg shadow p-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-4"></div>
-            <div className="text-gray-600">Cargando calendario...</div>
-          </div>
-        ) : (
-          <FullCalendar
-  plugins={[dayGridPlugin, interactionPlugin]}
-  initialView="dayGridMonth"
-  headerToolbar={{
-    left: 'prev,next today',
-    center: 'title',
-    right: 'dayGridMonth',
-  }}
-  locale={esLocale}
-  events={events}
-  eventClick={handleEventClick}
-  height="78vh"
-  nowIndicator={true}
-  eventDisplay="block"
-  dayMaxEventRows={false} // evita que la celda se expanda
-  dayCellClassNames="fc-day-cell-scroll" // clase para aplicar scroll interno
-/>
+      return {
+        id: `factura-${f.id}`,
+        title: `Factura ${f.numero_factura}`,
+        start,
+        end: start,
+        allDay: true,
+        backgroundColor: color,
+        borderColor: color,
+        textColor: '#fff',
+        extendedProps: {
+          tipo: 'factura',
+          cliente_id: f.cliente_id,
+          estado: f.estado,
+          fecha_emision: f.fecha_emision,
+          fecha_vencimiento: f.fecha_vencimiento,
+        },
+      };
+    }).filter(Boolean);
+  } catch (err) {
+    console.warn('No se pudieron cargar facturas para el calendario', err);
+  }
 
+  return [...instalaciones, ...contratos, ...facturas];
+}
 
-        )}
-      </div>
+// Genera facturación recurrente mensual según el contrato
+function generateMonthlyInvoices(contrato) {
+  const { fecha_inicio, fecha_fin, numero_contrato, cliente_id } = contrato;
+  if (!fecha_inicio || !fecha_fin) return [];
 
-      {/* Modal simple de detalles (inline, estilado con Tailwind) */}
-      {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 px-4">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-xl p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">{selected.title}</h2>
-                <p className="text-sm text-gray-500">
-                  {selected.start ? format(new Date(selected.start), "PPPP 'a las' p") : 'Fecha no disponible'}
-                </p>
-              </div>
-              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">✕</button>
-            </div>
+  const invoices = [];
+  let current = parseISO(fecha_inicio);
+  const end = parseISO(fecha_fin);
 
-            <div className="mt-4 text-sm text-gray-700 space-y-2">
-              <div><strong>Cliente:</strong> {selected.extended.cliente_nombre || selected.extended.cliente_id || 'N/A'}</div>
-              <div><strong>Dirección:</strong> {selected.extended.direccion_instalacion || 'N/A'}</div>
-              <div><strong>Instalador:</strong> {selected.extended.instalador_nombre || selected.extended.instalador || 'No asignado'}</div>
-              <div><strong>Teléfono:</strong> {selected.extended.telefono_contacto || 'N/A'}</div>
-              <div><strong>Tipo:</strong> {selected.extended.tipo_instalacion || 'N/A'}</div>
-              <div><strong>Estado:</strong> {selected.extended.estado || 'N/A'}</div>
-              {selected.extended.observaciones && (
-                <div>
-                  <strong>Observaciones:</strong>
-                  <div className="mt-1 text-sm text-gray-600 whitespace-pre-wrap">{selected.extended.observaciones}</div>
-                </div>
-              )}
-            </div>
+  while (isAfter(end, current) || +current === +end) {
+    invoices.push({
+      id: `facturacion-${numero_contrato}-${formatISO(current, { representation: 'date' })}`,
+      title: `Facturación ${numero_contrato}`,
+      start: formatISO(current),
+      end: formatISO(current),
+      allDay: true,
+      backgroundColor: '#F59E0B',
+      borderColor: '#F59E0B',
+      textColor: '#fff',
+      extendedProps: {
+        tipo: 'facturacion_recurrente',
+        cliente_id,
+        contrato_id: contrato.id,
+      },
+    });
+    current = addMonths(current, 1);
+  }
 
-            <div className="mt-6 flex justify-end">
-              <button onClick={closeModal} className="px-4 py-2 bg-gray-200 rounded mr-2">Cerrar</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+  return invoices;
+}
 
-export default CalendarioManagement;
+export default { getCalendarEvents };

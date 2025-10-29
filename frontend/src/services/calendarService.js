@@ -1,61 +1,61 @@
-// frontend/src/services/calendarService.js
 import api from './apiService';
-import { formatISO, addDays } from 'date-fns';
+import { formatISO, addMonths, isAfter, parseISO } from 'date-fns';
 
-/**
- * Convierte contratos activos en eventos de calendario.
- * Solo toma fecha_fin y puede marcar un color fijo (ej: azul).
- */
-async function getContractEvents(params = {}) {
+/* ==============================
+   Función principal: solo se toca contratos y facturación
+============================== */
+export async function getCalendarEvents(params = {}) {
+  // 1️⃣ Eventos de instalaciones: dejamos exactamente como estaba
+  const instalaciones = await import('./calendarService').then(m => m.getInstalacionesEvents(params));
+
+  // 2️⃣ Eventos de contratos
+  let contratos = [];
   try {
     const res = await api.get('/contratos?activo=1');
-    const items = Array.isArray(res.data)
-      ? res.data
-      : res.data?.contratos || [];
+    const items = Array.isArray(res.data) ? res.data : res.data?.contratos || [];
 
-    return items.map((c) => {
-      const start = c.fecha_fin ? formatISO(new Date(c.fecha_fin)) : null;
-      if (!start) return null;
+    contratos = items.flatMap((c) => {
+      if (!c.fecha_fin) return [];
 
-      return {
-        id: `contrato-${c.id}`,
-        title: `Contrato ${c.numero_contrato}`,
-        start,
-        end: start,
-        allDay: true,
-        backgroundColor: '#3B82F6', // azul
-        borderColor: '#3B82F6',
-        textColor: '#fff',
-        extendedProps: {
-          tipo: 'contrato',
-          cliente_id: c.cliente_id,
-          estado: c.estado,
-          fecha_fin: c.fecha_fin,
+      const fechaFin = parseISO(c.fecha_fin);
+      const start = formatISO(fechaFin);
+
+      return [
+        {
+          id: `contrato-${c.id}`,
+          title: `Contrato ${c.numero_contrato}`,
+          start,
+          end: start,
+          allDay: true,
+          backgroundColor: '#3B82F6',
+          borderColor: '#3B82F6',
+          textColor: '#fff',
+          extendedProps: {
+            tipo: 'contrato',
+            cliente_id: c.cliente_id,
+            estado: c.estado,
+            fecha_fin: c.fecha_fin,
+          },
         },
-      };
-    }).filter(Boolean);
+        // 🔄 Agregar facturación mensual recurrente hasta la fecha de fin del contrato
+        ...generateMonthlyInvoices(c),
+      ];
+    });
   } catch (err) {
     console.warn('No se pudieron cargar contratos para el calendario', err);
-    return [];
   }
-}
 
-/**
- * Convierte facturas pendientes/pagadas/vencidas en eventos de calendario.
- * Se puede usar fecha_vencimiento como start y marcar color por estado.
- */
-async function getInvoiceEvents(params = {}) {
+  // 3️⃣ Eventos de facturas sueltas
+  let facturas = [];
   try {
-    const res = await api.get('/facturas?estado=pending,pagada,vencida');
-    const items = Array.isArray(res.data)
-      ? res.data
-      : res.data?.facturas || [];
+    const res = await api.get('/facturas?estado=pendiente,pagada,vencida');
+    const items = Array.isArray(res.data) ? res.data : res.data?.facturas || [];
 
-    return items.map((f) => {
-      const start = f.fecha_vencimiento ? formatISO(new Date(f.fecha_vencimiento)) : null;
-      if (!start) return null;
+    facturas = items.map((f) => {
+      if (!f.fecha_vencimiento) return null;
+      const start = formatISO(parseISO(f.fecha_vencimiento));
 
-      let color = '#2563EB'; // azul por defecto
+      let color = '#2563EB';
       if (f.estado === 'vencida') color = '#EF4444';
       else if (f.estado === 'pagada') color = '#10B981';
       else if (f.estado === 'pendiente') color = '#F59E0B';
@@ -80,25 +80,42 @@ async function getInvoiceEvents(params = {}) {
     }).filter(Boolean);
   } catch (err) {
     console.warn('No se pudieron cargar facturas para el calendario', err);
-    return [];
   }
+
+  return [...instalaciones, ...contratos, ...facturas];
 }
 
-/**
- * Función principal que obtiene todos los eventos para FullCalendar
- */
-export async function getCalendarEvents(params = {}) {
-  // Primero obtenemos instalaciones (ya tu código existente)
-  const instalaciones = await import('./calendarServiceInstalaciones').then(m => m.getCalendarEvents(params));
+/* ==============================
+   Función auxiliar: genera facturas recurrentes mes a mes
+============================== */
+function generateMonthlyInvoices(contrato) {
+  const { fecha_inicio, fecha_fin, numero_contrato, cliente_id } = contrato;
+  if (!fecha_inicio || !fecha_fin) return [];
 
-  // Luego contratos
-  const contratos = await getContractEvents(params);
+  const invoices = [];
+  let current = parseISO(fecha_inicio);
+  const end = parseISO(fecha_fin);
 
-  // Luego facturas
-  const facturas = await getInvoiceEvents(params);
+  while (isAfter(end, current) || +current === +end) {
+    invoices.push({
+      id: `facturacion-${numero_contrato}-${formatISO(current, { representation: 'date' })}`,
+      title: `Facturación ${numero_contrato}`,
+      start: formatISO(current),
+      end: formatISO(current),
+      allDay: true,
+      backgroundColor: '#F59E0B', // naranja para facturas recurrentes
+      borderColor: '#F59E0B',
+      textColor: '#fff',
+      extendedProps: {
+        tipo: 'facturacion_recurrente',
+        cliente_id,
+        contrato_id: contrato.id,
+      },
+    });
+    current = addMonths(current, 1); // siguiente mes
+  }
 
-  // Combinamos todos los eventos
-  return [...instalaciones, ...contratos, ...facturas];
+  return invoices;
 }
 
 export default { getCalendarEvents };
