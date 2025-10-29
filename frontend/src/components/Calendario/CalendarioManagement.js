@@ -8,7 +8,8 @@ import { getCalendarEvents } from '../../services/calendarService';
 import { format } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
 import 'tailwindcss/tailwind.css';
-import './App.css';
+import 'src/App.css';
+
 
 
 const CalendarioManagement = () => {

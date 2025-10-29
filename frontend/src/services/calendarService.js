@@ -15,7 +15,8 @@
  *   ...
  * ]
  */
-import './App.css';
+import 'src/App.css';
+
 import api from './apiService'; // tu wrapper axios central
 
 export async function getCalendarEvents(params = {}) {
