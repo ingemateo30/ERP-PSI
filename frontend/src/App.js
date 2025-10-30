@@ -459,7 +459,7 @@ function App() {
 <Route
   path="/reports"
   element={
-    <ProtectedRoute requiredRole="supervisor,administrador">
+    <ProtectedRoute>
       <MainLayout title="Dashboard de Estadísticas" subtitle="Métricas generales del sistema">
         <EstadisticasGeneral />
       </MainLayout>
