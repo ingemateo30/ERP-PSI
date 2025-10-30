@@ -144,37 +144,52 @@ const FacturacionAutomatica = () => {
     }
   };
 
-  const generarFacturacionMensual = async () => {
-    try {
-      setLoading(true);
-      
-      const params = {
-        fecha_referencia: new Date().toISOString(),
-        solo_preview: false
-      };
+const generarFacturacionMensual = async () => {
+  try {
+    setLoading(true);
+    
+    const params = {
+      fecha_referencia: new Date().toISOString(),
+      solo_preview: false
+    };
 
-      console.log('🚀 Generando facturación mensual con parámetros:', params);
-      
-      const response = await facturasService.generarFacturacionMensual(params);
-      
-      setResultado(response.data);
-      
-      // Recargar datos
-      await cargarEstadisticas();
-      await cargarFacturas();
-      
-    } catch (error) {
-      console.error('Error generando facturación:', error);
-      setResultado({
-        success: false,
-        message: error.message,
-        errores: [error.message]
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    console.log('🚀 Generando facturación mensual con parámetros:', params);
+    
+    const response = await facturasService.generarFacturacionMensual(params);
+    
+    console.log('✅ Respuesta completa:', response);
+    console.log('✅ response.data:', response.data);
 
+    // ✅ CORRECCIÓN: Validar que detalles sea un array
+    const datos = response.data || response;
+    const resultadoValidado = {
+      ...datos,
+      detalles: Array.isArray(datos?.detalles) ? datos.detalles : [],
+      clientes_procesados: datos?.clientes_procesados || 0,
+      facturas_generadas: datos?.facturas_generadas || 0,
+      errores: datos?.errores || 0,
+      tasa_exito: datos?.tasa_exito || '0.00'
+    };
+
+    console.log('✅ Resultado validado:', resultadoValidado);
+    setResultado(resultadoValidado);
+    
+    // Recargar datos
+    await cargarEstadisticas();
+    await cargarFacturas();
+    
+  } catch (error) {
+    console.error('Error generando facturación:', error);
+    setResultado({
+      success: false,
+      message: error.message,
+      errores: [error.message],
+      detalles: [] // ✅ Asegurar que detalles sea array incluso en error
+    });
+  } finally {
+    setLoading(false);
+  }
+};
   const obtenerPreview = async () => {
     try {
       setLoading(true);
@@ -433,65 +448,151 @@ const FacturacionAutomatica = () => {
           </div>
 
           {/* Resultados y Preview */}
-          {(resultado || preview) && (
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">
-                  {preview ? 'Vista Previa de Facturación' : 'Resultado de Facturación'}
-                </h3>
-              </div>
-              <div className="p-6">
-                <div className={`rounded-xl p-6 border-2 ${
-                  (resultado?.success !== false && preview?.success !== false) ? 
-                  'bg-green-50 border-green-200' : 
-                  'bg-red-50 border-red-200'
-                }`}>
-                  <div className="flex items-start space-x-3">
-                    <div className="flex-shrink-0">
-                      {(resultado?.success !== false && preview?.success !== false) ? 
-                        <CheckCircle className="w-6 h-6 text-green-600" /> :
-                        <XCircle className="w-6 h-6 text-red-600" />
-                      }
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-lg font-medium text-gray-900">
-                        {resultado?.message || preview?.message || 'Proceso completado'}
-                      </h4>
-                      
-                      {preview?.resumen && (
-                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="bg-white rounded-lg p-4 border border-gray-200">
-                            <div className="text-sm font-medium text-gray-500">Clientes a facturar</div>
-                            <div className="text-2xl font-bold text-gray-900">{preview.resumen.total_clientes}</div>
-                          </div>
-                          <div className="bg-white rounded-lg p-4 border border-gray-200">
-                            <div className="text-sm font-medium text-gray-500">Monto estimado</div>
-                            <div className="text-2xl font-bold text-gray-900">{formatearMoneda(preview.resumen.monto_total_estimado)}</div>
-                          </div>
-                          <div className="bg-white rounded-lg p-4 border border-gray-200">
-                            <div className="text-sm font-medium text-gray-500">Servicios totales</div>
-                            <div className="text-2xl font-bold text-gray-900">{preview.resumen.servicios_totales || 0}</div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {(resultado?.errores || preview?.errores) && (
-                        <div className="mt-4">
-                          <h5 className="text-sm font-medium text-red-800 mb-2">Errores encontrados:</h5>
-                          <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
-                            {(resultado?.errores || preview?.errores).map((error, index) => (
-                              <li key={index}>{error}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+{/* Resultados y Preview */}
+{(resultado || preview) && (
+  <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+    <div className="px-6 py-4 border-b border-gray-200">
+      <h3 className="text-lg font-medium text-gray-900">
+        {preview ? 'Vista Previa de Facturación' : 'Resultado de Facturación'}
+      </h3>
+    </div>
+    <div className="p-6">
+      <div className={`rounded-xl p-6 border-2 ${
+        (resultado?.success !== false && preview?.success !== false) ? 
+        'bg-green-50 border-green-200' : 
+        'bg-red-50 border-red-200'
+      }`}>
+        <div className="flex items-start space-x-3">
+          <div className="flex-shrink-0">
+            {(resultado?.success !== false && preview?.success !== false) ? 
+              <CheckCircle className="w-6 h-6 text-green-600" /> :
+              <XCircle className="w-6 h-6 text-red-600" />
+            }
+          </div>
+          <div className="flex-1">
+            <h4 className="text-lg font-medium text-gray-900">
+              {resultado?.message || preview?.message || 'Proceso completado'}
+            </h4>
+            
+            {/* Resumen de Preview */}
+            {preview?.resumen && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-sm font-medium text-gray-500">Clientes a facturar</div>
+                  <div className="text-2xl font-bold text-gray-900">{preview.resumen.total_clientes}</div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-sm font-medium text-gray-500">Monto estimado</div>
+                  <div className="text-2xl font-bold text-gray-900">{formatearMoneda(preview.resumen.monto_total_estimado)}</div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-sm font-medium text-gray-500">Servicios totales</div>
+                  <div className="text-2xl font-bold text-gray-900">{preview.resumen.servicios_totales || 0}</div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
+            {/* ✅ NUEVO: Resumen de Resultado */}
+            {resultado && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-sm font-medium text-gray-500">Procesados</div>
+                  <div className="text-2xl font-bold text-blue-700">{resultado.clientes_procesados || 0}</div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-sm font-medium text-gray-500">Generadas</div>
+                  <div className="text-2xl font-bold text-green-700">{resultado.facturas_generadas || 0}</div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-sm font-medium text-gray-500">Errores</div>
+                  <div className="text-2xl font-bold text-red-700">{resultado.errores || 0}</div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-sm font-medium text-gray-500">Tasa Éxito</div>
+                  <div className="text-2xl font-bold text-gray-900">{resultado.tasa_exito || 0}%</div>
+                </div>
+              </div>
+            )}
+
+            {/* ✅ NUEVO: Detalle por Cliente */}
+            {resultado && Array.isArray(resultado.detalles) && resultado.detalles.length > 0 && (
+              <div className="mt-6 space-y-2">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Detalle por Cliente</h4>
+                <div className="max-h-96 overflow-y-auto space-y-2">
+                  {resultado.detalles.map((detalle, index) => (
+                    <div
+                      key={index}
+                      className={`p-3 rounded-lg border ${
+                        detalle.estado === 'generada'
+                          ? 'bg-green-50 border-green-200'
+                          : detalle.estado === 'error'
+                          ? 'bg-red-50 border-red-200'
+                          : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900 text-sm">
+                            {detalle.nombre || 'Sin nombre'}
+                          </p>
+                          {detalle.numero_factura && (
+                            <p className="text-xs text-gray-600 mt-1">
+                              Factura: {detalle.numero_factura}
+                            </p>
+                          )}
+                          {detalle.razon && (
+                            <p className="text-xs text-gray-600 mt-1">
+                              {detalle.razon}
+                            </p>
+                          )}
+                          {detalle.error && (
+                            <p className="text-xs text-red-600 mt-1">
+                              Error: {detalle.error}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right ml-4">
+                          {detalle.total && (
+                            <p className="font-semibold text-gray-900 text-sm">
+                              {formatearMoneda(detalle.total)}
+                            </p>
+                          )}
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${
+                              detalle.estado === 'generada'
+                                ? 'bg-green-100 text-green-700'
+                                : detalle.estado === 'error'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            {detalle.estado}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Errores */}
+            {(resultado?.errores || preview?.errores) && (
+              <div className="mt-4">
+                <h5 className="text-sm font-medium text-red-800 mb-2">Errores encontrados:</h5>
+                <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                  {(resultado?.errores || preview?.errores).map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
           {/* Lista de Facturas */}
           <div className="bg-white shadow-sm rounded-xl border border-gray-200">
             <div className="px-6 py-4 border-b border-gray-200">
