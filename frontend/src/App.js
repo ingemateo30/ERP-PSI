@@ -453,17 +453,17 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route
+              // ✅ DESPUÉS (CORRECTO) - Permite administrador y supervisor
+<Route
   path="/reports"
   element={
-    <ProtectedRoute requiredRole="supervisor">
+    <ProtectedRoute>
       <MainLayout title="Dashboard de Estadísticas" subtitle="Métricas generales del sistema">
         <EstadisticasGeneral />
       </MainLayout>
     </ProtectedRoute>
   }
 />
-
               <Route
   path="/calendar"
   element={
