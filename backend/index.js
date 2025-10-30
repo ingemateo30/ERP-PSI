@@ -340,7 +340,8 @@ try {
   console.error('Stack trace:', error.stack);
   process.exit(1);
 }
-
+const estadisticasRoutes = require('./routes/estadisticas');
+app.use('/api/v1/estadisticas', estadisticasRoutes);
 // Ruta base de la API con información completa
 app.get('/api/v1', (req, res) => {
   res.json({
