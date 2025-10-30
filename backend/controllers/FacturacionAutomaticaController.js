@@ -10,58 +10,41 @@ class FacturacionAutomaticaController {
    */
   static async generarFacturacionMensual(req, res) {
     try {
-      console.log('🚀 Iniciando facturación mensual automática desde controller...');
-      console.log('📦 Parámetros recibidos:', req.body);
-
-      const { fecha_referencia, solo_preview, clientes_especificos } = req.body;
-
-      // Si es solo preview, no generar facturas
-      if (solo_preview) {
-        return FacturacionAutomaticaController.obtenerPreviewFacturacion(req, res);
-      }
-
-      // Validar fecha de referencia
-      const fechaRef = fecha_referencia ? new Date(fecha_referencia) : new Date();
+      console.log('🏗️ Iniciando generación de facturación mensual...');
+      console.log('📋 Parámetros recibidos:', req.body);
       
-      if (isNaN(fechaRef.getTime())) {
-        return res.status(400).json({
-          success: false,
-          message: 'Fecha de referencia inválida'
-        });
-      }
-
-      // Ejecutar facturación automática
-      const parametros = {
-        periodo: `${fechaRef.getFullYear()}-${String(fechaRef.getMonth() + 1).padStart(2, '0')}`,
-        clientes_especificos: clientes_especificos || null,
-        usuario_id: req.user?.id || 1
+      const resultado = await FacturacionAutomaticaService.generarFacturacionMensual(req.body);
+      
+      console.log('✅ Resultado del servicio:', resultado);
+      
+      // ✅ CORRECCIÓN: Asegurar que detalles sea un array
+      const respuesta = {
+        ...resultado,
+        detalles: Array.isArray(resultado.detalles) ? resultado.detalles : [],
+        success: true
       };
 
-      console.log('⚙️ Ejecutando facturación con parámetros:', parametros);
-
-      const resultado = await FacturacionAutomaticaService.generarFacturacionMensual(parametros);
-
-      console.log('✅ Facturación completada:', resultado);
-
-     res.json({
-      success: true,
-      data: {
-        ...resultado,
-        detalles: Array.isArray(resultado.detalles) ? resultado.detalles : []
-      }
-    });
-
+      console.log('✅ Respuesta final:', respuesta);
+      
+      res.json({
+        success: true,
+        data: respuesta
+      });
+      
     } catch (error) {
-      console.error('❌ Error en facturación mensual:', error);
+      console.error('❌ Error en controller de facturación:', error);
       res.status(500).json({
         success: false,
-        message: 'Error procesando facturación mensual',
-        error: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        message: error.message || 'Error generando facturación',
+        data: {
+          detalles: [], // ✅ Asegurar array vacío en error
+          clientes_procesados: 0,
+          facturas_generadas: 0,
+          errores: 1
+        }
       });
     }
   }
-
   /**
    * Obtener preview de facturación (sin generar facturas)
    * GET /api/v1/facturacion/automatica/preview-mensual
