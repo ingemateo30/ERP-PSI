@@ -1,12 +1,12 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import esLocale from '@fullcalendar/core/locales/es';
 import api from '../../services/apiService';
-import { format, addDays, addMonths, parseISO } from 'date-fns';
+import { format, parseISO, addDays, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Bell, TrendingUp, Filter, X } from 'lucide-react';
 import 'tailwindcss/tailwind.css';
 import './CalendarioManagement.css';
 
@@ -15,86 +15,131 @@ const CalendarioManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [showAlerts, setShowAlerts] = useState(false);
+  const [showReports, setShowReports] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    tipo: 'todos', // todos, instalaciones, facturas, contratos
+    estado: 'todos', // todos, pendiente, pagada, vencida
+  });
 
-  /**
-   * Calcula los periodos de facturación según la lógica del sistema:
-   * - Primera factura: desde fecha_inicio hasta día+30
-   * - Segunda factura: desde día+30 hasta final del mes para nivelar
-   * - Siguientes facturas: periodos completos del 1 al 30/31 de cada mes
-   */
-  const calcularPeriodosFacturacion = (contrato, numPeriodos = 6) => {
-    const periodos = [];
-    const fechaInicio = parseISO(contrato.fecha_inicio);
-    const diaInicio = fechaInicio.getDate();
-    
-    // PRIMERA FACTURA: día inicio hasta día+29 (30 días)
-    const finPrimerPeriodo = addDays(fechaInicio, 29);
-    periodos.push({
-      numero: 1,
-      inicio: fechaInicio,
-      fin: finPrimerPeriodo,
-      tipo: 'Primera factura (30 días)',
-      descripcion: `Primer mes de servicio desde día ${diaInicio}`,
+  // Calcular alertas automáticamente
+  const alertas = useMemo(() => {
+    const hoy = new Date();
+    const en3Dias = addDays(hoy, 3);
+    const en7Dias = addDays(hoy, 7);
+
+    const facturasProximasVencer = events.filter(e => {
+      if (!e.id.startsWith('factura-')) return false;
+      if (!e.extendedProps?.fecha_vencimiento) return false;
+      if (e.extendedProps?.estado_display === 'Pagada') return false;
+      
+      const fechaVenc = parseISO(e.extendedProps.fecha_vencimiento);
+      return fechaVenc >= hoy && fechaVenc <= en3Dias;
     });
 
-    // SEGUNDA FACTURA: día+30 hasta fin de mes (para nivelar)
-    const inicioSegundoPeriodo = addDays(finPrimerPeriodo, 1);
-    const mesSegundo = inicioSegundoPeriodo.getMonth();
-    const anioSegundo = inicioSegundoPeriodo.getFullYear();
-    const ultimoDiaMes = new Date(anioSegundo, mesSegundo + 1, 0).getDate();
-    const finSegundoPeriodo = new Date(anioSegundo, mesSegundo, ultimoDiaMes);
-    
-    const diasSegundoPeriodo = Math.ceil((finSegundoPeriodo - inicioSegundoPeriodo) / (1000 * 60 * 60 * 24)) + 1;
-    
-    periodos.push({
-      numero: 2,
-      inicio: inicioSegundoPeriodo,
-      fin: finSegundoPeriodo,
-      tipo: 'Nivelación',
-      descripcion: `Nivelación al fin de mes (${diasSegundoPeriodo} días)`,
+    const contratosProximosVencer = events.filter(e => {
+      if (!e.id.startsWith('contrato-fin-')) return false;
+      if (!e.start) return false;
+      
+      const fechaFin = new Date(e.start);
+      return fechaFin >= hoy && fechaFin <= en7Dias;
     });
 
-    // FACTURAS SIGUIENTES: del 1 al último día de cada mes
-    let mesActual = finSegundoPeriodo.getMonth() + 1;
-    let anioActual = finSegundoPeriodo.getFullYear();
+    const instalacionesHoy = events.filter(e => {
+      if (!e.id.startsWith('instalacion-')) return false;
+      if (!e.start) return false;
+      
+      const fechaInst = new Date(e.start);
+      return fechaInst.toDateString() === hoy.toDateString();
+    });
+
+    const facturasVencidas = events.filter(e => 
+      e.id.startsWith('factura-') && 
+      (e.extendedProps?.estado_display === 'Vencida' || e.extendedProps?.dias_vencimiento > 0)
+    );
+
+    return {
+      facturasProximasVencer,
+      contratosProximosVencer,
+      instalacionesHoy,
+      facturasVencidas,
+      total: facturasProximasVencer.length + contratosProximosVencer.length + facturasVencidas.length
+    };
+  }, [events]);
+
+  // Calcular reportes
+  const reportes = useMemo(() => {
+    const facturas = events.filter(e => e.id.startsWith('factura-'));
     
-    for (let i = 3; i <= numPeriodos; i++) {
-      if (mesActual > 11) {
-        mesActual = 0;
-        anioActual++;
+    const totalFacturado = facturas.reduce((sum, f) => 
+      sum + (parseFloat(f.extendedProps?.valor_total) || 0), 0
+    );
+
+    const totalPagado = facturas
+      .filter(f => f.extendedProps?.estado_display === 'Pagada')
+      .reduce((sum, f) => sum + (parseFloat(f.extendedProps?.valor_total) || 0), 0);
+
+    const totalPendiente = facturas
+      .filter(f => f.extendedProps?.estado_display === 'Pendiente')
+      .reduce((sum, f) => sum + (parseFloat(f.extendedProps?.valor_total) || 0), 0);
+
+    const totalVencido = facturas
+      .filter(f => f.extendedProps?.estado_display === 'Vencida' || f.extendedProps?.dias_vencimiento > 0)
+      .reduce((sum, f) => sum + (parseFloat(f.extendedProps?.valor_total) || 0), 0);
+
+    const tasaPago = facturas.length > 0 
+      ? ((facturas.filter(f => f.extendedProps?.estado_display === 'Pagada').length / facturas.length) * 100).toFixed(1)
+      : 0;
+
+    return {
+      totalFacturas: facturas.length,
+      totalFacturado,
+      totalPagado,
+      totalPendiente,
+      totalVencido,
+      tasaPago,
+      porEstado: {
+        pagadas: facturas.filter(f => f.extendedProps?.estado_display === 'Pagada').length,
+        pendientes: facturas.filter(f => f.extendedProps?.estado_display === 'Pendiente').length,
+        vencidas: facturas.filter(f => f.extendedProps?.estado_display === 'Vencida' || f.extendedProps?.dias_vencimiento > 0).length,
       }
-      
-      const inicioPeriodo = new Date(anioActual, mesActual, 1);
-      const ultimoDia = new Date(anioActual, mesActual + 1, 0).getDate();
-      const finPeriodo = new Date(anioActual, mesActual, ultimoDia);
-      
-      periodos.push({
-        numero: i,
-        inicio: inicioPeriodo,
-        fin: finPeriodo,
-        tipo: 'Mensual completa',
-        descripcion: `Periodo mensual completo`,
-      });
-      
-      mesActual++;
-    }
-    
-    return periodos;
-  };
+    };
+  }, [events]);
+
+  // Filtrar eventos según filtros activos
+  const eventosFiltrados = useMemo(() => {
+    return events.filter(event => {
+      // Filtro por tipo
+      if (filters.tipo !== 'todos') {
+        if (filters.tipo === 'instalaciones' && !event.id.startsWith('instalacion-')) return false;
+        if (filters.tipo === 'facturas' && !event.id.startsWith('factura-')) return false;
+        if (filters.tipo === 'contratos' && !event.id.startsWith('contrato-')) return false;
+      }
+
+      // Filtro por estado (solo para facturas)
+      if (filters.estado !== 'todos' && event.id.startsWith('factura-')) {
+        const estado = event.extendedProps?.estado_display?.toLowerCase();
+        if (filters.estado === 'pendiente' && estado !== 'pendiente') return false;
+        if (filters.estado === 'pagada' && estado !== 'pagada') return false;
+        if (filters.estado === 'vencida' && estado !== 'vencida') return false;
+      }
+
+      return true;
+    });
+  }, [events, filters]);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('🔄 Cargando eventos del calendario...');
+      console.log('🔄 Cargando eventos del calendario desde el backend...');
 
       const allEvents = [];
 
       // 1️⃣ INSTALACIONES
       try {
         const resInstalaciones = await api.get('/instalaciones', { params: { limit: 10000 } });
-        console.log('📦 Respuesta instalaciones:', resInstalaciones.data);
-        
         const instalaciones = resInstalaciones?.data?.instalaciones || 
                              resInstalaciones?.data?.rows || 
                              resInstalaciones?.data || [];
@@ -150,16 +195,13 @@ const CalendarioManagement = () => {
         console.error('❌ Error cargando instalaciones:', err);
       }
 
-      // 2️⃣ CONTRATOS - Fecha de inicio y vencimiento
+      // 2️⃣ CONTRATOS
       try {
         const resContratos = await api.get('/contratos', { params: { activo: 1 } });
-        console.log('📦 Respuesta contratos:', resContratos.data);
-        
         const contratos = resContratos?.data?.contratos || 
                          resContratos?.data?.rows || 
                          resContratos?.data || [];
 
-        // Evento de inicio de contrato
         contratos.forEach(c => {
           if (c.fecha_inicio) {
             allEvents.push({
@@ -175,14 +217,15 @@ const CalendarioManagement = () => {
                 cliente_nombre: c.cliente?.nombre || c.cliente_nombre || 'Sin cliente',
                 numero_contrato: c.numero_contrato || c.id,
                 direccion_instalacion: c.direccion || c.direccion_instalacion,
-                valor: c.valor_mensual || c.valor_total,
+                valor_mensual: c.valor_mensual || c.valor_total,
                 telefono_contacto: c.telefono || c.telefono_contacto,
-                descripcion: 'Generación automática: Contrato + Orden de Instalación + Primera Factura',
+                descripcion: 'Se genera automáticamente: Contrato + Orden de Instalación + Primera Factura',
+                plan_nombre: c.plan_nombre,
+                estrato: c.estrato,
               },
             });
           }
 
-          // Evento de vencimiento de contrato
           const fechaFin = c.fecha_fin || c.fecha_vencimiento_permanencia;
           if (fechaFin) {
             allEvents.push({
@@ -204,60 +247,30 @@ const CalendarioManagement = () => {
               },
             });
           }
-
-          // 🆕 GENERAR PERIODOS DE FACTURACIÓN AUTOMÁTICA
-          if (c.fecha_inicio && c.estado !== 'inactivo') {
-            try {
-              const periodos = calcularPeriodosFacturacion(c, 6);
-              
-              periodos.forEach(periodo => {
-                const hoy = new Date();
-                // Solo mostrar periodos futuros o del mes actual
-                if (periodo.fin >= hoy) {
-                  allEvents.push({
-                    id: `facturacion-${c.id}-periodo-${periodo.numero}`,
-                    title: `💰 Factura ${periodo.numero}: ${c.cliente?.nombre || c.cliente_nombre || 'Cliente'}`,
-                    start: periodo.fin.toISOString().split('T')[0],
-                    allDay: true,
-                    backgroundColor: periodo.numero === 1 ? '#EC4899' : periodo.numero === 2 ? '#F59E0B' : '#06B6D4',
-                    borderColor: periodo.numero === 1 ? '#EC4899' : periodo.numero === 2 ? '#F59E0B' : '#06B6D4',
-                    textColor: '#fff',
-                    extendedProps: {
-                      tipo_evento: 'Generación de Factura',
-                      subtipo: periodo.tipo,
-                      cliente_nombre: c.cliente?.nombre || c.cliente_nombre || 'Sin cliente',
-                      numero_contrato: c.numero_contrato || c.id,
-                      periodo_numero: periodo.numero,
-                      fecha_inicio_periodo: format(periodo.inicio, 'dd/MM/yyyy'),
-                      fecha_fin_periodo: format(periodo.fin, 'dd/MM/yyyy'),
-                      dias_facturados: Math.ceil((periodo.fin - periodo.inicio) / (1000 * 60 * 60 * 24)) + 1,
-                      valor: c.valor_mensual || c.valor_total,
-                      direccion_instalacion: c.direccion || c.direccion_instalacion,
-                      descripcion: periodo.descripcion,
-                      plan: c.plan_nombre || 'Plan no especificado',
-                      estrato: c.estrato || null,
-                    },
-                  });
-                }
-              });
-            } catch (err) {
-              console.warn('Error calculando periodos para contrato:', c.id, err);
-            }
-          }
         });
 
-        console.log('✅ Contratos y periodos de facturación cargados');
+        console.log('✅ Contratos cargados');
       } catch (err) {
         console.error('❌ Error cargando contratos:', err);
       }
 
-      // 3️⃣ FACTURAS ELECTRÓNICAS EMITIDAS
+      // 3️⃣ FACTURAS ELECTRÓNICAS
       try {
-        const resFacturas = await api.get('/facturas', { params: { estado: 'pending,pagada,vencida' } });
-        console.log('📦 Respuesta facturas:', resFacturas.data);
+        const hoy = new Date();
+        const hace6Meses = new Date(hoy.getFullYear(), hoy.getMonth() - 6, 1);
+        const en3Meses = new Date(hoy.getFullYear(), hoy.getMonth() + 3, 0);
+
+        const resFacturas = await api.get('/facturas', { 
+          params: { 
+            fecha_desde: hace6Meses.toISOString().split('T')[0],
+            fecha_hasta: en3Meses.toISOString().split('T')[0],
+            limit: 1000
+          } 
+        });
         
         const facturas = resFacturas?.data?.facturas || 
                         resFacturas?.data?.rows || 
+                        resFacturas?.data?.data?.facturas ||
                         resFacturas?.data || [];
 
         const facturasEvents = facturas
@@ -266,13 +279,29 @@ const CalendarioManagement = () => {
             const fechaEmision = f.fecha_emision || f.fecha;
             const estado = (f.estado || 'pending').toLowerCase();
             
-            const color = estado === 'vencida' ? '#EF4444' 
-              : estado === 'pagada' ? '#10B981' 
-              : '#F59E0B';
+            let color, icono, tipoEvento;
+            
+            if (estado === 'pagada') {
+              color = '#10B981';
+              icono = '✅';
+              tipoEvento = 'Factura Pagada';
+            } else if (estado === 'vencida' || f.dias_vencimiento > 0) {
+              color = '#EF4444';
+              icono = '⚠️';
+              tipoEvento = 'Factura Vencida';
+            } else if (estado === 'anulada') {
+              color = '#6B7280';
+              icono = '🚫';
+              tipoEvento = 'Factura Anulada';
+            } else {
+              color = '#F59E0B';
+              icono = '💳';
+              tipoEvento = 'Factura Pendiente';
+            }
 
             return {
               id: `factura-${f.id}`,
-              title: `📄 Fact. #${f.numero_factura || f.numero || f.id}`,
+              title: `${icono} ${f.numero_factura || `#${f.id}`}`,
               start: fechaEmision.split('T')[0],
               allDay: true,
               backgroundColor: color,
@@ -280,22 +309,30 @@ const CalendarioManagement = () => {
               textColor: '#fff',
               extendedProps: {
                 ...f,
-                tipo_evento: 'Factura Emitida',
-                cliente_nombre: f.cliente?.nombre || f.cliente_nombre || 'Sin cliente',
-                estado: estado === 'pending' ? 'Pendiente' 
+                tipo_evento: tipoEvento,
+                cliente_nombre: f.nombre_cliente || f.cliente?.nombre || f.cliente_nombre || 'Sin cliente',
+                numero_factura: f.numero_factura || `FAC-${f.id}`,
+                periodo_facturacion: f.periodo_facturacion,
+                fecha_desde: f.fecha_desde,
+                fecha_hasta: f.fecha_hasta,
+                fecha_vencimiento: f.fecha_vencimiento,
+                fecha_pago: f.fecha_pago,
+                estado_display: estado === 'pending' ? 'Pendiente' 
                   : estado === 'pagada' ? 'Pagada' 
-                  : estado === 'vencida' ? 'Vencida' 
+                  : estado === 'vencida' ? 'Vencida'
+                  : estado === 'anulada' ? 'Anulada'
                   : estado,
-                valor: f.total || f.valor_total || f.valor || 0,
-                periodo_facturado: f.periodo_inicio && f.periodo_fin 
-                  ? `${format(parseISO(f.periodo_inicio), 'dd/MM/yyyy')} - ${format(parseISO(f.periodo_fin), 'dd/MM/yyyy')}`
-                  : null,
+                valor_total: f.total || f.valor_total || f.valor || 0,
+                subtotal: f.subtotal || 0,
+                iva: f.iva || 0,
+                metodo_pago: f.metodo_pago,
+                dias_vencimiento: f.dias_vencimiento || 0,
               },
             };
           });
 
         allEvents.push(...facturasEvents);
-        console.log('✅ Facturas emitidas cargadas:', facturasEvents.length);
+        console.log('✅ Facturas cargadas:', facturasEvents.length);
       } catch (err) {
         console.error('❌ Error cargando facturas:', err);
       }
@@ -329,62 +366,356 @@ const CalendarioManagement = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header con botones de acción */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">📅 Calendario de Gestión</h1>
+          <h1 className="text-2xl font-bold text-gray-900">📅 Calendario de Gestión ISP</h1>
           <p className="text-sm text-gray-600 mt-1">
-            Instalaciones, contratos, facturación automática y pagos
+            Instalaciones, contratos y facturación electrónica en tiempo real
           </p>
         </div>
-        <div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowAlerts(!showAlerts)}
+            className={`relative px-3 py-2 border rounded-md text-sm transition ${
+              showAlerts ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <Bell className="w-4 h-4 inline mr-1" />
+            Alertas
+            {alertas.total > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {alertas.total}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setShowReports(!showReports)}
+            className={`px-3 py-2 border rounded-md text-sm transition ${
+              showReports ? 'bg-green-50 border-green-300 text-green-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 inline mr-1" />
+            Reportes
+          </button>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-3 py-2 border rounded-md text-sm transition ${
+              showFilters ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <Filter className="w-4 h-4 inline mr-1" />
+            Filtros
+          </button>
           <button
             onClick={load}
-            className="px-3 py-2 bg-white border border-gray-200 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+            className="px-3 py-2 bg-white border border-gray-200 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition"
           >
             🔄 Actualizar
           </button>
         </div>
       </div>
 
+      {/* Panel de Alertas */}
+      {showAlerts && (
+        <div className="mb-4 bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-900">🔔 Alertas y Notificaciones</h3>
+            <button onClick={() => setShowAlerts(false)} className="text-gray-400 hover:text-gray-600">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Facturas próximas a vencer */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-yellow-800">⚠️ Vencen en 3 días</h4>
+                <span className="bg-yellow-200 text-yellow-800 text-xs font-bold px-2 py-1 rounded">
+                  {alertas.facturasProximasVencer.length}
+                </span>
+              </div>
+              {alertas.facturasProximasVencer.length > 0 ? (
+                <ul className="text-xs space-y-1">
+                  {alertas.facturasProximasVencer.slice(0, 3).map(f => (
+                    <li key={f.id} className="text-yellow-700">
+                      • {f.extendedProps?.numero_factura} - {f.extendedProps?.cliente_nombre}
+                      <span className="ml-2 text-yellow-600">
+                        (Vence: {format(parseISO(f.extendedProps.fecha_vencimiento), 'dd/MM/yyyy')})
+                      </span>
+                    </li>
+                  ))}
+                  {alertas.facturasProximasVencer.length > 3 && (
+                    <li className="text-yellow-600 font-semibold">
+                      ... y {alertas.facturasProximasVencer.length - 3} más
+                    </li>
+                  )}
+                </ul>
+              ) : (
+                <p className="text-xs text-yellow-600">No hay facturas próximas a vencer</p>
+              )}
+            </div>
+
+            {/* Facturas vencidas */}
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-red-800">🚨 Facturas Vencidas</h4>
+                <span className="bg-red-200 text-red-800 text-xs font-bold px-2 py-1 rounded">
+                  {alertas.facturasVencidas.length}
+                </span>
+              </div>
+              {alertas.facturasVencidas.length > 0 ? (
+                <ul className="text-xs space-y-1">
+                  {alertas.facturasVencidas.slice(0, 3).map(f => (
+                    <li key={f.id} className="text-red-700">
+                      • {f.extendedProps?.numero_factura} - {f.extendedProps?.cliente_nombre}
+                      <span className="ml-2 text-red-600">
+                        ({f.extendedProps?.dias_vencimiento} días)
+                      </span>
+                    </li>
+                  ))}
+                  {alertas.facturasVencidas.length > 3 && (
+                    <li className="text-red-600 font-semibold">
+                      ... y {alertas.facturasVencidas.length - 3} más
+                    </li>
+                  )}
+                </ul>
+              ) : (
+                <p className="text-xs text-red-600">No hay facturas vencidas 🎉</p>
+              )}
+            </div>
+
+            {/* Instalaciones hoy */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-blue-800">🔧 Instalaciones Hoy</h4>
+                <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-1 rounded">
+                  {alertas.instalacionesHoy.length}
+                </span>
+              </div>
+              {alertas.instalacionesHoy.length > 0 ? (
+                <ul className="text-xs space-y-1">
+                  {alertas.instalacionesHoy.map(i => (
+                    <li key={i.id} className="text-blue-700">
+                      • {i.extendedProps?.cliente_nombre} - {i.extendedProps?.hora_programada}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-blue-600">No hay instalaciones programadas hoy</p>
+              )}
+            </div>
+
+            {/* Contratos próximos a vencer */}
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-purple-800">📄 Contratos (7 días)</h4>
+                <span className="bg-purple-200 text-purple-800 text-xs font-bold px-2 py-1 rounded">
+                  {alertas.contratosProximosVencer.length}
+                </span>
+              </div>
+              {alertas.contratosProximosVencer.length > 0 ? (
+                <ul className="text-xs space-y-1">
+                  {alertas.contratosProximosVencer.map(c => (
+                    <li key={c.id} className="text-purple-700">
+                      • {c.extendedProps?.cliente_nombre} - Contrato #{c.extendedProps?.numero_contrato}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-purple-600">No hay contratos próximos a vencer</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Panel de Reportes */}
+      {showReports && (
+        <div className="mb-4 bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-900">📊 Reportes de Facturación</h3>
+            <button onClick={() => setShowReports(false)} className="text-gray-400 hover:text-gray-600">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="bg-blue-50 rounded-lg p-3">
+              <p className="text-xs text-blue-600 font-semibold uppercase">Total Facturado</p>
+              <p className="text-2xl font-bold text-blue-700">
+                ${reportes.totalFacturado.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-blue-500">{reportes.totalFacturas} facturas</p>
+            </div>
+
+            <div className="bg-green-50 rounded-lg p-3">
+              <p className="text-xs text-green-600 font-semibold uppercase">Pagado</p>
+              <p className="text-2xl font-bold text-green-700">
+                ${reportes.totalPagado.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-green-500">{reportes.porEstado.pagadas} facturas</p>
+            </div>
+
+            <div className="bg-yellow-50 rounded-lg p-3">
+              <p className="text-xs text-yellow-600 font-semibold uppercase">Pendiente</p>
+              <p className="text-2xl font-bold text-yellow-700">
+                ${reportes.totalPendiente.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-yellow-500">{reportes.porEstado.pendientes} facturas</p>
+            </div>
+
+            <div className="bg-red-50 rounded-lg p-3">
+              <p className="text-xs text-red-600 font-semibold uppercase">Vencido</p>
+              <p className="text-2xl font-bold text-red-700">
+                ${reportes.totalVencido.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-red-500">{reportes.porEstado.vencidas} facturas</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+            <div>
+              <p className="text-sm text-gray-600">Tasa de Pago</p>
+              <p className="text-3xl font-bold text-gray-900">{reportes.tasaPago}%</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-500">Pagadas vs Total</p>
+              <p className="text-sm text-gray-700">
+                {reportes.porEstado.pagadas} de {reportes.totalFacturas}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Panel de Filtros */}
+      {showFilters && (
+        <div className="mb-4 bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-900">🔍 Filtros</h3>
+            <button onClick={() => setShowFilters(false)} className="text-gray-400 hover:text-gray-600">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Evento</label>
+              <select
+                value={filters.tipo}
+                onChange={(e) => setFilters({ ...filters, tipo: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="todos">Todos los eventos</option>
+                <option value="instalaciones">Solo Instalaciones</option>
+                <option value="facturas">Solo Facturas</option>
+                <option value="contratos">Solo Contratos</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Estado de Facturas</label>
+              <select
+                value={filters.estado}
+                onChange={(e) => setFilters({ ...filters, estado: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="todos">Todos los estados</option>
+                <option value="pendiente">Pendientes</option>
+                <option value="pagada">Pagadas</option>
+                <option value="vencida">Vencidas</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              Mostrando {eventosFiltrados.length} de {events.length} eventos
+            </p>
+            <button
+              onClick={() => setFilters({ tipo: 'todos', estado: 'todos' })}
+              className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Estadísticas rápidas */}
+      <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 uppercase">Total Eventos</p>
+              <p className="text-2xl font-bold text-gray-900">{eventosFiltrados.length}</p>
+            </div>
+            <div className="text-3xl">📊</div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 uppercase">Instalaciones</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {events.filter(e => e.id.startsWith('instalacion-')).length}
+              </p>
+            </div>
+            <div className="text-3xl">🔧</div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 uppercase">Facturas</p>
+              <p className="text-2xl font-bold text-yellow-600">
+                {events.filter(e => e.id.startsWith('factura-')).length}
+              </p>
+            </div>
+            <div className="text-3xl">💳</div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 uppercase">Contratos</p>
+              <p className="text-2xl font-bold text-purple-600">
+                {events.filter(e => e.id.startsWith('contrato-')).length}
+              </p>
+            </div>
+            <div className="text-3xl">📄</div>
+          </div>
+        </div>
+      </div>
+
       {/* Leyenda de colores */}
       <div className="mb-4 bg-white rounded-lg shadow p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">📊 Leyenda de Eventos:</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-xs">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">🎨 Códigos de Color:</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded" style={{ backgroundColor: '#10B981' }}></div>
-            <span>Inicio Contrato / Pagada</span>
+            <span>Pagada / Inicio</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded" style={{ backgroundColor: '#2563EB' }}></div>
-            <span>Instalación Programada</span>
+            <span>Instalación</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#F59E0B' }}></div>
+            <span>Pendiente</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#EF4444' }}></div>
+            <span>Vencida</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded" style={{ backgroundColor: '#8B5CF6' }}></div>
             <span>Vence Contrato</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#EC4899' }}></div>
-            <span>1ª Factura (30 días)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#F59E0B' }}></div>
-            <span>2ª Factura (nivelación)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#06B6D4' }}></div>
-            <span>Factura Mensual</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#EF4444' }}></div>
-            <span>Vencida / Cancelada</span>
-          </div>
-        </div>
-        
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          <p className="text-xs text-gray-600">
-            <strong>Sistema de Facturación:</strong> 1ª factura (30 días desde inicio), 
-            2ª factura (nivelación hasta fin de mes), siguientes facturas (periodos completos del 1 al 30/31)
-          </p>
         </div>
       </div>
 
@@ -411,12 +742,17 @@ const CalendarioManagement = () => {
               right: 'dayGridMonth',
             }}
             locale={esLocale}
-            events={events}
+            events={eventosFiltrados}
             eventClick={handleEventClick}
             height="78vh"
             nowIndicator={true}
             eventDisplay="block"
             dayMaxEventRows={true}
+            eventTimeFormat={{
+              hour: '2-digit',
+              minute: '2-digit',
+              meridiem: false
+            }}
           />
         )}
       </div>
@@ -441,23 +777,13 @@ const CalendarioManagement = () => {
             </div>
 
             <div className="space-y-3 text-sm">
-              {/* Tipo de evento */}
               {selected.extended?.tipo_evento && (
                 <div className="flex items-start">
-                  <span className="font-semibold text-gray-700 w-40">Tipo de Evento:</span>
+                  <span className="font-semibold text-gray-700 w-40">Tipo:</span>
                   <span className="text-gray-900 flex-1">{selected.extended.tipo_evento}</span>
                 </div>
               )}
 
-              {/* Subtipo para facturación */}
-              {selected.extended?.subtipo && (
-                <div className="flex items-start">
-                  <span className="font-semibold text-gray-700 w-40">Subtipo:</span>
-                  <span className="text-gray-900 flex-1">{selected.extended.subtipo}</span>
-                </div>
-              )}
-
-              {/* Cliente */}
               {selected.extended?.cliente_nombre && (
                 <div className="flex items-start">
                   <span className="font-semibold text-gray-700 w-40">Cliente:</span>
@@ -465,7 +791,13 @@ const CalendarioManagement = () => {
                 </div>
               )}
 
-              {/* Número de contrato */}
+              {selected.extended?.numero_factura && (
+                <div className="flex items-start">
+                  <span className="font-semibold text-gray-700 w-40">Número:</span>
+                  <span className="text-gray-900 flex-1 font-mono">{selected.extended.numero_factura}</span>
+                </div>
+              )}
+
               {selected.extended?.numero_contrato && (
                 <div className="flex items-start">
                   <span className="font-semibold text-gray-700 w-40">Contrato:</span>
@@ -473,59 +805,72 @@ const CalendarioManagement = () => {
                 </div>
               )}
 
-              {/* Periodo de facturación */}
-              {selected.extended?.periodo_numero && (
+              {selected.extended?.periodo_facturacion && (
                 <div className="flex items-start">
                   <span className="font-semibold text-gray-700 w-40">Periodo:</span>
+                  <span className="text-gray-900 flex-1">{selected.extended.periodo_facturacion}</span>
+                </div>
+              )}
+
+              {selected.extended?.fecha_desde && selected.extended?.fecha_hasta && (
+                <div className="flex items-start">
+                  <span className="font-semibold text-gray-700 w-40">Rango:</span>
                   <span className="text-gray-900 flex-1">
-                    Factura #{selected.extended.periodo_numero}
+                    {format(parseISO(selected.extended.fecha_desde), 'dd/MM/yyyy')} al{' '}
+                    {format(parseISO(selected.extended.fecha_hasta), 'dd/MM/yyyy')}
                   </span>
                 </div>
               )}
 
-              {/* Fechas del periodo */}
-              {selected.extended?.fecha_inicio_periodo && selected.extended?.fecha_fin_periodo && (
+              {selected.extended?.fecha_vencimiento && (
                 <div className="flex items-start">
-                  <span className="font-semibold text-gray-700 w-40">Periodo Facturado:</span>
+                  <span className="font-semibold text-gray-700 w-40">Vencimiento:</span>
                   <span className="text-gray-900 flex-1">
-                    {selected.extended.fecha_inicio_periodo} al {selected.extended.fecha_fin_periodo}
-                    {selected.extended.dias_facturados && (
-                      <span className="text-gray-500 ml-2">({selected.extended.dias_facturados} días)</span>
+                    {format(parseISO(selected.extended.fecha_vencimiento), 'dd/MM/yyyy')}
+                    {selected.extended.dias_vencimiento > 0 && (
+                      <span className="ml-2 text-red-600 font-semibold">
+                        ({selected.extended.dias_vencimiento} días vencida)
+                      </span>
                     )}
                   </span>
                 </div>
               )}
 
-              {/* Periodo facturado para facturas emitidas */}
-              {selected.extended?.periodo_facturado && (
+              {selected.extended?.fecha_pago && (
                 <div className="flex items-start">
-                  <span className="font-semibold text-gray-700 w-40">Periodo:</span>
-                  <span className="text-gray-900 flex-1">{selected.extended.periodo_facturado}</span>
+                  <span className="font-semibold text-gray-700 w-40">Fecha Pago:</span>
+                  <span className="text-gray-900 flex-1">
+                    {format(parseISO(selected.extended.fecha_pago), 'dd/MM/yyyy')}
+                  </span>
                 </div>
               )}
 
-              {/* Plan */}
-              {selected.extended?.plan && (
+              {selected.extended?.metodo_pago && (
+                <div className="flex items-start">
+                  <span className="font-semibold text-gray-700 w-40">Método Pago:</span>
+                  <span className="text-gray-900 flex-1 capitalize">{selected.extended.metodo_pago}</span>
+                </div>
+              )}
+
+              {selected.extended?.plan_nombre && (
                 <div className="flex items-start">
                   <span className="font-semibold text-gray-700 w-40">Plan:</span>
-                  <span className="text-gray-900 flex-1">{selected.extended.plan}</span>
+                  <span className="text-gray-900 flex-1">{selected.extended.plan_nombre}</span>
                 </div>
               )}
 
-              {/* Estrato (para cálculo de IVA) */}
               {selected.extended?.estrato && (
                 <div className="flex items-start">
                   <span className="font-semibold text-gray-700 w-40">Estrato:</span>
                   <span className="text-gray-900 flex-1">
                     {selected.extended.estrato}
-                    {[1,2,3].includes(selected.extended.estrato) && (
+                    {[1,2,3].includes(parseInt(selected.extended.estrato)) && (
                       <span className="ml-2 text-green-600 text-xs">(Sin IVA en Internet)</span>
                     )}
                   </span>
                 </div>
               )}
 
-              {/* Descripción */}
               {selected.extended?.descripcion && (
                 <div className="flex items-start">
                   <span className="font-semibold text-gray-700 w-40">Descripción:</span>
@@ -533,7 +878,6 @@ const CalendarioManagement = () => {
                 </div>
               )}
 
-              {/* Dirección */}
               {selected.extended?.direccion_instalacion && (
                 <div className="flex items-start">
                   <span className="font-semibold text-gray-700 w-40">Dirección:</span>
@@ -541,7 +885,6 @@ const CalendarioManagement = () => {
                 </div>
               )}
 
-              {/* Instalador */}
               {selected.extended?.instalador_nombre && (
                 <div className="flex items-start">
                   <span className="font-semibold text-gray-700 w-40">Instalador:</span>
@@ -549,7 +892,6 @@ const CalendarioManagement = () => {
                 </div>
               )}
 
-              {/* Teléfono */}
               {selected.extended?.telefono_contacto && (
                 <div className="flex items-start">
                   <span className="font-semibold text-gray-700 w-40">Teléfono:</span>
@@ -557,7 +899,6 @@ const CalendarioManagement = () => {
                 </div>
               )}
 
-              {/* Hora */}
               {selected.extended?.hora_programada && (
                 <div className="flex items-start">
                   <span className="font-semibold text-gray-700 w-40">Hora:</span>
@@ -565,47 +906,44 @@ const CalendarioManagement = () => {
                 </div>
               )}
 
-              {/* Estado */}
-              {selected.extended?.estado && (
+              {selected.extended?.estado_display && (
                 <div className="flex items-start">
                   <span className="font-semibold text-gray-700 w-40">Estado:</span>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    selected.extended.estado === 'Completada' || selected.extended.estado === 'Pagada' || selected.extended.estado === 'Activo'
+                    selected.extended.estado_display === 'Pagada' || selected.extended.estado_display === 'Completada' || selected.extended.estado_display === 'Activo'
                       ? 'bg-green-100 text-green-800'
-                      : selected.extended.estado === 'Cancelada' || selected.extended.estado === 'Vencida'
+                      : selected.extended.estado_display === 'Vencida' || selected.extended.estado_display === 'Cancelada' || selected.extended.estado_display === 'Anulada'
                       ? 'bg-red-100 text-red-800'
                       : 'bg-yellow-100 text-yellow-800'
                   }`}>
-                    {selected.extended.estado}
+                    {selected.extended.estado_display}
                   </span>
                 </div>
               )}
 
-              {/* Valor */}
-              {selected.extended?.valor && (
-                <div className="flex items-start">
-                  <span className="font-semibold text-gray-700 w-40">Valor:</span>
-                  <span className="text-gray-900 flex-1 font-semibold">
-                    ${Number(selected.extended.valor).toLocaleString('es-CO')}
-                  </span>
+              {(selected.extended?.valor_total || selected.extended?.valor_mensual || selected.extended?.valor) && (
+                <div className="pt-3 border-t border-gray-200">
+                  {selected.extended.subtotal > 0 && (
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-gray-600">Subtotal:</span>
+                      <span className="text-gray-900">${Number(selected.extended.subtotal).toLocaleString('es-CO')}</span>
+                    </div>
+                  )}
+                  {selected.extended.iva > 0 && (
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-gray-600">IVA:</span>
+                      <span className="text-gray-900">${Number(selected.extended.iva).toLocaleString('es-CO')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center font-semibold text-lg pt-2 border-t border-gray-300">
+                    <span className="text-gray-700">Total:</span>
+                    <span className="text-gray-900">
+                      ${Number(selected.extended.valor_total || selected.extended.valor_mensual || selected.extended.valor).toLocaleString('es-CO')}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
-
-            {/* Nota informativa para facturación */}
-            {selected.extended?.tipo_evento === 'Generación de Factura' && (
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
-                <strong>💡 Proceso Automático:</strong> El sistema generará y enviará esta factura 
-                a la DIAN automáticamente en esta fecha. Se enviará notificación al cliente.
-              </div>
-            )}
-
-            {selected.extended?.tipo_evento === 'Inicio de Contrato' && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-800">
-                <strong>✅ Generación Automática:</strong> Al crear el cliente se generan: Contrato, 
-                Orden de Instalación y Primera Factura (incluye cargo de instalación $42.016 + IVA).
-              </div>
-            )}
 
             <div className="mt-6 flex justify-end">
               <button 

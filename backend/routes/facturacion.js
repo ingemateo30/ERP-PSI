@@ -3,6 +3,8 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const FacturacionAutomaticaController = require('../controllers/FacturacionAutomaticaController');
+
 
 // Aplicar autenticación a todas las rutas
 router.use(authenticateToken);
@@ -516,7 +518,6 @@ router.get('/vencidas', async (req, res) => {
     });
   }
 });
-
 // ==========================================
 // ENDPOINTS DE FACTURACIÓN AUTOMÁTICA
 // ==========================================
@@ -526,278 +527,50 @@ router.get('/vencidas', async (req, res) => {
  * @desc Generar facturación mensual masiva
  * @access Administrador
  */
-router.post('/automatica/generar-mensual', requireRole('administrador'), async (req, res) => {
-  try {
-    console.log('🔄 Iniciando facturación mensual masiva...');
-    
-    const { fecha_referencia, solo_preview } = req.body;
-    const fechaRef = fecha_referencia ? new Date(fecha_referencia) : new Date();
-    
-    // Validar fecha
-    if (isNaN(fechaRef.getTime())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Fecha de referencia inválida'
-      });
-    }
-
-    // Simulación básica de facturación automática
-    const resultado = {
-      exitosas: 0,
-      fallidas: 0,
-      total_procesados: 0,
-      errores: [],
-      detalles: []
-    };
-
-    // Si es solo preview, mostrar qué se facturaría sin generar
-    if (solo_preview) {
-      // Obtener clientes activos para preview
-      const { Database } = require('../models/Database');
-
-      try {
-        const clientes = await Database.query(`
-          SELECT 
-            id, 
-            nombre, 
-            identificacion
-          FROM clientes c
-          WHERE activo = 1
-          LIMIT 10
-        `);
-
-        resultado.preview = true;
-        resultado.clientes_a_facturar = clientes.length;
-        resultado.detalles = clientes;
-
-      } catch (error) {
-        resultado.clientes_a_facturar = 0;
-        resultado.detalles = [];
-        resultado.errores.push('No se pudieron obtener clientes para preview');
-      }
-
-      return res.json({
-        success: true,
-        data: resultado,
-        message: 'Preview de facturación mensual generado',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Aquí iría la lógica real de facturación automática
-    resultado.mensaje = 'Funcionalidad de facturación automática en desarrollo';
-    
-    res.json({
-      success: true,
-      data: resultado,
-      message: `Facturación mensual procesada: ${resultado.exitosas} exitosas, ${resultado.fallidas} fallidas`,
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error('❌ Error en facturación mensual:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error procesando facturación mensual',
-      error: error.message
-    });
-  }
-});
+router.post('/automatica/generar-mensual', 
+  requireRole('administrador'), 
+  FacturacionAutomaticaController.generarFacturacionMensual
+);
 
 /**
  * @route GET /api/v1/facturacion/automatica/preview-mensual
- * @desc Obtener preview de facturación mensual MEJORADO
+ * @desc Obtener preview de facturación mensual
  * @access Administrador, Supervisor
  */
-router.get('/automatica/preview-mensual', requireRole('administrador', 'supervisor'), async (req, res) => {
-  try {
-    const { periodo } = req.query;
-    const fechaPeriodo = periodo ? new Date(periodo + '-01') : new Date();
+router.get('/automatica/preview-mensual', 
+  requireRole('administrador', 'supervisor'), 
+  FacturacionAutomaticaController.obtenerPreviewFacturacion
+);
 
-    const { Database } = require('../models/Database');
+/**
+ * @route POST /api/v1/facturacion/automatica/cliente/:clienteId
+ * @desc Generar factura individual para un cliente
+ * @access Administrador, Supervisor
+ */
+router.post('/automatica/cliente/:clienteId',
+  requireRole('administrador', 'supervisor'),
+  FacturacionAutomaticaController.generarFacturaIndividual
+);
 
-    console.log('📊 Generando preview de facturación...');
+/**
+ * @route POST /api/v1/facturacion/automatica/procesar-saldos
+ * @desc Procesar saldos e intereses
+ * @access Administrador
+ */
+router.post('/automatica/procesar-saldos',
+  requireRole('administrador'),
+  FacturacionAutomaticaController.procesarSaldosIntereses
+);
 
-    try {
-      // PASO 1: Verificar si existen las tablas necesarias
-      let clientesExiste = true;
-      let serviciosExiste = true;
-      let planesExiste = true;
-
-      try {
-        await Database.query('SELECT 1 FROM clientes LIMIT 1');
-      } catch (error) {
-        clientesExiste = false;
-        console.log('⚠️ Tabla clientes no existe');
-      }
-
-      try {
-        await Database.query('SELECT 1 FROM servicios_cliente LIMIT 1');
-      } catch (error) {
-        serviciosExiste = false;
-        console.log('⚠️ Tabla servicios_cliente no existe');
-      }
-
-      try {
-        await Database.query('SELECT 1 FROM planes_servicio LIMIT 1');
-      } catch (error) {
-        planesExiste = false;
-        console.log('⚠️ Tabla planes_servicio no existe');
-      }
-
-      // PASO 2: Obtener clientes activos (básico)
-      let clientesActivos = [];
-      if (clientesExiste) {
-        clientesActivos = await Database.query(`
-          SELECT 
-            id,
-            identificacion,
-            nombre,
-            telefono,
-            direccion,
-            estado
-          FROM clientes 
-          WHERE estado = 'activo' 
-          ORDER BY nombre ASC
-          LIMIT 100
-        `);
-        console.log(`✅ Encontrados ${clientesActivos.length} clientes activos`);
-      }
-
-      // PASO 3: Si existe servicios_cliente, obtener clientes con servicios
-      let clientesConServicios = [];
-      if (clientesExiste && serviciosExiste) {
-        try {
-          clientesConServicios = await Database.query(`
-            SELECT 
-              c.id,
-              c.identificacion,
-              c.nombre,
-              c.telefono,
-              c.direccion,
-              COUNT(sc.id) as servicios_activos,
-              COALESCE(SUM(ps.precio), 50000) as monto_estimado
-            FROM clientes c
-            LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id AND sc.estado = 'activo'
-            LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-            WHERE c.estado = 'activo'
-            GROUP BY c.id, c.identificacion, c.nombre, c.telefono, c.direccion
-            HAVING servicios_activos > 0
-            ORDER BY c.nombre ASC
-            LIMIT 50
-          `);
-          console.log(`✅ Encontrados ${clientesConServicios.length} clientes con servicios activos`);
-        } catch (error) {
-          console.log('⚠️ Error consultando servicios, usando clientes básicos');
-          clientesConServicios = [];
-        }
-      }
-
-      // PASO 4: Usar clientes con servicios si existen, si no usar clientes básicos
-      let clientesParaFacturar = clientesConServicios.length > 0 ? clientesConServicios : clientesActivos;
-
-      // Si no hay clientes con servicios, simular datos para clientes activos
-      if (clientesConServicios.length === 0 && clientesActivos.length > 0) {
-        clientesParaFacturar = clientesActivos.map(cliente => ({
-          ...cliente,
-          servicios_activos: 1,
-          monto_estimado: 45000 // Monto simulado
-        }));
-      }
-
-      // PASO 5: Calcular resumen
-      const resumen = {
-        total_clientes: clientesParaFacturar.length,
-        monto_total_estimado: clientesParaFacturar.reduce((sum, cliente) => 
-          sum + parseFloat(cliente.monto_estimado || 45000), 0
-        ),
-        servicios_totales: clientesParaFacturar.reduce((sum, cliente) => 
-          sum + parseInt(cliente.servicios_activos || 1), 0
-        ),
-        promedio_por_cliente: clientesParaFacturar.length > 0 ? 
-          clientesParaFacturar.reduce((sum, cliente) => sum + parseFloat(cliente.monto_estimado || 45000), 0) / clientesParaFacturar.length : 0
-      };
-
-      // PASO 6: Información adicional del sistema
-      const infoSistema = {
-        tablas_disponibles: {
-          clientes: clientesExiste,
-          servicios_cliente: serviciosExiste,
-          planes_servicio: planesExiste
-        },
-        modo_facturacion: clientesConServicios.length > 0 ? 'completo' : 'simulado',
-        periodo_facturacion: fechaPeriodo.toISOString().slice(0, 7)
-      };
-
-      console.log('📊 Resumen del preview:', resumen);
-
-      res.json({
-        success: true,
-        data: {
-          resumen,
-          clientes: clientesParaFacturar.slice(0, 20), // Mostrar solo los primeros 20 en el preview
-          total_clientes_disponibles: clientesParaFacturar.length,
-          periodo: fechaPeriodo.toISOString().slice(0, 7),
-          info_sistema: infoSistema,
-          recomendaciones: {
-            mensaje: clientesConServicios.length === 0 && clientesActivos.length > 0 ? 
-              'Se detectaron clientes activos pero sin servicios configurados. Se usarán valores simulados para la facturación.' :
-              clientesParaFacturar.length === 0 ?
-              'No se encontraron clientes activos. Agregue clientes al sistema para generar facturas.' :
-              'Sistema listo para facturación automática.',
-            acciones_sugeridas: clientesConServicios.length === 0 && clientesActivos.length > 0 ? [
-              'Configurar planes de servicio en el sistema',
-              'Asignar servicios a los clientes existentes',
-              'Verificar que los servicios estén en estado "activo"'
-            ] : []
-          }
-        },
-        message: clientesParaFacturar.length > 0 ? 
-          `Preview generado: ${clientesParaFacturar.length} clientes listos para facturación` :
-          'No se encontraron clientes para facturar'
-      });
-
-    } catch (error) {
-      console.error('❌ Error en preview:', error);
-      
-      // Si hay error, retornar preview básico
-      res.json({
-        success: true,
-        data: {
-          resumen: {
-            total_clientes: 0,
-            monto_total_estimado: 0,
-            servicios_totales: 0,
-            promedio_por_cliente: 0
-          },
-          clientes: [],
-          periodo: fechaPeriodo.toISOString().slice(0, 7),
-          info_sistema: {
-            error: error.message,
-            estado: 'error_base_datos'
-          },
-          recomendaciones: {
-            mensaje: 'Error accediendo a la base de datos. Verifique la conexión y estructura de tablas.',
-            acciones_sugeridas: [
-              'Verificar conexión a la base de datos',
-              'Crear las tablas necesarias (clientes, servicios_cliente, planes_servicio)',
-              'Revisar los logs del servidor para más detalles'
-            ]
-          }
-        },
-        message: 'Preview con error - Revisar configuración de base de datos'
-      });
-    }
-
-  } catch (error) {
-    console.error('❌ Error obteniendo preview:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error obteniendo preview de facturación',
-      error: error.message
-    });
-  }
-});
+/**
+ * @route GET /api/v1/facturacion/automatica/estadisticas-ultimo-proceso
+ * @desc Obtener estadísticas del último proceso de facturación
+ * @access Administrador, Supervisor
+ */
+router.get('/automatica/estadisticas-ultimo-proceso',
+  requireRole('administrador', 'supervisor'),
+  FacturacionAutomaticaController.obtenerEstadisticasUltimoProceso
+);
 
 
 // ==========================================
