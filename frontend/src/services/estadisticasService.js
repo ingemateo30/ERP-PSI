@@ -168,11 +168,11 @@ class EstadisticasService {
   }
 
   /**
-   * Formatear moneda
+   * Formatear moneda en pesos colombianos
    * @param {Number} valor
    * @returns {String}
    */
-  formatearMoneda(valor) {
+  formatCurrency(valor) {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
@@ -182,11 +182,11 @@ class EstadisticasService {
   }
 
   /**
-   * Formatear número
+   * Formatear número con separadores de miles
    * @param {Number} valor
    * @returns {String}
    */
-  formatearNumero(valor) {
+  formatNumber(valor) {
     return new Intl.NumberFormat('es-CO').format(valor || 0);
   }
 
@@ -195,8 +195,21 @@ class EstadisticasService {
    * @param {Number} valor
    * @returns {String}
    */
+  formatPercentage(valor) {
+    return `${parseFloat(valor || 0).toFixed(1)}%`;
+  }
+
+  // Alias en español para compatibilidad con código existente
+  formatearMoneda(valor) {
+    return this.formatCurrency(valor);
+  }
+
+  formatearNumero(valor) {
+    return this.formatNumber(valor);
+  }
+
   formatearPorcentaje(valor) {
-    return `${parseFloat(valor || 0).toFixed(2)}%`;
+    return this.formatPercentage(valor);
   }
 }
 
