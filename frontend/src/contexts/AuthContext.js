@@ -422,26 +422,46 @@ const refreshToken = async () => {
     }
   };
 
-  // Función para verificar permisos
-  const hasPermission = (requiredRole) => {
-    if (!state.user) return false;
-    
-    const userRole = state.user.role || state.user.rol;
-    
-    // Sistema de jerarquía de roles
-    const roleHierarchy = {
-      'administrador': 3,
-      'supervisor': 2,
-      'instalador': 1,
-      'usuario': 0
-    };
-    
-    const userLevel = roleHierarchy[userRole] || 0;
-    const requiredLevel = roleHierarchy[requiredRole] || 0;
-    
-    return userLevel >= requiredLevel;
-  };
+  // En tu AuthContext.js, REEMPLAZA la función hasPermission por esta:
 
+// Función para verificar permisos
+const hasPermission = (requiredRole) => {
+  if (!state.user) {
+    console.log('❌ hasPermission: No hay usuario');
+    return false;
+  }
+  
+  const userRole = (state.user.role || state.user.rol || '').toLowerCase().trim();
+  
+  console.log('🔍 hasPermission:', {
+    userRole,
+    requiredRole
+  });
+  
+  // Si no se requiere rol específico, permitir acceso
+  if (!requiredRole) {
+    console.log('✅ hasPermission: Sin requisito de rol');
+    return true;
+  }
+  
+  // El administrador SIEMPRE tiene acceso a todo
+  if (userRole === 'administrador') {
+    console.log('✅ hasPermission: Usuario es ADMINISTRADOR');
+    return true;
+  }
+  
+  // Normalizar el rol requerido y verificar
+  const normalizedRequired = requiredRole.toLowerCase().trim();
+  
+  // Soportar múltiples roles separados por coma
+  const rolesPermitidos = normalizedRequired.split(',').map(r => r.trim());
+  
+  const hasAccess = rolesPermitidos.includes(userRole);
+  
+  console.log(hasAccess ? '✅ hasPermission: Acceso permitido' : '❌ hasPermission: Acceso denegado');
+  
+  return hasAccess;
+};
   // Función para verificar si el usuario puede acceder a un recurso específico
   const canAccess = (resource, action = 'read') => {
     if (!state.user) return false;

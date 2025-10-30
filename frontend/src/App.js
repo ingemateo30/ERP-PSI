@@ -7,7 +7,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/Layout/MainLayout';
 import { Loader2 } from 'lucide-react';
 import CalendarioManagement from './components/Calendario/CalendarioManagement';
+
 const EstadisticasGeneral = lazy(() => import('./components/Reports/EstadisticasGeneral'));
+
 // Lazy loading de componentes principales
 const LoginComponent = lazy(() => import('./components/Login'));
 const SimpleDashboard = lazy(() => import('./components/SimpleDashboard'));
@@ -246,7 +248,7 @@ function App() {
               <Route
                 path="/config/banks"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Configuración de Bancos" subtitle="Gestión de entidades bancarias">
                       <BanksConfig />
                     </MainLayout>
@@ -268,7 +270,7 @@ function App() {
               <Route
                 path="/config/service-plans"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Planes de Servicio" subtitle="Configuración de planes y servicios">
                       <ServicePlansConfig />
                     </MainLayout>
@@ -280,7 +282,7 @@ function App() {
               <Route
                 path="/config/conceptos"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Conceptos de Facturación" subtitle="Gestión de conceptos facturables">
                       <ConceptosConfig />
                     </MainLayout>
@@ -306,7 +308,7 @@ function App() {
               <Route
                 path="/clients"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Detalle de Cliente" subtitle="">
                       <ClientsManagement />
                     </MainLayout>
@@ -317,7 +319,7 @@ function App() {
               <Route
                 path="/clients/:id"
                 element={
-                  <ProtectedRoute requiredRole="supervisor">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Detalle de Cliente" subtitle="Esta funcionalidad está en desarrollo">
                       <ComingSoon pageName="Detalle de Cliente" />
                     </MainLayout>
@@ -388,7 +390,7 @@ function App() {
               <Route
                 path="/services"
                 element={
-                  <ProtectedRoute requiredRole="supervisor">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Gestión de Servicios" subtitle="Esta funcionalidad está en desarrollo">
                       <ComingSoon pageName="Gestión de Servicios" />
                     </MainLayout>
@@ -399,7 +401,7 @@ function App() {
               <Route
                 path="/instalaciones"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout
                       title="Gestión de Instalaciones"
                       subtitle="Administra las instalaciones de servicios de internet y televisión"
@@ -413,7 +415,7 @@ function App() {
               <Route
                 path="/inventory"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Gestión de Inventario" subtitle="">
                       <InventoryManagement />
                     </MainLayout>
@@ -434,7 +436,7 @@ function App() {
               <Route
                 path="incidencias"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Gestión de Incidencias" subtitle="">
                       <IncidenciasManagement />
                     </MainLayout>
@@ -457,7 +459,7 @@ function App() {
 <Route
   path="/reports"
   element={
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="supervisor,administrador">
       <MainLayout title="Dashboard de Estadísticas" subtitle="Métricas generales del sistema">
         <EstadisticasGeneral />
       </MainLayout>
