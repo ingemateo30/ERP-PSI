@@ -140,7 +140,7 @@ class FacturacionAutomaticaService {
           FROM clientes c
           INNER JOIN servicios_cliente sc ON c.id = sc.cliente_id
             AND sc.estado = 'activo'
-            AND sc.activo = 1
+            AND ps.activo = 1
           LEFT JOIN facturas f ON c.id = f.cliente_id
             AND f.activo = 1
             AND f.estado != 'anulada'
@@ -191,7 +191,7 @@ class FacturacionAutomaticaService {
           INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
           WHERE sc.cliente_id = ?
             AND sc.estado = 'activo'
-            AND sc.activo = 1
+            AND ps.activo = 1
             AND ps.activo = 1
           ORDER BY ps.tipo ASC
         `, [clienteId]);
