@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/Layout/MainLayout';
 import { Loader2 } from 'lucide-react';
 import CalendarioManagement from './components/Calendario/CalendarioManagement';
+const EstadisticasGeneral = lazy(() => import('./components/Reports/EstadisticasGeneral'));
 // Lazy loading de componentes principales
 const LoginComponent = lazy(() => import('./components/Login'));
 const SimpleDashboard = lazy(() => import('./components/SimpleDashboard'));
@@ -453,15 +454,15 @@ function App() {
                 }
               />
               <Route
-                path="/reports"
-                element={
-                  <ProtectedRoute requiredRole="supervisor">
-                    <MainLayout title="Reportes y Estadísticas" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Reportes y Estadísticas" />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
+  path="/reports"
+  element={
+    <ProtectedRoute requiredRole="supervisor">
+      <MainLayout title="Dashboard de Estadísticas" subtitle="Métricas generales del sistema">
+        <EstadisticasGeneral />
+      </MainLayout>
+    </ProtectedRoute>
+  }
+/>
 
               <Route
   path="/calendar"
