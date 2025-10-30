@@ -1,4 +1,4 @@
-// backend/services/FacturacionAutomaticaService.js - VERSIÓN COMPLETA Y CORREGIDA
+// backend/services/FacturacionAutomaticaService.js - CORREGIDO SIN c.activo
 const { Database } = require('../models/Database');
 const InteresesMoratoriosService = require('./InteresesMoratoriosService');
 const IVACalculatorService = require('./IVACalculatorService');
@@ -117,7 +117,7 @@ class FacturacionAutomaticaService {
   }
 
   /**
-   * Obtener clientes activos para facturar
+   * Obtener clientes activos para facturar - CORREGIDO
    */
   static async obtenerClientesParaFacturar(fechaReferencia = new Date()) {
     try {
@@ -144,8 +144,7 @@ class FacturacionAutomaticaService {
           LEFT JOIN facturas f ON c.id = f.cliente_id
             AND f.activo = 1
             AND f.estado != 'anulada'
-          WHERE c.activo = 1
-            AND c.estado IN ('activo', 'suspendido')
+          WHERE c.estado IN ('activo', 'suspendido')
           GROUP BY c.id, c.nombre, c.identificacion, c.estado, c.estrato, c.fecha_registro
           HAVING servicios_activos > 0
           ORDER BY c.nombre ASC
@@ -332,7 +331,7 @@ class FacturacionAutomaticaService {
   }
 
   /**
-   * Validar si un cliente puede ser facturado
+   * Validar si un cliente puede ser facturado - CORREGIDO
    */
   static async validarClienteParaFacturacion(clienteId) {
     try {
@@ -340,17 +339,17 @@ class FacturacionAutomaticaService {
 
       try {
         const [cliente] = await conexion.execute(`
-          SELECT estado, activo 
+          SELECT estado
           FROM clientes 
           WHERE id = ?
         `, [clienteId]);
 
-        if (!cliente[0] || !cliente[0].activo) {
-          return { permitir: false, razon: 'Cliente inactivo o no encontrado' };
+        if (!cliente[0]) {
+          return { permitir: false, razon: 'Cliente no encontrado' };
         }
 
-        if (cliente[0].estado === 'retirado') {
-          return { permitir: false, razon: 'Cliente retirado' };
+        if (cliente[0].estado === 'retirado' || cliente[0].estado === 'inactivo') {
+          return { permitir: false, razon: 'Cliente retirado o inactivo' };
         }
 
         const [servicios] = await conexion.execute(`
@@ -783,90 +782,85 @@ class FacturacionAutomaticaService {
       console.error('❌ Error marcando varios:', error);
     }
   }
-
- /**
- * Calcular totales de la factura
- */
-static calcularTotalesFactura(conceptos) {
-  let internet = 0, television = 0, varios = 0, interes = 0;
-  let reconexion = 0, descuento = 0, saldoAnterior = 0;
-  let subtotal = 0, totalIVA = 0;
-
-  conceptos.forEach(concepto => {
-    const valor = parseFloat(concepto.valor || 0);
-    const iva = concepto.aplica_iva ? valor * (concepto.porcentaje_iva / 100) : 0;
-
-    switch (concepto.tipo) {
-      case 'internet':
-        internet += valor;
-        break;
-      case 'television':
-        television += valor;
-        break;
-      case 'varios':
-      case 'instalacion':
-        varios += valor;
-        break;
-      case 'interes':
-        interes += valor;
-        break;
-      case 'reconexion':
-        reconexion += valor;
-        break;
-      case 'descuento':
-        descuento += valor;
-        break;
-      case 'saldo_anterior':
-        saldoAnterior += valor;
-        break;
-    }
-
-    subtotal += valor;
-    totalIVA += iva;
-  });
-
-  return {
-    internet: Math.round(internet),
-    television: Math.round(television),
-    varios: Math.round(varios),
-    interes: Math.round(interes),
-    reconexion: Math.round(reconexion),
-    descuento: Math.round(descuento),
-    saldo_anterior: Math.round(saldoAnterior),
-    subtotal: Math.round(subtotal),
-    iva: Math.round(totalIVA),
-    total: Math.round(subtotal + totalIVA)
-  };
-}
-
 /**
- * Registrar log de facturación
- */
-static async registrarLogFacturacion(resumen) {
-  try {
-    const conexion = await Database.getConnection();
+   * Calcular totales de la factura
+   */
+  static calcularTotalesFactura(conceptos) {
+    let internet = 0, television = 0, varios = 0, interes = 0;
+    let reconexion = 0, descuento = 0, saldoAnterior = 0;
+    let subtotal = 0, totalIVA = 0;
 
-    try {
-      await conexion.execute(`
-        INSERT INTO logs_sistema (
-          tipo, descripcion, datos_json, created_at
-        ) VALUES (?, ?, ?, NOW())
-      `, [
-        'FACTURACION_MENSUAL_AUTOMATICA',
-        `Facturación mensual ${resumen.periodo} - ${resumen.facturas_generadas} facturas generadas`,
-        JSON.stringify(resumen)
-      ]);
-    } finally {
-      conexion.release();
-    }
-  } catch (error) {
-    console.warn('⚠️ No se pudo registrar log de facturación:', error.message);
+    conceptos.forEach(concepto => {
+      const valor = parseFloat(concepto.valor || 0);
+      const iva = concepto.aplica_iva ? valor * (concepto.porcentaje_iva / 100) : 0;
+
+      switch (concepto.tipo) {
+        case 'internet':
+          internet += valor;
+          break;
+        case 'television':
+          television += valor;
+          break;
+        case 'varios':
+        case 'instalacion':
+          varios += valor;
+          break;
+        case 'interes':
+          interes += valor;
+          break;
+        case 'reconexion':
+          reconexion += valor;
+          break;
+        case 'descuento':
+          descuento += valor;
+          break;
+        case 'saldo_anterior':
+          saldoAnterior += valor;
+          break;
+      }
+
+      subtotal += valor;
+      totalIVA += iva;
+    });
+
+    return {
+      internet: Math.round(internet),
+      television: Math.round(television),
+      varios: Math.round(varios),
+      interes: Math.round(interes),
+      reconexion: Math.round(reconexion),
+      descuento: Math.round(descuento),
+      saldo_anterior: Math.round(saldoAnterior),
+      subtotal: Math.round(subtotal),
+      iva: Math.round(totalIVA),
+      total: Math.round(subtotal + totalIVA)
+    };
   }
-}
 
-// ========================================
-// CIERRE DE LA CLASE
-// ========================================
+  /**
+   * Registrar log de facturación
+   */
+  static async registrarLogFacturacion(resumen) {
+    try {
+      const conexion = await Database.getConnection();
+
+      try {
+        await conexion.execute(`
+          INSERT INTO logs_sistema (
+            tipo, descripcion, datos_json, created_at
+          ) VALUES (?, ?, ?, NOW())
+        `, [
+          'FACTURACION_MENSUAL_AUTOMATICA',
+          `Facturación mensual ${resumen.periodo} - ${resumen.facturas_generadas} facturas generadas`,
+          JSON.stringify(resumen)
+        ]);
+      } finally {
+        conexion.release();
+      }
+    } catch (error) {
+      console.warn('⚠️ No se pudo registrar log de facturación:', error.message);
+    }
+  }
 }
 
 module.exports = FacturacionAutomaticaService;
