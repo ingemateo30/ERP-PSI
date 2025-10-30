@@ -1,4 +1,4 @@
-// backend/services/FacturacionAutomaticaService.js - CORREGIDO SIN c.activo
+// backend/services/FacturacionAutomaticaService.js - CORREGIDO
 const { Database } = require('../models/Database');
 const InteresesMoratoriosService = require('./InteresesMoratoriosService');
 const IVACalculatorService = require('./IVACalculatorService');
@@ -117,7 +117,7 @@ class FacturacionAutomaticaService {
   }
 
   /**
-   * Obtener clientes activos para facturar - CORREGIDO
+   * ✅ CORREGIDO: Obtener clientes activos para facturar
    */
   static async obtenerClientesParaFacturar(fechaReferencia = new Date()) {
     try {
@@ -126,6 +126,7 @@ class FacturacionAutomaticaService {
       try {
         console.log('🔍 Buscando clientes para facturar...');
 
+        // ✅ CORRECCIÓN: JOIN correcto incluyendo planes_servicio
         const [clientes] = await conexion.execute(`
           SELECT DISTINCT
             c.id,
@@ -140,6 +141,7 @@ class FacturacionAutomaticaService {
           FROM clientes c
           INNER JOIN servicios_cliente sc ON c.id = sc.cliente_id
             AND sc.estado = 'activo'
+          INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
             AND ps.activo = 1
           LEFT JOIN facturas f ON c.id = f.cliente_id
             AND f.activo = 1
@@ -165,7 +167,7 @@ class FacturacionAutomaticaService {
   }
 
   /**
-   * Obtener servicios activos de un cliente
+   * ✅ CORREGIDO: Obtener servicios activos de un cliente
    */
   static async obtenerServiciosActivos(clienteId) {
     try {
@@ -191,7 +193,6 @@ class FacturacionAutomaticaService {
           INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
           WHERE sc.cliente_id = ?
             AND sc.estado = 'activo'
-            AND ps.activo = 1
             AND ps.activo = 1
           ORDER BY ps.tipo ASC
         `, [clienteId]);
@@ -331,7 +332,7 @@ class FacturacionAutomaticaService {
   }
 
   /**
-   * Validar si un cliente puede ser facturado - CORREGIDO
+   * Validar si un cliente puede ser facturado
    */
   static async validarClienteParaFacturacion(clienteId) {
     try {
@@ -356,8 +357,7 @@ class FacturacionAutomaticaService {
           SELECT COUNT(*) as servicios_activos
           FROM servicios_cliente 
           WHERE cliente_id = ? 
-            AND estado = 'activo' 
-            AND activo = 1
+            AND estado = 'activo'
         `, [clienteId]);
 
         if (servicios[0].servicios_activos === 0) {
@@ -456,9 +456,9 @@ class FacturacionAutomaticaService {
     }
   }
 
-  /**
-   * Calcular saldo anterior del cliente
-   */
+  // ... (resto de métodos sin cambios: calcularSaldoAnterior, calcularInteresMora, etc.)
+  // Incluir TODOS los métodos restantes del archivo original
+
   static async calcularSaldoAnterior(conexion, clienteId) {
     try {
       const [resultado] = await conexion.execute(`
@@ -497,9 +497,6 @@ class FacturacionAutomaticaService {
     }
   }
 
-  /**
-   * Calcular interés de mora
-   */
   static async calcularInteresMora(conexion, clienteId) {
     try {
       const interesPendiente = await InteresesMoratoriosService.calcularInteresPendiente(clienteId);
@@ -524,9 +521,6 @@ class FacturacionAutomaticaService {
     }
   }
 
-  /**
-   * Calcular reconexión si aplica
-   */
   static async calcularReconexion(conexion, clienteId) {
     try {
       const [cortesRecientes] = await conexion.execute(`
@@ -565,9 +559,6 @@ class FacturacionAutomaticaService {
     }
   }
 
-  /**
-   * Calcular varios pendientes
-   */
   static async calcularVarios(conexion, clienteId) {
     try {
       const [varios] = await conexion.execute(`
@@ -594,9 +585,6 @@ class FacturacionAutomaticaService {
     }
   }
 
-  /**
-   * Crear factura completa
-   */
   static async crearFacturaCompleta(cliente, conceptos, periodo) {
     try {
       const conexion = await Database.getConnection();
@@ -672,9 +660,6 @@ class FacturacionAutomaticaService {
     }
   }
 
-  /**
-   * Crear detalle de factura
-   */
   static async crearDetalleFactura(conexion, facturaId, conceptos) {
     try {
       for (const concepto of conceptos) {
@@ -719,9 +704,6 @@ class FacturacionAutomaticaService {
     }
   }
 
-  /**
-   * Generar número de factura
-   */
   static async generarNumeroFactura() {
     try {
       const conexion = await Database.getConnection();
@@ -746,9 +728,6 @@ class FacturacionAutomaticaService {
     }
   }
 
-  /**
-   * Actualizar consecutivos
-   */
   static async actualizarConsecutivos() {
     try {
       const conexion = await Database.getConnection();
@@ -768,9 +747,6 @@ class FacturacionAutomaticaService {
     }
   }
 
-  /**
-   * Marcar varios como facturados
-   */
   static async marcarVariosComoFacturados(conexion, clienteId) {
     try {
       await conexion.execute(`
@@ -782,85 +758,266 @@ class FacturacionAutomaticaService {
       console.error('❌ Error marcando varios:', error);
     }
   }
+
 /**
-   * Calcular totales de la factura
-   */
-  static calcularTotalesFactura(conceptos) {
-    let internet = 0, television = 0, varios = 0, interes = 0;
-    let reconexion = 0, descuento = 0, saldoAnterior = 0;
-    let subtotal = 0, totalIVA = 0;
+ * Calcular totales de la factura
+ */
+static calcularTotalesFactura(conceptos) {
+  let internet = 0, television = 0, varios = 0, interes = 0;
+  let reconexion = 0, descuento = 0, saldoAnterior = 0;
+  let subtotal = 0, totalIVA = 0;
 
-    conceptos.forEach(concepto => {
-      const valor = parseFloat(concepto.valor || 0);
-      const iva = concepto.aplica_iva ? valor * (concepto.porcentaje_iva / 100) : 0;
+  conceptos.forEach(concepto => {
+    const valor = parseFloat(concepto.valor || 0);
+    const iva = concepto.aplica_iva ? valor * (concepto.porcentaje_iva / 100) : 0;
 
-      switch (concepto.tipo) {
-        case 'internet':
-          internet += valor;
-          break;
-        case 'television':
-          television += valor;
-          break;
-        case 'varios':
-        case 'instalacion':
-          varios += valor;
-          break;
-        case 'interes':
-          interes += valor;
-          break;
-        case 'reconexion':
-          reconexion += valor;
-          break;
-        case 'descuento':
-          descuento += valor;
-          break;
-        case 'saldo_anterior':
-          saldoAnterior += valor;
-          break;
-      }
-
-      subtotal += valor;
-      totalIVA += iva;
-    });
-
-    return {
-      internet: Math.round(internet),
-      television: Math.round(television),
-      varios: Math.round(varios),
-      interes: Math.round(interes),
-      reconexion: Math.round(reconexion),
-      descuento: Math.round(descuento),
-      saldo_anterior: Math.round(saldoAnterior),
-      subtotal: Math.round(subtotal),
-      iva: Math.round(totalIVA),
-      total: Math.round(subtotal + totalIVA)
-    };
-  }
-
-  /**
-   * Registrar log de facturación
-   */
-  static async registrarLogFacturacion(resumen) {
-    try {
-      const conexion = await Database.getConnection();
-
-      try {
-        await conexion.execute(`
-          INSERT INTO logs_sistema (
-            tipo, descripcion, datos_json, created_at
-          ) VALUES (?, ?, ?, NOW())
-        `, [
-          'FACTURACION_MENSUAL_AUTOMATICA',
-          `Facturación mensual ${resumen.periodo} - ${resumen.facturas_generadas} facturas generadas`,
-          JSON.stringify(resumen)
-        ]);
-      } finally {
-        conexion.release();
-      }
-    } catch (error) {
-      console.warn('⚠️ No se pudo registrar log de facturación:', error.message);
+    switch (concepto.tipo) {
+      case 'internet':
+        internet += valor;
+        break;
+      case 'television':
+        television += valor;
+        break;
+      case 'varios':
+      case 'instalacion':
+        varios += valor;
+        break;
+      case 'interes':
+        interes += valor;
+        break;
+      case 'reconexion':
+        reconexion += valor;
+        break;
+      case 'descuento':
+        descuento += valor;
+        break;
+      case 'saldo_anterior':
+        saldoAnterior += valor;
+        break;
     }
+
+    subtotal += valor;
+    totalIVA += iva;
+  });
+
+  return {
+    internet: Math.round(internet),
+    television: Math.round(television),
+    varios: Math.round(varios),
+    interes: Math.round(interes),
+    reconexion: Math.round(reconexion),
+    descuento: Math.round(descuento),
+    saldo_anterior: Math.round(saldoAnterior),
+    subtotal: Math.round(subtotal),
+    iva: Math.round(totalIVA),
+    total: Math.round(subtotal + totalIVA)
+  };
+}
+
+/**
+ * Registrar log de facturación
+ */
+static async registrarLogFacturacion(resumen) {
+  try {
+    const conexion = await Database.getConnection();
+
+    try {
+      await conexion.execute(`
+        INSERT INTO logs_sistema (
+          tipo, descripcion, datos_json, created_at
+        ) VALUES (?, ?, ?, NOW())
+      `, [
+        'FACTURACION_MENSUAL_AUTOMATICA',
+        `Facturación mensual ${resumen.periodo} - ${resumen.facturas_generadas} facturas generadas`,
+        JSON.stringify(resumen)
+      ]);
+
+      console.log('✅ Log de facturación registrado correctamente');
+
+    } finally {
+      conexion.release();
+    }
+  } catch (error) {
+    console.warn('⚠️ No se pudo registrar log de facturación:', error.message);
   }
+}
+
+/**
+ * Obtener estadísticas de facturación del mes
+ */
+static async obtenerEstadisticasMes(periodo) {
+  try {
+    const conexion = await Database.getConnection();
+
+    try {
+      const [stats] = await conexion.execute(`
+        SELECT 
+          COUNT(*) as total_facturas,
+          SUM(total) as total_facturado,
+          SUM(CASE WHEN estado = 'pagada' THEN total ELSE 0 END) as total_pagado,
+          SUM(CASE WHEN estado = 'pendiente' THEN total ELSE 0 END) as total_pendiente,
+          SUM(CASE WHEN estado = 'vencida' THEN total ELSE 0 END) as total_vencido
+        FROM facturas
+        WHERE DATE_FORMAT(fecha_emision, '%Y-%m') = ?
+          AND activo = 1
+      `, [periodo]);
+
+      return stats[0] || {
+        total_facturas: 0,
+        total_facturado: 0,
+        total_pagado: 0,
+        total_pendiente: 0,
+        total_vencido: 0
+      };
+
+    } finally {
+      conexion.release();
+    }
+
+  } catch (error) {
+    console.error('❌ Error obteniendo estadísticas:', error);
+    return null;
+  }
+}
+
+/**
+ * Verificar facturas duplicadas antes de generar
+ */
+static async verificarFacturaDuplicada(clienteId, periodo) {
+  try {
+    const conexion = await Database.getConnection();
+
+    try {
+      const [facturas] = await conexion.execute(`
+        SELECT id, numero_factura
+        FROM facturas
+        WHERE cliente_id = ?
+          AND DATE_FORMAT(fecha_emision, '%Y-%m') = ?
+          AND activo = 1
+        LIMIT 1
+      `, [clienteId, periodo]);
+
+      return facturas.length > 0 ? facturas[0] : null;
+
+    } finally {
+      conexion.release();
+    }
+
+  } catch (error) {
+    console.error('❌ Error verificando factura duplicada:', error);
+    return null;
+  }
+}
+
+/**
+ * Anular factura (soft delete)
+ */
+static async anularFactura(facturaId, motivo, usuarioId) {
+  try {
+    const conexion = await Database.getConnection();
+
+    try {
+      await conexion.beginTransaction();
+
+      await conexion.execute(`
+        UPDATE facturas
+        SET estado = 'anulada',
+            activo = 0,
+            motivo_anulacion = ?,
+            fecha_anulacion = NOW(),
+            anulada_por = ?
+        WHERE id = ?
+      `, [motivo, usuarioId, facturaId]);
+
+      await conexion.execute(`
+        INSERT INTO logs_sistema (tipo, descripcion, usuario_id, created_at)
+        VALUES ('FACTURA_ANULADA', ?, ?, NOW())
+      `, [`Factura ${facturaId} anulada: ${motivo}`, usuarioId]);
+
+      await conexion.commit();
+
+      console.log(`✅ Factura ${facturaId} anulada correctamente`);
+      return { success: true };
+
+    } catch (error) {
+      await conexion.rollback();
+      throw error;
+    } finally {
+      conexion.release();
+    }
+
+  } catch (error) {
+    console.error('❌ Error anulando factura:', error);
+    throw error;
+  }
+}
+
+/**
+ * Regenerar factura para un cliente específico
+ */
+static async regenerarFacturaCliente(clienteId) {
+  try {
+    console.log(`🔄 Regenerando factura para cliente ${clienteId}...`);
+
+    const conexion = await Database.getConnection();
+
+    try {
+      // Obtener info del cliente
+      const [clientes] = await conexion.execute(`
+        SELECT id, nombre, identificacion, estado, estrato
+        FROM clientes
+        WHERE id = ?
+      `, [clienteId]);
+
+      if (clientes.length === 0) {
+        throw new Error('Cliente no encontrado');
+      }
+
+      const cliente = clientes[0];
+
+      // Validar
+      const validacion = await this.validarClienteParaFacturacion(clienteId);
+      if (!validacion.permitir) {
+        throw new Error(validacion.razon);
+      }
+
+      // Calcular período
+      const periodo = await this.calcularPeriodoFacturacion(clienteId);
+
+      // Obtener servicios
+      const servicios = await this.obtenerServiciosActivos(clienteId);
+
+      if (servicios.length === 0) {
+        throw new Error('No hay servicios activos');
+      }
+
+      // Calcular conceptos
+      const conceptos = await this.calcularConceptosFacturacion(cliente, servicios, periodo);
+
+      if (conceptos.length === 0) {
+        throw new Error('No hay conceptos para facturar');
+      }
+
+      // Crear factura
+      const factura = await this.crearFacturaCompleta(cliente, conceptos, periodo);
+
+      console.log(`✅ Factura regenerada: ${factura.numero}`);
+
+      return {
+        success: true,
+        factura
+      };
+
+    } finally {
+      conexion.release();
+    }
+
+  } catch (error) {
+    console.error('❌ Error regenerando factura:', error);
+    throw error;
+  }
+}
+
 }
 
 module.exports = FacturacionAutomaticaService;
