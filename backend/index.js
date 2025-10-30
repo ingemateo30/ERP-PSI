@@ -334,14 +334,17 @@ try {
   }
 
   console.log('✅ Todas las rutas cargadas exitosamente');
+ console.log('📊 Cargando rutas de estadísticas...');
+  const estadisticasRoutes = require('./routes/estadisticas'); // ✅ BIEN (dentro del try)
+  app.use('/api/v1/estadisticas', estadisticasRoutes);
+  console.log('✅ Rutas de estadísticas cargadas: /api/v1/estadisticas');
 
 } catch (error) {
   console.error('❌ Error cargando rutas:', error.message);
   console.error('Stack trace:', error.stack);
   process.exit(1);
 }
-const estadisticasRoutes = require('./routes/estadisticas');
-app.use('/api/v1/estadisticas', estadisticasRoutes);
+
 // Ruta base de la API con información completa
 app.get('/api/v1', (req, res) => {
   res.json({
