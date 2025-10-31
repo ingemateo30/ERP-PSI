@@ -4,10 +4,10 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const AlertasClienteService = require('../services/AlertasClienteService');
-const { verificarRol } = require('../middleware/roleAuth');
-const express = require('express');
 const { autenticar } = require('../middleware/auth');
-const { verificarRol } = require('../middleware/roleAuth'); // ← AGREGAR ESTA LÍNEA
+const { verificarRol, verificarPermiso } = require('../middleware/roleAuth'); // ← UNA SOLA VEZ
+
+
 
 
 // Importar controlador con manejo de errores
@@ -25,7 +25,6 @@ try {
 let authenticateToken, requireRole;
 try {
   const auth = require('../middleware/auth');
-  const { verificarRol, verificarPermiso } = require('../middleware/roleAuth');
   authenticateToken = auth.authenticateToken || auth.auth;
   requireRole = auth.requireRole;
   console.log('✅ Middleware de autenticación cargado');
