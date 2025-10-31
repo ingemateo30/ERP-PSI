@@ -152,19 +152,18 @@ router.get('/mis-trabajos/:instalador_id', async (req, res) => {
       }
     }
 
-    // Consulta con JOIN a clientes y planes
+// Consulta con JOIN a clientes y planes
     const query = `
       SELECT 
         i.*,
         c.nombre as cliente_nombre,
-        c.apellidos as cliente_apellidos,
         c.telefono as cliente_telefono,
-        c.email as cliente_email,
+        c.correo as cliente_email,
         sc.plan_id,
         ps.nombre as plan_nombre,
         ps.velocidad_bajada,
         ps.velocidad_subida,
-        CONCAT(c.nombre, ' ', IFNULL(c.apellidos, '')) as nombre_completo
+        c.nombre as nombre_completo
       FROM instalaciones i
       INNER JOIN clientes c ON i.cliente_id = c.id
       LEFT JOIN servicios_cliente sc ON i.servicio_cliente_id = sc.id
