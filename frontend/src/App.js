@@ -292,7 +292,7 @@ function App() {
               <Route
                 path="/config/plantillas-correo"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Plantillas de Correo" subtitle="Gestión de plantillas de correo electrónico">
                       <PlantillasCorreoConfig />
                     </MainLayout>
@@ -329,7 +329,7 @@ function App() {
               <Route
                 path="/facturas"
                 element={
-                  <ProtectedRoute requiredRole="administrador" >
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Facturas" subtitle="Sistema de facturación mensual">
                       <FacturasManagement />
                     </MainLayout>
@@ -339,7 +339,7 @@ function App() {
               <Route
                 path="/facturacion-automatica"
                 element={
-                  <ProtectedRoute requiredRole="administrador" >
+                  <ProtectedRoute requiredRole="supervisor,administrador" >
                     <MainLayout title="Facturación Automática" subtitle="Sistema automatizado de facturación mensual">
                       <FacturacionAutomatica />
                     </MainLayout>
@@ -349,7 +349,7 @@ function App() {
                <Route
                 path="/historial-facturas"
                 element={
-                  <ProtectedRoute requiredRole="administrador" >
+                  <ProtectedRoute requiredRole="supervisor,administrador" >
                     <MainLayout title="Historial Facturacion cliente" subtitle="">
                       <HistorialFacturacionWrapper />
                     </MainLayout>
@@ -359,7 +359,7 @@ function App() {
               <Route
                 path="/cruce-pagos"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Cruce de Pagos Bancarios" subtitle="Registrar pagos de facturas">
                       <CrucePagosBancarios />
                     </MainLayout>
@@ -369,7 +369,7 @@ function App() {
               <Route
                 path="/contratos"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Contratos" subtitle="Gestión de contratos de servicio">
                       <ContratosList />
                     </MainLayout>
@@ -425,7 +425,7 @@ function App() {
               <Route
                 path="pqr"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Gestión de Incidencias" subtitle="">
                       <PQRManagement />
                     </MainLayout>
@@ -459,7 +459,7 @@ function App() {
 <Route
   path="/reports"
   element={
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="administrador">
       <MainLayout title="Dashboard de Estadísticas" subtitle="Métricas generales del sistema">
         <EstadisticasGeneral />
       </MainLayout>
