@@ -350,7 +350,7 @@ const InstaladorDashboard = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
                     <button
-                        onClick={() => navigate('/installations')}
+                        onClick={() => navigate('/mis-trabajos')}
                         className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
                     >
                         <Wrench size={18} className="mr-2" />

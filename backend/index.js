@@ -272,6 +272,8 @@ try {
   //rutas de instalaciones
   console.log('🔧 Cargando rutas de instalaciones...');
   const instalacionesRoutes = require('./routes/instalaciones');
+  const inventarioRoutes = require('./routes/inventario'); // ← AGREGAR ESTA LÍNEA
+app.use('/api/inventario', inventarioRoutes); 
   app.use('/api/v1/instalaciones', instalacionesRoutes);
 
   const CronJobs = require('./utils/cronJobs');

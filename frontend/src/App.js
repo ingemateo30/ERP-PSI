@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/Layout/MainLayout';
 import { Loader2 } from 'lucide-react';
 import CalendarioManagement from './components/Calendario/CalendarioManagement';
+import MisTrabajos from './components/Instalaciones/MisTrabajos';
 
 const EstadisticasGeneral = lazy(() => import('./components/Reports/EstadisticasGeneral'));
 
@@ -207,6 +208,17 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              {/* Ruta Mis Trabajos - Para Instaladores */}
+<Route
+  path="/mis-trabajos"
+  element={
+    <ProtectedRoute requiredRole="instalador,supervisor,administrador">
+      <MainLayout title="Mis Trabajos" subtitle="Gestión de instalaciones del día">
+        <MisTrabajos />
+      </MainLayout>
+    </ProtectedRoute>
+  }
+/>
 
               <Route
                 path="/profile"

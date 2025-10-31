@@ -1207,8 +1207,431 @@ router.patch('/:id/iniciar', async (req, res) => {
             message: error.message || 'Error al iniciar instalación'
         });
     }
+    // backend/routes/instalaciones.js - AGREGAR AL FINAL DEL ARCHIVO
+
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configurar multer para subida de fotos
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(__dirname, '../uploads/instalaciones');
+    
+    // Crear directorio si no existe
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'instalacion-' + uniqueSuffix + path.extname(file.originalname));
+  }
 });
 
-console.log('✅ Rutas de instalaciones ARREGLADAS configuradas');
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: function (req, file, cb) {
+    const allowedTypes = /jpeg|jpg|png/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten imágenes (jpeg, jpg, png)'));
+    }
+  }
+});
 
+/**
+ * NUEVA RUTA: Obtener trabajos del instalador
+ * GET /api/instalaciones/mis-trabajos/:instalador_id
+ */
+router.get('/mis-trabajos/:instalador_id', async (req, res) => {
+  try {
+    const { instalador_id } = req.params;
+    const { estado } = req.query;
+
+    console.log(`📋 Obteniendo trabajos del instalador ${instalador_id}`);
+
+    // Verificar que el usuario solo pueda ver sus propios trabajos (a menos que sea admin/supervisor)
+    if (req.user.rol !== 'administrador' && req.user.rol !== 'supervisor') {
+      if (parseInt(instalador_id) !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permiso para ver estos trabajos'
+        });
+      }
+    }
+
+    let whereClause = 'WHERE i.instalador_id = ?';
+    const params = [instalador_id];
+
+    // Filtrar por estado si se proporciona
+    if (estado && estado !== 'todas') {
+      if (estado === 'pendiente') {
+        whereClause += " AND i.estado = 'programada'";
+      } else {
+        whereClause += ' AND i.estado = ?';
+        params.push(estado);
+      }
+    }
+
+    // Consulta con JOIN a clientes y planes
+    const query = `
+      SELECT 
+        i.*,
+        c.nombre as cliente_nombre,
+        c.apellidos as cliente_apellidos,
+        c.telefono as cliente_telefono,
+        c.email as cliente_email,
+        sc.plan_id,
+        ps.nombre as plan_nombre,
+        ps.velocidad_bajada,
+        ps.velocidad_subida,
+        CONCAT(c.nombre, ' ', IFNULL(c.apellidos, '')) as nombre_completo
+      FROM instalaciones i
+      INNER JOIN clientes c ON i.cliente_id = c.id
+      LEFT JOIN servicios_cliente sc ON i.servicio_cliente_id = sc.id
+      LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+      ${whereClause}
+      ORDER BY i.fecha_programada ASC, i.hora_programada ASC
+    `;
+
+    const instalaciones = await Database.query(query, params);
+
+    res.json({
+      success: true,
+      data: instalaciones,
+      total: instalaciones.length
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo trabajos:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error obteniendo trabajos del instalador'
+    });
+  }
+});
+
+/**
+ * NUEVA RUTA: Iniciar instalación
+ * PUT /api/instalaciones/:id/iniciar
+ */
+router.put('/:id/iniciar', upload.single('foto_antes'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log(`🚀 Iniciando instalación ${id}`);
+
+    // Verificar que la instalación existe
+    const [instalacion] = await Database.query(
+      'SELECT * FROM instalaciones WHERE id = ?',
+      [id]
+    );
+
+    if (!instalacion) {
+      return res.status(404).json({
+        success: false,
+        message: 'Instalación no encontrada'
+      });
+    }
+
+    // Verificar permisos
+    if (req.user.rol !== 'administrador' && req.user.rol !== 'supervisor') {
+      if (instalacion.instalador_id !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permiso para modificar esta instalación'
+        });
+      }
+    }
+
+    // Preparar datos de actualización
+    const horaInicio = new Date().toTimeString().split(' ')[0];
+    let fotosArray = [];
+
+    // Si ya hay fotos, parsearlas
+    if (instalacion.fotos_instalacion) {
+      try {
+        fotosArray = JSON.parse(instalacion.fotos_instalacion);
+      } catch (e) {
+        fotosArray = [];
+      }
+    }
+
+    // Agregar nueva foto si se subió
+    if (req.file) {
+      fotosArray.push({
+        url: `/uploads/instalaciones/${req.file.filename}`,
+        descripcion: 'Foto antes de la instalación',
+        fecha: new Date().toISOString(),
+        tipo: 'antes'
+      });
+    }
+
+    // Actualizar instalación
+    await Database.query(
+      `UPDATE instalaciones 
+       SET estado = 'en_proceso',
+           hora_inicio = ?,
+           fotos_instalacion = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [horaInicio, JSON.stringify(fotosArray), id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Instalación iniciada correctamente',
+      data: {
+        hora_inicio: horaInicio,
+        foto_subida: !!req.file
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error iniciando instalación:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error iniciando instalación'
+    });
+  }
+});
+
+/**
+ * NUEVA RUTA: Actualizar progreso de instalación
+ * PUT /api/instalaciones/:id/actualizar
+ */
+router.put('/:id/actualizar', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { equipos_instalados, observaciones, estado, motivo_cancelacion } = req.body;
+
+    console.log(`💾 Actualizando instalación ${id}`);
+
+    // Verificar que la instalación existe
+    const [instalacion] = await Database.query(
+      'SELECT * FROM instalaciones WHERE id = ?',
+      [id]
+    );
+
+    if (!instalacion) {
+      return res.status(404).json({
+        success: false,
+        message: 'Instalación no encontrada'
+      });
+    }
+
+    // Preparar datos de actualización
+    const updateFields = [];
+    const updateValues = [];
+
+    if (equipos_instalados !== undefined) {
+      updateFields.push('equipos_instalados = ?');
+      updateValues.push(JSON.stringify(equipos_instalados));
+    }
+
+    if (observaciones !== undefined) {
+      updateFields.push('observaciones = ?');
+      updateValues.push(observaciones);
+    }
+
+    if (estado) {
+      updateFields.push('estado = ?');
+      updateValues.push(estado);
+    }
+
+    if (motivo_cancelacion) {
+      updateFields.push('motivo_cancelacion = ?');
+      updateValues.push(motivo_cancelacion);
+    }
+
+    updateFields.push('updated_at = CURRENT_TIMESTAMP');
+    updateValues.push(id);
+
+    // Ejecutar actualización
+    await Database.query(
+      `UPDATE instalaciones SET ${updateFields.join(', ')} WHERE id = ?`,
+      updateValues
+    );
+
+    res.json({
+      success: true,
+      message: 'Instalación actualizada correctamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error actualizando instalación:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error actualizando instalación'
+    });
+  }
+});
+
+/**
+ * NUEVA RUTA: Completar instalación
+ * PUT /api/instalaciones/:id/completar
+ */
+router.put('/:id/completar', upload.single('foto_despues'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { equipos_instalados, observaciones, estado } = req.body;
+
+    console.log(`✅ Completando instalación ${id}`);
+
+    // Verificar que la instalación existe
+    const [instalacion] = await Database.query(
+      'SELECT * FROM instalaciones WHERE id = ?',
+      [id]
+    );
+
+    if (!instalacion) {
+      return res.status(404).json({
+        success: false,
+        message: 'Instalación no encontrada'
+      });
+    }
+
+    const horaFin = new Date().toTimeString().split(' ')[0];
+    const fechaRealizada = new Date().toISOString().split('T')[0];
+    let fotosArray = [];
+
+    // Si ya hay fotos, parsearlas
+    if (instalacion.fotos_instalacion) {
+      try {
+        fotosArray = JSON.parse(instalacion.fotos_instalacion);
+      } catch (e) {
+        fotosArray = [];
+      }
+    }
+
+    // Agregar foto después si se subió
+    if (req.file) {
+      fotosArray.push({
+        url: `/uploads/instalaciones/${req.file.filename}`,
+        descripcion: 'Foto después de la instalación',
+        fecha: new Date().toISOString(),
+        tipo: 'despues'
+      });
+    }
+
+    // Actualizar instalación
+    await Database.query(
+      `UPDATE instalaciones 
+       SET estado = ?,
+           hora_fin = ?,
+           fecha_realizada = ?,
+           equipos_instalados = ?,
+           observaciones = ?,
+           fotos_instalacion = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [
+        estado || 'completada',
+        horaFin,
+        fechaRealizada,
+        equipos_instalados,
+        observaciones,
+        JSON.stringify(fotosArray),
+        id
+      ]
+    );
+
+    // Si hay equipos instalados, actualizar inventario
+    if (equipos_instalados) {
+      const equipos = JSON.parse(equipos_instalados);
+      
+      for (const equipo of equipos) {
+        // Actualizar estado del equipo en inventario
+        await Database.query(
+          `UPDATE inventario_equipos 
+           SET estado = 'instalado',
+               instalador_id = ?,
+               fecha_asignacion = CURRENT_TIMESTAMP,
+               ubicacion_actual = ?,
+               notas_instalador = ?
+           WHERE id = ?`,
+          [
+            instalacion.instalador_id,
+            instalacion.direccion_instalacion,
+            equipo.observaciones || '',
+            equipo.equipo_id
+          ]
+        );
+
+        // Registrar en historial
+        await Database.query(
+          `INSERT INTO inventario_historial 
+           (equipo_id, tipo_movimiento, instalador_id, cliente_id, instalacion_id, observaciones)
+           VALUES (?, 'instalacion', ?, ?, ?, ?)`,
+          [
+            equipo.equipo_id,
+            instalacion.instalador_id,
+            instalacion.cliente_id,
+            id,
+            `Equipo instalado: ${equipo.observaciones || ''}`
+          ]
+        );
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Instalación completada correctamente',
+      data: {
+        hora_fin: horaFin,
+        fecha_realizada: fechaRealizada,
+        foto_subida: !!req.file
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error completando instalación:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error completando instalación'
+    });
+  }
+});
+
+/**
+ * NUEVA RUTA: Obtener equipos disponibles
+ * GET /api/inventario/equipos/disponibles
+ */
+router.get('/equipos/disponibles', async (req, res) => {
+  try {
+    console.log('📦 Obteniendo equipos disponibles');
+
+    const equipos = await Database.query(
+      `SELECT id, codigo, nombre, tipo, marca, modelo, numero_serie, estado, ubicacion
+       FROM inventario_equipos
+       WHERE estado = 'disponible'
+       ORDER BY tipo, nombre`
+    );
+
+    res.json({
+      success: true,
+      data: equipos,
+      total: equipos.length
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo equipos:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error obteniendo equipos disponibles'
+    });
+  }
+});
+});
 module.exports = router;
+    
+
+
