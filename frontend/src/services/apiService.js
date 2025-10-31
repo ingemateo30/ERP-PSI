@@ -389,3 +389,4 @@ export const configService = {
 
 // Exportar el servicio principal
 export default apiService;
+export { API_BASE_URL };
