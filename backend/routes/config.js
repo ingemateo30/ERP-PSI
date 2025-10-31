@@ -49,7 +49,7 @@ try {
 // Middleware de autenticación para todas las rutas
 router.use(authenticateToken);
 // Todas las rutas de configuración requieren rol administrador
-router.use(verificarRol('administrador'));
+router.use(verificarRol('administrador', 'supervisor'));
 
 // ==========================================
 // RUTAS BÁSICAS DE CONFIGURACIÓN
