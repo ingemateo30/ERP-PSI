@@ -187,7 +187,7 @@ router.get('/conceptos/:id', requireRole('administrador', 'supervisor'), async (
  * @route POST /api/v1/config/conceptos
  * @desc Crear nuevo concepto
  */
-router.post('/conceptos', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.post('/conceptos', requireRole('administrador'), async (req, res) => {
   try {
     console.log('➕ POST /config/conceptos');
 
@@ -217,7 +217,7 @@ router.post('/conceptos', requireRole('administrador', 'supervisor'), async (req
  * @route PUT /api/v1/config/conceptos/:id
  * @desc Actualizar concepto
  */
-router.put('/conceptos/:id', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.put('/conceptos/:id', verificarRol('administrador'), async (req, res) => {
   try {
     console.log('✏️ PUT /config/conceptos/:id');
 
@@ -247,7 +247,7 @@ router.put('/conceptos/:id', requireRole('administrador', 'supervisor'), async (
  * @route POST /api/v1/config/conceptos/:id/toggle
  * @desc Cambiar estado de concepto
  */
-router.post('/conceptos/:id/toggle', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.post('/conceptos/:id/toggle', verificarRol('administrador'), async (req, res) => {
   try {
     console.log('🔄 POST /config/conceptos/:id/toggle');
 
@@ -535,7 +535,7 @@ router.get('/stats', requireRole('administrador', 'supervisor'), async (req, res
  * @route GET /api/v1/config/departments
  * @desc Obtener departamentos
  */
-router.get('/departments', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/departments',requireRole('administrador'), async (req, res) => {
   try {
     console.log('🏛️ GET /config/departments');
 
