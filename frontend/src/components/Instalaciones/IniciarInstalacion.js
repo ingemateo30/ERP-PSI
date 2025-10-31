@@ -1,5 +1,5 @@
 // frontend/src/components/Instalaciones/IniciarInstalacion.js
-import API_BASE_URL from '../../config/api';
+import API_BASE_URL from '../../config/apiService';
 import React, { useState, useEffect } from 'react';
 import {
   X,
