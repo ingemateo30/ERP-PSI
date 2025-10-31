@@ -1529,9 +1529,7 @@ router.delete('/banks/:id', requireRole('administrador'), async (req, res) => {
 // ==========================================
 
 // GET /api/v1/config/service-plans - Listar planes
-router.get('/service-plans', 
-  verificarPermiso('ver'),  
-  async (req, res) => {
+router.get('/service-plans', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     console.log('🔄 Backend: GET /config/service-plans');
     const { activo, orden } = req.query;
@@ -1709,9 +1707,7 @@ router.get('/service-plans/:id', async (req, res) => {
   }
 });
 
-router.post('/service-plans', 
-  verificarPermiso('crear'),  // ← Supervisor NO pasará (false)
-  async (req, res) => {
+router.post('/service-plans', requireRole('administrador'), async (req, res) => {
   try {
     const {
       codigo,
@@ -1839,9 +1835,7 @@ const resultado = await Database.query(`
 });
 
 
-router.put('/service-plans/:id', 
-  verificarPermiso('editar'),  // ← Supervisor NO pasará (false)
-  async (req, res) =>{
+router.put('/service-plans/:id', requireRole('administrador'), async (req, res) => {
   try {
     const { id } = req.params;
     const datosActualizacion = req.body;
@@ -2000,9 +1994,7 @@ router.put('/service-plans/:id',
 });
 
 
-router.delete('/service-plans/:id', 
-  verificarPermiso('eliminar'),  // ← Supervisor NO pasará (false)
-  async (req, res) => {
+router.delete('/service-plans/:id', requireRole('administrador'), async (req, res) => {
   try {
     const { id } = req.params;
 
