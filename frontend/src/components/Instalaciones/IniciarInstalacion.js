@@ -1,5 +1,5 @@
 // frontend/src/components/Instalaciones/IniciarInstalacion.js
-
+import API_BASE_URL from '../../config/api';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -78,7 +78,7 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
   const cargarEquiposDisponibles = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/inventario/equipos/disponibles', {
+      const response = await axios.get(`${API_BASE_URL}/inventario/equipos/disponibles`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -168,7 +168,7 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       }
 
       const response = await axios.put(
-        `http://localhost:5000/api/instalaciones/${instalacion.id}/iniciar`,
+        `${API_BASE_URL}/instalaciones/${instalacion.id}/iniciar`,
         formData,
         {
           headers: {
@@ -202,7 +202,7 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       };
 
       const response = await axios.put(
-        `http://localhost:5000/api/instalaciones/${instalacion.id}/actualizar`,
+        `${API_BASE_URL}/instalaciones/${instalacion.id}/actualizar`,
         datos,
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -243,7 +243,7 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       formData.append('estado', 'completada');
 
       const response = await axios.put(
-        `http://localhost:5000/api/instalaciones/${instalacion.id}/completar`,
+        `${API_BASE_URL}/instalaciones/${instalacion.id}/completar`,
         formData,
         {
           headers: {
@@ -286,7 +286,7 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       };
 
       const response = await axios.put(
-        `http://localhost:5000/api/instalaciones/${instalacion.id}/actualizar`,
+        `${API_BASE_URL}/instalaciones/${instalacion.id}/actualizar`,
         datos,
         {
           headers: { Authorization: `Bearer ${token}` }

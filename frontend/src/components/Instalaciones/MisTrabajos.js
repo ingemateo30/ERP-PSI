@@ -1,5 +1,5 @@
 // frontend/src/components/Instalaciones/MisTrabajos.js
-
+import API_BASE_URL from '../../config/api';
 import React, { useState, useEffect } from 'react';
 import {
   Calendar,
@@ -43,7 +43,7 @@ const MisTrabajos = () => {
 
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        `http://localhost:5000/api/instalaciones/mis-trabajos/${user.id}`,
+        `${API_BASE_URL}/instalaciones/mis-trabajos/${user.id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           params: { estado: filtroEstado }
