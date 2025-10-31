@@ -20,6 +20,7 @@ try {
 let authenticateToken, requireRole;
 try {
   const auth = require('../middleware/auth');
+  const { verificarRol, verificarPermiso } = require('../middleware/roleAuth');
   authenticateToken = auth.authenticateToken || auth.auth;
   requireRole = auth.requireRole;
   console.log('✅ Middleware de autenticación cargado');
@@ -1112,6 +1113,7 @@ router.put('/:id',
 // Eliminar cliente
 router.delete('/:id',
   rateLimiter.criticas,
+  verificarRol('administrador'),
   ClienteController.eliminar
 );
 // Manejo de errores para rutas no encontradas

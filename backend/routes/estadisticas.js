@@ -5,11 +5,16 @@ const express = require('express');
 const router = express.Router();
 const EstadisticasController = require('../controllers/estadisticasController');
 const { authenticateToken } = require('../middleware/auth');
+const { verificarRol } = require('../middleware/roleAuth');
+
+
 
 console.log('🔧 Configurando rutas de estadísticas...');
 
 // Middleware de autenticación para todas las rutas
 router.use(authenticateToken);
+// Todas las rutas de estadísticas solo para administrador
+router.use(verificarRol('administrador'));
 
 // ==========================================
 // RUTAS PRINCIPALES

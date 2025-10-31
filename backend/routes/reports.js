@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const ReportsController = require('../controllers/reportsController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { verificarRol } = require('../middleware/roleAuth');
 
 /**
  * @route GET /api/v1/reports/financial
@@ -12,7 +13,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
  */
 router.get('/financial',
   authenticateToken,
-  requireRole('supervisor', 'administrador'),
+  verificarRol('administrador'),
   ReportsController.getFinancialReport
 );
 
@@ -23,7 +24,7 @@ router.get('/financial',
  */
 router.get('/clients',
   authenticateToken,
-  requireRole('supervisor', 'administrador'),
+  verificarRol('administrador'),
   ReportsController.getClientsReport
 );
 
@@ -34,6 +35,7 @@ router.get('/clients',
  */
 router.get('/dashboard',
   authenticateToken,
+  verificarRol('administrador'),
   ReportsController.getDashboardStats
 );
 

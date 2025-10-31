@@ -7,6 +7,7 @@ const { body, param } = require('express-validator');
 // Controlador y middleware
 const UsersController = require('../controllers/userController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { verificarRol } = require('../middleware/roleAuth');
 
 // Validaciones
 const userValidation = {
@@ -201,7 +202,7 @@ router.post('/',
  */
 router.put('/:id',
   authenticateToken,
-  requireRole('administrador'),
+  verificarRol('administrador'),
   userValidation.id,
   userValidation.update,
   UsersController.updateUser
@@ -214,7 +215,7 @@ router.put('/:id',
  */
 router.post('/:id/change-password',
   authenticateToken,
-  requireRole('administrador'),
+  verificarRol('administrador'),
   userValidation.id,
   userValidation.changePassword,
   UsersController.changePassword
@@ -227,7 +228,7 @@ router.post('/:id/change-password',
  */
 router.post('/:id/toggle-status',
   authenticateToken,
-  requireRole('administrador'),
+  verificarRol('administrador'),
   userValidation.id,
   UsersController.toggleUserStatus
 );
@@ -239,7 +240,7 @@ router.post('/:id/toggle-status',
  */
 router.delete('/:id',
   authenticateToken,
-  requireRole('administrador'),
+  verificarRol('administrador'),
   userValidation.id,
   UsersController.deleteUser
 );

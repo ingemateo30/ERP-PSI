@@ -6,6 +6,7 @@ const { Database } = require('../models/Database');
 
 // Middleware
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { verificarRol } = require('../middleware/roleAuth');
 
 // Importaciones seguras de controladores
 let CompanyConfigController, GeographyController, BanksController, ServicePlansController, conceptosController;
@@ -47,6 +48,8 @@ try {
 
 // Middleware de autenticación para todas las rutas
 router.use(authenticateToken);
+// Todas las rutas de configuración requieren rol administrador
+router.use(verificarRol('administrador'));
 
 // ==========================================
 // RUTAS BÁSICAS DE CONFIGURACIÓN

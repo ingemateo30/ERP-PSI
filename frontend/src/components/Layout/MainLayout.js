@@ -19,9 +19,12 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  const { currentUser, logout, hasPermission } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const { currentUser, logout, hasPermission, userRole } = useAuth();
+const location = useLocation();
+const navigate = useNavigate();
+// Obtener rol normalizado
+const rol = (userRole || '').toLowerCase().trim();
+const esAdministrador = rol === 'administrador';
 
   // Estilos CSS para ocultar scrollbar
   useEffect(() => {
@@ -172,13 +175,13 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       icon: <PieChartIcon size={22} />,
       label: 'Reportes',
       path: '/reportes-regulatorios',
-      permission: 'supervisor,administrador'
+      permission: 'administrador'
     },
     {
       icon: <BarChart3 size={22} />,
       label: 'Estadísticas',
       path: '/reports',
-      permission: 'supervisor'
+      permission: 'administrador'
     }
   ];
 
@@ -188,7 +191,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       icon: <UserCheck size={22} />,
       label: 'Usuarios Sistema',
       path: '/admin/users',
-      permission: 'supervisor'
+      permission: 'administrador'
     },
     {
       icon: <FileText size={22} />,
@@ -294,12 +297,12 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
           ))}
         </nav>
 
-        {/* Notificaciones de configuración - Solo cuando sidebar está abierto */}
-        {sidebarOpen && hasPermission('administrador') && (
-          <div className="px-2 pb-2">
-            <ConfigSidebarNotification />
-          </div>
-        )}
+        {/* Notificaciones de configuración - Solo para administrador */}
+{sidebarOpen && esAdministrador && (
+  <div className="px-2 pb-2">
+    <ConfigSidebarNotification />
+  </div>
+)}
 
         {/* Botón de logout - Siempre visible en la parte inferior */}
         <div className="p-4 border-t border-white/10 mt-auto flex-shrink-0">
@@ -391,25 +394,29 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                       <p className="text-xs text-gray-500 capitalize">{currentUser?.rol}</p>
                     </div>
                     <button
-                      onClick={() => {
-                        navigate('/profile');
-                        setProfileOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
-                    >
-                      <User size={16} className="mr-2" />
-                      Mi Perfil
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigate('/config');
-                        setProfileOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
-                    >
-                      <Settings size={16} className="mr-2" />
-                      Configuración
-                    </button>
+  onClick={() => {
+    navigate('/profile');
+    setProfileOpen(false);
+  }}
+  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
+>
+  <User size={16} className="mr-2" />
+  Mi Perfil
+</button>
+
+{/* Configuración - Solo para administrador */}
+{esAdministrador && (
+  <button
+    onClick={() => {
+      navigate('/config');
+      setProfileOpen(false);
+    }}
+    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
+  >
+    <Settings size={16} className="mr-2" />
+    Configuración
+  </button>
+)}
                     <div className="border-t border-gray-100 mt-1">
                       <LogoutButton 
                         variant="ghost" 
@@ -427,15 +434,18 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
         {/* Content Area */}
         <main className="flex-1 overflow-auto bg-gray-50 p-6">
           {showWelcome && (
-            <div className="mb-6 bg-gradient-to-r from-[#0e6493] to-[#0a5273] text-white p-6 rounded-lg shadow-lg">
-              <h1 className="text-2xl font-bold mb-2">
-                ¡Bienvenido, {currentUser?.nombre}!
-              </h1>
-              <p className="text-blue-100">
-                Sistema de gestión para empresa de internet y televisión
-              </p>
-            </div>
-          )}
+  <div className="mb-6 bg-gradient-to-r from-[#0e6493] to-[#0a5273] text-white p-6 rounded-lg shadow-lg">
+    <h1 className="text-2xl font-bold mb-2">
+      ¡Bienvenido, {currentUser?.nombre}!
+    </h1>
+    <p className="text-blue-100">
+      Sistema de gestión para empresa de internet y televisión
+    </p>
+    <p className="text-blue-200 text-sm mt-1">
+      Rol: <span className="font-semibold capitalize">{userRole}</span>
+    </p>
+  </div>
+)}
 
 
           <div className="bg-white rounded-lg shadow-sm min-h-full">
