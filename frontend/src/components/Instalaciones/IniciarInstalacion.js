@@ -1,5 +1,5 @@
 // frontend/src/components/Instalaciones/IniciarInstalacion.js
-import { API_BASE_URL } from '../../services/apiService';
+import apiService from '../../services/apiService';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -14,7 +14,7 @@ import {
   Search,
   AlertCircle
 } from 'lucide-react';
-import axios from 'axios';
+
 
 const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
   const [paso, setPaso] = useState(1); // 1: Fotos, 2: Equipos, 3: Completar
@@ -76,15 +76,12 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
   }, [instalacion]);
 
   const cargarEquiposDisponibles = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/inventario/equipos/disponibles`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (response.data.success) {
-        setEquiposDisponibles(response.data.data || []);
-      }
+  try {
+    const response = await apiService.get('/inventario/equipos/disponibles');
+    
+    if (response.data.success) {
+      setEquiposDisponibles(response.data.data || []);
+    }
     } catch (err) {
       console.error('Error cargando equipos:', err);
     }
@@ -160,23 +157,16 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       setProcesando(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
       const formData = new FormData();
-      
-      if (fotoAntes) {
-        formData.append('foto_antes', fotoAntes);
-      }
 
-      const response = await axios.put(
-        `${API_BASE_URL}/instalaciones/${instalacion.id}/iniciar`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        }
-      );
+if (fotoAntes) {
+  formData.append('foto_antes', fotoAntes);
+}
+
+const response = await apiService.post(
+  `/instalaciones/${instalacion.id}/iniciar`,
+  formData
+);
 
       if (response.data.success) {
         setSuccess('Instalación iniciada correctamente');
@@ -195,20 +185,15 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       setProcesando(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
-      const datos = {
-        equipos_instalados: equiposAsignados,
-        observaciones: observaciones
-      };
+     const datos = {
+  equipos_instalados: equiposAsignados,
+  observaciones: observaciones
+};
 
-      const response = await axios.put(
-        `${API_BASE_URL}/instalaciones/${instalacion.id}/actualizar`,
-        datos,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
+const response = await apiService.put(
+  `/instalaciones/${instalacion.id}/actualizar`,
+  datos
+);
       if (response.data.success) {
         setSuccess('Progreso guardado correctamente');
         setTimeout(() => setSuccess(null), 3000);
@@ -231,27 +216,20 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       setProcesando(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
       const formData = new FormData();
-      
-      if (fotoDespues) {
-        formData.append('foto_despues', fotoDespues);
-      }
-      
-      formData.append('equipos_instalados', JSON.stringify(equiposAsignados));
-      formData.append('observaciones', observaciones);
-      formData.append('estado', 'completada');
 
-      const response = await axios.put(
-        `${API_BASE_URL}/instalaciones/${instalacion.id}/completar`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        }
-      );
+if (fotoDespues) {
+  formData.append('foto_despues', fotoDespues);
+}
+
+formData.append('equipos_instalados', JSON.stringify(equiposAsignados));
+formData.append('observaciones', observaciones);
+formData.append('estado', 'completada');
+
+const response = await apiService.post(
+  `/instalaciones/${instalacion.id}/completar`,
+  formData
+);
 
       if (response.data.success) {
         setSuccess('¡Instalación completada exitosamente!');
@@ -278,20 +256,16 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       setProcesando(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
       const datos = {
-        estado: 'cancelada',
-        motivo_cancelacion: motivoCancelacion,
-        observaciones: observaciones
-      };
+  estado: 'cancelada',
+  motivo_cancelacion: motivoCancelacion,
+  observaciones: observaciones
+};
 
-      const response = await axios.put(
-        `${API_BASE_URL}/instalaciones/${instalacion.id}/actualizar`,
-        datos,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+const response = await apiService.put(
+  `/instalaciones/${instalacion.id}/actualizar`,
+  datos
+);
 
       if (response.data.success) {
         setSuccess('Instalación cancelada');

@@ -1,5 +1,5 @@
 // frontend/src/components/Instalaciones/MisTrabajos.js
-import { API_BASE_URL } from '../../services/apiService';
+import apiService from '../../services/apiService';
 import React, { useState, useEffect } from 'react';
 import {
   Calendar,
@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import IniciarInstalacion from './IniciarInstalacion';
-import axios from 'axios';
+
 
 const MisTrabajos = () => {
   const { user } = useAuth();
@@ -41,14 +41,12 @@ const MisTrabajos = () => {
       setCargando(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
-      const response = await axios.get(
-        `${API_BASE_URL}/instalaciones/mis-trabajos/${user.id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { estado: filtroEstado }
-        }
-      );
+    
+      const params = filtroEstado !== 'todos' ? { estado: filtroEstado } : {};
+const response = await apiService.get(
+  `/instalaciones/mis-trabajos/${user.id}`,
+  params
+);
 
       if (response.data.success) {
         setInstalaciones(response.data.data || []);
