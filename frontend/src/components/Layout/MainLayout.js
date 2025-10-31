@@ -80,7 +80,7 @@ const esAdministrador = rol === 'administrador';
       icon: <Users size={22} />,
       label: 'Clientes',
       path: '/clients',
-      permission: 'administrador'
+      permission: 'supervisor,administrador'
     }
   ];
 
@@ -90,31 +90,31 @@ const esAdministrador = rol === 'administrador';
       icon: <Activity size={22} />,
       label: 'Facturación Automática',
       path: '/facturacion-automatica',
-      permission: 'administrador'
+      permission: 'supervisor,administrador'
     },
     {
       icon: <TrendingUp size={22} />,
       label: 'Facturas',
       path: '/facturas',
-      permission: 'administrador'
+      permission: 'supervisor,administrador'
     },
     {
       icon: <FileText size={22} />,
       label: 'Contratos',
       path: '/contratos',
-      permission: 'supervisor'
+      permission: 'supervisor,administrador'
     },
     {
       icon: <CreditCard size={22} />,
       label: 'Pagos',
       path: '/cruce-pagos',
-      permission: 'administrador'
+      permission: 'supervisor,administrador'
     },
     {
       icon: <FileText size={22} />,
       label: 'Historial Facturas',
       path: '/historial-facturas',
-      permission: 'supervisor'
+      permission: 'supervisor,administrador'
     }
     
   ];
@@ -125,19 +125,19 @@ const esAdministrador = rol === 'administrador';
       icon: <Wifi size={22} />,
       label: 'Planes de Servicio',
       path: '/config/service-plans',
-      permission: 'supervisor'
+      permission: 'supervisor,administrador'
     },
     {
       icon: <Wrench size={22} />,
       label: 'Instalaciones',
       path: '/instalaciones',
-      permission: 'administrador'
+      permission: 'supervisor,administrador'
     },
     {
       icon: <Package size={22} />,
       label: 'Inventario',
       path: '/inventory',
-      permission: 'supervisor'
+      permission: 'supervisor,administrador'
     },
     {
       icon: <Calendar size={22} />,
@@ -165,7 +165,7 @@ const esAdministrador = rol === 'administrador';
       icon: <Mail size={22} />,
       label: 'Plantillas Correo',
       path: '/config/plantillas-correo',
-      permission: 'supervisor'
+      permission: 'supervisor,administrador'
     }
   ];
 
