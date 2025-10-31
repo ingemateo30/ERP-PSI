@@ -30,8 +30,8 @@ export const usePermissions = () => {
     },
     instalador: {
       ver: true,
-      crear: false,
-      editar: false,
+      crear: true,
+      editar: true,
       eliminar: false,
       configuracion: false,
       usuarios: false,

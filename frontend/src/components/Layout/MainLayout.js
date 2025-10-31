@@ -80,7 +80,7 @@ const esAdministrador = rol === 'administrador';
       icon: <Users size={22} />,
       label: 'Clientes',
       path: '/clients',
-      permission: 'supervisor,administrador'
+      permission: 'instalador,supervisor,administrador'
     }
   ];
 
@@ -131,19 +131,19 @@ const esAdministrador = rol === 'administrador';
       icon: <Wrench size={22} />,
       label: 'Instalaciones',
       path: '/instalaciones',
-      permission: 'supervisor,administrador'
+      permission: 'instalador,supervisor,administrador'
     },
     {
       icon: <Package size={22} />,
       label: 'Inventario',
       path: '/inventory',
-      permission: 'supervisor,administrador'
+      permission: 'instalador,supervisor,administrador'
     },
     {
       icon: <Calendar size={22} />,
       label: 'Calendario',
       path: '/calendar',
-      permission: 'supervisor,administrador'
+      permission: 'instalador,supervisor,administrador'
     }
   ];
 
@@ -159,7 +159,7 @@ const esAdministrador = rol === 'administrador';
       icon: <Loader2 size={22} />,
       label: 'Incidencias',
       path: '/incidencias',
-      permission: 'supervisor,administrador'
+      permission: 'instalador,supervisor,administrador'
     },
     {
       icon: <Mail size={22} />,

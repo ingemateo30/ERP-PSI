@@ -308,7 +308,7 @@ function App() {
               <Route
                 path="/clients"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
                     <MainLayout title="Detalle de Cliente" subtitle="">
                       <ClientsManagement />
                     </MainLayout>
@@ -401,7 +401,7 @@ function App() {
               <Route
                 path="/instalaciones"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
                     <MainLayout
                       title="Gestión de Instalaciones"
                       subtitle="Administra las instalaciones de servicios de internet y televisión"
@@ -415,7 +415,7 @@ function App() {
               <Route
                 path="/inventory"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
                     <MainLayout title="Gestión de Inventario" subtitle="">
                       <InventoryManagement />
                     </MainLayout>
@@ -436,7 +436,7 @@ function App() {
               <Route
                 path="incidencias"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
                     <MainLayout title="Gestión de Incidencias" subtitle="">
                       <IncidenciasManagement />
                     </MainLayout>
@@ -469,7 +469,7 @@ function App() {
               <Route
   path="/calendar"
   element={
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="instalador,supervisor,administrador">
       <MainLayout title="Calendario" subtitle="Agenda y gestión de eventos">
         <CalendarioManagement />
       </MainLayout>
