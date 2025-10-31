@@ -4,6 +4,11 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const AlertasClienteService = require('../services/AlertasClienteService');
+const { verificarRol } = require('../middleware/roleAuth');
+const express = require('express');
+const { autenticar } = require('../middleware/auth');
+const { verificarRol } = require('../middleware/roleAuth'); // ← AGREGAR ESTA LÍNEA
+
 
 // Importar controlador con manejo de errores
 let ClienteController;
