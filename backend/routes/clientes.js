@@ -5,10 +5,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const AlertasClienteService = require('../services/AlertasClienteService');
 const { autenticar } = require('../middleware/auth');
-const { verificarRol, verificarPermiso } = require('../middleware/roleAuth'); // ← UNA SOLA VEZ
-
-
-
+const { verificarRol, verificarPermiso } = require('../middleware/roleAuth');
 
 // Importar controlador con manejo de errores
 let ClienteController;
@@ -17,8 +14,6 @@ try {
   console.log('✅ ClienteController cargado correctamente');
 } catch (error) {
   console.error('❌ Error cargando ClienteController:', error.message);
-  // Crear controlador dummy temporal
- 
 }
 
 // Importar middleware de autenticación con manejo de errores
@@ -30,15 +25,13 @@ try {
   console.log('✅ Middleware de autenticación cargado');
 } catch (error) {
   console.error('❌ Error cargando middleware auth:', error.message);
-  // Crear middleware dummy
   authenticateToken = (req, res, next) => {
     console.warn('⚠️ Usando middleware de autenticación dummy');
-    req.user = { id: 1, role: 'administrador' }; // Usuario dummy para desarrollo
+    req.user = { id: 1, role: 'administrador' };
     next();
   };
   requireRole = (...roles) => (req, res, next) => next();
 }
-
 // Importar rateLimiter con manejo de errores
 let rateLimiter;
 try {
