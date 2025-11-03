@@ -285,6 +285,7 @@ app.use('/api/inventario', inventarioRoutes);
 
   console.log('🕐 Configurando sistema de facturación automática...');
 
+
   console.log('📋 Cargando rutas de contratos...');
   const contratosRoutes = require('./routes/contratos');
   app.use('/api/v1/contratos', contratosRoutes);
@@ -294,6 +295,10 @@ app.use('/api/inventario', inventarioRoutes);
   const Clientecompleto = require('./routes/clienteCompleto');
   app.use('/api/v1/clientes-completo', Clientecompleto);
   console.log('✅ Rutas de cliente completo cargadas: /api/v1/clientes-completo');
+
+console.log('💾 Cargando rutas de sistema (backups)...');
+app.use('/api/v1/sistema', require('./routes/sistema'));
+console.log('✅ Rutas de sistema cargadas: /api/v1/sistema');
 
   const inicializarFacturacionAutomatica = () => {
     const cronEnabled = process.env.NODE_ENV === 'production' ||

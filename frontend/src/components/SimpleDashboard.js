@@ -44,6 +44,33 @@ const SimpleDashboard = () => {
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
+    
+    // Función para generar backup
+    const generarBackup = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/sistema/backup/generar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(`✅ Backup generado exitosamente!\n\n📁 Archivo: ${data.archivo}\n💾 Tamaño: ${data.tamano}\n📅 Fecha: ${data.fecha}`);
+            } else {
+                alert('❌ Error al generar backup: ' + data.message);
+            }
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error de conexión al generar backup');
+        }
+    };
 
     const adminStats = {
         totalUsuarios: 12,
@@ -58,7 +85,6 @@ const AdminDashboard = () => {
         { modulo: 'Conceptos de Facturación', completado: 60, urgente: false },
         { modulo: 'Planes de Servicio', completado: 40, urgente: true }
     ];
-
     return (
         <>
             {/* Welcome Message específico para Admin */}
@@ -171,12 +197,12 @@ const AdminDashboard = () => {
                     color="#e21f25"
                 />
                 <QuickAccessCard
-                    title="Respaldos y Seguridad"
-                    description="Gestionar backups y seguridad"
-                    icon={<Database size={32} className="text-[#10b981]" />}
-                    onClick={() => alert('Funcionalidad en desarrollo')}
-                    color="#10b981"
-                />
+    title="Respaldos y Seguridad"
+    description="Gestionar backups y seguridad"
+    icon={<Database size={32} className="text-[#10b981]" />}
+    onClick={generarBackup}
+    color="#10b981"
+/>
             </div>
         </>
     );
