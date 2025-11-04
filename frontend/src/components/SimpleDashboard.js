@@ -1,5 +1,5 @@
 // frontend/src/components/SimpleDashboard.js
-
+import ModalCompletarInstalacion from './Instalador/ModalCompletarInstalacion';
 import React, { useState, useEffect } from 'react';
 import {
     DollarSign, TrendingUp, UserCheck, Wifi, Users,
@@ -344,7 +344,7 @@ const SupervisorDashboard = () => {
 // ===================================
 const InstaladorDashboard = () => {
     const navigate = useNavigate();
-    const { currentUser, getToken } = useAuth();  // <-- AGREGAR getToken
+    const { currentUser, getToken } = useAuth();
     const [trabajosHoy, setTrabajosHoy] = useState([]);
     const [estadisticas, setEstadisticas] = useState({
         pendientesHoy: 0,
@@ -352,79 +352,83 @@ const InstaladorDashboard = () => {
         equiposAsignados: 0
     });
     const [loading, setLoading] = useState(true);
+    const [modalCompletarOpen, setModalCompletarOpen] = useState(false);
+    const [instalacionSeleccionada, setInstalacionSeleccionada] = useState(null);
 
     useEffect(() => {
         cargarDatos();
     }, []);
 
-   const cargarDatos = async () => {
-    try {
-        setLoading(true);
-        const token = getToken();  // <-- USAR getToken() del AuthContext
-        console.log('🔍 Token desde localStorage:', token);
-        
-        if (!token) {
-            console.error('❌ No hay token en localStorage');
-            setLoading(false);
-            return;
-        }
-        
-        // Cargar trabajos de hoy
-        const respuestaTrabajos = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-trabajos/hoy`, {
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}` 
+    const cargarDatos = async () => {
+        try {
+            setLoading(true);
+            const token = getToken();
+            
+            console.log('🔍 Token desde localStorage:', token);
+            
+            if (!token) {
+                console.error('❌ No hay token disponible');
+                setLoading(false);
+                return;
             }
-        });
-        const dataTrabajos = await respuestaTrabajos.json();
-        
-        if (dataTrabajos.success) {
-            setTrabajosHoy(dataTrabajos.trabajos || []);
-        }
+            
+            // Cargar trabajos de hoy
+            const respuestaTrabajos = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-trabajos/hoy`, {
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                }
+            });
+            const dataTrabajos = await respuestaTrabajos.json();
+            
+            if (dataTrabajos.success) {
+                setTrabajosHoy(dataTrabajos.trabajos || []);
+            }
 
-        // Cargar estadísticas
-        const respuestaEstadisticas = await fetch(`${process.env.REACT_APP_API_URL}/instalador/estadisticas`, {
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}` 
+            // Cargar estadísticas
+            const respuestaEstadisticas = await fetch(`${process.env.REACT_APP_API_URL}/instalador/estadisticas`, {
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                }
+            });
+            const dataEstadisticas = await respuestaEstadisticas.json();
+            
+            if (dataEstadisticas.success) {
+                setEstadisticas(dataEstadisticas.estadisticas);
             }
-        });
-        const dataEstadisticas = await respuestaEstadisticas.json();
-        
-        if (dataEstadisticas.success) {
-            setEstadisticas(dataEstadisticas.estadisticas);
+            
+        } catch (error) {
+            console.error('Error cargando datos:', error);
+        } finally {
+            setLoading(false);
         }
-        
-    } catch (error) {
-        console.error('Error cargando datos:', error);
-    } finally {
-        setLoading(false);
-    }
-};
-const iniciarTrabajo = async (trabajoId) => {
-    try {
-        const token = getToken();
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/instalacion/${trabajoId}/iniciar`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+    };
+
+    const iniciarTrabajo = async (trabajoId) => {
+        try {
+            const token = getToken();
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/instalacion/${trabajoId}/iniciar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('✅ Instalación iniciada');
+                cargarDatos();
+            } else {
+                alert('❌ Error al iniciar instalación');
             }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            alert('✅ Instalación iniciada');
-            cargarDatos();
-        } else {
-            alert('❌ Error al iniciar instalación');
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error de conexión');
         }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error de conexión');
-    }
-};
+    };
 
     return (
         <>
@@ -539,9 +543,15 @@ const iniciarTrabajo = async (trabajoId) => {
                                         </button>
                                     )}
                                     {trabajo.estado === 'en_proceso' && (
-                                        <span className="inline-block mt-2 px-3 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">
-                                            En proceso
-                                        </span>
+                                        <button
+                                            onClick={() => {
+                                                setInstalacionSeleccionada(trabajo);
+                                                setModalCompletarOpen(true);
+                                            }}
+                                            className="mt-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                        >
+                                            Completar
+                                        </button>
                                     )}
                                 </div>
                             </div>
@@ -549,10 +559,17 @@ const iniciarTrabajo = async (trabajoId) => {
                     </div>
                 )}
             </div>
+
+            {/* Modal Completar Instalación */}
+            <ModalCompletarInstalacion
+                isOpen={modalCompletarOpen}
+                onClose={() => setModalCompletarOpen(false)}
+                instalacion={instalacionSeleccionada}
+                onSuccess={cargarDatos}
+            />
         </>
     );
-};
-// ===================================
+};// ===================================
 // DASHBOARD PARA OPERADORES
 // ===================================
 const OperadorDashboard = () => {
