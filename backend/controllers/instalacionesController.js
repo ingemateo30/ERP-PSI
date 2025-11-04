@@ -326,15 +326,85 @@ const instalaciones = await Database.query(selectQuery, params);
     }
 
     // Crear nueva instalación
-    static async crear(req, res) {
-        const connection = await Database.getConnection();
+static async crear(req, res) {
+    const connection = await Database.getConnection();
 
-        try {
-            await connection.beginTransaction();
+    try {
+        await connection.beginTransaction();
 
-            console.log('➕ Creando nueva instalación:', req.body);
+        console.log('➕ Creando nueva instalación:', req.body);
 
-            const {
+        const {
+            cliente_id,
+            servicio_cliente_id,
+            instalador_id,
+            fecha_programada,
+            hora_programada,
+            direccion_instalacion,
+            barrio,
+            telefono_contacto,
+            persona_recibe,
+            tipo_instalacion = 'nueva',
+            observaciones,
+            equipos_instalados = [],
+            costo_instalacion = 0,
+            coordenadas_lat,
+            coordenadas_lng,
+            contrato_id,
+            tipo_orden = 'instalacion'
+        } = req.body;
+
+        // Validar cliente existe
+        const [clientes] = await connection.query(
+            'SELECT id, nombre FROM clientes WHERE id = ?',
+            [cliente_id]
+        );
+
+        if (!clientes || clientes.length === 0) {
+            throw new Error('Cliente no encontrado');
+        }
+
+        // Validar servicio cliente existe si se proporciona
+        if (servicio_cliente_id) {
+            const [serviciosCliente] = await connection.query(
+                'SELECT id, plan_id FROM servicios_cliente WHERE id = ?',
+                [servicio_cliente_id]
+            );
+
+            if (!serviciosCliente || serviciosCliente.length === 0) {
+                throw new Error('Servicio de cliente no encontrado');
+            }
+
+            // Verificar si ya existe una instalación pendiente para este servicio
+            const [instalacionesExistentes] = await connection.query(
+                `SELECT id FROM instalaciones 
+                 WHERE servicio_cliente_id = ? AND estado NOT IN ('cancelada', 'completada')`,
+                [servicio_cliente_id]
+            );
+
+            if (instalacionesExistentes && instalacionesExistentes.length > 0) {
+                throw new Error('Ya existe una instalación pendiente para este servicio');
+            }
+        }
+
+        // Validar instalador si se proporciona
+        if (instalador_id) {
+            const [instaladores] = await connection.query(
+                `SELECT id, nombre FROM sistema_usuarios
+                 WHERE id = ? AND rol IN ('instalador', 'supervisor')`,
+                [instalador_id]
+            );
+
+            if (!instaladores || instaladores.length === 0) {
+                throw new Error('Instalador no encontrado o no tiene permisos');
+            }
+        }
+
+        // Preparar datos para inserción
+        const equiposJson = JSON.stringify(equipos_instalados);
+
+        const query = `
+            INSERT INTO instalaciones (
                 cliente_id,
                 servicio_cliente_id,
                 instalador_id,
@@ -344,154 +414,124 @@ const instalaciones = await Database.query(selectQuery, params);
                 barrio,
                 telefono_contacto,
                 persona_recibe,
-                tipo_instalacion = 'nueva',
+                tipo_instalacion,
                 observaciones,
-                equipos_instalados = [],
-                costo_instalacion = 0,
+                equipos_instalados,
+                costo_instalacion,
                 coordenadas_lat,
                 coordenadas_lng,
                 contrato_id,
-                tipo_orden = 'instalacion'
-            } = req.body;
+                tipo_orden,
+                estado,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'programada', NOW(), NOW())
+        `;
 
-            // Validar cliente existe
-            const [cliente] = await connection.query(
-                'SELECT id, nombre FROM clientes WHERE id = ?',
-                [cliente_id]
-            );
+        const parametros = [
+            cliente_id,
+            servicio_cliente_id || null,
+            instalador_id || null,
+            fecha_programada,
+            hora_programada || null,
+            direccion_instalacion || null,
+            barrio || null,
+            telefono_contacto || null,
+            persona_recibe || null,
+            tipo_instalacion,
+            observaciones || null,
+            equiposJson,
+            costo_instalacion,
+            coordenadas_lat || null,
+            coordenadas_lng || null,
+            contrato_id || null,
+            tipo_orden
+        ];
 
-            if (!cliente) {
-                throw new Error('Cliente no encontrado');
-            }
+        const [result] = await connection.query(query, parametros);
+        const instalacionId = result.insertId;
 
-            // Validar servicio cliente existe
-            const [servicioCliente] = await connection.query(
-                'SELECT id, plan_id FROM servicios_cliente WHERE id = ?',
-                [servicio_cliente_id]
-            );
-
-            if (!servicioCliente) {
-                throw new Error('Servicio de cliente no encontrado');
-            }
-
-            // Validar instalador si se proporciona
-            if (instalador_id) {
-                const [instalador] = await connection.query(
-                    `SELECT id, nombre FROM sistema_usuarios
-           WHERE id = ? AND rol IN ('instalador', 'supervisor')`,
-                    [instalador_id]
-                );
-
-                if (!instalador) {
-                    throw new Error('Instalador no encontrado o no tiene permisos');
+        // Si hay equipos, actualizar su estado a "asignado"
+        if (equipos_instalados && equipos_instalados.length > 0) {
+            for (const equipo of equipos_instalados) {
+                if (equipo.equipo_id) {
+                    await connection.query(
+                        `UPDATE inventario_equipos 
+                         SET estado = 'asignado', instalador_id = ?, fecha_asignacion = NOW()
+                         WHERE id = ?`,
+                        [instalador_id, equipo.equipo_id]
+                    );
                 }
             }
+        }
 
-            // Verificar si ya existe una instalación para este servicio
-           if (servicio_cliente_id) {
-    const [instalacionExistente] = await connection.query(
-        `SELECT id FROM instalaciones 
-         WHERE servicio_cliente_id = ? AND estado NOT IN ('cancelada', 'completada')`,
-        [servicio_cliente_id]
-    );
+        await connection.commit();
 
-    if (instalacionExistente) {
-        throw new Error('Ya existe una instalación pendiente para este servicio');
+        // Obtener la instalación creada con datos completos
+        const instalacionCreada = await this.obtenerInstalacionCompleta(connection, instalacionId);
+
+        res.status(201).json({
+            success: true,
+            message: 'Instalación creada exitosamente',
+            data: instalacionCreada
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('❌ Error creando instalación:', error);
+
+        res.status(400).json({
+            success: false,
+            message: error.message || 'Error al crear la instalación',
+            error: error.message
+        });
+    } finally {
+        connection.release();
     }
 }
-            // Preparar datos para inserción
-            const equiposJson = JSON.stringify(equipos_instalados);
 
-            const query = `
-        INSERT INTO instalaciones (
-          cliente_id,
-          servicio_cliente_id,
-          instalador_id,
-          fecha_programada,
-          hora_programada,
-          direccion_instalacion,
-          barrio,
-          telefono_contacto,
-          persona_recibe,
-          tipo_instalacion,
-          observaciones,
-          equipos_instalados,
-          costo_instalacion,
-          coordenadas_lat,
-          coordenadas_lng,
-          contrato_id,
-          tipo_orden,
-          estado,
-          created_at,
-          updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'programada', NOW(), NOW())
-      `;
+// Método auxiliar para obtener instalación completa
+static async obtenerInstalacionCompleta(connection, instalacionId) {
+    const [instalaciones] = await connection.query(
+        `SELECT 
+            i.*,
+            c.nombre as cliente_nombre,
+            c.email as cliente_email,
+            c.telefono as cliente_telefono,
+            c.documento as cliente_documento,
+            sc.plan_id,
+            sc.estado as servicio_estado,
+            p.nombre as plan_nombre,
+            p.velocidad as plan_velocidad,
+            u.nombre as instalador_nombre,
+            u.telefono as instalador_telefono,
+            u.email as instalador_email
+        FROM instalaciones i
+        INNER JOIN clientes c ON i.cliente_id = c.id
+        LEFT JOIN servicios_cliente sc ON i.servicio_cliente_id = sc.id
+        LEFT JOIN planes p ON sc.plan_id = p.id
+        LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
+        WHERE i.id = ?`,
+        [instalacionId]
+    );
 
-            const parametros = [
-                cliente_id,
-                servicio_cliente_id,
-                instalador_id || null,
-                fecha_programada,
-                hora_programada || null,
-                direccion_instalacion || null,
-                barrio || null,
-                telefono_contacto || null,
-                persona_recibe || null,
-                tipo_instalacion,
-                observaciones || null,
-                equiposJson,
-                costo_instalacion,
-                coordenadas_lat || null,
-                coordenadas_lng || null,
-                contrato_id || null,
-                tipo_orden
-            ];
+    if (!instalaciones || instalaciones.length === 0) {
+        throw new Error('Instalación no encontrada');
+    }
 
-            const result = await connection.query(query, parametros);
-            const instalacionId = result.insertId;
+    const instalacion = instalaciones[0];
 
-            // Registrar en logs
-
-
-            // Si hay equipos, actualizar su estado a "asignado"
-            if (equipos_instalados && equipos_instalados.length > 0) {
-                for (const equipo of equipos_instalados) {
-                    if (equipo.equipo_id) {
-                        await connection.query(
-                            `UPDATE inventario_equipos 
-               SET estado = 'asignado', instalador_id = ?, fecha_asignacion = NOW()
-               WHERE id = ?`,
-                            [instalador_id, equipo.equipo_id]
-                        );
-                    }
-                }
-            }
-
-            await connection.commit();
-
-            // Obtener la instalación creada con datos completos
-            const instalacionCreada = await this.obtenerInstalacionCompleta(instalacionId);
-
-            res.status(201).json({
-                success: true,
-                message: 'Instalación creada exitosamente',
-                data: instalacionCreada
-            });
-
-        } catch (error) {
-            await connection.rollback();
-            console.error('❌ Error creando instalación:', error);
-
-            res.status(400).json({
-                success: false,
-                message: error.message || 'Error al crear la instalación',
-                error: error.message
-            });
-        } finally {
-            connection.release();
+    // Parsear equipos_instalados si es string JSON
+    if (typeof instalacion.equipos_instalados === 'string') {
+        try {
+            instalacion.equipos_instalados = JSON.parse(instalacion.equipos_instalados);
+        } catch (e) {
+            instalacion.equipos_instalados = [];
         }
     }
 
+    return instalacion;
+}
     // Actualizar instalación
  static async actualizar(req, res) {
         const connection = await Database.getConnection(); // CORRECCIÓN: usar pool en lugar de Database
