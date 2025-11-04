@@ -499,6 +499,7 @@ const hasPermission = (requiredRole) => {
     resetPassword,
     changePassword,
     refreshToken,
+    getToken: () => authService.getToken(),  // <-- AGREGADO
     
     // Gestión de usuario
     updateUser,
