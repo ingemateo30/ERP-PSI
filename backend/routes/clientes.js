@@ -112,7 +112,7 @@ router.get('/verificar-existente',
  * @access Administrador, Supervisor
  */
 router.post('/:id/agregar-servicio',
-  requireRole('administrador', 'supervisor'),
+  requireRole(['administrador', 'supervisor']),
   async (req, res) => {
     try {
       const { id: clienteId } = req.params;
@@ -180,7 +180,7 @@ router.get('/search',
 // ⭐ CRÍTICO: MOVER ESTA RUTA ANTES DE /:id
 router.get('/inactivos',
   rateLimiter.clientes,
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   async (req, res) => {
     try {
       const { page = 1, limit = 10, search = '' } = req.query;
@@ -281,7 +281,7 @@ router.post('/',
 
 router.put('/:id/inactivar',
   rateLimiter.clientes,
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -387,7 +387,7 @@ router.put('/:id/inactivar',
  * @access Private (Administrador)
  */
 router.post('/clientes-con-servicios',
-  requireRole('administrador'),
+  requireRole(['administrador']),
   async (req, res) => {
     const conexion = await pool.getConnection();
 
@@ -1032,7 +1032,7 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
 
 router.put('/:id/reactivar',
   rateLimiter.clientes,
-  requireRole('administrador'),
+  requireRole(['administrador']),
   async (req, res) => {
     try {
       const { id } = req.params;

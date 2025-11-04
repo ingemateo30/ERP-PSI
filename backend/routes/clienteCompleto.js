@@ -115,7 +115,7 @@ router.get('/facturas/:id',
  */
 router.get('/contratos',
   authenticateToken,
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   async (req, res) => {
     try {
       const { page = 1, limit = 10, cliente_id } = req.query;
@@ -149,7 +149,7 @@ router.get('/contratos',
  */
 router.post('/crear',
   authenticateToken,  // ✅ Agregado
-  requireRole('supervisor', 'administrador'),  // ✅ Agregado
+  requireRole(['supervisor', 'administrador']),  // ✅ Agregado
   async (req, res) => {
     try {
       console.log('📨 Datos recibidos en el servidor:', JSON.stringify(req.body, null, 2));
@@ -288,7 +288,7 @@ router.get('/:id',
  */
 router.post('/:id/generar-contrato',
   authenticateToken,
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -318,7 +318,7 @@ router.post('/:id/generar-contrato',
 
 router.post('/:id/generar-orden-instalacion',
   authenticateToken,
-  requireRole('instalador', 'supervisor', 'administrador'),
+  requireRole(['instalador', 'supervisor', 'administrador']),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -348,7 +348,7 @@ router.post('/:id/generar-orden-instalacion',
 
 router.post('/:id/generar-factura',
   authenticateToken,
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -407,7 +407,7 @@ router.get('/:id/servicios',
 
 router.put('/:id/cambiar-plan',
   authenticateToken,
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -446,7 +446,7 @@ router.put('/:id/cambiar-plan',
 
 router.put('/:id/suspender',
   authenticateToken,
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -476,7 +476,7 @@ router.put('/:id/suspender',
 
 router.put('/:id/reactivar',
   authenticateToken,
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -511,7 +511,7 @@ router.put('/:id/reactivar',
  */
 router.post('/:clienteId/agregar-sede',
   authenticateToken,  // ✅ Agregado
-  requireRole('supervisor', 'administrador'),  // ✅ Agregado
+  requireRole(['supervisor', 'administrador']),  // ✅ Agregado
   async (req, res) => {
     try {
       const { clienteId } = req.params;
