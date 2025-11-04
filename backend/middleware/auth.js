@@ -75,7 +75,7 @@ const authenticateToken = async (req, res, next) => {
 };
 
 // Middleware para verificar roles específicos
-const requireRole = (...roles) => {
+const requireRole = (roles) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
@@ -85,11 +85,14 @@ const requireRole = (...roles) => {
       });
     }
 
-    if (!roles.includes(req.user.rol)) {
+    // Convertir a array si no lo es
+    const rolesArray = Array.isArray(roles) ? roles : [roles];
+    
+    if (!rolesArray.includes(req.user.rol)) {
       return res.status(403).json({
         success: false,
         message: 'Permisos insuficientes',
-        required_roles: roles,
+        required_roles: rolesArray,
         user_role: req.user.rol,
         timestamp: new Date().toISOString()
       });
@@ -98,7 +101,6 @@ const requireRole = (...roles) => {
     next();
   };
 };
-
 // Middleware opcional de autenticación (no falla si no hay token)
 const optionalAuth = async (req, res, next) => {
   try {
