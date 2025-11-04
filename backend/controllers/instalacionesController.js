@@ -388,16 +388,17 @@ const instalaciones = await Database.query(selectQuery, params);
             }
 
             // Verificar si ya existe una instalación para este servicio
-            const [instalacionExistente] = await connection.query(
-                `SELECT id FROM instalaciones 
+           if (servicio_cliente_id) {
+    const [instalacionExistente] = await connection.query(
+        `SELECT id FROM instalaciones 
          WHERE servicio_cliente_id = ? AND estado NOT IN ('cancelada', 'completada')`,
-                [servicio_cliente_id]
-            );
+        [servicio_cliente_id]
+    );
 
-            if (instalacionExistente) {
-                throw new Error('Ya existe una instalación pendiente para este servicio');
-            }
-
+    if (instalacionExistente) {
+        throw new Error('Ya existe una instalación pendiente para este servicio');
+    }
+}
             // Preparar datos para inserción
             const equiposJson = JSON.stringify(equipos_instalados);
 
