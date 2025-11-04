@@ -119,12 +119,12 @@ const userValidation = {
 /**
  * @route GET /api/v1/users
  * @desc Obtener lista de usuarios con filtros y paginación
- * @access Private (Admin/Supervisor)
+ * @access Private (Admin/Supervisor/Instalador)
  * @params ?search, ?rol, ?activo, ?page, ?limit, ?sort, ?order
  */
 router.get('/',
   authenticateToken,
-  requireRole('administrador', 'supervisor'),
+  requireRole(['administrador', 'supervisor', 'instalador']),
   UsersController.getUsers
 );
 
@@ -135,7 +135,7 @@ router.get('/',
  */
 router.get('/stats',
   authenticateToken,
-  requireRole('administrador', 'supervisor'),
+  requireRole(['administrador', 'supervisor']),
   UsersController.getUserStats
 );
 
@@ -178,7 +178,7 @@ router.post('/profile/change-password',
  */
 router.get('/:id',
   authenticateToken,
-  requireRole('administrador', 'supervisor'),
+  requireRole(['administrador', 'supervisor']),
   userValidation.id,
   UsersController.getUserById
 );
@@ -190,7 +190,7 @@ router.get('/:id',
  */
 router.post('/',
   authenticateToken,
-  requireRole('administrador', 'supervisor'),
+  requireRole(['administrador', 'supervisor']),
   userValidation.create,
   UsersController.createUser
 );
