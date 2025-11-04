@@ -345,20 +345,74 @@ const SupervisorDashboard = () => {
 const InstaladorDashboard = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
+    const [trabajosHoy, setTrabajosHoy] = useState([]);
+    const [estadisticas, setEstadisticas] = useState({
+        pendientesHoy: 0,
+        completadasSemana: 0,
+        equiposAsignados: 0
+    });
+    const [loading, setLoading] = useState(true);
 
-    const instaladorStats = {
-        instalacionesPendientes: 8,
-        instalacionesCompletadas: 15,
-        mantenimientosProgramados: 5,
-        equiposDisponibles: 24
+    useEffect(() => {
+        cargarDatos();
+    }, []);
+
+    const cargarDatos = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            
+            // Cargar trabajos de hoy
+            const respuestaTrabajos = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-trabajos/hoy`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const dataTrabajos = await respuestaTrabajos.json();
+            
+            if (dataTrabajos.success) {
+                setTrabajosHoy(dataTrabajos.trabajos || []);
+            }
+
+            // Cargar estadísticas
+            const respuestaEstadisticas = await fetch(`${process.env.REACT_APP_API_URL}/instalador/estadisticas`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const dataEstadisticas = await respuestaEstadisticas.json();
+            
+            if (dataEstadisticas.success) {
+                setEstadisticas(dataEstadisticas.estadisticas);
+            }
+            
+        } catch (error) {
+            console.error('Error cargando datos:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const trabajosHoy = [
-        { cliente: 'María González', direccion: 'Calle 15 #23-45', hora: '09:00', tipo: 'Instalación' },
-        { cliente: 'Juan Pérez', direccion: 'Carrera 8 #12-34', hora: '11:30', tipo: 'Mantenimiento' },
-        { cliente: 'Ana Rodríguez', direccion: 'Avenida 20 #45-67', hora: '14:00', tipo: 'Instalación' },
-        { cliente: 'Carlos Ruiz', direccion: 'Calle 22 #33-11', hora: '16:30', tipo: 'Reparación' }
-    ];
+    const iniciarTrabajo = async (trabajoId) => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/instalacion/${trabajoId}/iniciar`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('✅ Instalación iniciada');
+                cargarDatos();
+            } else {
+                alert('❌ Error al iniciar instalación');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error de conexión');
+        }
+    };
 
     return (
         <>
@@ -371,7 +425,7 @@ const InstaladorDashboard = () => {
                     ¡Hola, {currentUser?.nombre || 'Usuario'}!
                 </h1>
                 <p className="text-lg md:text-xl mb-4 md:mb-6 opacity-90">
-                    ¿Qué quieres hacer hoy?,Gestiona tus trabajos de campo
+                    ¿Qué quieres hacer hoy? Gestiona tus trabajos de campo
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
@@ -394,39 +448,32 @@ const InstaladorDashboard = () => {
                         className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
                     >
                         <Package size={18} className="mr-2" />
-                        <span className="text-sm md:text-base">Inventario</span>
+                        <span className="text-sm md:text-base">Mis Equipos</span>
                     </button>
                 </div>
             </div>
 
             {/* Stats Cards para Instalador */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 <StatCard
-                    title="Pendientes"
-                    value={instaladorStats.instalacionesPendientes}
+                    title="Pendientes Hoy"
+                    value={estadisticas.pendientesHoy}
                     icon={<Clock size={24} className="text-[#f59e0b]" />}
-                    change="2 hoy"
+                    change="Programadas"
                     color="#f59e0b"
                 />
                 <StatCard
                     title="Completadas"
-                    value={instaladorStats.instalacionesCompletadas}
+                    value={estadisticas.completadasSemana}
                     icon={<CheckCircle size={24} className="text-[#10b981]" />}
-                    change="3 esta semana"
+                    change="Esta semana"
                     color="#10b981"
                 />
                 <StatCard
-                    title="Mantenimientos"
-                    value={instaladorStats.mantenimientosProgramados}
-                    icon={<TypeIcon size={24} className="text-[#6366f1]" />}
-                    change="2 mañana"
-                    color="#6366f1"
-                />
-                <StatCard
-                    title="Equipos Disponibles"
-                    value={instaladorStats.equiposDisponibles}
+                    title="Equipos Asignados"
+                    value={estadisticas.equiposAsignados}
                     icon={<Package size={24} className="text-[#0e6493]" />}
-                    change="En almacén"
+                    change="En tu poder"
                     color="#0e6493"
                 />
             </div>
@@ -435,35 +482,64 @@ const InstaladorDashboard = () => {
             <div className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-semibold text-[#0e6493]">Trabajos de Hoy</h2>
-                    <span className="text-sm text-gray-500">{new Date().toLocaleDateString()}</span>
+                    <span className="text-sm text-gray-500">{new Date().toLocaleDateString('es-CO')}</span>
                 </div>
-                <div className="space-y-3">
-                    {trabajosHoy.map((trabajo, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center space-x-3">
-                                <div className={`w-3 h-3 rounded-full ${trabajo.tipo === 'Instalación' ? 'bg-blue-500' :
-                                    trabajo.tipo === 'Mantenimiento' ? 'bg-yellow-500' : 'bg-red-500'
+                
+                {loading ? (
+                    <div className="text-center py-8">
+                        <p className="text-gray-500">Cargando trabajos...</p>
+                    </div>
+                ) : trabajosHoy.length === 0 ? (
+                    <div className="text-center py-8">
+                        <CheckCircle size={48} className="mx-auto text-green-500 mb-4" />
+                        <p className="text-gray-500">🎉 No tienes trabajos programados para hoy</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {trabajosHoy.map((trabajo) => (
+                            <div key={trabajo.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                                <div className="flex items-center space-x-3 flex-1">
+                                    <div className={`w-3 h-3 rounded-full ${
+                                        trabajo.estado === 'en_proceso' ? 'bg-yellow-500' :
+                                        trabajo.tipo_orden === 'instalacion' ? 'bg-blue-500' :
+                                        trabajo.tipo_orden === 'mantenimiento' ? 'bg-orange-500' : 'bg-red-500'
                                     }`}></div>
-                                <div>
-                                    <p className="font-medium text-gray-900">{trabajo.cliente}</p>
-                                    <p className="text-sm text-gray-500 flex items-center">
-                                        <MapPin size={14} className="mr-1" />
-                                        {trabajo.direccion}
-                                    </p>
+                                    <div className="flex-1">
+                                        <p className="font-medium text-gray-900">{trabajo.cliente_nombre}</p>
+                                        <p className="text-sm text-gray-500 flex items-center">
+                                            <MapPin size={14} className="mr-1" />
+                                            {trabajo.direccion}
+                                        </p>
+                                        {trabajo.telefono_contacto && (
+                                            <p className="text-sm text-gray-500">📞 {trabajo.telefono_contacto}</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="text-right ml-4">
+                                    <p className="font-medium text-[#0e6493]">{trabajo.hora}</p>
+                                    <p className="text-sm text-gray-500 capitalize">{trabajo.tipo_orden?.replace('_', ' ')}</p>
+                                    {trabajo.estado === 'programada' && (
+                                        <button
+                                            onClick={() => iniciarTrabajo(trabajo.id)}
+                                            className="mt-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                        >
+                                            Iniciar
+                                        </button>
+                                    )}
+                                    {trabajo.estado === 'en_proceso' && (
+                                        <span className="inline-block mt-2 px-3 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">
+                                            En proceso
+                                        </span>
+                                    )}
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <p className="font-medium text-[#0e6493]">{trabajo.hora}</p>
-                                <p className="text-sm text-gray-500">{trabajo.tipo}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </>
     );
 };
-
 // ===================================
 // DASHBOARD PARA OPERADORES
 // ===================================

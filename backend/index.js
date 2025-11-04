@@ -299,6 +299,10 @@ app.use('/api/inventario', inventarioRoutes);
 console.log('💾 Cargando rutas de sistema (backups)...');
 app.use('/api/v1/sistema', require('./routes/sistema'));
 console.log('✅ Rutas de sistema cargadas: /api/v1/sistema');
+console.log('👷 Cargando rutas de instalador...');
+const instaladorRoutes = require('./routes/instalador');
+app.use('/api/v1/instalador', instaladorRoutes);
+console.log('✅ Rutas de instalador cargadas: /api/v1/instalador');
 
   const inicializarFacturacionAutomatica = () => {
     const cronEnabled = process.env.NODE_ENV === 'production' ||
