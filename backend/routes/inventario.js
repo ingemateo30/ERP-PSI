@@ -1,4 +1,4 @@
-// backend/routes/inventario.js (o inventory.js)
+// backend/routes/inventario.js
 
 const express = require('express');
 const { body, param, query } = require('express-validator');
@@ -40,56 +40,31 @@ const createEquipmentValidation = [
 // RUTAS DE EQUIPOS
 // ==========================================
 
-/**
- * @route   GET /api/v1/inventory/equipment
- * @desc    Obtener todos los equipos con filtros y paginación
- * @access  Private (Todos los roles)
- */
 router.get('/equipment', 
-  requireRole('supervisor', 'administrador', 'instalador'),
+  requireRole(['supervisor', 'administrador', 'instalador']),
   InventoryController.getAllEquipment
 );
 
-/**
- * @route   GET /api/v1/inventory/equipment/:id
- * @desc    Obtener equipo por ID
- * @access  Private (Todos los roles)
- */
 router.get('/equipment/:id',
-  requireRole('supervisor', 'administrador', 'instalador'),
+  requireRole(['supervisor', 'administrador', 'instalador']),
   param('id').isInt({ min: 1 }).withMessage('ID de equipo no válido'),
   InventoryController.getEquipmentById
 );
 
-/**
- * @route   POST /api/v1/inventory/equipment
- * @desc    Crear nuevo equipo
- * @access  Private (Supervisor+)
- */
 router.post('/equipment',
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   createEquipmentValidation,
   InventoryController.createEquipment
 );
 
-/**
- * @route   PUT /api/v1/inventory/equipment/:id
- * @desc    Actualizar equipo
- * @access  Private (Supervisor+)
- */
 router.put('/equipment/:id',
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   param('id').isInt({ min: 1 }).withMessage('ID de equipo no válido'),
   InventoryController.updateEquipment
 );
 
-/**
- * @route   DELETE /api/v1/inventory/equipment/:id
- * @desc    Eliminar equipo
- * @access  Private (Administrador)
- */
 router.delete('/equipment/:id',
-  requireRole('administrador'),
+  requireRole(['administrador']),
   param('id').isInt({ min: 1 }).withMessage('ID de equipo no válido'),
   InventoryController.deleteEquipment
 );
@@ -98,36 +73,21 @@ router.delete('/equipment/:id',
 // RUTAS DE ASIGNACIONES
 // ==========================================
 
-/**
- * @route   POST /api/v1/inventory/equipment/:id/assign
- * @desc    Asignar equipo a instalador
- * @access  Private (Supervisor+)
- */
 router.post('/equipment/:id/assign',
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   param('id').isInt({ min: 1 }).withMessage('ID de equipo no válido'),
   body('instalador_id').isInt({ min: 1 }).withMessage('ID de instalador no válido'),
   InventoryController.assignToInstaller
 );
 
-/**
- * @route   POST /api/v1/inventory/equipment/:id/return
- * @desc    Devolver equipo
- * @access  Private (Todos los roles)
- */
 router.post('/equipment/:id/return',
-  requireRole('supervisor', 'administrador', 'instalador'),
+  requireRole(['supervisor', 'administrador', 'instalador']),
   param('id').isInt({ min: 1 }).withMessage('ID de equipo no válido'),
   InventoryController.returnEquipment
 );
 
-/**
- * @route   POST /api/v1/inventory/equipment/:id/install
- * @desc    Marcar equipo como instalado
- * @access  Private (Instalador+)
- */
 router.post('/equipment/:id/install',
-  requireRole('instalador', 'supervisor', 'administrador'),
+  requireRole(['instalador', 'supervisor', 'administrador']),
   param('id').isInt({ min: 1 }).withMessage('ID de equipo no válido'),
   body('instalador_id').isInt({ min: 1 }).withMessage('ID de instalador no válido'),
   body('ubicacion_cliente').notEmpty().withMessage('La ubicación del cliente es requerida'),
@@ -138,89 +98,48 @@ router.post('/equipment/:id/install',
 // RUTAS DE UTILIDADES
 // ==========================================
 
-/**
- * @route   GET /api/v1/inventory/stats
- * @desc    Obtener estadísticas del inventario
- * @access  Private (Supervisor+)
- */
 router.get('/stats',
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   InventoryController.getStats
 );
 
-/**
- * @route   GET /api/v1/inventory/available
- * @desc    Obtener equipos disponibles
- * @access  Private (Todos los roles)
- */
 router.get('/available',
-  requireRole('supervisor', 'administrador', 'instalador'),
+  requireRole(['supervisor', 'administrador', 'instalador']),
   InventoryController.getAvailableEquipment
 );
 
-/**
- * @route   GET /api/v1/inventory/installers
- * @desc    Obtener instaladores activos
- * @access  Private (Supervisor+)
- */
 router.get('/installers',
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   InventoryController.getActiveInstallers
 );
 
-/**
- * @route   GET /api/v1/inventory/search
- * @desc    Buscar equipos
- * @access  Private (Todos los roles)
- */
 router.get('/search',
-  requireRole('supervisor', 'administrador', 'instalador'),
+  requireRole(['supervisor', 'administrador', 'instalador']),
   query('q').isLength({ min: 2 }).withMessage('El término de búsqueda debe tener al menos 2 caracteres'),
   InventoryController.searchEquipment
 );
 
-/**
- * @route   GET /api/v1/inventory/types
- * @desc    Obtener tipos de equipos
- * @access  Private (Todos los roles)
- */
 router.get('/types',
-  requireRole('supervisor', 'administrador', 'instalador'),
+  requireRole(['supervisor', 'administrador', 'instalador']),
   InventoryController.getTypes
 );
 
-/**
- * @route   GET /api/v1/inventory/check-code/:codigo
- * @desc    Verificar disponibilidad de código
- * @access  Private (Supervisor+)
- */
 router.get('/check-code/:codigo',
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   param('codigo').notEmpty().withMessage('Código requerido'),
   InventoryController.checkCodeAvailability
 );
 
-/**
- * @route   GET /api/v1/inventory/equipment/:id/history
- * @desc    Obtener historial de un equipo
- * @access  Private (Supervisor+)
- */
 router.get('/equipment/:id/history',
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   param('id').isInt({ min: 1 }).withMessage('ID de equipo no válido'),
   InventoryController.getEquipmentHistory
 );
 
-/**
- * @route   GET /api/v1/inventory/installer/:instaladorId/equipment
- * @desc    Obtener equipos de un instalador
- * @access  Private (Supervisor+ o propio instalador)
- */
 router.get('/installer/:instaladorId/equipment',
-  requireRole('supervisor', 'administrador', 'instalador'),
+  requireRole(['supervisor', 'administrador', 'instalador']),
   param('instaladorId').isInt({ min: 1 }).withMessage('ID de instalador no válido'),
   (req, res, next) => {
-    // Instaladores solo pueden ver sus propios equipos
     if (req.user.rol === 'instalador' && req.user.id != req.params.instaladorId) {
       return res.status(403).json({
         success: false,
@@ -232,15 +151,6 @@ router.get('/installer/:instaladorId/equipment',
   InventoryController.getInstallerEquipment
 );
 
-// ==========================================
-// RUTA DE TEST
-// ==========================================
-
-/**
- * @route   GET /api/v1/inventory/test
- * @desc    Ruta de prueba
- * @access  Private
- */
 router.get('/test', (req, res) => {
   res.json({
     success: true,
@@ -253,10 +163,6 @@ router.get('/test', (req, res) => {
     }
   });
 });
-
-// ==========================================
-//  MIDDLEWARE DE MANEJO DE ERRORES
-// ==========================================
 
 router.use((error, req, res, next) => {
   console.error('Error en rutas de inventario:', error);
