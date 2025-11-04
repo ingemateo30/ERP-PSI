@@ -2,11 +2,14 @@
 const jwt = require('jsonwebtoken');
 const { Database } = require('../models/Database');
 
-// Middleware para autenticar token JWT
 const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
+    console.log('🔍 Auth Header completo:', authHeader);
+    console.log('🔍 Tipo de authHeader:', typeof authHeader);
+    
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    console.log('🔑 Token extraído:', token ? `${token.substring(0, 30)}...` : 'NO HAY TOKEN');
 
     if (!token) {
       return res.status(401).json({
@@ -18,6 +21,7 @@ const authenticateToken = async (req, res, next) => {
 
     // Verificar el token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('✅ Token decodificado exitosamente:', { userId: decoded.userId, rol: decoded.rol });
     
     // Verificar que el usuario aún existe y está activo
     const [user] = await Database.query(
@@ -41,9 +45,10 @@ const authenticateToken = async (req, res, next) => {
       rol: user.rol
     };
 
+    console.log('✅ Usuario autenticado:', { id: user.id, nombre: user.nombre, rol: user.rol });
     next();
   } catch (error) {
-    console.error('Error en autenticación:', error);
+    console.error('❌ Error en autenticación:', error.name, '-', error.message);
     
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
