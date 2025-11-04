@@ -99,7 +99,7 @@ router.post('/equipment/:id/install',
 // ==========================================
 
 router.get('/stats',
-  requireRole(['supervisor', 'administrador']),
+  requireRole(['supervisor', 'administrador', 'instalador']),
   InventoryController.getStats
 );
 
