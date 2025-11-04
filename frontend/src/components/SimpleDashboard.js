@@ -401,30 +401,30 @@ const InstaladorDashboard = () => {
         setLoading(false);
     }
 };
-    const iniciarTrabajo = async (trabajoId) => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/instalacion/${trabajoId}/iniciar`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                alert('✅ Instalación iniciada');
-                cargarDatos();
-            } else {
-                alert('❌ Error al iniciar instalación');
+const iniciarTrabajo = async (trabajoId) => {
+    try {
+        const token = getToken();
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/instalacion/${trabajoId}/iniciar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('❌ Error de conexión');
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ Instalación iniciada');
+            cargarDatos();
+        } else {
+            alert('❌ Error al iniciar instalación');
         }
-    };
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error de conexión');
+    }
+};
 
     return (
         <>
