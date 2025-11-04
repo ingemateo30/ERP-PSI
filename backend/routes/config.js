@@ -64,7 +64,7 @@ router.use(verificarRol('administrador', 'supervisor'));
  * @route GET /api/v1/config/conceptos
  * @desc Obtener conceptos de facturación
  */
-router.get('/conceptos', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/conceptos', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     console.log('📋 GET /config/conceptos - Redirigiendo a conceptos');
 
@@ -96,7 +96,7 @@ router.get('/conceptos', requireRole('administrador', 'supervisor'), async (req,
  * @route GET /api/v1/config/conceptos/stats
  * @desc Obtener estadísticas de conceptos
  */
-router.get('/conceptos/stats', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/conceptos/stats', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     console.log('📊 GET /config/conceptos/stats');
 
@@ -126,7 +126,7 @@ router.get('/conceptos/stats', requireRole('administrador', 'supervisor'), async
  * @route GET /api/v1/config/conceptos/tipos
  * @desc Obtener tipos de conceptos
  */
-router.get('/conceptos/tipos', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/conceptos/tipos', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     console.log('📋 GET /config/conceptos/tipos');
 
@@ -156,7 +156,7 @@ router.get('/conceptos/tipos', requireRole('administrador', 'supervisor'), async
  * @route GET /api/v1/config/conceptos/:id
  * @desc Obtener concepto por ID
  */
-router.get('/conceptos/:id', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/conceptos/:id', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     const { id } = req.params;
     console.log('🔍 GET /config/conceptos/:id con ID:', id);
@@ -187,7 +187,7 @@ router.get('/conceptos/:id', requireRole('administrador', 'supervisor'), async (
  * @route POST /api/v1/config/conceptos
  * @desc Crear nuevo concepto
  */
-router.post('/conceptos', requireRole('administrador'), async (req, res) => {
+router.post('/conceptos', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('➕ POST /config/conceptos');
 
@@ -217,7 +217,7 @@ router.post('/conceptos', requireRole('administrador'), async (req, res) => {
  * @route PUT /api/v1/config/conceptos/:id
  * @desc Actualizar concepto
  */
-router.put('/conceptos/:id', verificarRol('administrador'), async (req, res) => {
+router.put('/conceptos/:id', verificarRol(['administrador']), async (req, res) => {
   try {
     console.log('✏️ PUT /config/conceptos/:id');
 
@@ -247,7 +247,7 @@ router.put('/conceptos/:id', verificarRol('administrador'), async (req, res) => 
  * @route POST /api/v1/config/conceptos/:id/toggle
  * @desc Cambiar estado de concepto
  */
-router.post('/conceptos/:id/toggle', verificarRol('administrador'), async (req, res) => {
+router.post('/conceptos/:id/toggle', verificarRol(['administrador']), async (req, res) => {
   try {
     console.log('🔄 POST /config/conceptos/:id/toggle');
 
@@ -277,7 +277,7 @@ router.post('/conceptos/:id/toggle', verificarRol('administrador'), async (req, 
  * @route DELETE /api/v1/config/conceptos/:id
  * @desc Eliminar concepto
  */
-router.delete('/conceptos/:id', requireRole('administrador'), async (req, res) => {
+router.delete('/conceptos/:id', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🗑️ DELETE /config/conceptos/:id');
 
@@ -308,7 +308,7 @@ router.delete('/conceptos/:id', requireRole('administrador'), async (req, res) =
  * @route GET /api/v1/config/overview
  * @desc Obtener resumen completo de configuración
  */
-router.get('/overview', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/overview', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     console.log('📊 GET /config/overview');
 
@@ -390,7 +390,7 @@ router.get('/overview', requireRole('administrador', 'supervisor'), async (req, 
  * @route GET /api/v1/config/health
  * @desc Verificar estado de configuración del sistema
  */
-router.get('/health', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/health', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     console.log('🏥 GET /config/health');
 
@@ -496,7 +496,7 @@ router.get('/health', requireRole('administrador', 'supervisor'), async (req, re
  * @route GET /api/v1/config/stats
  * @desc Obtener estadísticas básicas
  */
-router.get('/stats', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/stats', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     console.log('📈 GET /config/stats');
 
@@ -535,7 +535,7 @@ router.get('/stats', requireRole('administrador', 'supervisor'), async (req, res
  * @route GET /api/v1/config/departments
  * @desc Obtener departamentos
  */
-router.get('/departments',requireRole('administrador'), async (req, res) => {
+router.get('/departments',requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏛️ GET /config/departments');
 
@@ -563,7 +563,7 @@ router.get('/departments',requireRole('administrador'), async (req, res) => {
  * @route POST /api/v1/config/departments
  * @desc Crear departamento
  */
-router.post('/departments', requireRole('administrador'), async (req, res) => {
+router.post('/departments', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏛️ POST /config/departments');
 
@@ -621,7 +621,7 @@ router.post('/departments', requireRole('administrador'), async (req, res) => {
  * @route PUT /api/v1/config/departments/:id
  * @desc Actualizar departamento
  */
-router.put('/departments/:id', requireRole('administrador'), async (req, res) => {
+router.put('/departments/:id', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏛️ PUT /config/departments/:id');
 
@@ -693,7 +693,7 @@ router.put('/departments/:id', requireRole('administrador'), async (req, res) =>
  * @route DELETE /api/v1/config/departments/:id
  * @desc Eliminar departamento
  */
-router.delete('/departments/:id', requireRole('administrador'), async (req, res) => {
+router.delete('/departments/:id', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏛️ DELETE /config/departments/:id');
 
@@ -744,7 +744,7 @@ router.delete('/departments/:id', requireRole('administrador'), async (req, res)
  * @route GET /api/v1/config/cities
  * @desc Obtener ciudades con filtros opcionales
  */
-router.get('/cities', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/cities', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     console.log('🏙️ GET /config/cities');
 
@@ -794,7 +794,7 @@ router.get('/cities', requireRole('administrador', 'supervisor'), async (req, re
  * @route POST /api/v1/config/cities
  * @desc Crear ciudad
  */
-router.post('/cities', requireRole('administrador'), async (req, res) => {
+router.post('/cities', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏙️ POST /config/cities');
 
@@ -868,7 +868,7 @@ router.post('/cities', requireRole('administrador'), async (req, res) => {
  * @route PUT /api/v1/config/cities/:id
  * @desc Actualizar ciudad
  */
-router.put('/cities/:id', requireRole('administrador'), async (req, res) => {
+router.put('/cities/:id', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏙️ PUT /config/cities/:id');
 
@@ -956,7 +956,7 @@ router.put('/cities/:id', requireRole('administrador'), async (req, res) => {
  * @route DELETE /api/v1/config/cities/:id
  * @desc Eliminar ciudad
  */
-router.delete('/cities/:id', requireRole('administrador'), async (req, res) => {
+router.delete('/cities/:id', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏙️ DELETE /config/cities/:id');
 
@@ -1007,7 +1007,7 @@ router.delete('/cities/:id', requireRole('administrador'), async (req, res) => {
  * @route GET /api/v1/config/sectors
  * @desc Obtener sectores con filtros opcionales
  */
-router.get('/sectors', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/sectors', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     console.log('🏘️ GET /config/sectors');
 
@@ -1065,7 +1065,7 @@ router.get('/sectors', requireRole('administrador', 'supervisor'), async (req, r
  * @route POST /api/v1/config/sectors
  * @desc Crear sector
  */
-router.post('/sectors', requireRole('administrador'), async (req, res) => {
+router.post('/sectors', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏘️ POST /config/sectors');
 
@@ -1142,7 +1142,7 @@ router.post('/sectors', requireRole('administrador'), async (req, res) => {
  * @route PUT /api/v1/config/sectors/:id
  * @desc Actualizar sector
  */
-router.put('/sectors/:id', requireRole('administrador'), async (req, res) => {
+router.put('/sectors/:id', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏘️ PUT /config/sectors/:id');
 
@@ -1233,7 +1233,7 @@ router.put('/sectors/:id', requireRole('administrador'), async (req, res) => {
  * @route DELETE /api/v1/config/sectors/:id
  * @desc Eliminar sector
  */
-router.delete('/sectors/:id', requireRole('administrador'), async (req, res) => {
+router.delete('/sectors/:id', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏘️ DELETE /config/sectors/:id');
 
@@ -1284,7 +1284,7 @@ router.delete('/sectors/:id', requireRole('administrador'), async (req, res) => 
  * @route POST /api/v1/config/sectors/:id/toggle
  * @desc Cambiar estado activo/inactivo del sector
  */
-router.post('/sectors/:id/toggle', requireRole('administrador'), async (req, res) => {
+router.post('/sectors/:id/toggle', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏘️ POST /config/sectors/:id/toggle');
 
@@ -1361,7 +1361,7 @@ router.get('/sectores-por-ciudad/:ciudadId', async (req, res) => {
  * @route GET /api/v1/config/banks
  * @desc Obtener bancos
  */
-router.get('/banks', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/banks', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     console.log('🏦 GET /config/banks');
 
@@ -1402,7 +1402,7 @@ router.get('/banks', requireRole('administrador', 'supervisor'), async (req, res
 // ✅ PLANES DE SERVICIO MEJORADOS 
 // PUT /api/v1/config/banks/:id - Actualizar banco
 // PUT /api/v1/config/banks/:id - Actualizar banco
-router.put('/banks/:id', requireRole('administrador'), async (req, res) => {
+router.put('/banks/:id', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏦 PUT /config/banks/:id');
     console.log('📊 Body recibido:', req.body);
@@ -1451,7 +1451,7 @@ router.put('/banks/:id', requireRole('administrador'), async (req, res) => {
   }
 });
 // POST /api/v1/config/banks - Crear banco
-router.post('/banks', requireRole('administrador'), async (req, res) => {
+router.post('/banks', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏦 POST /config/banks');
     console.log('📊 Body recibido:', req.body);
@@ -1490,7 +1490,7 @@ router.post('/banks', requireRole('administrador'), async (req, res) => {
   }
 });
 // DELETE /api/v1/config/banks/:id - Eliminar banco
-router.delete('/banks/:id', requireRole('administrador'), async (req, res) => {
+router.delete('/banks/:id', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🗑️ DELETE /config/banks/:id');
     
@@ -1529,7 +1529,7 @@ router.delete('/banks/:id', requireRole('administrador'), async (req, res) => {
 // ==========================================
 
 // GET /api/v1/config/service-plans - Listar planes
-router.get('/service-plans', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/service-plans', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     console.log('🔄 Backend: GET /config/service-plans');
     const { activo, orden } = req.query;
@@ -1566,7 +1566,7 @@ router.get('/service-plans', requireRole('administrador', 'supervisor'), async (
   }
 });
 // POST /api/v1/config/banks/:id/toggle - Cambiar estado
-router.post('/banks/:id/toggle', requireRole('administrador'), async (req, res) => {
+router.post('/banks/:id/toggle', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🔄 POST /config/banks/:id/toggle');
     
@@ -1598,7 +1598,7 @@ router.post('/banks/:id/toggle', requireRole('administrador'), async (req, res) 
     });
   }
 });
-router.get('/service-plans/stats', requireRole('supervisor', 'administrador'), async (req, res) => {
+router.get('/service-plans/stats', requireRole(['supervisor', 'administrador']), async (req, res) => {
   try {
     const stats = await Database.query(`
       SELECT 
@@ -1707,7 +1707,7 @@ router.get('/service-plans/:id', async (req, res) => {
   }
 });
 
-router.post('/service-plans', requireRole('administrador'), async (req, res) => {
+router.post('/service-plans', requireRole(['administrador']), async (req, res) => {
   try {
     const {
       codigo,
@@ -1835,7 +1835,7 @@ const resultado = await Database.query(`
 });
 
 
-router.put('/service-plans/:id', requireRole('administrador'), async (req, res) => {
+router.put('/service-plans/:id', requireRole(['administrador']), async (req, res) => {
   try {
     const { id } = req.params;
     const datosActualizacion = req.body;
@@ -1994,7 +1994,7 @@ router.put('/service-plans/:id', requireRole('administrador'), async (req, res) 
 });
 
 
-router.delete('/service-plans/:id', requireRole('administrador'), async (req, res) => {
+router.delete('/service-plans/:id', requireRole(['administrador']), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -2034,7 +2034,7 @@ router.delete('/service-plans/:id', requireRole('administrador'), async (req, re
   }
 });
 
-router.patch('/service-plans/:id/toggle-status', requireRole('administrador'), async (req, res) => {
+router.patch('/service-plans/:id/toggle-status', requireRole(['administrador']), async (req, res) => {
   try {
     const { id } = req.params;
     const { activo } = req.body;
@@ -2071,7 +2071,7 @@ router.patch('/service-plans/:id/toggle-status', requireRole('administrador'), a
  * @route GET /api/v1/config/company
  * @desc Obtener configuración de empresa
  */
-router.get('/company', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/company', requireRole(['administrador', 'supervisor']), async (req, res) => {
   try {
     console.log('🏢 GET /config/company');
 
@@ -2100,7 +2100,7 @@ router.get('/company', requireRole('administrador', 'supervisor'), async (req, r
  * @route PUT /api/v1/config/company
  * @desc Actualizar configuración de empresa
  */
-router.put('/company', requireRole('administrador'), async (req, res) => {
+router.put('/company', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏢 PUT /config/company');
 
