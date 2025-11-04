@@ -18,7 +18,7 @@ router.use(authenticateToken);
  * @desc Obtener todas las incidencias con filtros opcionales
  * @access Private (Administrador, Supervisor, Instalador)
  */
-router.get('/', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
+router.get('/', requireRole(['administrador', 'supervisor', 'instalador']), async (req, res) => {
     try {
         console.log('📋 GET /api/incidencias - Obteniendo incidencias');
 
@@ -168,7 +168,7 @@ router.get('/', requireRole('administrador', 'supervisor', 'instalador'), async 
  * @desc Obtener estadísticas completas de incidencias
  * @access Private (Administrador, Supervisor)
  */
-router.get('/estadisticas', requireRole('administrador', 'supervisor'), async (req, res) => {
+router.get('/estadisticas', requireRolerequireRole(['administrador', 'supervisor']), async (req, res) => {
     try {
         console.log('📊 GET /api/incidencias/estadisticas');
 
@@ -254,7 +254,7 @@ router.get('/estadisticas', requireRole('administrador', 'supervisor'), async (r
  * @desc Obtener resumen de incidencias activas
  * @access Private (Administrador, Supervisor, Instalador)
  */
-router.get('/activas/resumen', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
+router.get('/activas/resumen', requireRole(['administrador', 'supervisor', 'instalador']), async (req, res) => {
     try {
         console.log('🚨 GET /api/incidencias/activas/resumen');
 
@@ -419,7 +419,7 @@ router.get('/:id', async (req, res) => {
  * @desc Crear nueva incidencia
  * @access Private (Administrador, Supervisor, Instalador)
  */
-router.post('/', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
+router.post('/', requireRole(['administrador', 'supervisor', 'instalador']), async (req, res) => {
     try {
         console.log('➕ POST /api/incidencias - Creando incidencia');
         
@@ -513,7 +513,7 @@ router.post('/', requireRole('administrador', 'supervisor', 'instalador'), async
  * @desc Actualizar incidencia
  * @access Private (Administrador, Supervisor, Instalador)
  */
-router.put('/:id', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
+router.put('/:id', requireRole(['administrador', 'supervisor', 'instalador']), async (req, res) => {
     try {
         const { id } = req.params;
         console.log(`✏️ PUT /api/incidencias/${id} - Actualizando incidencia`);
@@ -695,7 +695,7 @@ router.put('/:id', requireRole('administrador', 'supervisor', 'instalador'), asy
  * @desc Cerrar incidencia
  * @access Private (Administrador, Supervisor, Instalador)
  */
-router.post('/:id/cerrar', requireRole('administrador', 'supervisor', 'instalador'), async (req, res) => {
+router.post('/:id/cerrar', requireRole(['administrador', 'supervisor', 'instalador']), async (req, res) => {
     try {
         const { id } = req.params;
         console.log(`🔒 POST /api/incidencias/${id}/cerrar - Cerrando incidencia`);
