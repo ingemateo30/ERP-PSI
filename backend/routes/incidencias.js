@@ -168,7 +168,7 @@ router.get('/', requireRole(['administrador', 'supervisor', 'instalador']), asyn
  * @desc Obtener estadísticas completas de incidencias
  * @access Private (Administrador, Supervisor)
  */
-router.get('/estadisticas', requireRole(['administrador', 'supervisor']), async (req, res) => {
+router.get('/estadisticas', requireRole(['administrador', 'supervisor', 'instalador']), async (req, res) => {
     try {
         console.log('📊 GET /api/incidencias/estadisticas');
 
