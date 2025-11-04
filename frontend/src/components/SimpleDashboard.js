@@ -357,38 +357,51 @@ const InstaladorDashboard = () => {
         cargarDatos();
     }, []);
 
-    const cargarDatos = async () => {
-        try {
-            setLoading(true);
-            const token = localStorage.getItem('token');
-            
-            // Cargar trabajos de hoy
-            const respuestaTrabajos = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-trabajos/hoy`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const dataTrabajos = await respuestaTrabajos.json();
-            
-            if (dataTrabajos.success) {
-                setTrabajosHoy(dataTrabajos.trabajos || []);
-            }
-
-            // Cargar estadísticas
-            const respuestaEstadisticas = await fetch(`${process.env.REACT_APP_API_URL}/instalador/estadisticas`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const dataEstadisticas = await respuestaEstadisticas.json();
-            
-            if (dataEstadisticas.success) {
-                setEstadisticas(dataEstadisticas.estadisticas);
-            }
-            
-        } catch (error) {
-            console.error('Error cargando datos:', error);
-        } finally {
+   const cargarDatos = async () => {
+    try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        
+        console.log('🔍 Token desde localStorage:', token);
+        
+        if (!token) {
+            console.error('❌ No hay token en localStorage');
             setLoading(false);
+            return;
         }
-    };
+        
+        // Cargar trabajos de hoy
+        const respuestaTrabajos = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-trabajos/hoy`, {
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            }
+        });
+        const dataTrabajos = await respuestaTrabajos.json();
+        
+        if (dataTrabajos.success) {
+            setTrabajosHoy(dataTrabajos.trabajos || []);
+        }
 
+        // Cargar estadísticas
+        const respuestaEstadisticas = await fetch(`${process.env.REACT_APP_API_URL}/instalador/estadisticas`, {
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            }
+        });
+        const dataEstadisticas = await respuestaEstadisticas.json();
+        
+        if (dataEstadisticas.success) {
+            setEstadisticas(dataEstadisticas.estadisticas);
+        }
+        
+    } catch (error) {
+        console.error('Error cargando datos:', error);
+    } finally {
+        setLoading(false);
+    }
+};
     const iniciarTrabajo = async (trabajoId) => {
         try {
             const token = localStorage.getItem('token');
