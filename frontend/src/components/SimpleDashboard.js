@@ -344,7 +344,7 @@ const SupervisorDashboard = () => {
 // ===================================
 const InstaladorDashboard = () => {
     const navigate = useNavigate();
-    const { currentUser } = useAuth();
+    const { currentUser, getToken } = useAuth();  // <-- AGREGAR getToken
     const [trabajosHoy, setTrabajosHoy] = useState([]);
     const [estadisticas, setEstadisticas] = useState({
         pendientesHoy: 0,
@@ -360,8 +360,7 @@ const InstaladorDashboard = () => {
    const cargarDatos = async () => {
     try {
         setLoading(true);
-        const token = localStorage.getItem('token');
-        
+        const token = getToken();  // <-- USAR getToken() del AuthContext
         console.log('🔍 Token desde localStorage:', token);
         
         if (!token) {
