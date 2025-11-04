@@ -198,7 +198,7 @@ const AdminDashboard = () => {
                 />
                 <QuickAccessCard
     title="Respaldos y Seguridad"
-    description="Gestionar backups y seguridad"
+    description="Generar backup de la base de datos"
     icon={<Database size={32} className="text-[#10b981]" />}
     onClick={generarBackup}
     color="#10b981"
