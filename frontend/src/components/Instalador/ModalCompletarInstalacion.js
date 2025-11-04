@@ -77,7 +77,11 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+     const token = localStorage.getItem('token');
+if (!token) {
+    console.error('❌ No hay token');
+    return;
+}
       
       const formData = {
         equipos: equiposSeleccionados,
