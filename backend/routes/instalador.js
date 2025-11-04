@@ -16,7 +16,7 @@ router.get('/mis-trabajos/hoy', async (req, res) => {
       SELECT 
         i.id,
         i.cliente_id,
-        CONCAT(c.nombre, ' ', COALESCE(c.apellido, '')) as cliente_nombre,
+        c.nombre as cliente_nombre,
         i.direccion_instalacion as direccion,
         i.barrio,
         i.hora_programada as hora,
