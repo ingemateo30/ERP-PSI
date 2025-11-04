@@ -13,7 +13,7 @@ console.log('📋 Cargando rutas de contratos...');
  */
 router.get('/',
   authenticateToken,
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   ContratosController.obtenerTodos
 );
 
@@ -24,7 +24,7 @@ router.get('/',
  */
 router.get('/stats',
   authenticateToken,
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   ContratosController.obtenerEstadisticas
 );
 
@@ -65,7 +65,7 @@ router.get('/:id/descargar-pdf',
  */
 router.put('/:id/estado',
   authenticateToken,
-  requireRole('supervisor', 'administrador'),
+  requireRole(['supervisor', 'administrador']),
   ContratosController.actualizarEstado
 );
 
