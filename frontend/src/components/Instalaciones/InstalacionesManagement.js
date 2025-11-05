@@ -24,7 +24,7 @@ import {
   RefreshCw,
   FileText
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+
 import { instalacionesService } from '../../services/instalacionesService';
 import { useAuth } from '../../contexts/AuthContext';
 import InstalacionModal from './InstalacionModal';
