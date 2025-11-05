@@ -16,22 +16,14 @@ const FacturasStats = ({ facturas = [], loading = false }) => {
   const [loadingStats, setLoadingStats] = useState(true);
   const [errorStats, setErrorStats] = useState(null);
 
-  // ==========================================
-  // CALCULAR ESTADÍSTICAS DESDE LAS FACTURAS PROPS
+// ==========================================
+  // CARGAR ESTADÍSTICAS DESDE BACKEND SIEMPRE
   // ==========================================
   useEffect(() => {
-    if (Array.isArray(facturas)) {
-      console.log('📊 [FacturasStats] Calculando estadísticas desde facturas:', facturas.length);
-      
-      const statsCalculadas = calcularEstadisticas(facturas);
-      setStats(statsCalculadas);
-      setLoadingStats(false);
-      setErrorStats(null);
-    } else {
-      // Si no hay facturas en props, intentar cargar desde API
-      cargarEstadisticasAPI();
-    }
-  }, [facturas]);
+    // ✅ SIEMPRE cargar desde el backend (totales reales)
+    console.log('📊 [FacturasStats] Cargando estadísticas desde backend...');
+    cargarEstadisticasAPI();
+  }, []); // Sin dependencias para que cargue solo una vez al montar
 
   // ==========================================
   // FUNCIÓN PARA CALCULAR ESTADÍSTICAS LOCALMENTE
@@ -116,9 +108,10 @@ const FacturasStats = ({ facturas = [], loading = false }) => {
       
       console.log('📊 [FacturasStats] Cargando estadísticas desde API...');
       
-      const response = await fetch('/api/v1/facturas/stats', {
+      // ✅ Usar el servicio correcto
+      const response = await fetch('/api/v1/facturas/estadisticas', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
         }
       });
@@ -129,24 +122,26 @@ const FacturasStats = ({ facturas = [], loading = false }) => {
       
       const data = await response.json();
       
+      console.log('📊 Respuesta del backend:', data);
+      
+      // ✅ ADAPTADO para múltiples formatos de respuesta
       if (data.success && data.data) {
-        // Adaptar respuesta del API al formato esperado
         const statsAPI = {
-          total: data.data.resumen?.total_facturas || 0,
-          pendientes: data.data.por_estado?.pendientes || 0,
-          pagadas: data.data.por_estado?.pagadas || 0,
-          vencidas: data.data.por_estado?.vencidas || 0,
-          anuladas: data.data.por_estado?.anuladas || 0,
-          monto_total: data.data.resumen?.monto_total || 0,
-          monto_pendiente: data.data.resumen?.monto_pendiente || 0,
-          monto_pagado: data.data.resumen?.monto_pagado || 0,
-          monto_vencido: data.data.resumen?.monto_vencido || 0,
-          promedio: data.data.resumen?.promedio_factura || 0,
-          facturas_mora: data.data.mora?.facturas_en_mora || 0
+          total: parseInt(data.data.total || data.data.total_facturas || 0),
+          pendientes: parseInt(data.data.pendientes || data.data.total_pendientes || 0),
+          pagadas: parseInt(data.data.pagadas || data.data.total_pagadas || 0),
+          vencidas: parseInt(data.data.vencidas || data.data.total_vencidas || 0),
+          anuladas: parseInt(data.data.anuladas || data.data.total_anuladas || 0),
+          monto_total: parseFloat(data.data.valor_total || data.data.monto_total || 0),
+          monto_pendiente: parseFloat(data.data.valor_pendiente || data.data.monto_pendiente || 0),
+          monto_pagado: parseFloat(data.data.valor_pagado || data.data.monto_pagado || 0),
+          monto_vencido: parseFloat(data.data.valor_vencido || data.data.monto_vencido || 0),
+          promedio: parseFloat(data.data.promedio_factura || 0),
+          facturas_mora: parseInt(data.data.facturas_mora || 0)
         };
         
         setStats(statsAPI);
-        console.log('✅ [FacturasStats] Estadísticas cargadas desde API:', statsAPI);
+        console.log('✅ [FacturasStats] Estadísticas cargadas:', statsAPI);
       } else {
         throw new Error(data.message || 'Respuesta inválida del servidor');
       }
@@ -165,7 +160,6 @@ const FacturasStats = ({ facturas = [], loading = false }) => {
       setLoadingStats(false);
     }
   };
-
   // ==========================================
   // FUNCIÓN DE REFRESCO MANUAL
   // ==========================================
