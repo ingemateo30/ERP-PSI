@@ -28,7 +28,7 @@ static async obtenerTodos(req, res) {
         const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
         const offsetNum = (pageNum - 1) * limitNum;
 
-        // ✅ Query base
+        // ✅ Query base con soporte para servicios múltiples
         let query = `
             SELECT 
                 c.*,
@@ -38,16 +38,24 @@ static async obtenerTodos(req, res) {
                 cl.correo as cliente_email,
                 cl.direccion as cliente_direccion,
                 cl.estrato as cliente_estrato,
-                ps.nombre as plan_nombre,
-                ps.precio as plan_precio,
-                ps.tipo as plan_tipo,
-                ps.velocidad_bajada,
-                ps.velocidad_subida,
-                ps.canales_tv,
-                ps.descripcion as plan_descripcion
+                GROUP_CONCAT(
+                    DISTINCT CONCAT(
+                        ps.nombre, '|',
+                        COALESCE(ps.precio, 0), '|',
+                        ps.tipo
+                    ) SEPARATOR ';;'
+                ) as servicios_info
             FROM contratos c
             LEFT JOIN clientes cl ON c.cliente_id = cl.id
-            LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
+            LEFT JOIN servicios_cliente sc ON (
+                CASE 
+                    WHEN c.servicio_id REGEXP '^[0-9]+$' 
+                    THEN sc.id = CAST(c.servicio_id AS UNSIGNED)
+                    WHEN c.servicio_id LIKE '[%' 
+                    THEN FIND_IN_SET(sc.id, REPLACE(REPLACE(REPLACE(c.servicio_id, '[', ''), ']', ''), ',', ','))
+                    ELSE FALSE
+                END
+            )
             LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
             WHERE 1=1
         `;
@@ -60,11 +68,17 @@ static async obtenerTodos(req, res) {
             params.push(cliente_id);
         }
 
-        // Filtro especial para firma de contratos (prioridad sobre estado)
+        // Filtro especial para firma de contratos
         if (para_firma === 'true' || para_firma === true) {
-            console.log('🖊️ Filtrando contratos para firma (solo activos con PDF)');
-           query += ' AND c.estado = ? AND c.documento_pdf_path IS NOT NULL';
-            params.push('activo');
+            console.log('🖊️ Filtrando contratos para firma');
+            
+            if (req.query.filtroEstado === 'pendiente') {
+                query += ' AND c.firmado_cliente = 0 AND c.documento_pdf_path IS NOT NULL';
+            } else if (req.query.filtroEstado === 'firmado') {
+                query += ' AND c.firmado_cliente = 1';
+            } else if (req.query.filtroEstado === 'anulado') {
+                query += ' AND c.estado = "anulado"';
+            }
         } else if (estado) {
             query += ' AND c.estado = ?';
             params.push(estado);
@@ -81,16 +95,58 @@ static async obtenerTodos(req, res) {
             params.push(searchTerm, searchTerm, searchTerm);
         }
 
+        // Agrupar por contrato
+        query += ' GROUP BY c.id';
+
         // Contar total
-        const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
+        const countQuery = `SELECT COUNT(DISTINCT c.id) as total FROM contratos c 
+                           LEFT JOIN clientes cl ON c.cliente_id = cl.id 
+                           WHERE 1=1 ${query.substring(query.indexOf('WHERE 1=1') + 9, query.indexOf('GROUP BY'))}`;
         const [countResult] = await Database.query(countQuery, params);
         const total = countResult[0]?.total || 0;
 
-        // ✅ SOLUCIÓN QUE FUNCIONA - Interpolación directa
+        // Ordenar y paginar
         query += ` ORDER BY c.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
         
-        // Ejecutar SOLO con los params de filtros (sin limit/offset)
-        const contratos = await Database.query(query, params);
+        let contratos = await Database.query(query, params);
+
+        // ✅ Procesar servicios_info para extraer plan_nombre y plan_precio
+        contratos = contratos.map(contrato => {
+            let plan_nombre = 'N/A';
+            let plan_precio = 0;
+            let plan_tipo = 'N/A';
+
+            if (contrato.servicios_info) {
+                const servicios = contrato.servicios_info.split(';;');
+                if (servicios.length === 1) {
+                    // Un solo servicio
+                    const [nombre, precio, tipo] = servicios[0].split('|');
+                    plan_nombre = nombre;
+                    plan_precio = parseFloat(precio) || 0;
+                    plan_tipo = tipo;
+                } else if (servicios.length > 1) {
+                    // Múltiples servicios
+                    const nombres = [];
+                    let precioTotal = 0;
+                    for (const servicio of servicios) {
+                        const [nombre, precio] = servicio.split('|');
+                        if (nombre) nombres.push(nombre);
+                        precioTotal += parseFloat(precio) || 0;
+                    }
+                    plan_nombre = nombres.join(' + ');
+                    plan_precio = precioTotal;
+                    plan_tipo = 'combo';
+                }
+            }
+
+            return {
+                ...contrato,
+                plan_nombre,
+                plan_precio,
+                plan_tipo,
+                servicios_info: undefined // Eliminar campo temporal
+            };
+        });
 
         console.log(`✅ Encontrados ${contratos.length} contratos`);
 
@@ -116,7 +172,6 @@ static async obtenerTodos(req, res) {
         });
     }
 }
-
     static async obtenerPorId(req, res) {
         try {
             const { id } = req.params;
