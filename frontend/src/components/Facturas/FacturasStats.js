@@ -109,7 +109,7 @@ const FacturasStats = ({ facturas = [], loading = false }) => {
       console.log('📊 [FacturasStats] Cargando estadísticas desde API...');
       
       // ✅ Usar el servicio correcto
-      const response = await fetch('/api/v1/facturas/estadisticas', {
+      const response = await fetch('/api/v1/facturas/stats', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
