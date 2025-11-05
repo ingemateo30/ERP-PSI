@@ -27,7 +27,7 @@ static async obtenerTodos(req, res) {
         const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
         const offsetNum = (pageNum - 1) * limitNum;
 
-        // ✅ Query mejorado con manejo de servicio_id NULL
+        // ✅ Query mejorado - maneja servicio_id NULL y JSON arrays
         let query = `
             SELECT 
                 c.*,
@@ -39,9 +39,9 @@ static async obtenerTodos(req, res) {
                 cl.estrato as cliente_estrato,
                 GROUP_CONCAT(
                     DISTINCT CONCAT(
-                        COALESCE(ps.nombre, 'Sin plan'), '|',
+                        COALESCE(ps.nombre, ''), '|',
                         COALESCE(ps.precio, 0), '|',
-                        COALESCE(ps.tipo, 'N/A')
+                        COALESCE(ps.tipo, '')
                     ) SEPARATOR ';;'
                 ) as servicios_info
             FROM contratos c
@@ -51,7 +51,7 @@ static async obtenerTodos(req, res) {
                     WHEN c.servicio_id IS NULL THEN FALSE
                     WHEN c.servicio_id REGEXP '^[0-9]+$' 
                     THEN sc.id = CAST(c.servicio_id AS UNSIGNED)
-                    WHEN c.servicio_id LIKE '[%' 
+                    WHEN c.servicio_id LIKE '[%'
                     THEN JSON_CONTAINS(CAST(c.servicio_id AS JSON), CAST(sc.id AS JSON))
                     ELSE FALSE
                 END
@@ -106,26 +106,29 @@ static async obtenerTodos(req, res) {
         
         let contratos = await Database.query(query, params);
 
-        // ✅ Procesar resultados - Extraer info de observaciones si no hay servicio_id
+        // ✅ Procesar cada contrato para extraer plan_nombre y plan_precio
         contratos = contratos.map(contrato => {
             let plan_nombre = 'N/A';
             let plan_precio = 0;
             let plan_tipo = 'N/A';
 
-            // Intentar obtener de servicios_info primero
-            if (contrato.servicios_info && contrato.servicios_info !== 'Sin plan|0|N/A') {
-                const servicios = contrato.servicios_info.split(';;');
-                if (servicios.length === 1 && !servicios[0].startsWith('Sin plan')) {
+            // Primero intentar obtener de servicios_info
+            if (contrato.servicios_info && contrato.servicios_info.trim() !== '||') {
+                const servicios = contrato.servicios_info.split(';;').filter(s => s && s !== '||');
+                
+                if (servicios.length === 1) {
                     const [nombre, precio, tipo] = servicios[0].split('|');
-                    plan_nombre = nombre;
-                    plan_precio = parseFloat(precio) || 0;
-                    plan_tipo = tipo;
+                    if (nombre) {
+                        plan_nombre = nombre;
+                        plan_precio = parseFloat(precio) || 0;
+                        plan_tipo = tipo || 'servicio';
+                    }
                 } else if (servicios.length > 1) {
                     const nombres = [];
                     let precioTotal = 0;
                     for (const servicio of servicios) {
                         const [nombre, precio] = servicio.split('|');
-                        if (nombre && nombre !== 'Sin plan') {
+                        if (nombre) {
                             nombres.push(nombre);
                             precioTotal += parseFloat(precio) || 0;
                         }
@@ -138,23 +141,31 @@ static async obtenerTodos(req, res) {
                 }
             }
 
-            // ✅ Si no hay datos, intentar extraer de observaciones JSON
+            // ✅ Si no hay datos, extraer de observaciones JSON
             if (plan_nombre === 'N/A' && contrato.observaciones) {
                 try {
                     const obs = JSON.parse(contrato.observaciones);
                     if (obs.servicios_incluidos) {
-                        plan_nombre = obs.servicios_incluidos.replace(/INTERNET: |TELEVISION: /g, '');
-                        // Extraer precios de la cadena
-                        const matches = obs.servicios_incluidos.match(/\$(\d+)/g);
+                        // Extraer nombres limpiando prefijos
+                        plan_nombre = obs.servicios_incluidos
+                            .replace(/INTERNET: /g, '')
+                            .replace(/TELEVISION: /g, '')
+                            .replace(/\(\$\d+(\.\d+)?\)/g, '') // Quitar precios entre paréntesis
+                            .trim();
+                        
+                        // Extraer y sumar precios
+                        const matches = obs.servicios_incluidos.match(/\(?\$(\d+)/g);
                         if (matches) {
-                            plan_precio = matches.reduce((sum, precio) => 
-                                sum + parseInt(precio.replace('$', '')), 0
-                            );
+                            plan_precio = matches.reduce((sum, precio) => {
+                                const num = parseInt(precio.replace(/\(?\$/, ''));
+                                return sum + (isNaN(num) ? 0 : num);
+                            }, 0);
                         }
                         plan_tipo = obs.cantidad_servicios > 1 ? 'combo' : 'servicio';
                     }
                 } catch (e) {
                     // Si falla el parse, mantener N/A
+                    console.log(`⚠️ No se pudo parsear observaciones del contrato ${contrato.numero_contrato}`);
                 }
             }
 
@@ -163,7 +174,7 @@ static async obtenerTodos(req, res) {
                 plan_nombre,
                 plan_precio,
                 plan_tipo,
-                servicios_info: undefined
+                servicios_info: undefined // Remover campo temporal
             };
         });
 
