@@ -65,7 +65,7 @@ const tipoValidation = [
  * @access Supervisor+
  */
 router.get('/', 
-    requireRole('administrador', 'supervisor'),
+    requireRole(['administrador', 'supervisor']),
     [
         query('tipo').optional().isIn(['facturacion', 'corte', 'reconexion', 'bienvenida', 'general']),
         query('activo').optional().isIn(['true', 'false']),
@@ -82,7 +82,7 @@ router.get('/',
  * @access Supervisor+
  */
 router.get('/stats',
-    requireRole('administrador', 'supervisor'),
+    requireRole(['administrador', 'supervisor']),
     PlantillasCorreoController.getStats
 );
 
@@ -92,7 +92,7 @@ router.get('/stats',
  * @access Supervisor+
  */
 router.get('/tipo/:tipo',
-    requireRole('administrador', 'supervisor'),
+    requireRole(['administrador', 'supervisor']),
     tipoValidation,
     PlantillasCorreoController.getByType
 );
@@ -103,7 +103,7 @@ router.get('/tipo/:tipo',
  * @access Supervisor+
  */
 router.get('/:id',
-    requireRole('administrador', 'supervisor'),
+    requireRole(['administrador', 'supervisor']),
     idValidation,
     PlantillasCorreoController.getById
 );
@@ -118,7 +118,7 @@ router.get('/:id',
  * @access Administrador
  */
 router.post('/',
-    requireRole('administrador'),
+    requireRole(['administrador']),
     plantillaValidation,
     PlantillasCorreoController.create
 );
@@ -129,7 +129,7 @@ router.post('/',
  * @access Administrador
  */
 router.put('/:id',
-    requireRole('administrador'),
+    requireRole(['administrador']),
     [...idValidation, ...plantillaValidation],
     PlantillasCorreoController.update
 );
@@ -140,7 +140,7 @@ router.put('/:id',
  * @access Administrador
  */
 router.delete('/:id',
-    requireRole('administrador'),
+    requireRole(['administrador']),
     idValidation,
     PlantillasCorreoController.delete
 );
@@ -151,7 +151,7 @@ router.delete('/:id',
  * @access Administrador
  */
 router.post('/:id/toggle',
-    requireRole('administrador'),
+    requireRole(['administrador']),
     idValidation,
     PlantillasCorreoController.toggleStatus
 );
@@ -162,7 +162,7 @@ router.post('/:id/toggle',
  * @access Administrador
  */
 router.post('/:id/duplicate',
-    requireRole('administrador'),
+    requireRole(['administrador']),
     idValidation,
     PlantillasCorreoController.duplicate
 );
@@ -173,7 +173,7 @@ router.post('/:id/duplicate',
  * @access Administrador
  */
 router.post('/:id/preview',
-    requireRole('administrador'),
+    requireRole(['administrador']),
     idValidation,
     [
         body('nombre_cliente').optional().trim().isLength({ max: 255 }),
