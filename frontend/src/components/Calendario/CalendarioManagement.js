@@ -669,8 +669,7 @@ const load = useCallback(async () => {
           </div>
         </div>
       )}
-
-      {/* Estadísticas rápidas */}
+{/* Estadísticas rápidas */}
       <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center justify-between">
@@ -693,33 +692,35 @@ const load = useCallback(async () => {
             <div className="text-3xl">🔧</div>
           </div>
         </div>
-        {user?.rol !== 'instalador' && (
-  <>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 uppercase">Facturas</p>
-              <p className="text-2xl font-bold text-yellow-600">
-                {events.filter(e => e.id.startsWith('factura-')).length}
-              </p>
-            </div>
-            <div className="text-3xl">💳</div>
-          </div>
-        </div>
 
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 uppercase">Contratos</p>
-              <p className="text-2xl font-bold text-purple-600">
-                {events.filter(e => e.id.startsWith('contrato-')).length}
-              </p>
+        {user?.rol !== 'instalador' && (
+          <>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase">Facturas</p>
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {events.filter(e => e.id.startsWith('factura-')).length}
+                  </p>
+                </div>
+                <div className="text-3xl">💳</div>
+              </div>
             </div>
-            <div className="text-3xl">📄</div>
-           </div>
-    </div>
-  </>
-)}
+
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase">Contratos</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {events.filter(e => e.id.startsWith('contrato-')).length}
+                  </p>
+                </div>
+                <div className="text-3xl">📄</div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
       {/* Leyenda de colores */}
       <div className="mb-4 bg-white rounded-lg shadow p-4">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">🎨 Códigos de Color:</h3>
