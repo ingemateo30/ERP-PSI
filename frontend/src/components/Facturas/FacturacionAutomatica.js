@@ -73,32 +73,47 @@ const FacturacionAutomatica = () => {
   // ==========================================
 
   const cargarEstadisticas = async () => {
-    try {
-      const params = {
-        fecha_desde: filtros.fecha_desde,
-        fecha_hasta: filtros.fecha_hasta
-      };
+  try {
+    const params = {
+      fecha_desde: filtros.fecha_desde,
+      fecha_hasta: filtros.fecha_hasta
+    };
 
-      console.log('📊 Cargando estadísticas con parámetros:', params);
+    console.log('📊 Cargando estadísticas con parámetros:', params);
+    
+    const response = await facturasService.getEstadisticas(params);
+    
+    // ✅ VALIDAR Y USAR TOTALES DEL BACKEND
+    if (response.success && response.data) {
+      console.log('✅ Estadísticas del backend:', response.data);
       
-      const response = await facturasService.getEstadisticas(params);
-      
-      setEstadisticas(response.data || {
-        total_clientes: 0,
-        facturas_generadas: 0,
-        monto_total: 0,
-        errores: 0
-      });
-    } catch (error) {
-      console.error('Error cargando estadísticas:', error);
       setEstadisticas({
-        total_clientes: 0,
-        facturas_generadas: 0,
-        monto_total: 0,
-        errores: 0
+        total_clientes: parseInt(response.data.total_clientes || 0),
+        facturas_generadas: parseInt(response.data.total_facturas || response.data.facturas_generadas || 0),
+        monto_total: parseFloat(response.data.monto_total || response.data.total_facturado || 0),
+        errores: parseInt(response.data.errores || 0)
+      });
+    } else {
+      // Si no viene success o data, intentar usar response.data directamente
+      console.warn('⚠️ Respuesta sin estructura estándar, usando data directo');
+      
+      setEstadisticas({
+        total_clientes: parseInt(response.data?.total_clientes || 0),
+        facturas_generadas: parseInt(response.data?.total_facturas || response.data?.facturas_generadas || 0),
+        monto_total: parseFloat(response.data?.monto_total || response.data?.total_facturado || 0),
+        errores: parseInt(response.data?.errores || 0)
       });
     }
-  };
+  } catch (error) {
+    console.error('❌ Error cargando estadísticas:', error);
+    setEstadisticas({
+      total_clientes: 0,
+      facturas_generadas: 0,
+      monto_total: 0,
+      errores: 0
+    });
+  }
+};
 
   const cargarFacturas = async () => {
     try {

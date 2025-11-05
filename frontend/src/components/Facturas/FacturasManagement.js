@@ -483,7 +483,7 @@ const FacturasManagement = () => {
       </div>
 
       {/* Estadísticas */}
-      <FacturasStats facturas={facturas} loading={loading} />
+      <FacturasStats loading={loading} />
 
       {/* Filtros con transición */}
       <div className={`transition-all duration-300 ease-in-out ${
