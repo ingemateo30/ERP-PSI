@@ -102,64 +102,56 @@ const FacturasStats = ({ facturas = [], loading = false }) => {
   // FUNCIÓN PARA CARGAR DESDE API (FALLBACK)
   // ==========================================
   const cargarEstadisticasAPI = async () => {
-    try {
-      setLoadingStats(true);
-      setErrorStats(null);
+  try {
+    setLoadingStats(true);
+    setErrorStats(null);
+    
+    console.log('📊 [FacturasStats] Cargando estadísticas desde API...');
+    
+    // ✅ USAR apiService que ya está configurado
+    const apiService = await import('../../services/apiService');
+    const response = await apiService.default.get('/facturas/stats');
+    
+    console.log('📊 Respuesta del backend:', response);
+    
+    // ✅ ADAPTADO para múltiples formatos de respuesta
+    if (response.success && response.data) {
+      const data = response.data;
       
-      console.log('📊 [FacturasStats] Cargando estadísticas desde API...');
+      const statsAPI = {
+        total: parseInt(data.total || data.total_facturas || 0),
+        pendientes: parseInt(data.pendientes || data.total_pendientes || 0),
+        pagadas: parseInt(data.pagadas || data.total_pagadas || 0),
+        vencidas: parseInt(data.vencidas || data.total_vencidas || 0),
+        anuladas: parseInt(data.anuladas || data.total_anuladas || 0),
+        monto_total: parseFloat(data.valor_total || data.monto_total || 0),
+        monto_pendiente: parseFloat(data.valor_pendiente || data.monto_pendiente || 0),
+        monto_pagado: parseFloat(data.valor_pagado || data.monto_pagado || 0),
+        monto_vencido: parseFloat(data.valor_vencido || data.monto_vencido || 0),
+        promedio: parseFloat(data.promedio_factura || 0),
+        facturas_mora: parseInt(data.facturas_mora || 0)
+      };
       
-      // ✅ Usar el servicio correcto
-      const response = await fetch('/api/v1/facturas/stats', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      console.log('📊 Respuesta del backend:', data);
-      
-      // ✅ ADAPTADO para múltiples formatos de respuesta
-      if (data.success && data.data) {
-        const statsAPI = {
-          total: parseInt(data.data.total || data.data.total_facturas || 0),
-          pendientes: parseInt(data.data.pendientes || data.data.total_pendientes || 0),
-          pagadas: parseInt(data.data.pagadas || data.data.total_pagadas || 0),
-          vencidas: parseInt(data.data.vencidas || data.data.total_vencidas || 0),
-          anuladas: parseInt(data.data.anuladas || data.data.total_anuladas || 0),
-          monto_total: parseFloat(data.data.valor_total || data.data.monto_total || 0),
-          monto_pendiente: parseFloat(data.data.valor_pendiente || data.data.monto_pendiente || 0),
-          monto_pagado: parseFloat(data.data.valor_pagado || data.data.monto_pagado || 0),
-          monto_vencido: parseFloat(data.data.valor_vencido || data.data.monto_vencido || 0),
-          promedio: parseFloat(data.data.promedio_factura || 0),
-          facturas_mora: parseInt(data.data.facturas_mora || 0)
-        };
-        
-        setStats(statsAPI);
-        console.log('✅ [FacturasStats] Estadísticas cargadas:', statsAPI);
-      } else {
-        throw new Error(data.message || 'Respuesta inválida del servidor');
-      }
-      
-    } catch (error) {
-      console.error('❌ [FacturasStats] Error cargando estadísticas:', error);
-      setErrorStats(error.message);
-      
-      // Usar estadísticas vacías como fallback
-      setStats({
-        total: 0, pendientes: 0, pagadas: 0, vencidas: 0, anuladas: 0,
-        monto_total: 0, monto_pendiente: 0, monto_pagado: 0, monto_vencido: 0,
-        promedio: 0, facturas_mora: 0
-      });
-    } finally {
-      setLoadingStats(false);
+      setStats(statsAPI);
+      console.log('✅ [FacturasStats] Estadísticas cargadas:', statsAPI);
+    } else {
+      throw new Error('Respuesta inválida del servidor');
     }
-  };
+    
+  } catch (error) {
+    console.error('❌ [FacturasStats] Error cargando estadísticas:', error);
+    setErrorStats(error.message);
+    
+    // Usar estadísticas vacías como fallback
+    setStats({
+      total: 0, pendientes: 0, pagadas: 0, vencidas: 0, anuladas: 0,
+      monto_total: 0, monto_pendiente: 0, monto_pagado: 0, monto_vencido: 0,
+      promedio: 0, facturas_mora: 0
+    });
+  } finally {
+    setLoadingStats(false);
+  }
+};
   // ==========================================
   // FUNCIÓN DE REFRESCO MANUAL
   // ==========================================
