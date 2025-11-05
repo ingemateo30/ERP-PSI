@@ -6,8 +6,9 @@ import {
     Download, ExternalLink, Activity, Zap, Settings, FileText
 } from 'lucide-react';
 import incidenciasService from '../../services/incidenciasService';
-
+import { useAuth } from '../../contexts/AuthContext';
 const IncidenciasManagement = () => {
+    const { user } = useAuth();
     const [incidencias, setIncidencias] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -74,11 +75,31 @@ const IncidenciasManagement = () => {
 const cargarIncidencias = async () => {
     setLoading(true);
     try {
-        const response = await incidenciasService.getIncidencias({
-            ...filters,
-            page: currentPage
-        });
+        let response;
         
+        // Si es instalador, usar endpoint específico
+        if (user?.rol === 'instalador') {
+            const token = localStorage.getItem('token');
+            const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-incidencias`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await apiResponse.json();
+            response = {
+                success: true,
+                incidencias: {
+                    incidencias: data.incidencias || [],
+                    pagination: { total: data.incidencias?.length || 0, pages: 1 }
+                }
+            };
+        } else {
+            response = await incidenciasService.getIncidencias({
+                ...filters,
+                page: currentPage
+            });
+        }
         console.log('🔍 Respuesta completa del servicio:', response);
         console.log('🔍 response.incidencias:', response.incidencias);
         
@@ -104,10 +125,29 @@ const cargarIncidencias = async () => {
         setLoading(false);
     }
 };
-    const cargarEstadisticas = async () => {
-        try {
-            const response = await incidenciasService.getEstadisticas();
-
+const cargarEstadisticas = async () => {
+    try {
+        let response;
+        
+        if (user?.rol === 'instalador') {
+            const token = localStorage.getItem('token');
+            const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-incidencias/estadisticas`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await apiResponse.json();
+            response = {
+                success: true,
+                estadisticas: {
+                    resumen: data.estadisticas,
+                    por_estado: []
+                }
+            };
+        } else {
+            response = await incidenciasService.getEstadisticas();
+        }
             console.log('📊 Respuesta estadísticas completa:', response);
 
             if (response.success && response.estadisticas) {
@@ -276,9 +316,15 @@ const cargarIncidencias = async () => {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Gestión de Incidencias</h1>
-                    <p className="text-gray-600">Administración de incidencias de servicio</p>
-                </div>
+    <h1 className="text-2xl font-bold text-gray-900">
+        {user?.rol === 'instalador' ? 'Mis Incidencias Asignadas' : 'Gestión de Incidencias'}
+    </h1>
+    <p className="text-gray-600">
+        {user?.rol === 'instalador' 
+            ? 'Incidencias que me han sido asignadas' 
+            : 'Administración de incidencias de servicio'}
+    </p>
+</div>
                 <div className="flex space-x-3">
                     <button
                         onClick={exportarDatos}
@@ -288,6 +334,7 @@ const cargarIncidencias = async () => {
                         <Download className="w-4 h-4 mr-2" />
                         Exportar
                     </button>
+                    {user?.rol !== 'instalador' && (
                     <button
                         onClick={() => abrirModal()}
                         className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -295,6 +342,7 @@ const cargarIncidencias = async () => {
                         <Plus className="w-4 h-4 mr-2" />
                         Nueva Incidencia
                     </button>
+                    )}
                 </div>
             </div>
 
@@ -330,10 +378,12 @@ const cargarIncidencias = async () => {
                     </div>
                     <div className="text-sm text-gray-600">T. Promedio</div>
                 </div>
+                {user?.rol !== 'instalador' && (
                 <div className="bg-white p-4 rounded-lg shadow">
                     <div className="text-2xl font-bold text-orange-600">{stats.total_usuarios_afectados}</div>
                     <div className="text-sm text-gray-600">Usuarios Afectados</div>
                 </div>
+                )}
             </div>
 
             {/* Filtros */}
@@ -482,9 +532,11 @@ const cargarIncidencias = async () => {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Estado
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Impacto
-                                    </th>
+                                    {user?.rol !== 'instalador' && (
+    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+        Impacto
+    </th>
+)}
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Ubicación
                                     </th>
@@ -518,9 +570,11 @@ const cargarIncidencias = async () => {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             {getEstadoBadge(incidencia.estado)}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            {getImpactoBadge(incidencia.usuarios_afectados)}
-                                        </td>
+                                        {user?.rol !== 'instalador' && (
+    <td className="px-6 py-4 whitespace-nowrap">
+        {getImpactoBadge(incidencia.usuarios_afectados)}
+    </td>
+)}
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm text-gray-900">
                                                 {incidencia.municipio_nombre || 'N/A'}
