@@ -39,15 +39,29 @@ const InventoryManagement = () => {
   }, [filters]);
 
   // Cargar equipos con filtros
-  const loadEquipment = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      console.log('🔍 Cargando equipos con filtros:', filters);
-      
-      const response = await inventoryService.getEquipment(filters);
-      console.log('✅ Respuesta de equipos:', response);
+const loadEquipment = useCallback(async () => {
+  try {
+    setLoading(true);
+    setError('');
+    
+    console.log('🔍 Cargando equipos con filtros:', filters);
+    
+    // Si es instalador, usar endpoint específico
+    let response;
+    if (user.rol === 'instalador') {
+      // Llamar al endpoint de mis equipos
+      const token = localStorage.getItem('token');
+      const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-equipos`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      response = await apiResponse.json();
+    } else {
+      // Administrador y supervisor usan el endpoint normal
+      response = await inventoryService.getEquipment(filters);
+    } console.log('✅ Respuesta de equipos:', response);
       
       // Manejar diferentes estructuras de respuesta
       let equipos = [];
@@ -329,12 +343,32 @@ const InventoryManagement = () => {
         </div>
       )}
 
-      {/* Estadísticas con el estilo del dashboard */}
-      {stats && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <EquipmentStats stats={stats} />
-        </div>
-      )}
+{/* Estadísticas - Solo admin/supervisor */}
+{user.rol !== 'instalador' && stats && (
+  <div className="bg-white rounded-lg shadow-md p-6">
+    <EquipmentStats stats={stats} />
+  </div>
+)}
+{/* Estadísticas simplificadas para instalador */}
+{user.rol === 'instalador' && stats && (
+  <div className="bg-white rounded-lg shadow-md p-6">
+    <h3 className="text-lg font-semibold mb-4">Mis Equipos</h3>
+    <div className="grid grid-cols-3 gap-4">
+      <div className="text-center p-4 bg-blue-50 rounded-lg">
+        <p className="text-3xl font-bold text-blue-600">{stats.total || 0}</p>
+        <p className="text-sm text-gray-600">Total Asignados</p>
+      </div>
+      <div className="text-center p-4 bg-green-50 rounded-lg">
+        <p className="text-3xl font-bold text-green-600">{stats.disponibles || 0}</p>
+        <p className="text-sm text-gray-600">Disponibles</p>
+      </div>
+      <div className="text-center p-4 bg-purple-50 rounded-lg">
+        <p className="text-3xl font-bold text-purple-600">{stats.instalados || 0}</p>
+        <p className="text-sm text-gray-600">Instalados</p>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Filtros con fondo blanco y sombra */}
       <div className="bg-white rounded-lg shadow-md p-6">

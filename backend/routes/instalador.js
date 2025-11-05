@@ -5,7 +5,34 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 
 // Aplicar autenticación a todas las rutas
 router.use(authenticateToken);
-
+// Obtener MIS equipos asignados (solo del instalador logueado)
+router.get('/mis-equipos', async (req, res) => {
+  try {
+    const instaladorId = req.user.id;
+    
+    const equipos = await Database.query(`
+      SELECT 
+        id, codigo, nombre, tipo, marca, modelo,
+        estado, fecha_asignacion, ubicacion_actual
+      FROM inventario_equipos
+      WHERE instalador_id = ?
+        AND estado IN ('asignado', 'instalado')
+      ORDER BY fecha_asignacion DESC
+    `, [instaladorId]);
+    
+    res.json({
+      success: true,
+      equipos: equipos || []
+    });
+    
+  } catch (error) {
+    console.error('Error obteniendo equipos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener equipos'
+    });
+  }
+});
 // Obtener trabajos del instalador para hoy
 router.get('/mis-trabajos/hoy', async (req, res) => {
   try {
