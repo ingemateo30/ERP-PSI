@@ -434,139 +434,149 @@ static async obtenerTodas(req, res) {
     }
   }
 
-  /**
-   * Obtener estadísticas de facturas
-   */
-  static async obtenerEstadisticas(req, res) {
+ /**
+ * Obtener estadísticas de facturas
+ * GET /api/v1/facturas/stats
+ */
+static async obtenerEstadisticas(req, res) {
+  try {
+    console.log('📊 [FacturasController] Obteniendo estadísticas de facturas');
+    
+    const { 
+      fecha_desde, 
+      fecha_hasta,
+      cliente_id 
+    } = req.query;
+
+    // Verificar si existe la tabla facturas
+    let tablaExiste = true;
     try {
-      const { 
-        fecha_desde, 
-        fecha_hasta,
-        cliente_id 
-      } = req.query;
+      await Database.query('SELECT 1 FROM facturas LIMIT 1');
+    } catch (error) {
+      tablaExiste = false;
+    }
 
-      // Verificar si existe la tabla facturas
-      let tablaExiste = true;
-      try {
-        await Database.query('SELECT 1 FROM facturas LIMIT 1');
-      } catch (error) {
-        tablaExiste = false;
-      }
-
-      if (!tablaExiste) {
-        return res.json({
-          success: true,
-          data: {
-            resumen: {
-              total_facturas: 0,
-              total_clientes: 0,
-              monto_total: 0,
-              monto_pagado: 0,
-              monto_pendiente: 0,
-              monto_vencido: 0,
-              promedio_factura: 0
-            },
-            por_estado: {
-              pagadas: 0,
-              pendientes: 0,
-              vencidas: 0,
-              anuladas: 0
-            },
-            tendencia_mensual: [],
-            periodo: {
-              fecha_desde: fecha_desde || 'Sin filtro',
-              fecha_hasta: fecha_hasta || 'Sin filtro'
-            }
-          },
-          message: 'Estadísticas simuladas - tabla facturas no existe'
-        });
-      }
-
-      let whereClause = 'WHERE f.activo = 1';
-      let queryParams = [];
-
-      if (fecha_desde && fecha_hasta) {
-        whereClause += ' AND f.fecha_emision BETWEEN ? AND ?';
-        queryParams.push(fecha_desde, fecha_hasta);
-      }
-
-      if (cliente_id) {
-        whereClause += ' AND f.cliente_id = ?';
-        queryParams.push(cliente_id);
-      }
-
-      // Estadísticas generales
-      const estadisticas = await Database.query(`
-        SELECT 
-          COUNT(*) as total_facturas,
-          COUNT(DISTINCT f.cliente_id) as total_clientes,
-          SUM(f.total) as monto_total,
-          SUM(CASE WHEN f.estado = 'pagada' THEN f.total ELSE 0 END) as monto_pagado,
-          SUM(CASE WHEN f.estado = 'pendiente' THEN f.total ELSE 0 END) as monto_pendiente,
-          SUM(CASE WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' THEN f.total ELSE 0 END) as monto_vencido,
-          COUNT(CASE WHEN f.estado = 'pagada' THEN 1 END) as facturas_pagadas,
-          COUNT(CASE WHEN f.estado = 'pendiente' THEN 1 END) as facturas_pendientes,
-          COUNT(CASE WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' THEN 1 END) as facturas_vencidas,
-          COUNT(CASE WHEN f.estado = 'anulada' THEN 1 END) as facturas_anuladas,
-          AVG(f.total) as promedio_factura
-        FROM facturas f
-        ${whereClause}
-      `, queryParams);
-
-      // Estadísticas por mes (últimos 6 meses)
-      const estadisticasMensuales = await Database.query(`
-        SELECT 
-          DATE_FORMAT(f.fecha_emision, '%Y-%m') as mes,
-          COUNT(*) as cantidad_facturas,
-          SUM(f.total) as monto_total,
-          COUNT(DISTINCT f.cliente_id) as clientes_activos
-        FROM facturas f
-        WHERE f.activo = 1 
-          AND f.fecha_emision >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-        GROUP BY DATE_FORMAT(f.fecha_emision, '%Y-%m')
-        ORDER BY mes DESC
-        LIMIT 6
-      `);
-
-      const stats = estadisticas[0] || {};
-
-      res.json({
+    if (!tablaExiste) {
+      console.log('⚠️ Tabla facturas no existe');
+      return res.json({
         success: true,
         data: {
-          resumen: {
-            total_facturas: parseInt(stats.total_facturas || 0),
-            total_clientes: parseInt(stats.total_clientes || 0),
-            monto_total: parseFloat(stats.monto_total || 0),
-            monto_pagado: parseFloat(stats.monto_pagado || 0),
-            monto_pendiente: parseFloat(stats.monto_pendiente || 0),
-            monto_vencido: parseFloat(stats.monto_vencido || 0),
-            promedio_factura: parseFloat(stats.promedio_factura || 0)
-          },
-          por_estado: {
-            pagadas: parseInt(stats.facturas_pagadas || 0),
-            pendientes: parseInt(stats.facturas_pendientes || 0),
-            vencidas: parseInt(stats.facturas_vencidas || 0),
-            anuladas: parseInt(stats.facturas_anuladas || 0)
-          },
-          tendencia_mensual: estadisticasMensuales,
-          periodo: {
-            fecha_desde: fecha_desde || 'Sin filtro',
-            fecha_hasta: fecha_hasta || 'Sin filtro'
-          }
+          total: 0,
+          pendientes: 0,
+          pagadas: 0,
+          vencidas: 0,
+          anuladas: 0,
+          valor_total: 0,
+          valor_pendiente: 0,
+          valor_pagado: 0,
+          valor_vencido: 0,
+          promedio_factura: 0,
+          facturas_mora: 0
         },
-        message: 'Estadísticas obtenidas exitosamente'
-      });
-
-    } catch (error) {
-      console.error('❌ Error obteniendo estadísticas:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error obteniendo estadísticas',
-        error: error.message
+        message: 'Tabla facturas no existe'
       });
     }
-  }
 
+    // ✅ CONSTRUCCIÓN DINÁMICA DE FILTROS
+    let whereClause = 'WHERE f.activo = 1';
+    let queryParams = [];
+
+    // Solo aplicar filtro de fecha si se proporcionan AMBAS fechas
+    if (fecha_desde && fecha_hasta) {
+      whereClause += ' AND f.fecha_emision BETWEEN ? AND ?';
+      queryParams.push(fecha_desde, fecha_hasta);
+      console.log('📅 Aplicando filtro de fechas:', { fecha_desde, fecha_hasta });
+    } else {
+      console.log('📊 Sin filtro de fechas - mostrando TODAS las facturas');
+    }
+
+    // Filtro opcional por cliente
+    if (cliente_id) {
+      whereClause += ' AND f.cliente_id = ?';
+      queryParams.push(cliente_id);
+      console.log('👤 Aplicando filtro de cliente:', cliente_id);
+    }
+
+    // ✅ QUERY PRINCIPAL - Estadísticas completas
+    const estadisticas = await Database.query(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(DISTINCT f.cliente_id) as total_clientes,
+        
+        -- Contadores por estado
+        SUM(CASE WHEN f.estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
+        SUM(CASE WHEN f.estado = 'pagada' THEN 1 ELSE 0 END) as pagadas,
+        SUM(CASE WHEN f.estado = 'vencida' THEN 1 ELSE 0 END) as vencidas,
+        SUM(CASE WHEN f.estado = 'anulada' THEN 1 ELSE 0 END) as anuladas,
+        
+        -- Montos por estado
+        SUM(f.total) as valor_total,
+        SUM(CASE WHEN f.estado = 'pagada' THEN f.total ELSE 0 END) as valor_pagado,
+        SUM(CASE WHEN f.estado IN ('pendiente', 'vencida') THEN f.total ELSE 0 END) as valor_pendiente,
+        SUM(CASE WHEN f.estado = 'vencida' THEN f.total ELSE 0 END) as valor_vencido,
+        
+        -- Promedio y mora
+        AVG(f.total) as promedio_factura,
+        SUM(CASE WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' AND f.estado != 'anulada' THEN 1 ELSE 0 END) as facturas_mora
+      FROM facturas f
+      ${whereClause}
+    `, queryParams);
+
+    const stats = estadisticas[0] || {};
+
+    console.log('✅ [FacturasController] Estadísticas calculadas:', {
+      total: stats.total,
+      pendientes: stats.pendientes,
+      pagadas: stats.pagadas,
+      vencidas: stats.vencidas
+    });
+
+    // ✅ RESPUESTA EN FORMATO ESPERADO POR EL FRONTEND
+    res.json({
+      success: true,
+      data: {
+        // Formato principal que espera el frontend
+        total: parseInt(stats.total) || 0,
+        pendientes: parseInt(stats.pendientes) || 0,
+        pagadas: parseInt(stats.pagadas) || 0,
+        vencidas: parseInt(stats.vencidas) || 0,
+        anuladas: parseInt(stats.anuladas) || 0,
+        valor_total: parseFloat(stats.valor_total) || 0,
+        valor_pendiente: parseFloat(stats.valor_pendiente) || 0,
+        valor_pagado: parseFloat(stats.valor_pagado) || 0,
+        valor_vencido: parseFloat(stats.valor_vencido) || 0,
+        promedio_factura: parseFloat(stats.promedio_factura) || 0,
+        facturas_mora: parseInt(stats.facturas_mora) || 0,
+        
+        // Formato adicional (compatibilidad con otros componentes)
+        resumen: {
+          total_facturas: parseInt(stats.total) || 0,
+          total_clientes: parseInt(stats.total_clientes) || 0,
+          monto_total: parseFloat(stats.valor_total) || 0,
+          monto_pagado: parseFloat(stats.valor_pagado) || 0,
+          monto_pendiente: parseFloat(stats.valor_pendiente) || 0,
+          monto_vencido: parseFloat(stats.valor_vencido) || 0,
+          promedio_factura: parseFloat(stats.promedio_factura) || 0
+        },
+        por_estado: {
+          pagadas: parseInt(stats.pagadas) || 0,
+          pendientes: parseInt(stats.pendientes) || 0,
+          vencidas: parseInt(stats.vencidas) || 0,
+          anuladas: parseInt(stats.anuladas) || 0
+        }
+      },
+      message: 'Estadísticas obtenidas exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ [FacturasController] Error obteniendo estadísticas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error obteniendo estadísticas',
+      error: error.message
+    });
+  }
+}
   /**
    * Obtener facturas vencidas
    */
