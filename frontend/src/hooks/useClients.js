@@ -29,29 +29,63 @@ export const useClients = (initialFilters = {}) => {
   };
 
   // Cargar clientes
-  const loadClients = useCallback(async (customFilters = {}) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const searchParams = {
-        page: pagination.currentPage,
-        limit: pagination.itemsPerPage,
-        ...filters,
-        ...customFilters
-      };
+// Cargar clientes
+const loadClients = useCallback(async (customFilters = {}) => {
+  setLoading(true);
+  setError(null);
+  
+  try {
+    const searchParams = {
+      page: pagination.currentPage,
+      limit: pagination.itemsPerPage,
+      ...filters,
+      ...customFilters
+    };
 
-      // Limpiar parámetros vacíos
-      Object.keys(searchParams).forEach(key => {
-        if (searchParams[key] === '' || searchParams[key] === null || searchParams[key] === undefined) {
-          delete searchParams[key];
+    // Limpiar parámetros vacíos
+    Object.keys(searchParams).forEach(key => {
+      if (searchParams[key] === '' || searchParams[key] === null || searchParams[key] === undefined) {
+        delete searchParams[key];
+      }
+    });
+
+    logDebug('Cargando clientes con parámetros', searchParams);
+
+    let response;
+    
+    // NUEVO: Si es instalador, usar endpoint específico
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    
+    if (user?.rol === 'instalador') {
+      logDebug('Usuario instalador detectado, usando endpoint específico');
+      
+      const token = localStorage.getItem('token');
+      const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-clientes`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
-
-      logDebug('Cargando clientes con parámetros', searchParams);
-
-      const response = await clientService.getClients(searchParams);
       
+      const data = await apiResponse.json();
+      
+      response = {
+        success: true,
+        data: data.clientes || [],
+        pagination: {
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: data.clientes?.length || 0,
+          itemsPerPage: data.clientes?.length || 0,
+          hasNextPage: false,
+          hasPrevPage: false
+        }
+      };
+    } else {
+      // Administrador y supervisor usan el endpoint normal
+      response = await clientService.getClients(searchParams);
+    }
       logDebug('Respuesta del servicio', response);
 
       if (response.success) {

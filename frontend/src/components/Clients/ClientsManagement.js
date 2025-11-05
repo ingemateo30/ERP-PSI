@@ -191,8 +191,8 @@ const ClientsManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Estadísticas */}
-      <ClientStats />
+      {/* Estadísticas - Solo admin/supervisor */}
+{user?.rol !== 'instalador' && <ClientStats />}
 
       {/* Header y controles */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -201,21 +201,26 @@ const ClientsManagement = () => {
           {/* Título y botón principal */}
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Gestión de Clientes</h1>
-              <p className="text-gray-600 mt-1">
-                {pagination.total || 0} clientes registrados
-              </p>
-            </div>
+  <h1 className="text-2xl font-bold text-gray-900">
+    {user?.rol === 'instalador' ? 'Mis Clientes Asignados' : 'Gestión de Clientes'}
+  </h1>
+  <p className="text-gray-600 mt-1">
+    {user?.rol === 'instalador' 
+      ? `${pagination.total || 0} clientes con instalaciones` 
+      : `${pagination.total || 0} clientes registrados`
+    }
+  </p>
+</div>
             
-            {permissions.canCreate && (
-              <button
-                onClick={() => setShowForm(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Nuevo Cliente
-              </button>
-            )}
+            {permissions.canCreate && user?.rol !== 'instalador' && (
+  <button
+    onClick={() => setShowForm(true)}
+    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+  >
+    <Plus className="w-4 h-4" />
+    Nuevo Cliente
+  </button>
+)}
           </div>
 
           {/* Controles de acción */}
@@ -232,14 +237,16 @@ const ClientsManagement = () => {
               />
             </div>
 
-            {/* NUEVO: Botón para ver clientes inactivos */}
-            <button
-              onClick={toggleInactivos}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
-            >
-              <UserX className="w-4 h-4" />
-              Ver Inactivos
-            </button>
+            {/* Botón para ver clientes inactivos - Solo admin/supervisor */}
+{user?.rol !== 'instalador' && (
+  <button
+    onClick={toggleInactivos}
+    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+  >
+    <UserX className="w-4 h-4" />
+    Ver Inactivos
+  </button>
+)}
 
             {/* Botón de refrescar */}
             <button
@@ -250,9 +257,9 @@ const ClientsManagement = () => {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
 
-            {/* Exportar */}
-            {permissions.canExport && (
-              <div className="relative">
+            {/* Exportar - Solo admin/supervisor */}
+{permissions.canExport && user?.rol !== 'instalador' && (
+  <div className="relative">
                 <button
                   onClick={() => setShowExportMenu(!showExportMenu)}
                   disabled={exporting}

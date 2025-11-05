@@ -107,6 +107,45 @@ router.get('/mis-incidencias/estadisticas', async (req, res) => {
     });
   }
 });
+// Obtener clientes con instalaciones del instalador
+router.get('/mis-clientes', async (req, res) => {
+  try {
+    const instaladorId = req.user.id;
+    
+    const clientes = await Database.query(`
+      SELECT DISTINCT
+        c.id,
+        c.identificacion,
+        c.nombre,
+        c.correo,
+        c.telefono,
+        c.direccion,
+        c.estado,
+        ci.nombre as municipio_nombre,
+        d.nombre as departamento_nombre,
+        COUNT(DISTINCT i.id) as instalaciones_count
+      FROM clientes c
+      INNER JOIN instalaciones i ON c.id = i.cliente_id
+      LEFT JOIN ciudades ci ON c.municipio_id = ci.id
+      LEFT JOIN departamentos d ON ci.departamento_id = d.id
+      WHERE i.instalador_id = ?
+      GROUP BY c.id
+      ORDER BY c.nombre ASC
+    `, [instaladorId]);
+    
+    res.json({
+      success: true,
+      clientes: clientes || []
+    });
+    
+  } catch (error) {
+    console.error('Error obteniendo clientes:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener clientes'
+    });
+  }
+});
 // Obtener trabajos del instalador para hoy
 router.get('/mis-trabajos/hoy', async (req, res) => {
   try {
