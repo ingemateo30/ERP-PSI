@@ -146,6 +146,62 @@ router.get('/mis-clientes', async (req, res) => {
     });
   }
 });
+// Obtener TODAS mis instalaciones (no solo de hoy)
+router.get('/mis-instalaciones', async (req, res) => {
+  try {
+    const instaladorId = req.user.id;
+    const { estado, fecha_desde, fecha_hasta } = req.query;
+    
+    let whereConditions = ['i.instalador_id = ?'];
+    let params = [instaladorId];
+    
+    if (estado) {
+      whereConditions.push('i.estado = ?');
+      params.push(estado);
+    }
+    
+    if (fecha_desde) {
+      whereConditions.push('i.fecha_programada >= ?');
+      params.push(fecha_desde);
+    }
+    
+    if (fecha_hasta) {
+      whereConditions.push('i.fecha_programada <= ?');
+      params.push(fecha_hasta);
+    }
+    
+    const instalaciones = await Database.query(`
+      SELECT 
+        i.*,
+        c.nombre as cliente_nombre,
+        c.identificacion as cliente_identificacion,
+        c.telefono as cliente_telefono,
+        c.direccion as cliente_direccion,
+        sc.plan_id,
+        ps.nombre as plan_nombre,
+        u.nombre as instalador_nombre
+      FROM instalaciones i
+      INNER JOIN clientes c ON i.cliente_id = c.id
+      LEFT JOIN servicios_cliente sc ON i.servicio_cliente_id = sc.id
+      LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+      LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY i.fecha_programada DESC, i.hora_programada DESC
+    `, params);
+    
+    res.json({
+      success: true,
+      instalaciones: instalaciones || []
+    });
+    
+  } catch (error) {
+    console.error('Error obteniendo instalaciones:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener instalaciones'
+    });
+  }
+});
 // Obtener trabajos del instalador para hoy
 router.get('/mis-trabajos/hoy', async (req, res) => {
   try {

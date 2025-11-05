@@ -24,7 +24,7 @@ import {
   RefreshCw,
   FileText
 } from 'lucide-react';
-
+import { useAuth } from '../../contexts/AuthContext';
 import { instalacionesService } from '../../services/instalacionesService';
 import { useAuth } from '../../contexts/AuthContext';
 import InstalacionModal from './InstalacionModal';
@@ -124,11 +124,51 @@ const InstalacionesManagement = () => {
   // FUNCIONES DE CARGA DE DATOS
   // ==========================================
 
-  const cargarDatos = useCallback(async () => {
-    try {
-      setCargando(true);
-      setError(null);
+const cargarDatos = useCallback(async () => {
+  try {
+    setCargando(true);
+    setError(null);
 
+    let response;
+
+    // Si es instalador, usar endpoint específico
+    if (user?.rol === 'instalador') {
+      console.log('👷 Instalador detectado, cargando solo mis instalaciones');
+      
+      const token = localStorage.getItem('token');
+      const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-instalaciones`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await apiResponse.json();
+      
+      response = {
+        success: true,
+        instalaciones: data.instalaciones || [],
+        pagination: {
+          total: data.instalaciones?.length || 0,
+          totalPages: 1
+        },
+        estadisticas: {
+          total: data.instalaciones?.length || 0,
+          programadas: data.instalaciones?.filter(i => i.estado === 'programada').length || 0,
+          en_proceso: data.instalaciones?.filter(i => i.estado === 'en_proceso').length || 0,
+          completadas: data.instalaciones?.filter(i => i.estado === 'completada').length || 0,
+          canceladas: data.instalaciones?.filter(i => i.estado === 'cancelada').length || 0,
+          vencidas: data.instalaciones?.filter(i => {
+            if (i.estado !== 'programada') return false;
+            const fechaProgramada = new Date(i.fecha_programada);
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            return fechaProgramada < hoy;
+          }).length || 0
+        }
+      };
+    } else {
+      // Admin y supervisor usan el servicio normal
       const parametros = {
         page: paginacion.pagina_actual,
         limit: paginacion.registros_por_pagina,
@@ -136,9 +176,8 @@ const InstalacionesManagement = () => {
       };
 
       console.log('🔄 Cargando datos con parámetros:', parametros);
-
-      const response = await instalacionesService.getInstalaciones(parametros);
-
+      response = await instalacionesService.getInstalaciones(parametros);
+    }
       if (response.success) {
         setInstalaciones(response.instalaciones || []);
         setPaginacion(prev => ({
@@ -619,13 +658,16 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Gestión de Instalaciones
-              </h1>
-              <p className="mt-1 text-sm text-gray-600">
-                Administra las instalaciones de servicios
-              </p>
-            </div>
+  <h1 className="text-2xl font-bold text-gray-900">
+    {user?.rol === 'instalador' ? 'Mis Instalaciones Asignadas' : 'Gestión de Instalaciones'}
+  </h1>
+  <p className="mt-1 text-sm text-gray-600">
+    {user?.rol === 'instalador' 
+      ? 'Instalaciones que me han sido asignadas' 
+      : 'Administra las instalaciones de servicios'
+    }
+  </p>
+</div>
 
             <div className="flex items-center space-x-3">
               {/* ARREGLADO: Botón exportar - Solo admin y supervisor */}
@@ -640,15 +682,17 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
                 </button>
               )}
 
-              {/* Botón crear - Todos los roles pueden crear */}
-              <button
-                onClick={() => abrirModal('crear')}
-                disabled={procesando}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nueva Instalación
-              </button>
+              {/* Botón crear - Solo admin y supervisor */}
+{(user?.rol === 'administrador' || user?.rol === 'supervisor') && (
+  <button
+    onClick={() => abrirModal('crear')}
+    disabled={procesando}
+    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+  >
+    <Plus className="w-4 h-4 mr-2" />
+    Nueva Instalación
+  </button>
+)}
             </div>
           </div>
         </div>
