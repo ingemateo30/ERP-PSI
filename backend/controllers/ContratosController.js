@@ -169,6 +169,13 @@ static async obtenerTodos(req, res) {
                 }
             }
 
+            // ✅ Último fallback - Mensaje más descriptivo si sigue siendo N/A
+            if (plan_nombre === 'N/A') {
+                plan_nombre = 'Sin información de plan';
+                plan_precio = 0;
+                plan_tipo = 'servicio';
+            }
+
             return {
                 ...contrato,
                 plan_nombre,
