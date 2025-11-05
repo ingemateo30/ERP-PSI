@@ -344,7 +344,7 @@ const SupervisorDashboard = () => {
 // ===================================
 const InstaladorDashboard = () => {
     const navigate = useNavigate();
-    const { currentUser, getToken } = useAuth();
+    const { currentUser } = useAuth();
     const [trabajosHoy, setTrabajosHoy] = useState([]);
     const [estadisticas, setEstadisticas] = useState({
         pendientesHoy: 0,
@@ -362,44 +362,66 @@ const InstaladorDashboard = () => {
     const cargarDatos = async () => {
         try {
             setLoading(true);
-            const token = getToken();
+            const token = localStorage.getItem('accessToken');
             
-            console.log('🔍 Token desde localStorage:', token);
+            console.log('🔍 DASHBOARD - Token obtenido:', token ? 'EXISTS' : 'MISSING');
+            console.log('🔍 DASHBOARD - Current User:', currentUser);
             
             if (!token) {
-                console.error('❌ No hay token disponible');
+                console.error('❌ DASHBOARD - No hay token disponible');
                 setLoading(false);
                 return;
             }
             
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+            
+            console.log('📡 DASHBOARD - Haciendo petición a trabajos de hoy...');
+            console.log('📡 DASHBOARD - URL:', `${process.env.REACT_APP_API_URL}/instalador/mis-trabajos/hoy`);
+            
             // Cargar trabajos de hoy
             const respuestaTrabajos = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-trabajos/hoy`, {
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` 
-                }
+                headers
             });
+            
+            console.log('📊 DASHBOARD - Status trabajos:', respuestaTrabajos.status);
+            console.log('📊 DASHBOARD - OK:', respuestaTrabajos.ok);
+            
             const dataTrabajos = await respuestaTrabajos.json();
+            console.log('📦 DASHBOARD - Data trabajos:', dataTrabajos);
             
             if (dataTrabajos.success) {
                 setTrabajosHoy(dataTrabajos.trabajos || []);
+                console.log('✅ DASHBOARD - Trabajos cargados:', dataTrabajos.trabajos?.length || 0);
+            } else {
+                console.error('❌ DASHBOARD - Error en trabajos:', dataTrabajos.message);
             }
 
             // Cargar estadísticas
+            console.log('📡 DASHBOARD - Haciendo petición a estadísticas...');
+            console.log('📡 DASHBOARD - URL:', `${process.env.REACT_APP_API_URL}/instalador/estadisticas`);
+            
             const respuestaEstadisticas = await fetch(`${process.env.REACT_APP_API_URL}/instalador/estadisticas`, {
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` 
-                }
+                headers
             });
+            
+            console.log('📊 DASHBOARD - Status estadísticas:', respuestaEstadisticas.status);
+            
             const dataEstadisticas = await respuestaEstadisticas.json();
+            console.log('📦 DASHBOARD - Data estadísticas:', dataEstadisticas);
             
             if (dataEstadisticas.success) {
                 setEstadisticas(dataEstadisticas.estadisticas);
+                console.log('✅ DASHBOARD - Estadísticas cargadas:', dataEstadisticas.estadisticas);
+            } else {
+                console.error('❌ DASHBOARD - Error en estadísticas:', dataEstadisticas.message);
             }
             
         } catch (error) {
-            console.error('Error cargando datos:', error);
+            console.error('❌ DASHBOARD - Error cargando datos:', error);
+            console.error('❌ DASHBOARD - Error stack:', error.stack);
         } finally {
             setLoading(false);
         }
@@ -407,7 +429,15 @@ const InstaladorDashboard = () => {
 
     const iniciarTrabajo = async (trabajoId) => {
         try {
-            const token = getToken();
+            const token = localStorage.getItem('accessToken');
+            
+            if (!token) {
+                alert('❌ No hay token de autenticación');
+                return;
+            }
+            
+            console.log('🚀 DASHBOARD - Iniciando trabajo ID:', trabajoId);
+            
             const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/instalacion/${trabajoId}/iniciar`, {
                 method: 'POST',
                 headers: {
@@ -417,16 +447,17 @@ const InstaladorDashboard = () => {
             });
             
             const data = await response.json();
+            console.log('📦 DASHBOARD - Respuesta iniciar trabajo:', data);
             
             if (data.success) {
-                alert('✅ Instalación iniciada');
+                alert('✅ Instalación iniciada exitosamente');
                 cargarDatos();
             } else {
-                alert('❌ Error al iniciar instalación');
+                alert('❌ Error al iniciar instalación: ' + (data.message || 'Error desconocido'));
             }
         } catch (error) {
-            console.error('Error:', error);
-            alert('❌ Error de conexión');
+            console.error('❌ DASHBOARD - Error iniciando trabajo:', error);
+            alert('❌ Error de conexión al iniciar instalación');
         }
     };
 
@@ -503,6 +534,7 @@ const InstaladorDashboard = () => {
                 
                 {loading ? (
                     <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0e6493] mx-auto mb-4"></div>
                         <p className="text-gray-500">Cargando trabajos...</p>
                     </div>
                 ) : trabajosHoy.length === 0 ? (
