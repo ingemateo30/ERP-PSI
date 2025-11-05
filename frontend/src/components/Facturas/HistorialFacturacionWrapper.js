@@ -392,33 +392,81 @@ const cargarFacturasCliente = async () => {
         }
     };
 
-    const calcularEstadisticas = (facturasList) => {
-        const stats = facturasList.reduce((acc, factura) => {
-            const total = parseFloat(factura.total || 0);
-
-            acc.total_facturas++;
-            acc.monto_total += total;
-
-            if (factura.estado === 'pagada') {
-                acc.total_pagadas++;
-                acc.monto_pagado += total;
-            } else {
-                acc.total_pendientes++;
-                acc.monto_pendiente += total;
-            }
-
-            return acc;
-        }, {
-            total_facturas: 0,
-            total_pagadas: 0,
-            total_pendientes: 0,
-            monto_total: 0,
-            monto_pagado: 0,
-            monto_pendiente: 0
+ const cargarFacturas = async (clienteId) => {
+  try {
+    setLoadingFacturas(true);
+    setError(null);
+    
+    const response = await facturasService.getHistorialCliente(clienteId);
+    
+    if (response.success) {
+      const facturasData = response.data || [];
+      setFacturas(facturasData);
+      
+      // ✅ PRIORIDAD 1: Usar estadísticas del BACKEND (totales reales)
+      if (response.estadisticas && Object.keys(response.estadisticas).length > 0) {
+        console.log('✅ Usando estadísticas del BACKEND:', response.estadisticas);
+        setEstadisticas({
+          total_facturas: parseInt(response.estadisticas.total_facturas || response.estadisticas.total || 0),
+          total_pagadas: parseInt(response.estadisticas.pagadas || response.estadisticas.total_pagadas || 0),
+          total_pendientes: parseInt(response.estadisticas.pendientes || response.estadisticas.total_pendientes || 0),
+          total_vencidas: parseInt(response.estadisticas.vencidas || response.estadisticas.total_vencidas || 0),
+          monto_total: parseFloat(response.estadisticas.valor_total || response.estadisticas.monto_total || 0),
+          monto_pagado: parseFloat(response.estadisticas.valor_pagado || response.estadisticas.monto_pagado || 0),
+          monto_pendiente: parseFloat(response.estadisticas.valor_pendiente || response.estadisticas.monto_pendiente || 0)
         });
+      } else {
+        // ✅ FALLBACK: Solo si backend no envía estadísticas
+        console.warn('⚠️ Backend sin estadísticas, calculando localmente');
+        calcularEstadisticasLocal(facturasData);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error:', error);
+    setError(error.message);
+  } finally {
+    setLoadingFacturas(false);
+  }
+};
 
-        setEstadisticas(stats);
-    };
+// Función de respaldo (solo usar si backend falla)
+const calcularEstadisticasLocal = (facturasList) => {
+  if (!Array.isArray(facturasList) || facturasList.length === 0) {
+    setEstadisticas({
+      total_facturas: 0, total_pagadas: 0, total_pendientes: 0, total_vencidas: 0,
+      monto_total: 0, monto_pagado: 0, monto_pendiente: 0
+    });
+    return;
+  }
+  
+  // ⚠️ ADVERTENCIA: Esto solo cuenta las facturas CARGADAS, no el total real
+  console.warn('⚠️ Calculando con datos locales - puede no ser el total real');
+  
+  const stats = facturasList.reduce((acc, factura) => {
+    const total = parseFloat(factura.total || 0);
+    acc.total_facturas++;
+    acc.monto_total += total;
+
+    if (factura.estado === 'pagada') {
+      acc.total_pagadas++;
+      acc.monto_pagado += total;
+    } else if (factura.estado === 'vencida') {
+      acc.total_vencidas++;
+      acc.monto_pendiente += total;
+    } else {
+      acc.total_pendientes++;
+      acc.monto_pendiente += total;
+    }
+
+    return acc;
+  }, {
+    total_facturas: 0, total_pagadas: 0, total_pendientes: 0, total_vencidas: 0,
+    monto_total: 0, monto_pagado: 0, monto_pendiente: 0
+  });
+
+  setEstadisticas(stats);
+};
+
 
     const resetearEstadisticas = () => {
         setEstadisticas({
