@@ -31,7 +31,8 @@ const ContratosList = () => {
   const [paginacion, setPaginacion] = useState({
     page: 1,
     totalPages: 1,
-    total: 0
+    total: 0,
+    limit: 10
   });
 
   // Cargar contratos
@@ -53,7 +54,15 @@ const ContratosList = () => {
       
       if (response.success) {
         setContratos(response.data.contratos || []);
-        setPaginacion(response.data.pagination || {});
+        
+        // ✅ CORRECCIÓN: Mapear correctamente la paginación
+        const pag = response.data.pagination || {};
+        setPaginacion({
+          page: pag.page || 1,
+          totalPages: pag.totalPages || 1,
+          total: pag.total || 0,
+          limit: pag.limit || 10
+        });
       } else {
         setError(response.message || 'Error cargando contratos');
       }
@@ -64,7 +73,6 @@ const ContratosList = () => {
       setLoading(false);
     }
   };
-
   const cargarEstadisticas = async () => {
     try {
       const response = await contratosService.obtenerEstadisticas();
