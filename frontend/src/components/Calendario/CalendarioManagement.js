@@ -9,8 +9,10 @@ import { es } from 'date-fns/locale';
 import { AlertTriangle, Bell, TrendingUp, Filter, X } from 'lucide-react';
 import 'tailwindcss/tailwind.css';
 import './CalendarioManagement.css';
+import { useAuth } from '../../contexts/AuthContext';
 
 const CalendarioManagement = () => {
+    const { user } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -129,22 +131,38 @@ const CalendarioManagement = () => {
     });
   }, [events, filters]);
 
-  const load = useCallback(async () => {
+const load = useCallback(async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    console.log('🔄 Cargando eventos del calendario desde el backend...');
+
+    const allEvents = [];
+
+    // 1️⃣ INSTALACIONES
     try {
-      setLoading(true);
-      setError(null);
-      console.log('🔄 Cargando eventos del calendario desde el backend...');
-
-      const allEvents = [];
-
-      // 1️⃣ INSTALACIONES
-      try {
+      let instalaciones = [];
+      
+      if (user?.rol === 'instalador') {
+        // Instalador: solo sus instalaciones
+        console.log('👷 Instalador detectado, cargando solo mis instalaciones');
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-instalaciones`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        const data = await response.json();
+        instalaciones = data.instalaciones || [];
+      } else {
+        // Admin/Supervisor: todas las instalaciones
         const resInstalaciones = await api.get('/instalaciones', { params: { limit: 10000 } });
-        const instalaciones = resInstalaciones?.data?.instalaciones || 
-                             resInstalaciones?.data?.rows || 
-                             resInstalaciones?.data || [];
-
-        const instalacionEvents = instalaciones.map(it => {
+        instalaciones = resInstalaciones?.data?.instalaciones || 
+                       resInstalaciones?.data?.rows || 
+                       resInstalaciones?.data || [];
+      }
+      const instalacionEvents = instalaciones.map(it => {
           const id = it.id ?? it._id;
           const fecha = it.fecha_programada ?? it.fecha;
           const hora = it.hora_programada ?? '08:00:00';
@@ -196,6 +214,7 @@ const CalendarioManagement = () => {
       }
 
       // 2️⃣ CONTRATOS
+      if (user?.rol !== 'instalador') {
       try {
         const resContratos = await api.get('/contratos', { params: { activo: 1 } });
         const contratos = resContratos?.data?.contratos || 
@@ -250,11 +269,12 @@ const CalendarioManagement = () => {
         });
 
         console.log('✅ Contratos cargados');
-      } catch (err) {
-        console.error('❌ Error cargando contratos:', err);
-      }
-
+ } catch (err) {
+    console.error('❌ Error cargando contratos:', err);
+  }
+}
       // 3️⃣ FACTURAS ELECTRÓNICAS
+      if (user?.rol !== 'instalador') {
       try {
         const hoy = new Date();
         const hace6Meses = new Date(hoy.getFullYear(), hoy.getMonth() - 6, 1);
@@ -333,9 +353,10 @@ const CalendarioManagement = () => {
 
         allEvents.push(...facturasEvents);
         console.log('✅ Facturas cargadas:', facturasEvents.length);
-      } catch (err) {
-        console.error('❌ Error cargando facturas:', err);
-      }
+       } catch (err) {
+    console.error('❌ Error cargando facturas:', err);
+  }
+}
 
       setEvents(allEvents);
       console.log('✅ Total eventos combinados:', allEvents.length);
@@ -389,6 +410,7 @@ const CalendarioManagement = () => {
               </span>
             )}
           </button>
+          {user?.rol !== 'instalador' && (
           <button
             onClick={() => setShowReports(!showReports)}
             className={`px-3 py-2 border rounded-md text-sm transition ${
@@ -398,6 +420,7 @@ const CalendarioManagement = () => {
             <TrendingUp className="w-4 h-4 inline mr-1" />
             Reportes
           </button>
+          )}
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`px-3 py-2 border rounded-md text-sm transition ${
@@ -416,120 +439,124 @@ const CalendarioManagement = () => {
         </div>
       </div>
 
-      {/* Panel de Alertas */}
-      {showAlerts && (
-        <div className="mb-4 bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-gray-900">🔔 Alertas y Notificaciones</h3>
-            <button onClick={() => setShowAlerts(false)} className="text-gray-400 hover:text-gray-600">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+{/* Panel de Alertas */}
+{showAlerts && (
+  <div className="mb-4 bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+    <div className="flex items-center justify-between mb-3">
+      <h3 className="text-lg font-semibold text-gray-900">🔔 Alertas y Notificaciones</h3>
+      <button onClick={() => setShowAlerts(false)} className="text-gray-400 hover:text-gray-600">
+        <X className="w-5 h-5" />
+      </button>
+    </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Facturas próximas a vencer */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-yellow-800">⚠️ Vencen en 3 días</h4>
-                <span className="bg-yellow-200 text-yellow-800 text-xs font-bold px-2 py-1 rounded">
-                  {alertas.facturasProximasVencer.length}
-                </span>
-              </div>
-              {alertas.facturasProximasVencer.length > 0 ? (
-                <ul className="text-xs space-y-1">
-                  {alertas.facturasProximasVencer.slice(0, 3).map(f => (
-                    <li key={f.id} className="text-yellow-700">
-                      • {f.extendedProps?.numero_factura} - {f.extendedProps?.cliente_nombre}
-                      <span className="ml-2 text-yellow-600">
-                        (Vence: {format(parseISO(f.extendedProps.fecha_vencimiento), 'dd/MM/yyyy')})
-                      </span>
-                    </li>
-                  ))}
-                  {alertas.facturasProximasVencer.length > 3 && (
-                    <li className="text-yellow-600 font-semibold">
-                      ... y {alertas.facturasProximasVencer.length - 3} más
-                    </li>
-                  )}
-                </ul>
-              ) : (
-                <p className="text-xs text-yellow-600">No hay facturas próximas a vencer</p>
-              )}
-            </div>
-
-            {/* Facturas vencidas */}
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-red-800">🚨 Facturas Vencidas</h4>
-                <span className="bg-red-200 text-red-800 text-xs font-bold px-2 py-1 rounded">
-                  {alertas.facturasVencidas.length}
-                </span>
-              </div>
-              {alertas.facturasVencidas.length > 0 ? (
-                <ul className="text-xs space-y-1">
-                  {alertas.facturasVencidas.slice(0, 3).map(f => (
-                    <li key={f.id} className="text-red-700">
-                      • {f.extendedProps?.numero_factura} - {f.extendedProps?.cliente_nombre}
-                      <span className="ml-2 text-red-600">
-                        ({f.extendedProps?.dias_vencimiento} días)
-                      </span>
-                    </li>
-                  ))}
-                  {alertas.facturasVencidas.length > 3 && (
-                    <li className="text-red-600 font-semibold">
-                      ... y {alertas.facturasVencidas.length - 3} más
-                    </li>
-                  )}
-                </ul>
-              ) : (
-                <p className="text-xs text-red-600">No hay facturas vencidas 🎉</p>
-              )}
-            </div>
-
-            {/* Instalaciones hoy */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-blue-800">🔧 Instalaciones Hoy</h4>
-                <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-1 rounded">
-                  {alertas.instalacionesHoy.length}
-                </span>
-              </div>
-              {alertas.instalacionesHoy.length > 0 ? (
-                <ul className="text-xs space-y-1">
-                  {alertas.instalacionesHoy.map(i => (
-                    <li key={i.id} className="text-blue-700">
-                      • {i.extendedProps?.cliente_nombre} - {i.extendedProps?.hora_programada}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-blue-600">No hay instalaciones programadas hoy</p>
-              )}
-            </div>
-
-            {/* Contratos próximos a vencer */}
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-purple-800">📄 Contratos (7 días)</h4>
-                <span className="bg-purple-200 text-purple-800 text-xs font-bold px-2 py-1 rounded">
-                  {alertas.contratosProximosVencer.length}
-                </span>
-              </div>
-              {alertas.contratosProximosVencer.length > 0 ? (
-                <ul className="text-xs space-y-1">
-                  {alertas.contratosProximosVencer.map(c => (
-                    <li key={c.id} className="text-purple-700">
-                      • {c.extendedProps?.cliente_nombre} - Contrato #{c.extendedProps?.numero_contrato}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-purple-600">No hay contratos próximos a vencer</p>
-              )}
-            </div>
-          </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Instalaciones hoy */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-semibold text-blue-800">🔧 Instalaciones Hoy</h4>
+          <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-1 rounded">
+            {alertas.instalacionesHoy.length}
+          </span>
         </div>
-      )}
+        {alertas.instalacionesHoy.length > 0 ? (
+          <ul className="text-xs space-y-1">
+            {alertas.instalacionesHoy.map(i => (
+              <li key={i.id} className="text-blue-700">
+                • {i.extendedProps?.cliente_nombre} - {i.extendedProps?.hora_programada}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-blue-600">No hay instalaciones programadas hoy</p>
+        )}
+      </div>
 
+      {/* Solo admin/supervisor ven alertas financieras */}
+      {user?.rol !== 'instalador' && (
+        <>
+          {/* Facturas próximas a vencer */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold text-yellow-800">⚠️ Vencen en 3 días</h4>
+              <span className="bg-yellow-200 text-yellow-800 text-xs font-bold px-2 py-1 rounded">
+                {alertas.facturasProximasVencer.length}
+              </span>
+            </div>
+            {alertas.facturasProximasVencer.length > 0 ? (
+              <ul className="text-xs space-y-1">
+                {alertas.facturasProximasVencer.slice(0, 3).map(f => (
+                  <li key={f.id} className="text-yellow-700">
+                    • {f.extendedProps?.numero_factura} - {f.extendedProps?.cliente_nombre}
+                    <span className="ml-2 text-yellow-600">
+                      (Vence: {format(parseISO(f.extendedProps.fecha_vencimiento), 'dd/MM/yyyy')})
+                    </span>
+                  </li>
+                ))}
+                {alertas.facturasProximasVencer.length > 3 && (
+                  <li className="text-yellow-600 font-semibold">
+                    ... y {alertas.facturasProximasVencer.length - 3} más
+                  </li>
+                )}
+              </ul>
+            ) : (
+              <p className="text-xs text-yellow-600">No hay facturas próximas a vencer</p>
+            )}
+          </div>
+
+          {/* Facturas vencidas */}
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold text-red-800">🚨 Facturas Vencidas</h4>
+              <span className="bg-red-200 text-red-800 text-xs font-bold px-2 py-1 rounded">
+                {alertas.facturasVencidas.length}
+              </span>
+            </div>
+            {alertas.facturasVencidas.length > 0 ? (
+              <ul className="text-xs space-y-1">
+                {alertas.facturasVencidas.slice(0, 3).map(f => (
+                  <li key={f.id} className="text-red-700">
+                    • {f.extendedProps?.numero_factura} - {f.extendedProps?.cliente_nombre}
+                    <span className="ml-2 text-red-600">
+                      ({f.extendedProps?.dias_vencimiento} días)
+                    </span>
+                  </li>
+                ))}
+                {alertas.facturasVencidas.length > 3 && (
+                  <li className="text-red-600 font-semibold">
+                    ... y {alertas.facturasVencidas.length - 3} más
+                  </li>
+                )}
+              </ul>
+            ) : (
+              <p className="text-xs text-red-600">No hay facturas vencidas 🎉</p>
+            )}
+          </div>
+
+          {/* Contratos próximos a vencer */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold text-purple-800">📄 Contratos (7 días)</h4>
+              <span className="bg-purple-200 text-purple-800 text-xs font-bold px-2 py-1 rounded">
+                {alertas.contratosProximosVencer.length}
+              </span>
+            </div>
+            {alertas.contratosProximosVencer.length > 0 ? (
+              <ul className="text-xs space-y-1">
+                {alertas.contratosProximosVencer.map(c => (
+                  <li key={c.id} className="text-purple-700">
+                    • {c.extendedProps?.cliente_nombre} - Contrato #{c.extendedProps?.numero_contrato}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-purple-600">No hay contratos próximos a vencer</p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+)}
       {/* Panel de Reportes */}
       {showReports && (
         <div className="mb-4 bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
@@ -666,7 +693,8 @@ const CalendarioManagement = () => {
             <div className="text-3xl">🔧</div>
           </div>
         </div>
-
+        {user?.rol !== 'instalador' && (
+  <>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -688,10 +716,10 @@ const CalendarioManagement = () => {
               </p>
             </div>
             <div className="text-3xl">📄</div>
-          </div>
-        </div>
-      </div>
-
+           </div>
+    </div>
+  </>
+)}
       {/* Leyenda de colores */}
       <div className="mb-4 bg-white rounded-lg shadow p-4">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">🎨 Códigos de Color:</h3>
