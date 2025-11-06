@@ -79,26 +79,21 @@ const loadStats = async () => {
 
     const raw = response.data ?? response.stats ?? response.message ?? response;
 
-    // ✅ Reconstruimos la estructura exacta que el componente espera
+    // ✅ Normalizar nombres y convertir a número
     const normalized = {
-      general: {
-        total_equipos: Number(raw.total ?? 0),
-        disponibles: Number(raw.disponibles ?? 0),
-        asignados: Number(raw.asignados ?? 0),
-        instalados: Number(raw.instalados ?? 0),
-        en_mantenimiento: Number(raw.en_reparacion ?? 0),
-        dañados: Number(raw.danados ?? 0),
-        perdidos: Number(raw.perdidos ?? 0),
-        valor_total_inventario: Number(raw.valor_inventario ?? 0),
-      },
-      por_tipo: raw.por_tipo ?? [],
-      por_instalador: raw.por_instalador ?? [],
-      movimientos_recientes: raw.movimientos_recientes ?? []
+      totalEquipos: Number(raw.total ?? 0),
+      disponiblesEquipos: Number(raw.disponibles ?? 0),
+      asignadosEquipos: Number(raw.asignados ?? 0),
+      instaladosEquipos: Number(raw.instalados ?? 0),
+      reparacionEquipos: Number(raw.en_reparacion ?? 0),
+      danadosEquipos: Number(raw.danados ?? 0),
+      perdidosEquipos: Number(raw.perdidos ?? 0),
+      valorInventario: Number(raw.valor_inventario ?? 0)
     };
 
     setStats(normalized);
 
-    console.log("📌 Estadísticas procesadas (estructura correcta):", normalized);
+    console.log("📌 Estadísticas procesadas (normalizadas):", normalized);
 
   } catch (error) {
     console.error('Error cargando estadísticas:', error);
