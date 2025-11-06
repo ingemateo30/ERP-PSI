@@ -10,7 +10,7 @@ import { AlertTriangle, Bell, TrendingUp, Filter, X } from 'lucide-react';
 import 'tailwindcss/tailwind.css';
 import './CalendarioManagement.css';
 import { useAuth } from '../../contexts/AuthContext';
-
+import { instalacionesService } from '../../services/instalacionesService';
 const CalendarioManagement = () => {
     const { user } = useAuth();
   const [events, setEvents] = useState([]);
@@ -144,18 +144,10 @@ const load = useCallback(async () => {
       let instalaciones = [];
       
       if (user?.rol === 'instalador') {
-        // Instalador: solo sus instalaciones
-        console.log('👷 Instalador detectado, cargando solo mis instalaciones');
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-instalaciones`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        const data = await response.json();
-        instalaciones = data.instalaciones || [];
-      } else {
+  console.log('👷 Instalador detectado, cargando solo mis instalaciones');
+  const apiResponse = await instalacionesService.getMisInstalaciones();
+  instalaciones = apiResponse.instalaciones || [];
+} else {
         // Admin/Supervisor: todas las instalaciones
         const resInstalaciones = await api.get('/instalaciones', { params: { limit: 10000 } });
         instalaciones = resInstalaciones?.data?.instalaciones || 
