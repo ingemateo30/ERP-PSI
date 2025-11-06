@@ -74,120 +74,23 @@ const loadEquipment = useCallback(async () => {
   // Cargar estadísticas
 // frontend/src/components/Inventory/InventoryManagement.js
 const loadStats = async () => {
-  try {
-    const response = await inventoryService.getStats();
-    console.log('📊 Estadísticas recibidas raw:', response);
-
-    // Normalizar el payload base (cubre: response, response.data, response.stats, response.message)
-    const raw = (response && typeof response === 'object')
-      ? (response.data ?? response.stats ?? response.message ?? response)
-      : {};
-
-    // Si raw es array (por error), lo ignoramos y dejamos objetos vacíos
-    const safeRaw = Array.isArray(raw) ? {} : (raw || {});
-
-    // Helper para convertir a número seguro (si pasa '7' -> 7, si pasa null/NaN -> 0)
-    const toNumber = (v) => {
-      const n = Number(String(v ?? 0).replace(/[^0-9\.\-]/g, ''));
-      return Number.isFinite(n) ? n : 0;
-    };
-
-    // Detectores simples por forma de la respuesta
-    const hasGeneral = !!safeRaw.general && typeof safeRaw.general === 'object';
-    const hasTopLevelTotals = 'total' in safeRaw || 'disponibles' in safeRaw || 'asignados' in safeRaw;
-
-    // Construimos estructura final esperada por EquipmentStats (defensiva)
-    let normalized = {
-      general: {
-        total_equipos: 0,
-        disponibles: 0,
-        asignados: 0,
-        instalados: 0,
-        en_mantenimiento: 0,
-        dañados: 0,
-        perdidos: 0,
-        valor_total_inventario: 0
-      },
-      por_tipo: [],
-      por_instalador: [],
-      movimientos_recientes: []
-    };
-
-    if (hasGeneral) {
-      const g = safeRaw.general;
-      normalized.general = {
-        total_equipos: toNumber(g.total_equipos ?? g.total ?? g.totalEquipos),
-        disponibles: toNumber(g.disponibles ?? g.disponiblesEquipos ?? safeRaw.disponibles),
-        asignados: toNumber(g.asignados ?? g.asignadosEquipos ?? safeRaw.asignados),
-        instalados: toNumber(g.instalados ?? g.instaladosEquipos ?? safeRaw.instalados),
-        en_mantenimiento: toNumber(g.en_mantenimiento ?? g.en_reparacion ?? g.enReparacion ?? safeRaw.en_reparacion),
-        dañados: toNumber(g.dañados ?? g.danados ?? safeRaw.danados),
-        perdidos: toNumber(g.perdidos ?? safeRaw.perdidos),
-        valor_total_inventario: toNumber(g.valor_total_inventario ?? g.valor_inventario ?? safeRaw.valor_inventario)
-      };
-
-      normalized.por_tipo = Array.isArray(safeRaw.por_tipo) ? safeRaw.por_tipo : (safeRaw.por_tipo ?? []);
-      normalized.por_instalador = Array.isArray(safeRaw.por_instalador) ? safeRaw.por_instalador : (safeRaw.por_instalador ?? []);
-      normalized.movimientos_recientes = Array.isArray(safeRaw.movimientos_recientes) ? safeRaw.movimientos_recientes : (safeRaw.movimientos_recientes ?? []);
-
-    } else if (hasTopLevelTotals) {
-      // Cuando la API devuelve { total, disponibles, asignados, ... }
-      normalized.general = {
-        total_equipos: toNumber(safeRaw.total ?? safeRaw.totalEquipos),
-        disponibles: toNumber(safeRaw.disponibles ?? safeRaw.disponiblesEquipos),
-        asignados: toNumber(safeRaw.asignados ?? safeRaw.asignadosEquipos),
-        instalados: toNumber(safeRaw.instalados ?? safeRaw.instaladosEquipos),
-        en_mantenimiento: toNumber(safeRaw.en_reparacion ?? safeRaw.reparacion ?? safeRaw.en_mantenimiento),
-        dañados: toNumber(safeRaw.danados),
-        perdidos: toNumber(safeRaw.perdidos),
-        valor_total_inventario: toNumber(safeRaw.valor_inventario ?? safeRaw.valorTotalInventario)
-      };
-
-      normalized.por_tipo = Array.isArray(safeRaw.por_tipo) ? safeRaw.por_tipo : (safeRaw.por_tipo ?? []);
-      normalized.por_instalador = Array.isArray(safeRaw.por_instalador) ? safeRaw.por_instalador : (safeRaw.por_instalador ?? []);
-      normalized.movimientos_recientes = Array.isArray(safeRaw.movimientos_recientes) ? safeRaw.movimientos_recientes : (safeRaw.movimientos_recientes ?? []);
-    } else {
-      // Intento de mapear claves alternativas que ya normalizaste en consola
-      normalized.general = {
-        total_equipos: toNumber(safeRaw.totalEquipos ?? safeRaw.total ?? 0),
-        disponibles: toNumber(safeRaw.disponiblesEquipos ?? safeRaw.disponibles ?? 0),
-        asignados: toNumber(safeRaw.asignadosEquipos ?? safeRaw.asignados ?? 0),
-        instalados: toNumber(safeRaw.instaladosEquipos ?? safeRaw.instalados ?? 0),
-        en_mantenimiento: toNumber(safeRaw.reparacionEquipos ?? safeRaw.en_reparacion ?? 0),
-        dañados: toNumber(safeRaw.danadosEquipos ?? safeRaw.danados ?? 0),
-        perdidos: toNumber(safeRaw.perdidosEquipos ?? safeRaw.perdidos ?? 0),
-        valor_total_inventario: toNumber(safeRaw.valorInventario ?? safeRaw.valor_total_inventario ?? 0)
-      };
-
-      normalized.por_tipo = Array.isArray(safeRaw.por_tipo) ? safeRaw.por_tipo : (safeRaw.por_tipo ?? []);
-      normalized.por_instalador = Array.isArray(safeRaw.por_instalador) ? safeRaw.por_instalador : (safeRaw.por_instalador ?? []);
-      normalized.movimientos_recientes = Array.isArray(safeRaw.movimientos_recientes) ? safeRaw.movimientos_recientes : (safeRaw.movimientos_recientes ?? []);
+    try {
+      const response = await inventoryService.getStats();
+      console.log('📊 Estadísticas recibidas:', response);
+      
+      // Manejar la estructura de la respuesta
+      if (response.data) {
+        setStats(response.data);
+      } else if (response.message) {
+        setStats(response.message);
+      } else {
+        setStats(response);
+      }
+    } catch (error) {
+      console.error('Error cargando estadísticas:', error);
+      // No mostrar error por estadísticas, es opcional
     }
-
-    // Evitar referencias mutables accidentales
-    setStats(JSON.parse(JSON.stringify(normalized)));
-
-    console.log('📌 Estadísticas procesadas (defensivas):', normalized);
-
-  } catch (error) {
-    console.error('❌ Error en loadStats (safe):', error);
-    setStats({
-      general: {
-        total_equipos: 0,
-        disponibles: 0,
-        asignados: 0,
-        instalados: 0,
-        en_mantenimiento: 0,
-        dañados: 0,
-        perdidos: 0,
-        valor_total_inventario: 0
-      },
-      por_tipo: [],
-      por_instalador: [],
-      movimientos_recientes: []
-    });
-  }
-};
+  };
 
  // Exportar equipos a CSV
   const handleExportarCSV = () => {
