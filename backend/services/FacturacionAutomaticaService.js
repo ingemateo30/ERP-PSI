@@ -153,8 +153,7 @@ class FacturacionAutomaticaService {
           LEFT JOIN facturas f ON c.id = f.cliente_id 
             AND f.activo = '1'
             AND f.estado != 'anulada'
-          WHERE c.activo = 1
-            AND c.estado = 'activo'
+          WHERE c.estado = 'activo'
           GROUP BY c.id, c.identificacion, c.nombre, c.estrato, c.fecha_registro
           ORDER BY c.id ASC
         `);
