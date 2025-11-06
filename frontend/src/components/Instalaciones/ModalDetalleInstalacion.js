@@ -103,7 +103,7 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
         setEquipos([]);
       }
 
-// Parsear fotos
+// Parsear fotos - VERSIÓN MEJORADA
       try {
         let fotosData = null;
         
@@ -117,42 +117,43 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
             : instalacion.fotos;
         }
 
-        console.log('📷 MODAL DETALLE - Fotos parseadas:', fotosData);
-        console.log('📷 MODAL DETALLE - Cantidad de fotos:', Array.isArray(fotosData) ? fotosData.length : 0);
+        console.log('📷 MODAL DETALLE - Fotos raw:', fotosData);
 
-        if (fotosData && Array.isArray(fotosData)) {
-          // Si es un array de strings (base64 directo)
-          if (typeof fotosData[0] === 'string' && fotosData[0].startsWith('data:image')) {
-            console.log('📷 Detectado: Array de strings base64');
-            console.log('📷 Foto 0:', fotosData[0] ? 'EXISTS' : 'NULL');
-            console.log('📷 Foto 1:', fotosData[1] ? 'EXISTS' : 'NULL');
+        if (fotosData && Array.isArray(fotosData) && fotosData.length > 0) {
+          // Filtrar fotos válidas (que sean strings base64 o objetos con url/data)
+          const fotosValidas = fotosData.filter(foto => {
+            if (typeof foto === 'string' && foto.startsWith('data:image')) {
+              return true;
+            }
+            if (foto && typeof foto === 'object' && (foto.url || foto.data)) {
+              return true;
+            }
+            return false;
+          });
+
+          console.log('📷 Fotos válidas encontradas:', fotosValidas.length);
+
+          // Asignar las fotos
+          if (fotosValidas.length >= 1) {
+            const primeraFoto = typeof fotosValidas[0] === 'string' 
+              ? fotosValidas[0] 
+              : (fotosValidas[0].url || fotosValidas[0].data);
             
-            setFotos({
-              antes: fotosData[0] || null,
-              despues: fotosData[1] || null
-            });
-          } 
-          // Si es un array de objetos con descripcion y url/data
-          else if (fotosData[0] && typeof fotosData[0] === 'object') {
-            console.log('📷 Detectado: Array de objetos');
-            const fotoAntes = fotosData.find(f => 
-              f.descripcion?.toLowerCase().includes('antes')
-            );
-            const fotoDespues = fotosData.find(f => 
-              f.descripcion?.toLowerCase().includes('después') || 
-              f.descripcion?.toLowerCase().includes('despues')
-            );
-
-            console.log('📷 Foto ANTES encontrada:', fotoAntes);
-            console.log('📷 Foto DESPUÉS encontrada:', fotoDespues);
+            const segundaFoto = fotosValidas.length >= 2
+              ? (typeof fotosValidas[1] === 'string' 
+                  ? fotosValidas[1] 
+                  : (fotosValidas[1].url || fotosValidas[1].data))
+              : null;
 
             setFotos({
-              antes: fotoAntes?.url || fotoAntes?.data || null,
-              despues: fotoDespues?.url || fotoDespues?.data || null
+              antes: primeraFoto,
+              despues: segundaFoto
             });
+
+            console.log('📷 Fotos asignadas - Antes:', primeraFoto ? 'SI' : 'NO', 'Después:', segundaFoto ? 'SI' : 'NO');
           }
         } else {
-          console.log('📷 No se detectaron fotos válidas');
+          console.log('📷 No hay fotos en el array');
           setFotos({ antes: null, despues: null });
         }
       } catch (e) {
