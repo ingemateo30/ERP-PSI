@@ -320,7 +320,7 @@ function App() {
               <Route
                 path="/clients"
                 element={
-                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
+                  <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Detalle de Cliente" subtitle="">
                       <ClientsManagement />
                     </MainLayout>

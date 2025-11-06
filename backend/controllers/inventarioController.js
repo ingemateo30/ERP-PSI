@@ -2,6 +2,7 @@
 
 const InventoryModel = require('../models/inventario');
 const { validationResult } = require('express-validator');
+const { Database } = require('../models/Database'); 
 
 class InventoryController {
 
@@ -469,30 +470,13 @@ class InventoryController {
         }
     }
 
-    /**
-     * Obtener estadísticas del inventario
-     */
-    static async getStats(req, res) {
-        try {
-            const stats = await InventoryModel.getStats();
-
-            res.json({
-                success: true,
-                data: stats
-            });
-        } catch (error) {
-            console.error('Error en getStats:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error interno del servidor',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    }
-
+   
     /**
      * Obtener reporte por rango de fechas
      */
+/**
+ * Obtener estadísticas del inventario
+ */
 static async getStats(req, res) {
   try {
     console.log('📊 getStats - Usuario autenticado:', req.user);
@@ -504,6 +488,9 @@ static async getStats(req, res) {
         message: 'Usuario no autenticado'
       });
     }
+
+    // AGREGAR ESTE IMPORT SI NO EXISTE
+    const { Database } = require('../models/Database');
 
     let whereClause = '';
     let params = [];
@@ -530,7 +517,7 @@ static async getStats(req, res) {
 
     res.json({
       success: true,
-      stats: stats || {
+      data: stats || {
         total: 0,
         disponibles: 0,
         asignados: 0,
