@@ -19,7 +19,7 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
 
   const cargarEquiposDisponibles = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('accessToken'); // ✅ CAMBIO 1
       const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-equipos`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -77,11 +77,12 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
     setLoading(true);
 
     try {
-     const token = localStorage.getItem('token');
-if (!token) {
-    console.error('❌ No hay token');
-    return;
-}
+      const token = localStorage.getItem('accessToken'); // ✅ CAMBIO 2
+      if (!token) {
+        console.error('❌ No hay token');
+        alert('❌ No estás autenticado. Por favor inicia sesión nuevamente.');
+        return;
+      }
       
       const formData = {
         equipos: equiposSeleccionados,
