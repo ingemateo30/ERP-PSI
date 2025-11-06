@@ -73,23 +73,21 @@ const loadEquipment = useCallback(async () => {
 }, [filters, user.rol]);
   // Cargar estadísticas
   const loadStats = async () => {
-    try {
-      const response = await inventoryService.getStats();
-      console.log('📊 Estadísticas recibidas:', response);
-      
-      // Manejar la estructura de la respuesta
-      if (response.data) {
-        setStats(response.data);
-      } else if (response.message) {
-        setStats(response.message);
-      } else {
-        setStats(response);
-      }
-    } catch (error) {
-      console.error('Error cargando estadísticas:', error);
-      // No mostrar error por estadísticas, es opcional
-    }
-  };
+  try {
+    const response = await inventoryService.getStats();
+    console.log('📊 Estadísticas recibidas:', response);
+
+    // ✅ Normalizar SIEMPRE la respuesta igual que con equipos
+    const stats = response.data ?? response.stats ?? response.message ?? response;
+
+    setStats(stats);
+    
+    console.log("📌 Estadísticas procesadas:", stats);
+
+  } catch (error) {
+    console.error('Error cargando estadísticas:', error);
+  }
+};
  // Exportar equipos a CSV
   const handleExportarCSV = () => {
     try {
