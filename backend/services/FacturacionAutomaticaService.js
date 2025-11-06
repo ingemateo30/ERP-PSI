@@ -223,7 +223,7 @@ class FacturacionAutomaticaService {
             COUNT(f.id) as total_facturas,
             MAX(f.fecha_hasta) as ultima_fecha_facturada,
             MIN(sc.fecha_activacion) as fecha_activacion_servicios,
-            MIN(i.fecha_instalacion_real) as fecha_instalacion_real,
+            MIN(i.fecha_realizada) as fecha_instalacion_real,
             MIN(i.fecha_programada) as fecha_instalacion_programada
           FROM clientes c
           LEFT JOIN facturas f ON c.id = f.cliente_id AND f.estado != 'anulada'
