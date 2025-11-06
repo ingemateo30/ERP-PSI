@@ -474,7 +474,9 @@ class InventoryController {
     /**
      * Obtener reporte por rango de fechas
      */
-// ✅ MANTENER SOLO ESTA FUNCIÓN
+/**
+ * Obtener estadísticas del inventario
+ */
 static async getStats(req, res) {
   try {
     console.log('📊 getStats - Usuario autenticado:', req.user);
@@ -487,7 +489,7 @@ static async getStats(req, res) {
       });
     }
 
-    // AGREGAR ESTE IMPORT AL INICIO DEL ARCHIVO SI NO ESTÁ
+    // AGREGAR ESTE IMPORT SI NO EXISTE
     const { Database } = require('../models/Database');
 
     let whereClause = '';
@@ -515,7 +517,7 @@ static async getStats(req, res) {
 
     res.json({
       success: true,
-      stats: stats || {
+      data: stats || {
         total: 0,
         disponibles: 0,
         asignados: 0,
