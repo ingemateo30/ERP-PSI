@@ -477,65 +477,23 @@ class InventoryController {
 /**
  * Obtener estadísticas del inventario
  */
-static async getStats(req, res) {
-  try {
-    console.log('📊 getStats - Usuario autenticado:', req.user);
-    
-    // Validar que req.user existe
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: 'Usuario no autenticado'
-      });
+ static async getStats(req, res) {
+        try {
+            const stats = await InventoryModel.getStats();
+
+            res.json({
+                success: true,
+                data: stats
+            });
+        } catch (error) {
+            console.error('Error en getStats:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error interno del servidor',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
     }
-
-    // AGREGAR ESTE IMPORT SI NO EXISTE
-    const { Database } = require('../models/Database');
-
-    let whereClause = '';
-    let params = [];
-
-    // Si es instalador, filtrar por su ID
-    if (req.user.rol === 'instalador') {
-      whereClause = 'WHERE instalador_id = ?';
-      params = [req.user.id];
-    }
-
-    const query = `
-      SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN estado = 'disponible' THEN 1 ELSE 0 END) as disponibles,
-        SUM(CASE WHEN estado = 'asignado' THEN 1 ELSE 0 END) as asignados,
-        SUM(CASE WHEN estado = 'instalado' THEN 1 ELSE 0 END) as instalados,
-        SUM(CASE WHEN estado = 'en_reparacion' THEN 1 ELSE 0 END) as en_reparacion,
-        SUM(CASE WHEN estado = 'dado_de_baja' THEN 1 ELSE 0 END) as dados_de_baja
-      FROM inventario_equipos
-      ${whereClause}
-    `;
-
-    const [stats] = await Database.query(query, params);
-
-    res.json({
-      success: true,
-      data: stats || {
-        total: 0,
-        disponibles: 0,
-        asignados: 0,
-        instalados: 0,
-        en_reparacion: 0,
-        dados_de_baja: 0
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error en getStats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener estadísticas',
-      error: error.message
-    });
-  }
-}
     // ==========================================
     // UTILIDADES
     // ==========================================
