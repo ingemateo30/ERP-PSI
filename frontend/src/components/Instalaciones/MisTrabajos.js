@@ -37,44 +37,55 @@ const MisTrabajos = () => {
 
   // Cargar trabajos del instalador
   const cargarTrabajos = async () => {
-    try {
-      setCargando(true);
-      setError(null);
+  try {
+    setCargando(true);
+    setError(null);
 
-    
-      const params = filtroEstado !== 'todos' ? { estado: filtroEstado } : {};
-const response = await apiService.get(
-  `/instalaciones/mis-trabajos/${user.id}`,
-  params
-);
-
-      if (response.data.success) {
-        setInstalaciones(response.data.data || []);
-        
-        // Calcular estadísticas
-        const stats = {
-          pendientes: 0,
-          en_proceso: 0,
-          completadas_hoy: 0
-        };
-
-        response.data.data?.forEach(inst => {
-          if (inst.estado === 'programada') stats.pendientes++;
-          else if (inst.estado === 'en_proceso') stats.en_proceso++;
-          else if (inst.estado === 'completada' && esHoy(inst.fecha_realizada)) {
-            stats.completadas_hoy++;
-          }
-        });
-
-        setEstadisticas(stats);
+    // ✅ Usar el mismo endpoint que el Dashboard
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-instalaciones`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
-    } catch (err) {
-      console.error('Error cargando trabajos:', err);
-      setError(err.response?.data?.message || 'Error cargando trabajos');
-    } finally {
-      setCargando(false);
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      const todasInstalaciones = data.instalaciones || [];
+      
+      // Filtrar según el estado seleccionado
+      let instalacionesFiltradas = todasInstalaciones;
+      if (filtroEstado === 'pendiente') {
+        instalacionesFiltradas = todasInstalaciones.filter(inst => inst.estado === 'programada');
+      } else if (filtroEstado === 'en_proceso') {
+        instalacionesFiltradas = todasInstalaciones.filter(inst => inst.estado === 'en_proceso');
+      } else if (filtroEstado === 'completada') {
+        instalacionesFiltradas = todasInstalaciones.filter(inst => inst.estado === 'completada');
+      }
+      // Si es 'todas', no filtra
+      
+      setInstalaciones(instalacionesFiltradas);
+      
+      // Calcular estadísticas con TODAS las instalaciones
+      const stats = {
+        pendientes: todasInstalaciones.filter(inst => inst.estado === 'programada').length,
+        en_proceso: todasInstalaciones.filter(inst => inst.estado === 'en_proceso').length,
+        completadas_hoy: todasInstalaciones.filter(inst => 
+          inst.estado === 'completada' && esHoy(inst.fecha_realizada)
+        ).length
+      };
+
+      setEstadisticas(stats);
     }
-  };
+  } catch (err) {
+    console.error('Error cargando trabajos:', err);
+    setError('Error cargando trabajos');
+  } finally {
+    setCargando(false);
+  }
+};
 
   useEffect(() => {
     if (user?.id) {
