@@ -132,26 +132,19 @@ const cargarDatos = useCallback(async () => {
     let response;
 
     // Si es instalador, usar endpoint específico
-    if (user?.rol === 'instalador') {
-      console.log('👷 Instalador detectado, cargando solo mis instalaciones');
-      
-      const token = localStorage.getItem('token');
-      const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-instalaciones`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const data = await apiResponse.json();
-      
-      response = {
-        success: true,
-        instalaciones: data.instalaciones || [],
-        pagination: {
-          total: data.instalaciones?.length || 0,
-          totalPages: 1
-        },
+if (user?.rol === 'instalador') {
+  console.log('👷 Instalador detectado, cargando solo mis instalaciones');
+  
+  // ✅ Usar el servicio en lugar de fetch directo
+  const apiResponse = await instalacionesService.getMisInstalaciones();
+  
+  response = {
+    success: true,
+    instalaciones: apiResponse.instalaciones || [],
+    pagination: {
+      total: apiResponse.instalaciones?.length || 0,
+      totalPages: 1
+    },
         estadisticas: {
           total: data.instalaciones?.length || 0,
           programadas: data.instalaciones?.filter(i => i.estado === 'programada').length || 0,

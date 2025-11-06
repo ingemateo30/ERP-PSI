@@ -338,7 +338,27 @@ export const instalacionesService = {
       };
     }
   },
+// Agregar este método ANTES del cierre final del objeto
 
+async getMisInstalaciones() {
+  try {
+    console.log('👷 Obteniendo mis instalaciones como instalador');
+    const response = await apiService.get('/instalador/mis-instalaciones');
+    console.log('👷 Respuesta mis instalaciones:', response);
+
+    return {
+      success: true,
+      instalaciones: response.instalaciones || []
+    };
+  } catch (error) {
+    console.error('❌ Error obteniendo mis instalaciones:', error);
+    return { 
+      success: false, 
+      instalaciones: [], 
+      message: error.message 
+    };
+  }
+},
   // ==========================================
   // ESTADÍSTICAS Y REPORTES
   // ==========================================
