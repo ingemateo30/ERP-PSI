@@ -130,21 +130,14 @@ const cargarEstadisticas = async () => {
         let response;
         
         if (user?.rol === 'instalador') {
-            const token = localStorage.getItem('token');
-            const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-incidencias/estadisticas`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            const data = await apiResponse.json();
-            response = {
-                success: true,
-                estadisticas: {
-                    resumen: data.estadisticas,
-                    por_estado: []
-                }
-            };
+    const data = await apiService.get('/instalador/mis-incidencias/estadisticas');
+    response = {
+        success: true,
+        estadisticas: {
+            resumen: data.estadisticas,
+            por_estado: []
+        }
+    };
         } else {
             response = await incidenciasService.getEstadisticas();
         }
