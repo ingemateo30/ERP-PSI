@@ -140,11 +140,7 @@ router.get('/installer/:instaladorId/equipment',
   requireRole(['supervisor', 'administrador', 'instalador']),
   param('instaladorId').isInt({ min: 1 }).withMessage('ID de instalador no válido'),
   (req, res, next) => {
-<<<<<<< HEAD
-    if (req.user.rol === 'administrador' || req.user.rol === 'supervisor') { InventoryController.getInstallerEquipment}
-=======
->>>>>>> 2b48e6ecd4ec02f7fed3aa13d95ee38730c3bcf2
-    if (req.user.rol === 'instalador' && req.user.id != req.params.instaladorId) {
+if (req.user.rol === 'instalador' && req.user.id != req.params.instaladorId) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para ver equipos de otros instaladores'
@@ -155,10 +151,7 @@ router.get('/installer/:instaladorId/equipment',
   InventoryController.getInstallerEquipment
 );
 
-<<<<<<< HEAD
 
-=======
->>>>>>> 2b48e6ecd4ec02f7fed3aa13d95ee38730c3bcf2
 router.get('/test', (req, res) => {
   res.json({
     success: true,
