@@ -49,70 +49,35 @@ const loadEquipment = useCallback(async () => {
     // Si es instalador, usar endpoint específico
     let response;
     if (user.rol === 'instalador') {
-      // Llamar al endpoint de mis equipos
-      const token = localStorage.getItem('token');
-      const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-equipos`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      response = await apiResponse.json();
+      // ✅ Usar el servicio en lugar de fetch directo
+      response = await inventoryService.getMisEquipos();
     } else {
-      // Administrador y supervisor usan el endpoint normal
+      // Admin y supervisor usan el servicio normal
       response = await inventoryService.getEquipment(filters);
-    } console.log('✅ Respuesta de equipos:', response);
-      
-      // Manejar diferentes estructuras de respuesta
-      let equipos = [];
-      let pagination = {};
-      
-      if (response.equipos && response.pagination) {
-        // Estructura directa: { equipos: [], pagination: {} }
-        equipos = response.equipos;
-        pagination = response.pagination;
-        console.log('📋 Estructura directa detectada');
-      } else if (response.data && response.data.equipos) {
-        // Estructura: { success: true, data: { equipos: [], pagination: {} } }
-        equipos = response.data.equipos;
-        pagination = response.data.pagination || {};
-        console.log('📋 Estructura con data detectada');
-      } else if (response.message && response.message.equipos) {
-        // Estructura: { success: true, message: { equipos: [], pagination: {} } }
-        equipos = response.message.equipos;
-        pagination = response.message.pagination || {};
-        console.log('📋 Estructura con message detectada');
-      } else if (Array.isArray(response)) {
-        // Respuesta directa como array
-        equipos = response;
-        pagination = { total: response.length, currentPage: 1, totalPages: 1 };
-        console.log('📋 Array directo detectado');
-      } else {
-        console.warn('⚠️ Estructura de respuesta inesperada:', response);
-        equipos = [];
-        pagination = {};
-      }
-      
-      console.log('📦 Equipos procesados:', equipos.length);
-      console.log('📄 Paginación:', pagination);
-      
-      setEquipos(equipos);
-      setPagination(pagination);
-      
-    } catch (error) {
-      console.error('❌ Error cargando equipos:', error);
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        url: error.config?.url
-      });
-      setError('Error al cargar los equipos: ' + error.message);
-    } finally {
-      setLoading(false);
     }
-  }, [filters]);
-
+    
+    console.log('✅ Respuesta de equipos:', response);
+    
+    if (response && response.success) {
+      setEquipos(response.equipos || response.data || []);
+      setPagination(response.pagination || {});
+    } else {
+      console.warn('⚠️ Estructura de respuesta inesperada:', response);
+      setEquipos([]);
+      setPagination({});
+    }
+    
+    console.log('📦 Equipos procesados:', (response?.equipos || response?.data || []).length);
+    console.log('📄 Paginación:', response?.pagination || {});
+    
+  } catch (error) {
+    console.error('❌ Error cargando equipos:', error);
+    inventoryService.handleError(error, setError);
+    setEquipos([]);
+  } finally {
+    setLoading(false);
+  }
+}, [filters, user.rol]);
   // Cargar estadísticas
   const loadStats = async () => {
     try {

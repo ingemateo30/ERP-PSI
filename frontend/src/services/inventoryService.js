@@ -36,7 +36,27 @@ class InventoryService {
       throw this.handleError(error);
     }
   }
-  
+  // Agregar ANTES del cierre final del objeto inventoryService
+
+async getMisEquipos() {
+  try {
+    console.log('👷 Obteniendo mis equipos como instalador');
+    const response = await apiService.get('/instalador/mis-equipos');
+    console.log('👷 Respuesta mis equipos:', response);
+
+    return {
+      success: true,
+      equipos: response.equipos || response.data || []
+    };
+  } catch (error) {
+    console.error('❌ Error obteniendo mis equipos:', error);
+    return { 
+      success: false, 
+      equipos: [], 
+      message: error.message 
+    };
+  }
+}
   /**
    * Obtener equipo por ID
    */
