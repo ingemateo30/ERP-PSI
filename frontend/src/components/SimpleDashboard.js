@@ -1,4 +1,5 @@
 // frontend/src/components/SimpleDashboard.js
+import ModalDetalleInstalacion from './ModalDetalleInstalacion';
 import ModalCompletarInstalacion from './Instalador/ModalCompletarInstalacion';
 import React, { useState, useEffect } from 'react';
 import {
@@ -354,6 +355,8 @@ const InstaladorDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [modalCompletarOpen, setModalCompletarOpen] = useState(false);
     const [instalacionSeleccionada, setInstalacionSeleccionada] = useState(null);
+     const [modalDetalle, setModalDetalle] = useState(false);
+    const [instalacionDetalle, setInstalacionDetalle] = useState(null);
 
     useEffect(() => {
         cargarDatos();
@@ -593,16 +596,25 @@ const InstaladorDashboard = () => {
                                         </button>
                                     )}
                                     {trabajo.estado === 'en_proceso' && (
-                                        <button
-                                            onClick={() => {
-                                                setInstalacionSeleccionada(trabajo);
-                                                setModalCompletarOpen(true);
-                                            }}
-                                            className="mt-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
-                                        >
-                                            Completar
-                                        </button>
-                                    )}
+  <button
+    onClick={() => {
+      setInstalacionSeleccionada(trabajo);
+      setModalCompletarOpen(true);
+    }}
+    className="mt-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+  >
+    Completar
+  </button>
+)}
+<button
+  onClick={() => {
+    setInstalacionDetalle(trabajo);
+    setModalDetalle(true);
+  }}
+  className="mt-2 px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded transition-colors"
+>
+  Ver Detalle
+</button>
                                 </div>
                             </div>
                         ))}
@@ -610,16 +622,27 @@ const InstaladorDashboard = () => {
                 )}
             </div>
 
-            {/* Modal Completar Instalación */}
+           {/* Modal Completar Instalación */}
             <ModalCompletarInstalacion
                 isOpen={modalCompletarOpen}
                 onClose={() => setModalCompletarOpen(false)}
                 instalacion={instalacionSeleccionada}
                 onSuccess={cargarDatos}
             />
+
+            {/* Modal de Detalle */}
+            <ModalDetalleInstalacion
+                isOpen={modalDetalle}
+                onClose={() => {
+                    setModalDetalle(false);
+                    setInstalacionDetalle(null);
+                }}
+                instalacion={instalacionDetalle}
+            />
         </>
     );
-};// ===================================
+};
+// ===================================
 // DASHBOARD PARA OPERADORES
 // ===================================
 const OperadorDashboard = () => {
