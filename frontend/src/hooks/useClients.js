@@ -30,6 +30,7 @@ export const useClients = (initialFilters = {}) => {
 
   // Cargar clientes
 // Cargar clientes
+// Cargar clientes
 const loadClients = useCallback(async (customFilters = {}) => {
   setLoading(true);
   setError(null);
@@ -51,62 +52,30 @@ const loadClients = useCallback(async (customFilters = {}) => {
 
     logDebug('Cargando clientes con parámetros', searchParams);
 
-    let response;
-    
-    // NUEVO: Si es instalador, usar endpoint específico
-    const userStr = localStorage.getItem('user');
-    const user = userStr ? JSON.parse(userStr) : null;
-    
-    if (user?.rol === 'instalador') {
-      logDebug('Usuario instalador detectado, usando endpoint específico');
+    // USAR clientService que ya maneja el token correctamente
+    const response = await clientService.getClients(searchParams);
       
-      const token = localStorage.getItem('token');
-      const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-clientes`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const data = await apiResponse.json();
-      
-      response = {
-        success: true,
-        data: data.clientes || [],
-        pagination: {
-          currentPage: 1,
-          totalPages: 1,
-          totalItems: data.clientes?.length || 0,
-          itemsPerPage: data.clientes?.length || 0,
-          hasNextPage: false,
-          hasPrevPage: false
-        }
-      };
-    } else {
-      // Administrador y supervisor usan el endpoint normal
-      response = await clientService.getClients(searchParams);
-    }
-      logDebug('Respuesta del servicio', response);
+    logDebug('Respuesta del servicio', response);
 
-      if (response.success) {
-        setClients(response.data || []);
-        setPagination(response.pagination || pagination);
-        logDebug('Clientes cargados exitosamente', {
-          count: response.data?.length || 0,
-          pagination: response.pagination
-        });
-      } else {
-        setError(response.message || 'Error cargando clientes');
-        setClients([]);
-      }
-    } catch (err) {
-      logDebug('Error cargando clientes', err);
-      setError(err.message || 'Error de conexión');
+    if (response.success) {
+      setClients(response.data || []);
+      setPagination(response.pagination || pagination);
+      logDebug('Clientes cargados exitosamente', {
+        count: response.data?.length || 0,
+        pagination: response.pagination
+      });
+    } else {
+      setError(response.message || 'Error cargando clientes');
       setClients([]);
-    } finally {
-      setLoading(false);
     }
-  }, [filters, pagination.currentPage, pagination.itemsPerPage, debugMode]);
+  } catch (err) {
+    logDebug('Error cargando clientes', err);
+    setError(err.message || 'Error de conexión');
+    setClients([]);
+  } finally {
+    setLoading(false);
+  }
+}, [filters, pagination.currentPage, pagination.itemsPerPage, debugMode]);
 
   // Cambiar página
   const changePage = useCallback((newPage) => {

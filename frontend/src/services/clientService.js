@@ -122,60 +122,45 @@ handleError(error, operacion = 'operación') {
 
     return new Error(mensaje);
   }
-  // Obtener lista de clientes con filtros y paginación
-  async getClients(params = {}) {
-    try {
-      this.log('Obteniendo lista de clientes', params);
-
-      const queryParams = new URLSearchParams();
-
-      // Parámetros de paginación
-      if (params.page) queryParams.append('page', params.page);
-      if (params.limit) queryParams.append('limit', params.limit);
-
-      // Filtros
-      if (params.estado) queryParams.append('estado', params.estado);
-      if (params.identificacion) queryParams.append('identificacion', params.identificacion);
-      if (params.nombre) queryParams.append('nombre', params.nombre);
-      if (params.sector_id) queryParams.append('sector_id', params.sector_id);
-      if (params.ciudad_id) queryParams.append('ciudad_id', params.ciudad_id);
-      if (params.telefono) queryParams.append('telefono', params.telefono);
-
-      const url = `${CLIENT_ENDPOINTS.LIST}?${queryParams.toString()}`;
-      this.log('URL de petición', url);
-
-      const response = await apiService.get(url);
-      this.log('Respuesta del servidor', response);
-
-      // Procesar fechas en la respuesta
-      if (response.data && Array.isArray(response.data)) {
-        response.data = response.data.map(cliente => ({
-          ...cliente,
-          fecha_registro: this.corregirFechaUTC(cliente.fecha_registro),
-          fecha_inicio_servicio: this.corregirFechaUTC(cliente.fecha_inicio_servicio),
-          fecha_fin_servicio: this.corregirFechaUTC(cliente.fecha_fin_servicio),
-          updated_at: cliente.updated_at ? new Date(cliente.updated_at).toLocaleString('es-CO') : null,
-          created_at: cliente.created_at ? new Date(cliente.created_at).toLocaleString('es-CO') : null
-        }));
-      }
-
-      return {
-        success: true,
-        data: response.data,
-        pagination: response.pagination,
-        message: response.message
-      };
-    } catch (error) {
-      this.log('Error obteniendo clientes', error);
-      return {
-        success: false,
-        data: [],
-        pagination: null,
-        message: error.message || 'Error al cargar clientes'
-      };
+ // Obtener lista de clientes con filtros y paginación
+async getClients(params = {}) {
+  try {
+    this.log('Obteniendo lista de clientes', params);
+    
+    // Detectar si es instalador
+    const user = authService.getCurrentUserInfo();
+    
+    if (user?.rol === 'instalador') {
+      this.log('Usuario instalador detectado, usando endpoint específico');
+      return this.getMisClientes();
     }
-  }
 
+    const queryParams = new URLSearchParams();
+
+    // Parámetros de paginación
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+
+    // Filtros
+    if (params.estado) queryParams.append('estado', params.estado);
+    if (params.identificacion) queryParams.append('identificacion', params.identificacion);
+    if (params.nombre) queryParams.append('nombre', params.nombre);
+    if (params.sector_id) queryParams.append('sector_id', params.sector_id);
+    if (params.ciudad_id) queryParams.append('ciudad_id', params.ciudad_id);
+    if (params.telefono) queryParams.append('telefono', params.telefono);
+
+    const url = `${CLIENT_ENDPOINTS.LIST}?${queryParams.toString()}`;
+    this.log('URL de petición', url);
+
+    const response = await apiService.get(url);
+    this.log('Respuesta del servidor', response);
+
+    return response;
+  } catch (error) {
+    this.log('Error obteniendo clientes', error);
+    throw this.handleError(error, 'obtener clientes');
+  }
+}
   // CORRECCIÓN: Función para obtener estadísticas de clientes
   async getClientStats() {
     try {
@@ -208,7 +193,41 @@ handleError(error, operacion = 'operación') {
       };
     }
   }
-
+// Obtener clientes del instalador actual
+async getMisClientes() {
+  try {
+    this.log('Obteniendo mis clientes como instalador');
+    
+    const user = authService.getCurrentUserInfo();
+    
+    if (user?.rol === 'instalador') {
+      // Usar endpoint específico de instalador
+      const response = await apiService.get('/instalador/mis-clientes');
+      this.log('Respuesta mis-clientes', response);
+      
+      if (response.success) {
+        return {
+          success: true,
+          data: response.clientes || [],
+          pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            totalItems: response.clientes?.length || 0,
+            itemsPerPage: response.clientes?.length || 0,
+            hasNextPage: false,
+            hasPrevPage: false
+          }
+        };
+      }
+    }
+    
+    // Fallback a método normal
+    return this.getClients();
+  } catch (error) {
+    this.log('Error obteniendo mis clientes', error);
+    throw this.handleError(error, 'obtener clientes');
+  }
+}
   // Obtener cliente por ID
   async getClientById(id) {
     try {
