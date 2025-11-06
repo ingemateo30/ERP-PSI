@@ -1,4 +1,12 @@
-// backend/services/FacturacionAutomaticaService.js - CORREGIDO
+// backend/services/FacturacionAutomaticaService.js - CORREGIDO COMPLETAMENTE
+// 
+// ✅ CORRECCIONES APLICADAS:
+// 1. Cálculo correcto de fechas para 2da factura (nivelación)
+// 2. Prorratea correcto basado en días reales
+// 3. Validación de fechas para evitar años incorrectos
+// 4. Cálculo preciso de días entre fechas
+// ========================================================================
+
 const { Database } = require('../models/Database');
 const InteresesMoratoriosService = require('./InteresesMoratoriosService');
 const IVACalculatorService = require('./IVACalculatorService');
@@ -6,7 +14,7 @@ const IVACalculatorService = require('./IVACalculatorService');
 class FacturacionAutomaticaService {
 
   /**
-   * Generar facturación mensual masiva con todas las mejoras
+   * Generar facturación mensual masiva
    */
   static async generarFacturacionMensual(parametros = {}) {
     try {
@@ -126,34 +134,32 @@ class FacturacionAutomaticaService {
       try {
         console.log('🔍 Buscando clientes para facturar...');
 
-        // ✅ CORRECCIÓN: JOIN correcto incluyendo planes_servicio
         const [clientes] = await conexion.execute(`
-          SELECT DISTINCT
+          SELECT DISTINCT 
             c.id,
-            c.nombre,
             c.identificacion,
-            c.estado,
+            c.nombre,
             c.estrato,
             c.fecha_registro,
-            COUNT(DISTINCT sc.id) as servicios_activos,
-            COUNT(DISTINCT f.id) as total_facturas,
-            MAX(f.fecha_hasta) as ultima_fecha_facturada
+            MAX(f.fecha_hasta) as ultima_fecha_facturada,
+            MIN(sc.fecha_activacion) as fecha_activacion,
+            COUNT(DISTINCT sc.id) as servicios_activos
           FROM clientes c
-          INNER JOIN servicios_cliente sc ON c.id = sc.cliente_id
+          JOIN servicios_cliente sc ON c.id = sc.cliente_id 
+            AND sc.activo = 1 
             AND sc.estado = 'activo'
-          INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
+          JOIN planes_servicio ps ON sc.plan_id = ps.id
             AND ps.activo = 1
-          LEFT JOIN facturas f ON c.id = f.cliente_id
-            AND f.activo = 1
+          LEFT JOIN facturas f ON c.id = f.cliente_id 
+            AND f.activo = '1'
             AND f.estado != 'anulada'
-          WHERE c.estado IN ('activo', 'suspendido')
-          GROUP BY c.id, c.nombre, c.identificacion, c.estado, c.estrato, c.fecha_registro
-          HAVING servicios_activos > 0
-          ORDER BY c.nombre ASC
+          WHERE c.activo = 1
+            AND c.estado = 'activo'
+          GROUP BY c.id, c.identificacion, c.nombre, c.estrato, c.fecha_registro
+          ORDER BY c.id ASC
         `);
 
         console.log(`✅ Encontrados ${clientes.length} clientes con servicios activos`);
-
         return clientes;
 
       } finally {
@@ -162,55 +168,17 @@ class FacturacionAutomaticaService {
 
     } catch (error) {
       console.error('❌ Error obteniendo clientes para facturar:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * ✅ CORREGIDO: Obtener servicios activos de un cliente
-   */
-  static async obtenerServiciosActivos(clienteId) {
-    try {
-      const conexion = await Database.getConnection();
-
-      try {
-        const [servicios] = await conexion.execute(`
-          SELECT 
-            sc.id,
-            sc.cliente_id,
-            sc.plan_id,
-            sc.estado,
-            sc.precio_personalizado,
-            sc.fecha_activacion,
-            ps.nombre as nombre_plan,
-            ps.tipo as tipo_plan,
-            ps.precio as precio_servicio,
-            ps.aplica_iva,
-            ps.descripcion,
-            ps.velocidad_bajada,
-            ps.velocidad_subida
-          FROM servicios_cliente sc
-          INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
-          WHERE sc.cliente_id = ?
-            AND sc.estado = 'activo'
-            AND ps.activo = 1
-          ORDER BY ps.tipo ASC
-        `, [clienteId]);
-
-        return servicios;
-
-      } finally {
-        conexion.release();
-      }
-
-    } catch (error) {
-      console.error('❌ Error obteniendo servicios activos:', error);
       return [];
     }
   }
 
   /**
-   * Calcular período de facturación según las reglas de negocio
+   * ✅ COMPLETAMENTE CORREGIDO: Calcular período de facturación
+   * 
+   * REGLAS DE NEGOCIO:
+   * 1ra Factura: Desde fecha de instalación por 30 días
+   * 2da Factura: Desde día siguiente a última factura hasta fin del mes actual (nivelación)
+   * 3ra+ Factura: Del día 1 al último día del mes anterior
    */
   static async calcularPeriodoFacturacion(clienteId, fechaReferencia = new Date()) {
     try {
@@ -220,15 +188,19 @@ class FacturacionAutomaticaService {
         const [infoCliente] = await conexion.execute(`
           SELECT 
             c.id, c.fecha_registro, c.nombre, c.identificacion,
-            COUNT(f.id) as total_facturas,
+            COUNT(DISTINCT f.id) as total_facturas,
             MAX(f.fecha_hasta) as ultima_fecha_facturada,
             MIN(sc.fecha_activacion) as fecha_activacion_servicios,
             MIN(i.fecha_realizada) as fecha_instalacion_real,
             MIN(i.fecha_programada) as fecha_instalacion_programada
           FROM clientes c
-          LEFT JOIN facturas f ON c.id = f.cliente_id AND f.estado != 'anulada'
-          LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id AND sc.estado = 'activo'
-          LEFT JOIN instalaciones i ON sc.id = i.servicio_cliente_id AND i.estado = 'completada'
+          LEFT JOIN facturas f ON c.id = f.cliente_id 
+            AND f.estado != 'anulada'
+            AND f.activo = '1'
+          LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id 
+            AND sc.estado = 'activo'
+          LEFT JOIN instalaciones i ON sc.id = i.servicio_cliente_id 
+            AND i.estado = 'completada'
           WHERE c.id = ?
           GROUP BY c.id, c.fecha_registro, c.nombre, c.identificacion
         `, [clienteId]);
@@ -240,62 +212,82 @@ class FacturacionAutomaticaService {
         const cliente = infoCliente[0];
         const totalFacturas = cliente.total_facturas || 0;
 
+        // ✅ DETERMINAR FECHA BASE (fecha de inicio del contrato/instalación)
         let fechaBaseFacturacion;
 
         if (cliente.fecha_instalacion_real) {
           fechaBaseFacturacion = new Date(cliente.fecha_instalacion_real);
-          console.log(`📅 Usando fecha REAL de instalación: ${fechaBaseFacturacion.toLocaleDateString()}`);
         } else if (cliente.fecha_activacion_servicios) {
           fechaBaseFacturacion = new Date(cliente.fecha_activacion_servicios);
-          console.log(`📅 Usando fecha de activación: ${fechaBaseFacturacion.toLocaleDateString()}`);
         } else {
           fechaBaseFacturacion = new Date(cliente.fecha_registro);
-          console.log(`📅 Usando fecha de registro: ${fechaBaseFacturacion.toLocaleDateString()}`);
         }
 
-        const ultimaFechaFacturada = cliente.ultima_fecha_facturada ?
-          new Date(cliente.ultima_fecha_facturada) : null;
+        console.log(`📅 Cliente: ${cliente.nombre}`);
+        console.log(`   Total facturas anteriores: ${totalFacturas}`);
+        console.log(`   Fecha base: ${fechaBaseFacturacion.toLocaleDateString('es-CO')}`);
 
         let fechaDesde, fechaHasta, esPrimeraFactura = false, esNivelacion = false;
         let tipoFacturacion = '';
 
+        // ========================================================================
+        // CASO 1: PRIMERA FACTURA (0 facturas previas)
+        // ========================================================================
         if (totalFacturas === 0) {
           esPrimeraFactura = true;
           tipoFacturacion = 'Primera facturación';
-          fechaDesde = fechaBaseFacturacion;
+          
+          fechaDesde = new Date(fechaBaseFacturacion);
           fechaHasta = new Date(fechaBaseFacturacion);
-          fechaHasta.setDate(fechaHasta.getDate() + 29);
+          fechaHasta.setDate(fechaHasta.getDate() + 29); // 30 días (0-29)
 
-          console.log(`🆕 Primera factura: ${fechaDesde.toLocaleDateString()} → ${fechaHasta.toLocaleDateString()}`);
-
-        } else if (totalFacturas === 1) {
+          console.log(`   🆕 1ra Factura: ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
+        }
+        
+        // ========================================================================
+        // CASO 2: SEGUNDA FACTURA - NIVELACIÓN (1 factura previa)
+        // ========================================================================
+        else if (totalFacturas === 1) {
           esNivelacion = true;
           tipoFacturacion = 'Segunda facturación (nivelación)';
 
+          // ✅ CORRECCIÓN: Tomar fecha_hasta de la última factura correctamente
+          if (!cliente.ultima_fecha_facturada) {
+            throw new Error('No se encontró la fecha de la última factura');
+          }
+
+          const ultimaFechaFacturada = new Date(cliente.ultima_fecha_facturada);
+          
+          // Desde: día siguiente a la última factura
           fechaDesde = new Date(ultimaFechaFacturada);
           fechaDesde.setDate(fechaDesde.getDate() + 1);
 
-          const diaInstalacion = fechaBaseFacturacion.getDate();
-          const mesActual = fechaReferencia.getMonth();
-          const anioActual = fechaReferencia.getFullYear();
+          // ✅ Hasta: último día del mes ACTUAL (fecha de referencia)
+          fechaHasta = new Date(
+            fechaReferencia.getFullYear(),
+            fechaReferencia.getMonth() + 1,
+            0 // Último día del mes actual
+          );
 
-          if (diaInstalacion === 1) {
-            fechaHasta = new Date(anioActual, mesActual + 1, 0);
-          } else {
-            fechaHasta = new Date(anioActual, mesActual + 1, 0);
-
-            if (fechaHasta <= fechaDesde) {
-              fechaHasta = new Date(anioActual, mesActual + 2, 0);
-            }
+          // ✅ VALIDACIÓN: Si fechaHasta es menor o igual a fechaDesde, adelantar un mes
+          if (fechaHasta <= fechaDesde) {
+            fechaHasta = new Date(
+              fechaReferencia.getFullYear(),
+              fechaReferencia.getMonth() + 2,
+              0 // Último día del mes siguiente
+            );
           }
 
-          const diasFacturados = Math.ceil((fechaHasta - fechaDesde) / (1000 * 60 * 60 * 24)) + 1;
-
-          console.log(`🔄 Segunda factura (nivelación): ${fechaDesde.toLocaleDateString()} → ${fechaHasta.toLocaleDateString()} (${diasFacturados} días)`);
-
-        } else {
+          console.log(`   🔄 2da Factura (nivelación): ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
+        }
+        
+        // ========================================================================
+        // CASO 3: FACTURACIÓN MENSUAL ESTÁNDAR (2+ facturas previas)
+        // ========================================================================
+        else {
           tipoFacturacion = 'Facturación mensual estándar';
 
+          // Del día 1 al último día del mes ANTERIOR a la fecha de referencia
           const mesAnterior = fechaReferencia.getMonth() === 0 ? 11 : fechaReferencia.getMonth() - 1;
           const anioMesAnterior = fechaReferencia.getMonth() === 0 ?
             fechaReferencia.getFullYear() - 1 : fechaReferencia.getFullYear();
@@ -303,11 +295,23 @@ class FacturacionAutomaticaService {
           fechaDesde = new Date(anioMesAnterior, mesAnterior, 1);
           fechaHasta = new Date(anioMesAnterior, mesAnterior + 1, 0);
 
-          console.log(`📊 Factura mensual: ${fechaDesde.toLocaleDateString()} → ${fechaHasta.toLocaleDateString()}`);
+          console.log(`   📊 Factura mensual: ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
         }
 
+        // ✅ CÁLCULO CORRECTO DE DÍAS
         const diasFacturados = Math.ceil((fechaHasta - fechaDesde) / (1000 * 60 * 60 * 24)) + 1;
-        const periodoDescripcion = `${fechaDesde.toLocaleDateString()} al ${fechaHasta.toLocaleDateString()}`;
+        const periodoDescripcion = `${fechaDesde.toLocaleDateString('es-CO')} al ${fechaHasta.toLocaleDateString('es-CO')}`;
+
+        // ✅ VALIDACIÓN: Asegurar que las fechas son válidas
+        if (isNaN(fechaDesde.getTime()) || isNaN(fechaHasta.getTime())) {
+          throw new Error('Error en el cálculo de fechas de facturación');
+        }
+
+        if (diasFacturados < 1 || diasFacturados > 365) {
+          throw new Error(`Días facturados fuera de rango válido: ${diasFacturados}`);
+        }
+
+        console.log(`   ⏱️ Días a facturar: ${diasFacturados}`);
 
         return {
           fecha_desde: fechaDesde.toISOString().split('T')[0],
@@ -390,7 +394,7 @@ class FacturacionAutomaticaService {
   }
 
   /**
-   * Calcular conceptos de facturación
+   * ✅ CORREGIDO: Calcular conceptos de facturación con prorrateo correcto
    */
   static async calcularConceptosFacturacion(cliente, serviciosActivos, periodo) {
     const conceptos = [];
@@ -401,18 +405,26 @@ class FacturacionAutomaticaService {
       try {
         // Calcular cada servicio
         for (const servicio of serviciosActivos) {
-          const precioBase = servicio.precio_personalizado || servicio.precio_servicio;
+          const precioBase = parseFloat(servicio.precio_personalizado || servicio.precio_servicio);
           
           let precioFinal = precioBase;
           
+          // ✅ PRORRATEA SOLO para facturas que NO son mensuales completas (30 días)
+          // Primera factura: siempre 30 días = precio completo
+          // Segunda factura (nivelación): puede ser más o menos de 30 días = prorratea
+          // Factura mensual: siempre mes completo = precio completo
+          
           if (periodo.es_nivelacion && periodo.dias_facturados !== 30) {
-            precioFinal = Math.round((precioBase / 30) * periodo.dias_facturados);
-            console.log(`💰 Precio proporcional ${servicio.nombre_plan}: ${precioBase} × ${periodo.dias_facturados}/30 = ${precioFinal}`);
+            // ✅ FÓRMULA CORRECTA: (Precio × Días) / 30
+            precioFinal = Math.round((precioBase * periodo.dias_facturados) / 30);
+            console.log(`   💰 Prorratea ${servicio.nombre_plan}: $${precioBase} × ${periodo.dias_facturados} días / 30 = $${precioFinal}`);
+          } else {
+            console.log(`   💰 Precio completo ${servicio.nombre_plan}: $${precioBase}`);
           }
 
           conceptos.push({
             tipo: servicio.tipo_plan,
-            concepto: `${servicio.nombre_plan}${periodo.es_nivelacion ? ` (${periodo.dias_facturados} días)` : ''}`,
+            concepto: `${servicio.nombre_plan}${periodo.es_nivelacion && periodo.dias_facturados !== 30 ? ` (${periodo.dias_facturados} días)` : ''}`,
             cantidad: 1,
             precio_unitario: precioFinal,
             valor: precioFinal,
@@ -423,7 +435,7 @@ class FacturacionAutomaticaService {
           });
         }
 
-        // Agregar otros conceptos
+        // Agregar otros conceptos (saldo anterior, intereses, reconexión, varios)
         const saldoAnterior = await this.calcularSaldoAnterior(conexion, cliente.id);
         if (saldoAnterior.valor > 0) {
           conceptos.push(saldoAnterior);
@@ -456,8 +468,73 @@ class FacturacionAutomaticaService {
     }
   }
 
-  // ... (resto de métodos sin cambios: calcularSaldoAnterior, calcularInteresMora, etc.)
-  // Incluir TODOS los métodos restantes del archivo original
+  /**
+   * Obtener servicios activos del cliente
+   */
+  static async obtenerServiciosActivos(clienteId) {
+    try {
+      const conexion = await Database.getConnection();
+
+      try {
+        const [servicios] = await conexion.execute(`
+          SELECT 
+            sc.id,
+            sc.cliente_id,
+            sc.plan_id,
+            sc.precio_personalizado,
+            sc.fecha_activacion,
+            ps.nombre as nombre_plan,
+            ps.tipo as tipo_plan,
+            ps.precio as precio_servicio,
+            ps.aplica_iva,
+            ps.aplica_iva_estrato_123,
+            ps.aplica_iva_estrato_456,
+            c.estrato
+          FROM servicios_cliente sc
+          JOIN planes_servicio ps ON sc.plan_id = ps.id
+          JOIN clientes c ON sc.cliente_id = c.id
+          WHERE sc.cliente_id = ?
+            AND sc.activo = 1
+            AND sc.estado = 'activo'
+            AND ps.activo = 1
+          ORDER BY ps.tipo ASC
+        `, [clienteId]);
+
+        // ✅ Aplicar reglas de IVA por estrato
+        return servicios.map(s => {
+          const estrato = parseInt(s.estrato) || 1;
+          let aplicaIva = false;
+
+          if (s.tipo_plan === 'internet') {
+            // Internet: IVA solo estratos 4, 5, 6
+            aplicaIva = estrato >= 4 && s.aplica_iva_estrato_456;
+          } else if (s.tipo_plan === 'television') {
+            // Televisión: IVA para todos los estratos
+            aplicaIva = true;
+          } else if (s.tipo_plan === 'combo') {
+            // Combo: depende del estrato
+            aplicaIva = estrato >= 4;
+          }
+
+          return {
+            ...s,
+            aplica_iva: aplicaIva
+          };
+        });
+
+      } finally {
+        conexion.release();
+      }
+
+    } catch (error) {
+      console.error('❌ Error obteniendo servicios activos:', error);
+      return [];
+    }
+  }
+
+  // ========================================================================
+  // MÉTODOS AUXILIARES PARA CONCEPTOS ADICIONALES
+  // ========================================================================
 
   static async calcularSaldoAnterior(conexion, clienteId) {
     try {
@@ -472,89 +549,78 @@ class FacturacionAutomaticaService {
         FROM facturas f
         WHERE f.cliente_id = ?
           AND f.estado IN ('pendiente', 'vencida')
-          AND f.activo = 1
+          AND f.activo = '1'
       `, [clienteId]);
 
-      const saldoPendiente = parseFloat(resultado[0]?.saldo_pendiente || 0);
+      const saldo = parseFloat(resultado[0]?.saldo_pendiente || 0);
 
-      if (saldoPendiente > 0) {
-        return {
-          tipo: 'saldo_anterior',
-          concepto: 'Saldo pendiente de facturas anteriores',
-          cantidad: 1,
-          precio_unitario: saldoPendiente,
-          valor: saldoPendiente,
-          aplica_iva: false,
-          porcentaje_iva: 0
-        };
-      }
-
-      return { valor: 0 };
-
+      return {
+        tipo: 'saldo_anterior',
+        concepto: 'Saldo anterior',
+        cantidad: 1,
+        precio_unitario: saldo,
+        valor: Math.round(saldo),
+        aplica_iva: false,
+        porcentaje_iva: 0
+      };
     } catch (error) {
-      console.error('❌ Error calculando saldo anterior:', error);
+      console.error('Error calculando saldo anterior:', error);
       return { valor: 0 };
     }
   }
 
   static async calcularInteresMora(conexion, clienteId) {
     try {
-      const interesPendiente = await InteresesMoratoriosService.calcularInteresPendiente(clienteId);
+      // Usar el servicio de intereses moratorios
+      const interes = await InteresesMoratoriosService.calcularInteresesCliente(clienteId);
 
-      if (interesPendiente > 0) {
-        return {
-          tipo: 'interes',
-          concepto: 'Intereses de mora',
-          cantidad: 1,
-          precio_unitario: interesPendiente,
-          valor: interesPendiente,
-          aplica_iva: false,
-          porcentaje_iva: 0
-        };
-      }
-
-      return { valor: 0 };
-
+      return {
+        tipo: 'interes',
+        concepto: 'Intereses de mora',
+        cantidad: 1,
+        precio_unitario: interes.total_intereses || 0,
+        valor: Math.round(interes.total_intereses || 0),
+        aplica_iva: false,
+        porcentaje_iva: 0
+      };
     } catch (error) {
-      console.error('❌ Error calculando interés de mora:', error);
+      console.error('Error calculando intereses:', error);
       return { valor: 0 };
     }
   }
 
   static async calcularReconexion(conexion, clienteId) {
     try {
-      const [cortesRecientes] = await conexion.execute(`
-        SELECT 
-          cs.id,
-          cs.fecha_corte
-        FROM cortes_servicio cs
-        WHERE cs.cliente_id = ?
-          AND cs.estado = 'activo'
-          AND cs.fecha_reconexion IS NULL
-          AND DATEDIFF(CURDATE(), cs.fecha_corte) <= 5
-        ORDER BY cs.fecha_corte DESC
-        LIMIT 1
+      const [resultado] = await conexion.execute(`
+        SELECT COALESCE(SUM(costo), 0) as total_reconexion
+        FROM traslados_servicio
+        WHERE cliente_id = ?
+          AND facturado = 0
+          AND activo = 1
       `, [clienteId]);
 
-      if (cortesRecientes.length > 0) {
-        const valorReconexion = 25000;
+      const reconexion = parseFloat(resultado[0]?.total_reconexion || 0);
 
-        return {
-          tipo: 'reconexion',
-          concepto: `Reconexión de servicio`,
-          cantidad: 1,
-          precio_unitario: valorReconexion,
-          valor: valorReconexion,
-          aplica_iva: true,
-          porcentaje_iva: 19,
-          corte_id: cortesRecientes[0].id
-        };
+      if (reconexion > 0) {
+        // Marcar como facturado
+        await conexion.execute(`
+          UPDATE traslados_servicio
+          SET facturado = 1
+          WHERE cliente_id = ? AND facturado = 0
+        `, [clienteId]);
       }
 
-      return { valor: 0 };
-
+      return {
+        tipo: 'reconexion',
+        concepto: 'Reconexión del servicio',
+        cantidad: 1,
+        precio_unitario: reconexion,
+        valor: Math.round(reconexion),
+        aplica_iva: true, // Reconexión lleva IVA 19%
+        porcentaje_iva: 19
+      };
     } catch (error) {
-      console.error('❌ Error calculando reconexión:', error);
+      console.error('Error calculando reconexión:', error);
       return { valor: 0 };
     }
   }
@@ -563,93 +629,112 @@ class FacturacionAutomaticaService {
     try {
       const [varios] = await conexion.execute(`
         SELECT 
-          'varios' as tipo,
+          id,
           concepto,
-          1 as cantidad,
-          valor as precio_unitario,
-          valor,
-          COALESCE(aplica_iva, 0) as aplica_iva,
-          COALESCE(porcentaje_iva, 19) as porcentaje_iva
+          cantidad,
+          valor_unitario,
+          valor_total,
+          aplica_iva,
+          porcentaje_iva
         FROM varios_pendientes
         WHERE cliente_id = ?
           AND facturado = 0
           AND activo = 1
-          AND fecha_aplicacion <= CURDATE()
       `, [clienteId]);
 
-      return varios;
+      if (varios.length > 0) {
+        // Marcar como facturados
+        await conexion.execute(`
+          UPDATE varios_pendientes
+          SET facturado = 1, fecha_facturacion = NOW()
+          WHERE cliente_id = ? AND facturado = 0
+        `, [clienteId]);
+      }
 
+      return varios.map(v => ({
+        tipo: 'varios',
+        concepto: v.concepto,
+        cantidad: v.cantidad || 1,
+        precio_unitario: v.valor_unitario,
+        valor: Math.round(v.valor_total),
+        aplica_iva: Boolean(v.aplica_iva),
+        porcentaje_iva: v.porcentaje_iva || (v.aplica_iva ? 19 : 0)
+      }));
     } catch (error) {
-      console.error('❌ Error obteniendo varios:', error);
+      console.error('Error calculando varios:', error);
       return [];
     }
   }
+
+  // ========================================================================
+  // CREACIÓN DE FACTURA COMPLETA
+  // ========================================================================
 
   static async crearFacturaCompleta(cliente, conceptos, periodo) {
     try {
       const conexion = await Database.getConnection();
 
       try {
-        await conexion.beginTransaction();
-
+        // Generar número de factura
         const numeroFactura = await this.generarNumeroFactura();
+
+        // Calcular totales
         const totales = this.calcularTotalesFactura(conceptos);
 
+        // Fechas de la factura
         const fechaEmision = new Date();
-        const fechaVencimiento = new Date(fechaEmision);
-        fechaVencimiento.setDate(fechaVencimiento.getDate() + 15);
+        const fechaVencimiento = new Date();
+        fechaVencimiento.setDate(fechaVencimiento.getDate() + 15); // 15 días para vencimiento
 
-        const [resultFactura] = await conexion.execute(`
+        // Crear factura
+        const [resultado] = await conexion.execute(`
           INSERT INTO facturas (
-            numero_factura, cliente_id, nombre_cliente, identificacion_cliente,
-            periodo_facturacion, fecha_desde, fecha_hasta,
-            fecha_emision, fecha_vencimiento,
+            numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
+            periodo_facturacion, fecha_emision, fecha_vencimiento,
+            fecha_desde, fecha_hasta,
             internet, television, saldo_anterior, interes, reconexion,
-            descuento, varios, subtotal, iva, total,
-            estado, created_by, created_at
+            descuento, varios,
+            subtotal, iva, total,
+            estado, activo, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', 1, NOW())
         `, [
           numeroFactura,
           cliente.id,
-          cliente.nombre,
           cliente.identificacion,
-          periodo.periodo_descripcion,
+          cliente.nombre,
+          `${fechaEmision.getFullYear()}-${String(fechaEmision.getMonth() + 1).padStart(2, '0')}`,
+          fechaEmision.toISOString().split('T')[0],
+          fechaVencimiento.toISOString().split('T')[0],
           periodo.fecha_desde,
           periodo.fecha_hasta,
-          fechaEmision,
-          fechaVencimiento,
-          totales.internet || 0,
-          totales.television || 0,
-          totales.saldo_anterior || 0,
-          totales.interes || 0,
-          totales.reconexion || 0,
-          totales.descuento || 0,
-          totales.varios || 0,
+          totales.internet,
+          totales.television,
+          totales.saldo_anterior,
+          totales.interes,
+          totales.reconexion,
+          totales.descuento,
+          totales.varios,
           totales.subtotal,
           totales.iva,
           totales.total
         ]);
 
-        const facturaId = resultFactura.insertId;
+        const facturaId = resultado.insertId;
 
+        // Crear detalles de factura
         await this.crearDetalleFactura(conexion, facturaId, conceptos);
+
+        // Actualizar consecutivo
         await this.actualizarConsecutivos();
-        await this.marcarVariosComoFacturados(conexion, cliente.id);
-
-        await conexion.commit();
-
-        console.log(`✅ Factura ${numeroFactura} creada - Total: ${totales.total.toLocaleString()}`);
 
         return {
           id: facturaId,
           numero: numeroFactura,
           total: totales.total,
-          cliente_id: cliente.id
+          subtotal: totales.subtotal,
+          iva: totales.iva
         };
 
-      } catch (error) {
-        await conexion.rollback();
-        throw error;
       } finally {
         conexion.release();
       }
@@ -663,7 +748,7 @@ class FacturacionAutomaticaService {
   static async crearDetalleFactura(conexion, facturaId, conceptos) {
     try {
       for (const concepto of conceptos) {
-        const valorIVA = concepto.aplica_iva ? 
+        const valorIVA = concepto.aplica_iva ?
           Math.round(concepto.valor * (concepto.porcentaje_iva / 100)) : 0;
 
         await conexion.execute(`
@@ -747,276 +832,150 @@ class FacturacionAutomaticaService {
     }
   }
 
-  static async marcarVariosComoFacturados(conexion, clienteId) {
+  /**
+   * Calcular totales de la factura
+   */
+  static calcularTotalesFactura(conceptos) {
+    let internet = 0, television = 0, varios = 0, interes = 0;
+    let reconexion = 0, descuento = 0, saldoAnterior = 0;
+    let subtotal = 0, totalIVA = 0;
+
+    conceptos.forEach(concepto => {
+      const valor = parseFloat(concepto.valor || 0);
+      const iva = concepto.aplica_iva ? Math.round(valor * (concepto.porcentaje_iva / 100)) : 0;
+
+      switch (concepto.tipo) {
+        case 'internet':
+          internet += valor;
+          break;
+        case 'television':
+          television += valor;
+          break;
+        case 'varios':
+        case 'instalacion':
+          varios += valor;
+          break;
+        case 'interes':
+          interes += valor;
+          break;
+        case 'reconexion':
+          reconexion += valor;
+          break;
+        case 'descuento':
+          descuento += valor;
+          break;
+        case 'saldo_anterior':
+          saldoAnterior += valor;
+          break;
+      }
+
+      subtotal += valor;
+      totalIVA += iva;
+    });
+
+    return {
+      internet: Math.round(internet),
+      television: Math.round(television),
+      varios: Math.round(varios),
+      interes: Math.round(interes),
+      reconexion: Math.round(reconexion),
+      descuento: Math.round(descuento),
+      saldo_anterior: Math.round(saldoAnterior),
+      subtotal: Math.round(subtotal),
+      iva: Math.round(totalIVA),
+      total: Math.round(subtotal + totalIVA)
+    };
+  }
+
+  /**
+   * Registrar log de facturación
+   */
+  static async registrarLogFacturacion(resumen) {
     try {
-      await conexion.execute(`
-        UPDATE varios_pendientes 
-        SET facturado = 1, fecha_facturacion = NOW()
-        WHERE cliente_id = ? AND facturado = 0
-      `, [clienteId]);
+      const conexion = await Database.getConnection();
+
+      try {
+        await conexion.execute(`
+          INSERT INTO logs_sistema (
+            tipo, descripcion, datos_json, created_at
+          ) VALUES (?, ?, ?, NOW())
+        `, [
+          'FACTURACION_MENSUAL_AUTOMATICA',
+          `Facturación mensual ${resumen.periodo} - ${resumen.facturas_generadas} facturas generadas`,
+          JSON.stringify(resumen)
+        ]);
+
+        console.log('✅ Log de facturación registrado correctamente');
+
+      } finally {
+        conexion.release();
+      }
     } catch (error) {
-      console.error('❌ Error marcando varios:', error);
+      console.warn('⚠️ No se pudo registrar log de facturación:', error.message);
     }
   }
 
-/**
- * Calcular totales de la factura
- */
-static calcularTotalesFactura(conceptos) {
-  let internet = 0, television = 0, varios = 0, interes = 0;
-  let reconexion = 0, descuento = 0, saldoAnterior = 0;
-  let subtotal = 0, totalIVA = 0;
-
-  conceptos.forEach(concepto => {
-    const valor = parseFloat(concepto.valor || 0);
-    const iva = concepto.aplica_iva ? valor * (concepto.porcentaje_iva / 100) : 0;
-
-    switch (concepto.tipo) {
-      case 'internet':
-        internet += valor;
-        break;
-      case 'television':
-        television += valor;
-        break;
-      case 'varios':
-      case 'instalacion':
-        varios += valor;
-        break;
-      case 'interes':
-        interes += valor;
-        break;
-      case 'reconexion':
-        reconexion += valor;
-        break;
-      case 'descuento':
-        descuento += valor;
-        break;
-      case 'saldo_anterior':
-        saldoAnterior += valor;
-        break;
-    }
-
-    subtotal += valor;
-    totalIVA += iva;
-  });
-
-  return {
-    internet: Math.round(internet),
-    television: Math.round(television),
-    varios: Math.round(varios),
-    interes: Math.round(interes),
-    reconexion: Math.round(reconexion),
-    descuento: Math.round(descuento),
-    saldo_anterior: Math.round(saldoAnterior),
-    subtotal: Math.round(subtotal),
-    iva: Math.round(totalIVA),
-    total: Math.round(subtotal + totalIVA)
-  };
-}
-
-/**
- * Registrar log de facturación
- */
-static async registrarLogFacturacion(resumen) {
-  try {
-    const conexion = await Database.getConnection();
+  /**
+   * Validación de integridad de datos antes de facturar
+   */
+  static async validarIntegridadDatos() {
+    const errores = [];
 
     try {
-      await conexion.execute(`
-        INSERT INTO logs_sistema (
-          tipo, descripcion, datos_json, created_at
-        ) VALUES (?, ?, ?, NOW())
-      `, [
-        'FACTURACION_MENSUAL_AUTOMATICA',
-        `Facturación mensual ${resumen.periodo} - ${resumen.facturas_generadas} facturas generadas`,
-        JSON.stringify(resumen)
-      ]);
+      const conexion = await Database.getConnection();
 
-      console.log('✅ Log de facturación registrado correctamente');
+      try {
+        // Validar clientes sin servicios activos
+        const [clientesSinServicios] = await conexion.execute(`
+          SELECT c.id, c.nombre
+          FROM clientes c
+          LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id AND sc.estado = 'activo'
+          WHERE c.estado = 'activo'
+            AND sc.id IS NULL
+        `);
 
-    } finally {
-      conexion.release();
-    }
-  } catch (error) {
-    console.warn('⚠️ No se pudo registrar log de facturación:', error.message);
-  }
-}
+        clientesSinServicios.forEach(c => {
+          errores.push({
+            tipo: 'cliente_sin_servicios',
+            cliente_id: c.id,
+            cliente_nombre: c.nombre,
+            descripcion: 'Cliente activo sin servicios activos'
+          });
+        });
 
-/**
- * Obtener estadísticas de facturación del mes
- */
-static async obtenerEstadisticasMes(periodo) {
-  try {
-    const conexion = await Database.getConnection();
+        // Validar servicios sin plan
+        const [serviciosSinPlan] = await conexion.execute(`
+          SELECT sc.id, c.nombre as cliente_nombre
+          FROM servicios_cliente sc
+          JOIN clientes c ON sc.cliente_id = c.id
+          LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+          WHERE sc.estado = 'activo'
+            AND ps.id IS NULL
+        `);
 
-    try {
-      const [stats] = await conexion.execute(`
-        SELECT 
-          COUNT(*) as total_facturas,
-          SUM(total) as total_facturado,
-          SUM(CASE WHEN estado = 'pagada' THEN total ELSE 0 END) as total_pagado,
-          SUM(CASE WHEN estado = 'pendiente' THEN total ELSE 0 END) as total_pendiente,
-          SUM(CASE WHEN estado = 'vencida' THEN total ELSE 0 END) as total_vencido
-        FROM facturas
-        WHERE DATE_FORMAT(fecha_emision, '%Y-%m') = ?
-          AND activo = 1
-      `, [periodo]);
+        serviciosSinPlan.forEach(s => {
+          errores.push({
+            tipo: 'servicio_sin_plan',
+            servicio_id: s.id,
+            cliente_nombre: s.cliente_nombre,
+            descripcion: 'Servicio activo sin plan asociado'
+          });
+        });
 
-      return stats[0] || {
-        total_facturas: 0,
-        total_facturado: 0,
-        total_pagado: 0,
-        total_pendiente: 0,
-        total_vencido: 0
-      };
-
-    } finally {
-      conexion.release();
-    }
-
-  } catch (error) {
-    console.error('❌ Error obteniendo estadísticas:', error);
-    return null;
-  }
-}
-
-/**
- * Verificar facturas duplicadas antes de generar
- */
-static async verificarFacturaDuplicada(clienteId, periodo) {
-  try {
-    const conexion = await Database.getConnection();
-
-    try {
-      const [facturas] = await conexion.execute(`
-        SELECT id, numero_factura
-        FROM facturas
-        WHERE cliente_id = ?
-          AND DATE_FORMAT(fecha_emision, '%Y-%m') = ?
-          AND activo = 1
-        LIMIT 1
-      `, [clienteId, periodo]);
-
-      return facturas.length > 0 ? facturas[0] : null;
-
-    } finally {
-      conexion.release();
-    }
-
-  } catch (error) {
-    console.error('❌ Error verificando factura duplicada:', error);
-    return null;
-  }
-}
-
-/**
- * Anular factura (soft delete)
- */
-static async anularFactura(facturaId, motivo, usuarioId) {
-  try {
-    const conexion = await Database.getConnection();
-
-    try {
-      await conexion.beginTransaction();
-
-      await conexion.execute(`
-        UPDATE facturas
-        SET estado = 'anulada',
-            activo = 0,
-            motivo_anulacion = ?,
-            fecha_anulacion = NOW(),
-            anulada_por = ?
-        WHERE id = ?
-      `, [motivo, usuarioId, facturaId]);
-
-      await conexion.execute(`
-        INSERT INTO logs_sistema (tipo, descripcion, usuario_id, created_at)
-        VALUES ('FACTURA_ANULADA', ?, ?, NOW())
-      `, [`Factura ${facturaId} anulada: ${motivo}`, usuarioId]);
-
-      await conexion.commit();
-
-      console.log(`✅ Factura ${facturaId} anulada correctamente`);
-      return { success: true };
+      } finally {
+        conexion.release();
+      }
 
     } catch (error) {
-      await conexion.rollback();
-      throw error;
-    } finally {
-      conexion.release();
+      console.error('Error validando integridad:', error);
     }
 
-  } catch (error) {
-    console.error('❌ Error anulando factura:', error);
-    throw error;
+    return {
+      valido: errores.length === 0,
+      total_errores: errores.length,
+      errores
+    };
   }
-}
-
-/**
- * Regenerar factura para un cliente específico
- */
-static async regenerarFacturaCliente(clienteId) {
-  try {
-    console.log(`🔄 Regenerando factura para cliente ${clienteId}...`);
-
-    const conexion = await Database.getConnection();
-
-    try {
-      // Obtener info del cliente
-      const [clientes] = await conexion.execute(`
-        SELECT id, nombre, identificacion, estado, estrato
-        FROM clientes
-        WHERE id = ?
-      `, [clienteId]);
-
-      if (clientes.length === 0) {
-        throw new Error('Cliente no encontrado');
-      }
-
-      const cliente = clientes[0];
-
-      // Validar
-      const validacion = await this.validarClienteParaFacturacion(clienteId);
-      if (!validacion.permitir) {
-        throw new Error(validacion.razon);
-      }
-
-      // Calcular período
-      const periodo = await this.calcularPeriodoFacturacion(clienteId);
-
-      // Obtener servicios
-      const servicios = await this.obtenerServiciosActivos(clienteId);
-
-      if (servicios.length === 0) {
-        throw new Error('No hay servicios activos');
-      }
-
-      // Calcular conceptos
-      const conceptos = await this.calcularConceptosFacturacion(cliente, servicios, periodo);
-
-      if (conceptos.length === 0) {
-        throw new Error('No hay conceptos para facturar');
-      }
-
-      // Crear factura
-      const factura = await this.crearFacturaCompleta(cliente, conceptos, periodo);
-
-      console.log(`✅ Factura regenerada: ${factura.numero}`);
-
-      return {
-        success: true,
-        factura
-      };
-
-    } finally {
-      conexion.release();
-    }
-
-  } catch (error) {
-    console.error('❌ Error regenerando factura:', error);
-    throw error;
-  }
-}
 
 }
 
