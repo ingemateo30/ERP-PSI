@@ -19,23 +19,24 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // Verificar el token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('✅ Token decodificado exitosamente:', { userId: decoded.userId, rol: decoded.rol });
-    
-    // Verificar que el usuario aún existe y está activo
-    const [user] = await Database.query(
-      'SELECT id, email, nombre, rol, activo FROM sistema_usuarios WHERE id = ? AND activo = 1',
-      [decoded.userId]
-    );
+// ✅ DESPUÉS (reemplaza las líneas 26-39)
+const decoded = jwt.verify(token, process.env.JWT_SECRET);
+console.log('✅ Token decodificado:', decoded);
 
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Usuario no válido o inactivo',
-        timestamp: new Date().toISOString()
-      });
-    }
+// Soportar tanto 'id' como 'userId' por compatibilidad
+const userId = decoded.id || decoded.userId;
+
+if (!userId) {
+  return res.status(401).json({
+    success: false,
+    message: 'Token inválido: falta ID de usuario'
+  });
+}
+
+const [user] = await Database.query(
+  'SELECT id, email, nombre, rol, activo FROM sistema_usuarios WHERE id = ? AND activo = 1',
+  [userId]  // ✅ CORREGIDO
+);
 
     // Agregar información del usuario a la request
     req.user = {
