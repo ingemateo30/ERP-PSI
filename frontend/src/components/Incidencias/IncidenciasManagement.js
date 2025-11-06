@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import incidenciasService from '../../services/incidenciasService';
 import { useAuth } from '../../contexts/AuthContext';
+import apiService from '../../services/apiService';
 const IncidenciasManagement = () => {
     const { user } = useAuth();
     const [incidencias, setIncidencias] = useState([]);
