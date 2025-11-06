@@ -304,7 +304,7 @@ const loadStats = async () => {
       )}
 
 {/* Estadísticas - Solo admin/supervisor */}
-{user.rol == 'administrador' && stats && (
+{user.rol === 'administrador'&&(
   <div className="bg-white rounded-lg shadow-md p-6">
     <EquipmentStats stats={stats} />
   </div>
