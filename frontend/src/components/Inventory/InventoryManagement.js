@@ -63,8 +63,8 @@ const loadEquipment = useCallback(async () => {
       setPagination(response.pagination || {});
     } else {
       console.warn('⚠️ Estructura de respuesta inesperada:', response);
-      setEquipos([]);
-      setPagination({});
+      setEquipos(response.equipos || response.data || []);
+      setPagination(response.pagination || {});
     }
     
     console.log('📦 Equipos procesados:', (response?.equipos || response?.data || []).length);
