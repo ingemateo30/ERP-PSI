@@ -262,7 +262,7 @@ router.get('/activas/resumen', requireRole(['administrador', 'supervisor', 'inst
             SELECT 
                 i.*,
                 c.nombre as municipio_nombre,
-                CONCAT(u.nombres, ' ', u.apellidos) as responsable_nombre,
+                u.nombre as responsable_nombre,
                 TIMESTAMPDIFF(MINUTE, i.fecha_inicio, NOW()) as minutos_transcurridos
             FROM incidencias_servicio i
             LEFT JOIN ciudades c ON i.municipio_id = c.id
@@ -380,7 +380,7 @@ router.get('/:id', async (req, res) => {
                 i.*,
                 c.nombre as municipio_nombre,
                 d.nombre as departamento_nombre,
-                CONCAT(u.nombres, ' ', u.apellidos) as responsable_nombre,
+                u.nombre as responsable_nombre,
                 TIMESTAMPDIFF(MINUTE, i.fecha_inicio, COALESCE(i.fecha_fin, NOW())) as duracion_minutos
             FROM incidencias_servicio i
             LEFT JOIN ciudades c ON i.municipio_id = c.id
