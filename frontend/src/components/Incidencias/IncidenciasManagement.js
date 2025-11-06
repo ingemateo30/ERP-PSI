@@ -78,16 +78,8 @@ const cargarIncidencias = async () => {
     try {
         let response;
         
-        // Si es instalador, usar endpoint específico
         if (user?.rol === 'instalador') {
-            const token = localStorage.getItem('token');
-            const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-incidencias`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            const data = await apiResponse.json();
+            const data = await apiService.get('/instalador/mis-incidencias');
             response = {
                 success: true,
                 incidencias: {
@@ -101,19 +93,11 @@ const cargarIncidencias = async () => {
                 page: currentPage
             });
         }
-        console.log('🔍 Respuesta completa del servicio:', response);
-        console.log('🔍 response.incidencias:', response.incidencias);
         
         if (response.success) {
-            // ✅ CORRECCIÓN: Los datos vienen en response.incidencias.incidencias
-            const incidenciasData = response.incidencias?.incidencias || response.incidencias || response.data || [];
-            console.log('✅ Datos de incidencias a establecer:', incidenciasData);
-            console.log('✅ Es array?', Array.isArray(incidenciasData));
-            console.log('✅ Longitud:', incidenciasData.length);
-            
+            const incidenciasData = response.incidencias?.incidencias || response.incidencias || [];
             setIncidencias(incidenciasData);
             
-            // ✅ CORRECCIÓN: Pagination también viene en response.incidencias.pagination
             const paginationData = response.incidencias?.pagination || response.pagination;
             if (paginationData) {
                 setTotalPages(paginationData.pages || paginationData.total_pages || 1);
