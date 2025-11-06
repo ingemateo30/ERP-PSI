@@ -67,8 +67,8 @@ const loadEquipment = useCallback(async () => {
       setPagination(response.pagination || {});
     }
     
-    console.log('📦 Equipos procesados:', (response?.equipos || response?.data || []).length);
-    console.log('📄 Paginación:', response?.pagination || {});
+    console.log('📦 Equipos procesados:', (response.equipos || response.data || []).length);
+    console.log('📄 Paginación:', response.pagination || {});
     
   } catch (error) {
     console.error('❌ Error cargando equipos:', error);
