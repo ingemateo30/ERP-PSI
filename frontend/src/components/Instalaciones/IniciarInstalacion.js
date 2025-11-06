@@ -251,7 +251,7 @@ if (data.success) {
     // Preparar datos como lo hace ModalCompletarInstalacion
     const formData = {
       equipos: equiposAsignados.map(eq => eq.equipo_id), // Solo los IDs de equipos
-      foto: previsualizacionDespues || fotoPreview, // Base64
+      foto: previsualizacionDespues, // Base64
       observaciones: observaciones
     };
 
@@ -261,7 +261,7 @@ if (data.success) {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json' // JSON, no FormData
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(formData)
       }
