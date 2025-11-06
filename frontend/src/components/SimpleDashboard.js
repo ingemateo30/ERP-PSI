@@ -378,11 +378,11 @@ const InstaladorDashboard = () => {
                 'Authorization': `Bearer ${token}`
             };
             
-            console.log('📡 DASHBOARD - Haciendo petición a trabajos de hoy...');
-            console.log('📡 DASHBOARD - URL:', `${process.env.REACT_APP_API_URL}/instalador/mis-trabajos/hoy`);
+            // Cargar TODAS las instalaciones del instalador
+            console.log('📡 DASHBOARD - Haciendo petición a mis instalaciones...');
+            console.log('📡 DASHBOARD - URL:', `${process.env.REACT_APP_API_URL}/instalador/mis-instalaciones`);
             
-            // Cargar trabajos de hoy
-            const respuestaTrabajos = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-trabajos/hoy`, {
+            const respuestaTrabajos = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-instalaciones`, {
                 headers
             });
             
@@ -393,13 +393,30 @@ const InstaladorDashboard = () => {
             console.log('📦 DASHBOARD - Data trabajos:', dataTrabajos);
             
             if (dataTrabajos.success) {
-                setTrabajosHoy(dataTrabajos.trabajos || []);
-                console.log('✅ DASHBOARD - Trabajos cargados:', dataTrabajos.trabajos?.length || 0);
+                const instalaciones = dataTrabajos.instalaciones || [];
+                
+                // Filtrar solo instalaciones pendientes y en proceso (los "trabajos activos")
+                const trabajosActivos = instalaciones.filter(inst => 
+                    inst.estado === 'programada' || inst.estado === 'en_proceso'
+                );
+                
+                setTrabajosHoy(trabajosActivos);
+                console.log('✅ DASHBOARD - Trabajos activos cargados:', trabajosActivos.length);
+                
+                // Calcular estadísticas desde las instalaciones
+                const pendientes = instalaciones.filter(inst => inst.estado === 'programada').length;
+                const completadas = instalaciones.filter(inst => inst.estado === 'completada').length;
+                
+                setEstadisticas({
+                    pendientesHoy: pendientes,
+                    completadasSemana: completadas,
+                    equiposAsignados: estadisticas.equiposAsignados || 0
+                });
             } else {
                 console.error('❌ DASHBOARD - Error en trabajos:', dataTrabajos.message);
             }
 
-            // Cargar estadísticas
+            // Cargar estadísticas de equipos
             console.log('📡 DASHBOARD - Haciendo petición a estadísticas...');
             console.log('📡 DASHBOARD - URL:', `${process.env.REACT_APP_API_URL}/instalador/estadisticas`);
             
@@ -412,11 +429,12 @@ const InstaladorDashboard = () => {
             const dataEstadisticas = await respuestaEstadisticas.json();
             console.log('📦 DASHBOARD - Data estadísticas:', dataEstadisticas);
             
-            if (dataEstadisticas.success) {
-                setEstadisticas(dataEstadisticas.estadisticas);
-                console.log('✅ DASHBOARD - Estadísticas cargadas:', dataEstadisticas.estadisticas);
-            } else {
-                console.error('❌ DASHBOARD - Error en estadísticas:', dataEstadisticas.message);
+            if (dataEstadisticas.success && dataEstadisticas.estadisticas) {
+                setEstadisticas(prev => ({
+                    ...prev,
+                    equiposAsignados: dataEstadisticas.estadisticas.equiposAsignados || 0
+                }));
+                console.log('✅ DASHBOARD - Estadísticas de equipos cargadas');
             }
             
         } catch (error) {
