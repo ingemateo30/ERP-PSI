@@ -90,7 +90,7 @@ class PDFGenerator {
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', 30, y)
             .fontSize(9).font('Helvetica')
             .text(factura.identificacion_cliente || '1005450340', 30, y + 15)
-            .text(factura.direccion_cliente || 'CR 14A 21-63 ARBOLEDAS', 30, y + 30);
+            .text(factura.cliente_direccion || 'CR 14A 21-63 ARBOLEDAS', 30, y + 30);
 
         y += 60;
 
