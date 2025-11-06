@@ -1,16 +1,24 @@
-const bcrypt = require('bcrypt');
+// crear_hash.js
+const bcrypt = require("bcryptjs");
 
-async function generateHash() {
-  const plainPassword = '123456';
-  const saltRounds = 10;
-
+async function generarHash(password) {
   try {
-    const hash = await bcrypt.hash(plainPassword, saltRounds);
-    console.log('Hash generado para "123456":');
-    console.log(hash);
-  } catch (err) {
-    console.error('Error generando el hash:', err.message);
+    const saltRounds = 12; // Debe coincidir con tu AuthController
+    const hash = await bcrypt.hash(password, saltRounds);
+    console.log("\n🔐 Contraseña original:", password);
+    console.log("🔑 Hash generado listo para DB:\n");
+    console.log(hash + "\n");
+  } catch (error) {
+    console.error("❌ Error generando hash:", error);
   }
 }
 
-generateHash();
+// Cambia esto por la contraseña que quieras generar
+const passwordEnTextoPlano = process.argv[2];
+
+if (!passwordEnTextoPlano) {
+  console.log("Uso: node crear_hash.js <contraseña>");
+  process.exit(1);
+}
+
+generarHash(passwordEnTextoPlano);

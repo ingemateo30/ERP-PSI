@@ -685,7 +685,7 @@ router.post('/facturas/:id/pagar', requireRole('administrador', 'supervisor'), a
 router.get('/info', (req, res) => {
   res.json({
     success: true,
-    message: 'API de Facturación - Sistema ISP',
+    message: 'API de Facturación - Sistema PSI',
     version: '1.0.0',
     endpoints: {
       'GET /facturas': 'Listar facturas con filtros y paginación',

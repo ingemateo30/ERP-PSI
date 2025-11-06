@@ -1,8 +1,184 @@
-// backend/controllers/FacturacionAutomaticaController.js
+// backend/controllers/FacturacionAutomaticaController.js - CORREGIDO CON PREVIEW DETALLADO
+
 const FacturacionAutomaticaService = require('../services/FacturacionAutomaticaService');
 const { Database } = require('../models/Database');
 
 class FacturacionAutomaticaController {
+
+  /**
+   * Obtener preview DETALLADO de facturación (sin generar facturas)
+   * GET /api/v1/facturacion/automatica/preview-mensual
+   */
+  static async obtenerPreviewFacturacion(req, res) {
+    try {
+      console.log('👁️ Generando preview DETALLADO de facturación...');
+
+      const { periodo } = req.query;
+      const fechaPeriodo = periodo ? new Date(periodo + '-01') : new Date();
+
+      // 1. Obtener clientes para facturar
+      const clientesParaFacturar = await FacturacionAutomaticaService.obtenerClientesParaFacturar(fechaPeriodo);
+
+      console.log(`📊 Clientes encontrados: ${clientesParaFacturar.length}`);
+
+      if (clientesParaFacturar.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            clientes_a_facturar: 0,
+            monto_total_estimado: 0,
+            servicios_totales: 0,
+            detalles: [],
+            resumen: {
+              total_clientes: 0,
+              monto_total_estimado: 0,
+              servicios_totales: 0,
+              por_tipo_factura: {
+                primera: 0,
+                segunda: 0,
+                mensual: 0
+              }
+            }
+          },
+          message: 'No se encontraron clientes para facturar'
+        });
+      }
+
+      // 2. Procesar cada cliente y obtener detalles completos
+      const detallesClientes = [];
+      let montoTotalEstimado = 0;
+      let serviciosTotales = 0;
+      
+      const estadisticas = {
+        primera: 0,
+        segunda: 0,
+        mensual: 0
+      };
+
+      for (const cliente of clientesParaFacturar) {
+        try {
+          // Validar cliente
+          const validacion = await FacturacionAutomaticaService.validarClienteParaFacturacion(cliente.id);
+          if (!validacion.permitir) {
+            console.log(`⏭️ Cliente ${cliente.nombre} omitido: ${validacion.razon}`);
+            continue;
+          }
+
+          // Calcular período
+          const periodo = await FacturacionAutomaticaService.calcularPeriodoFacturacion(cliente.id, fechaPeriodo);
+
+          // Obtener servicios
+          const servicios = await FacturacionAutomaticaService.obtenerServiciosActivos(cliente.id);
+
+          if (servicios.length === 0) {
+            console.log(`⚠️ Cliente ${cliente.nombre} sin servicios activos`);
+            continue;
+          }
+
+          // Calcular conceptos
+          const conceptos = await FacturacionAutomaticaService.calcularConceptosFacturacion(cliente, servicios, periodo);
+
+          // Calcular totales
+          const totales = FacturacionAutomaticaService.calcularTotalesFactura(conceptos);
+
+          // Construir detalle del cliente
+          const detalleCliente = {
+            cliente_id: cliente.id,
+            identificacion: cliente.identificacion,
+            nombre: cliente.nombre,
+            estrato: cliente.estrato,
+            numero_factura: periodo.numero_factura,
+            tipo_factura: periodo.es_primera_factura ? 'primera' : 
+                         periodo.es_nivelacion ? 'segunda' : 'mensual',
+            tipo_factura_descripcion: periodo.tipo_facturacion,
+            periodo_facturacion: {
+              fecha_desde: periodo.fecha_desde,
+              fecha_hasta: periodo.fecha_hasta,
+              descripcion: periodo.periodo_descripcion,
+              dias: periodo.dias_facturados
+            },
+            servicios: servicios.map(s => ({
+              tipo: s.tipo_plan,
+              nombre: s.nombre_plan,
+              precio: s.precio_personalizado || s.precio_servicio,
+              aplica_iva: Boolean(s.aplica_iva),
+              porcentaje_iva: s.aplica_iva ? (s.porcentaje_iva || 19) : 0
+            })),
+            conceptos: conceptos.map(c => ({
+              tipo: c.tipo,
+              concepto: c.concepto,
+              valor: c.valor,
+              aplica_iva: c.aplica_iva,
+              porcentaje_iva: c.porcentaje_iva || 0,
+              iva: c.aplica_iva ? Math.round(c.valor * (c.porcentaje_iva / 100)) : 0
+            })),
+            totales: {
+              internet: totales.internet,
+              television: totales.television,
+              varios: totales.varios,
+              instalacion: conceptos.find(c => c.tipo === 'instalacion')?.valor || 0,
+              subtotal: totales.subtotal,
+              iva: totales.iva,
+              total: totales.total
+            }
+          };
+
+          detallesClientes.push(detalleCliente);
+          montoTotalEstimado += totales.total;
+          serviciosTotales += servicios.length;
+
+          // Estadísticas por tipo
+          if (periodo.es_primera_factura) estadisticas.primera++;
+          else if (periodo.es_nivelacion) estadisticas.segunda++;
+          else estadisticas.mensual++;
+
+        } catch (error) {
+          console.error(`❌ Error procesando cliente ${cliente.nombre}:`, error);
+        }
+      }
+
+      // 3. Construir respuesta completa
+      const respuesta = {
+        success: true,
+        data: {
+          clientes_a_facturar: detallesClientes.length,
+          monto_total_estimado: Math.round(montoTotalEstimado),
+          servicios_totales: serviciosTotales,
+          detalles: detallesClientes,
+          resumen: {
+            total_clientes: detallesClientes.length,
+            monto_total_estimado: Math.round(montoTotalEstimado),
+            servicios_totales: serviciosTotales,
+            por_tipo_factura: estadisticas,
+            promedio_por_cliente: detallesClientes.length > 0 ? 
+              Math.round(montoTotalEstimado / detallesClientes.length) : 0
+          }
+        },
+        message: `Preview generado: ${detallesClientes.length} clientes listos para facturación`
+      };
+
+      console.log('✅ Preview generado exitosamente:', {
+        clientes: respuesta.data.clientes_a_facturar,
+        monto: respuesta.data.monto_total_estimado
+      });
+
+      res.json(respuesta);
+
+    } catch (error) {
+      console.error('❌ Error obteniendo preview:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error obteniendo preview de facturación',
+        error: error.message,
+        data: {
+          clientes_a_facturar: 0,
+          monto_total_estimado: 0,
+          servicios_totales: 0,
+          detalles: []
+        }
+      });
+    }
+  }
 
   /**
    * Generar facturación mensual masiva
@@ -15,130 +191,25 @@ class FacturacionAutomaticaController {
       
       const resultado = await FacturacionAutomaticaService.generarFacturacionMensual(req.body);
       
-      console.log('✅ Resultado del servicio:', resultado);
-      
-      // ✅ CORRECCIÓN: Asegurar que detalles sea un array
-      const respuesta = {
-        ...resultado,
-        detalles: Array.isArray(resultado.detalles) ? resultado.detalles : [],
-        success: true
-      };
-
-      console.log('✅ Respuesta final:', respuesta);
+      console.log('✅ Facturación completada');
       
       res.json({
         success: true,
-        data: respuesta
+        data: resultado,
+        message: `Facturación completada: ${resultado.facturas_generadas} facturas generadas`
       });
       
     } catch (error) {
-      console.error('❌ Error en controller de facturación:', error);
+      console.error('❌ Error en facturación:', error);
       res.status(500).json({
         success: false,
         message: error.message || 'Error generando facturación',
         data: {
-          detalles: [], // ✅ Asegurar array vacío en error
+          detalles: [],
           clientes_procesados: 0,
           facturas_generadas: 0,
           errores: 1
         }
-      });
-    }
-  }
-  /**
-   * Obtener preview de facturación (sin generar facturas)
-   * GET /api/v1/facturacion/automatica/preview-mensual
-   */
-  static async obtenerPreviewFacturacion(req, res) {
-    try {
-      console.log('👁️ Generando preview de facturación...');
-
-      const { periodo } = req.query;
-      const fechaPeriodo = periodo ? new Date(periodo + '-01') : new Date();
-
-      // Obtener clientes activos para facturar
-      const clientesActivos = await Database.query(`
-        SELECT 
-          c.id,
-          c.identificacion,
-          c.nombre,
-          c.telefono,
-          c.direccion,
-          c.estrato,
-          c.estado,
-          COUNT(sc.id) as servicios_activos,
-          COALESCE(SUM(
-            COALESCE(sc.precio_personalizado, ps.precio)
-          ), 0) as monto_estimado
-        FROM clientes c
-        LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id AND sc.estado = 'activo'
-        LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-        WHERE c.estado = 'activo'
-        GROUP BY c.id, c.identificacion, c.nombre, c.telefono, c.direccion, c.estrato, c.estado
-        HAVING servicios_activos > 0
-        ORDER BY c.nombre ASC
-      `);
-
-      console.log(`✅ Encontrados ${clientesActivos.length} clientes con servicios activos`);
-
-      // Calcular resumen
-      const resumen = {
-        total_clientes: clientesActivos.length,
-        monto_total_estimado: clientesActivos.reduce((sum, c) => 
-          sum + parseFloat(c.monto_estimado || 0), 0
-        ),
-        servicios_totales: clientesActivos.reduce((sum, c) => 
-          sum + parseInt(c.servicios_activos || 0), 0
-        ),
-        promedio_por_cliente: clientesActivos.length > 0
-          ? clientesActivos.reduce((sum, c) => sum + parseFloat(c.monto_estimado || 0), 0) / clientesActivos.length
-          : 0
-      };
-
-      // Estadísticas adicionales
-      const estratos = clientesActivos.reduce((acc, c) => {
-        const estrato = c.estrato || 'sin_estrato';
-        acc[estrato] = (acc[estrato] || 0) + 1;
-        return acc;
-      }, {});
-
-      res.json({
-        success: true,
-        data: {
-          resumen,
-          clientes: clientesActivos.slice(0, 20), // Primeros 20 para preview
-          total_clientes_disponibles: clientesActivos.length,
-          periodo: fechaPeriodo.toISOString().slice(0, 7),
-          distribucion_estratos: estratos,
-          info_sistema: {
-            modo: 'preview',
-            fecha_generacion: new Date().toISOString(),
-            usuario: req.user?.username || 'sistema'
-          },
-          recomendaciones: clientesActivos.length === 0 ? {
-            mensaje: 'No se encontraron clientes con servicios activos para facturar',
-            acciones_sugeridas: [
-              'Verificar que existan clientes en estado activo',
-              'Asignar servicios activos a los clientes',
-              'Revisar configuración de planes de servicio'
-            ]
-          } : {
-            mensaje: `Sistema listo para facturar ${clientesActivos.length} clientes`,
-            monto_total: `$${resumen.monto_total_estimado.toLocaleString('es-CO')}`,
-            promedio: `$${Math.round(resumen.promedio_por_cliente).toLocaleString('es-CO')} por cliente`
-          }
-        },
-        message: clientesActivos.length > 0
-          ? `Preview generado: ${clientesActivos.length} clientes listos para facturación`
-          : 'No se encontraron clientes para facturar'
-      });
-
-    } catch (error) {
-      console.error('❌ Error obteniendo preview:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error obteniendo preview de facturación',
-        error: error.message
       });
     }
   }
@@ -161,7 +232,7 @@ class FacturacionAutomaticaController {
         });
       }
 
-      // Verificar que el cliente existe y está activo
+      // Verificar que el cliente existe
       const [cliente] = await Database.query(`
         SELECT id, nombre, estado FROM clientes WHERE id = ?
       `, [clienteId]);
@@ -180,7 +251,7 @@ class FacturacionAutomaticaController {
         });
       }
 
-      // Generar factura usando el servicio
+      // Generar factura
       const fechaInicio = fecha_inicio ? new Date(fecha_inicio) : new Date();
       const factura = await FacturacionAutomaticaService.crearFacturaInicialCliente(
         parseInt(clienteId),
@@ -192,8 +263,7 @@ class FacturacionAutomaticaController {
       res.json({
         success: true,
         data: factura,
-        message: `Factura ${factura.numero_factura} generada exitosamente para ${cliente.nombre}`,
-        timestamp: new Date().toISOString()
+        message: `Factura ${factura.numero_factura} generada exitosamente`
       });
 
     } catch (error) {
@@ -207,7 +277,7 @@ class FacturacionAutomaticaController {
   }
 
   /**
-   * Procesar saldos e intereses de facturas vencidas
+   * Procesar saldos e intereses
    * POST /api/v1/facturacion/automatica/procesar-saldos
    */
   static async procesarSaldosIntereses(req, res) {
@@ -218,8 +288,7 @@ class FacturacionAutomaticaController {
 
       res.json({
         success: true,
-        message: 'Saldos e intereses procesados exitosamente',
-        timestamp: new Date().toISOString()
+        message: 'Saldos e intereses procesados exitosamente'
       });
 
     } catch (error) {
@@ -233,7 +302,7 @@ class FacturacionAutomaticaController {
   }
 
   /**
-   * Obtener estadísticas del último proceso de facturación
+   * Obtener estadísticas del último proceso
    * GET /api/v1/facturacion/automatica/estadisticas-ultimo-proceso
    */
   static async obtenerEstadisticasUltimoProceso(req, res) {
@@ -260,8 +329,7 @@ class FacturacionAutomaticaController {
         data: {
           fecha_proceso: ultimoProceso[0].created_at,
           ...datos
-        },
-        message: 'Estadísticas del último proceso obtenidas'
+        }
       });
 
     } catch (error) {
