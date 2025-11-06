@@ -77,35 +77,20 @@ const loadStats = async () => {
     try {
       const response = await inventoryService.getStats();
       console.log('📊 Estadísticas recibidas:', response);
-
-      // ASUME que la respuesta es el objeto plano directamente, como indica el log.
-      // Reestructuramos la respuesta para que EquipmentStats pueda acceder a 'general'.
-      if (typeof response === 'object' && response !== null) {
-          // ✅ Solución: Crear la estructura anidada que EquipmentStats espera
-          setStats({
-              general: {
-                  total_equipos: response.total, // Usar 'total' de la API
-                  disponibles: response.disponibles,
-                  asignados: response.asignados,
-                  instalados: response.instalados,
-                  en_mantenimiento: response.en_reparacion, // Mapear 'en_reparacion' a 'en_mantenimiento'
-                  dañados: response.dados_de_baja, // Mapear 'dados_de_baja' a 'dañados'
-                  perdidos: response.perdidos || 0, // Si no existe, usar 0
-                  valor_total_inventario: response.valor_total_inventario || 0, // Si no existe, usar 0
-              },
-              // Si tu API devuelve 'por_tipo' o 'por_instalador', inclúyelos aquí:
-              por_tipo: response.por_tipo || [],
-              por_instalador: response.por_instalador || [],
-              movimientos_recientes: response.movimientos_recientes || []
-          });
+      
+      // Manejar la estructura de la respuesta
+      if (response.data) {
+        setStats(response.data);
+      } else if (response.message) {
+        setStats(response.message);
       } else {
-        setStats(null); // Si no es un objeto válido, resetea
+        setStats(response);
       }
     } catch (error) {
       console.error('Error cargando estadísticas:', error);
-      setStats(null); 
+      // No mostrar error por estadísticas, es opcional
     }
-};
+  };
 
  // Exportar equipos a CSV
   const handleExportarCSV = () => {
