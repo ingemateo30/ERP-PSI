@@ -43,33 +43,26 @@ const loadEquipment = useCallback(async () => {
   try {
     setLoading(true);
     setError('');
-    
-    console.log('🔍 Cargando equipos con filtros:', filters);
-    
-    // Si es instalador, usar endpoint específico
+
     let response;
     if (user.rol === 'instalador') {
-      // ✅ Usar el servicio en lugar de fetch directo
       response = await inventoryService.getMisEquipos();
     } else {
-      // Admin y supervisor usan el servicio normal
       response = await inventoryService.getEquipment(filters);
     }
-    
-    console.log('✅ Respuesta de equipos:', response.equipos);
-    
-    if (response && response.success) {
-      setEquipos(response.equipos || response.data || []);
-      setPagination(response.pagination || {});
-    } else {
-      console.warn('⚠️ Estructura de respuesta inesperada:', response);
-      setEquipos(response.equipos || response.data || []);
-      setPagination(response.pagination || {});
-    }
-    
-    console.log('📦 Equipos procesados:', (response.equipos || response.data || []).length);
-    console.log('📄 Paginación:', response.pagination || {});
-    
+
+    console.log('✅ Respuesta de equipos:', response);
+
+    // ✅ Normalizar respuesta SIEMPRE de la misma forma
+    const equipos = response.equipos ?? response.data ?? [];
+    const pagination = response.pagination ?? {};
+
+    setEquipos(equipos);
+    setPagination(pagination);
+
+    console.log('📦 Equipos procesados:', equipos.length);
+    console.log('📄 Paginación:', pagination);
+
   } catch (error) {
     console.error('❌ Error cargando equipos:', error);
     inventoryService.handleError(error, setError);
