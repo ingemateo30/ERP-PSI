@@ -137,7 +137,7 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
     } catch (error) {
       console.error('❌ Error general cargando datos:', error);
     }
-  };[instalacion];
+  };
 
   if (!isOpen || !instalacion) return null;
 
