@@ -176,30 +176,39 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
           </div>
 
           {/* Equipos Instalados */}
-          {equipos.length > 0 && (
+          {equipos && equipos.length > 0 && (
             <div className="bg-gray-50 rounded-lg p-5">
               <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
                 <Package className="mr-2" size={20} />
-                Equipos Instalados ({equipos.length})
+                Equipos Instalados ({equipos.filter(e => e !== null).length})
               </h3>
               <div className="space-y-3">
-                {equipos.map((equipo, index) => (
+                {equipos.filter(equipo => equipo !== null).map((equipo, index) => (
                   <div key={index} className="bg-white border border-gray-200 rounded-lg p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="font-semibold text-gray-900">{equipo.equipo_codigo}</p>
-                        <p className="text-sm text-gray-700">{equipo.equipo_nombre}</p>
+                        <p className="font-semibold text-gray-900">
+                          {equipo.equipo_codigo || 'Sin código'}
+                        </p>
+                        <p className="text-sm text-gray-700">
+                          {equipo.equipo_nombre || equipo.nombre || 'Sin nombre'}
+                        </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          {equipo.tipo} • {equipo.marca}
+                          {equipo.tipo || 'Sin tipo'} • {equipo.marca || 'Sin marca'}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium text-gray-900">
-                          Cantidad: {equipo.cantidad}
+                          Cantidad: {equipo.cantidad || 1}
                         </p>
                         {equipo.numero_serie && (
                           <p className="text-xs text-gray-500 mt-1">
                             S/N: {equipo.numero_serie}
+                          </p>
+                        )}
+                        {equipo.mac && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            MAC: {equipo.mac}
                           </p>
                         )}
                       </div>
