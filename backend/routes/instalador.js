@@ -357,7 +357,7 @@ router.get('/mis-incidencias/estadisticas', async (req, res) => {
         SUM(CASE WHEN estado = 'en_atencion' THEN 1 ELSE 0 END) as en_atencion,
         SUM(CASE WHEN estado = 'resuelto' THEN 1 ELSE 0 END) as resueltas,
         SUM(CASE WHEN estado = 'cerrado' THEN 1 ELSE 0 END) as cerradas,
-        SUM(CASE WHEN tipo = 'emergencia' THEN 1 ELSE 0 END) as emergencias,
+        SUM(CASE WHEN tipo_incidencia = 'emergencia' THEN 1 ELSE 0 END) as emergencias,
         AVG(TIMESTAMPDIFF(MINUTE, fecha_inicio, fecha_fin)) as tiempo_promedio_minutos
       FROM incidencias_servicio
       WHERE responsable_id = ?
