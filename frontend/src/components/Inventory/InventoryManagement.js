@@ -56,7 +56,7 @@ const loadEquipment = useCallback(async () => {
       response = await inventoryService.getEquipment(filters);
     }
     
-    console.log('✅ Respuesta de equipos:', response);
+    console.log('✅ Respuesta de equipos:', response.equipos);
     
     if (response && response.success) {
       setEquipos(response.equipos || response.data || []);
