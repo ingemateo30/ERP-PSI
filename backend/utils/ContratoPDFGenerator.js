@@ -371,14 +371,17 @@ class ContratoPDFGenerator {
   }
 
  static generarCondicionesComerciales(contratoData) {
+  const valorSinIva = contratoData.plan_precio || 0;
+  const valorConIva = valorSinIva * 1.19;
+
   return `
     <div class="section-box">
       <div class="section-title">CONDICIONES COMERCIALES</div>
       <div class="section-title" style="font-size: 10px;">CARACTERÍSTICAS DEL PLAN</div>
       <div class="text-content">
         <strong>Plan:</strong> ${contratoData.plan_nombre || 'Plan de Servicio'}<br/>
-        <strong>Valor mensual (sin IVA):</strong> $${this.formatearPrecio(contratoData.plan_precio || 0)}<br/>
-        <strong>Valor mensual (con IVA):</strong> $${this.formatearPrecio((contratoData.plan_precio || 0) * 1.19)}<br/>
+        <strong>Valor mensual (sin IVA):</strong> $${this.formatearPrecio(valorSinIva)}<br/>
+        <strong>Valor mensual (con IVA 19%):</strong> $${this.formatearPrecio(valorConIva)}<br/>
         ${contratoData.velocidad_bajada ? `<strong>Velocidad de descarga:</strong> ${contratoData.velocidad_bajada} Mbps<br/>` : ''}
         ${contratoData.velocidad_subida ? `<strong>Velocidad de subida:</strong> ${contratoData.velocidad_subida} Mbps<br/>` : ''}
         ${contratoData.canales_tv ? `<strong>Canales de TV:</strong> ${contratoData.canales_tv}<br/>` : ''}
@@ -388,6 +391,7 @@ class ContratoPDFGenerator {
       </div>
     </div>`;
 }
+
 
 
   static generarObligacionesUsuario() {
