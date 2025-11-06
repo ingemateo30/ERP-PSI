@@ -20,39 +20,74 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
   useEffect(() => {
     if (instalacion) {
       console.log('🔍 MODAL DETALLE - Instalación completa:', instalacion);
+      cargarDatosCompletos();
+    }
+  }, [instalacion]);
+
+  const cargarDatosCompletos = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
       
-      // Parsear equipos
+      // Parsear equipos instalados
+      let equiposIds = [];
       try {
-        let equiposData = null;
-        
-        // Intentar obtener equipos de diferentes campos posibles
         if (instalacion.equipos_instalados) {
-          equiposData = typeof instalacion.equipos_instalados === 'string'
+          equiposIds = typeof instalacion.equipos_instalados === 'string'
             ? JSON.parse(instalacion.equipos_instalados)
             : instalacion.equipos_instalados;
         } else if (instalacion.equipos) {
-          equiposData = typeof instalacion.equipos === 'string'
+          equiposIds = typeof instalacion.equipos === 'string'
             ? JSON.parse(instalacion.equipos)
             : instalacion.equipos;
         }
         
-        console.log('📦 MODAL DETALLE - Equipos parseados:', equiposData);
+        console.log('📦 MODAL DETALLE - IDs de equipos:', equiposIds);
         
-        // Asegurarse de que sea un array
-        if (Array.isArray(equiposData)) {
-          setEquipos(equiposData);
-        } else if (equiposData && typeof equiposData === 'object') {
-          // Si es un objeto único, convertirlo a array
-          setEquipos([equiposData]);
-        } else {
-          setEquipos([]);
-        }
+        // Filtrar IDs válidos
+        equiposIds = Array.isArray(equiposIds) 
+          ? equiposIds.filter(id => id !== null && id !== undefined && id !== '')
+          : [];
+          
       } catch (e) {
-        console.error('❌ Error parseando equipos:', e);
+        console.error('❌ Error parseando IDs de equipos:', e);
+        equiposIds = [];
+      }
+
+      // Obtener datos completos de los equipos
+      if (equiposIds.length > 0) {
+        const equiposCompletos = [];
+        
+        for (const equipoId of equiposIds) {
+          try {
+            const response = await fetch(
+              `${process.env.REACT_APP_API_URL}/inventory/${equipoId}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.equipo) {
+                equiposCompletos.push(data.equipo);
+                console.log('✅ Equipo cargado:', data.equipo);
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error cargando equipo:', equipoId, error);
+          }
+        }
+        
+        setEquipos(equiposCompletos);
+        console.log('📦 MODAL DETALLE - Equipos completos cargados:', equiposCompletos);
+      } else {
         setEquipos([]);
       }
 
-// Parsear fotos
+      // Parsear fotos
       try {
         let fotosData = null;
         
@@ -69,18 +104,28 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
         console.log('📷 MODAL DETALLE - Fotos parseadas:', fotosData);
 
         if (fotosData && Array.isArray(fotosData)) {
-          const fotoAntes = fotosData.find(f => 
-            f.descripcion?.toLowerCase().includes('antes')
-          );
-          const fotoDespues = fotosData.find(f => 
-            f.descripcion?.toLowerCase().includes('después') || 
-            f.descripcion?.toLowerCase().includes('despues')
-          );
+          // Si es un array de strings (base64 directo)
+          if (typeof fotosData[0] === 'string') {
+            setFotos({
+              antes: fotosData[0] || null,
+              despues: fotosData[1] || null
+            });
+          } 
+          // Si es un array de objetos con descripcion y url
+          else if (fotosData[0] && typeof fotosData[0] === 'object') {
+            const fotoAntes = fotosData.find(f => 
+              f.descripcion?.toLowerCase().includes('antes')
+            );
+            const fotoDespues = fotosData.find(f => 
+              f.descripcion?.toLowerCase().includes('después') || 
+              f.descripcion?.toLowerCase().includes('despues')
+            );
 
-          setFotos({
-            antes: fotoAntes?.url || null,
-            despues: fotoDespues?.url || null
-          });
+            setFotos({
+              antes: fotoAntes?.url || fotoAntes?.data || null,
+              despues: fotoDespues?.url || fotoDespues?.data || null
+            });
+          }
         } else {
           setFotos({ antes: null, despues: null });
         }
@@ -88,8 +133,11 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
         console.error('❌ Error parseando fotos:', e);
         setFotos({ antes: null, despues: null });
       }
+      
+    } catch (error) {
+      console.error('❌ Error general cargando datos:', error);
     }
-  }, [instalacion]);
+  };[instalacion];
 
   if (!isOpen || !instalacion) return null;
 
@@ -214,49 +262,66 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
             <div className="bg-gray-50 rounded-lg p-5">
               <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
                 <Package className="mr-2" size={20} />
-                Equipos Instalados ({equipos.filter(e => e !== null).length})
+                Equipos Instalados ({equipos.length})
               </h3>
               <div className="space-y-3">
-                {equipos.filter(equipo => equipo !== null).map((equipo, index) => (
+                {equipos.map((equipo, index) => (
                   <div key={index} className="bg-white border border-gray-200 rounded-lg p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="font-semibold text-gray-900">
-                          {equipo.equipo_codigo || equipo.codigo || 'Sin código'}
+                        <p className="font-semibold text-gray-900 text-lg">
+                          {equipo.codigo || equipo.equipo_codigo || 'Sin código'}
                         </p>
-                        <p className="text-sm text-gray-700">
-                          {equipo.equipo_nombre || equipo.nombre || equipo.descripcion || 'Sin nombre'}
+                        <p className="text-sm text-gray-700 font-medium mt-1">
+                          {equipo.nombre || equipo.equipo_nombre || equipo.descripcion || 'Sin nombre'}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {equipo.tipo || equipo.tipo_equipo || 'Sin tipo'} • {equipo.marca || 'Sin marca'}
-                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
+                            {equipo.tipo || equipo.tipo_equipo || 'Sin tipo'}
+                          </span>
+                          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
+                            {equipo.marca || 'Sin marca'}
+                          </span>
+                          {equipo.modelo && (
+                            <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
+                              {equipo.modelo}
+                            </span>
+                          )}
+                        </div>
                         {/* Mostrar si es el equipo principal */}
-                        {(equipo.es_principal || equipo.principal) && (
-                          <span className="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
-                            EQUIPO PRINCIPAL
+                        {(equipo.es_principal || equipo.principal || equipo.tipo?.toLowerCase().includes('ont') || equipo.tipo?.toLowerCase().includes('router')) && (
+                          <span className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full">
+                            ⭐ EQUIPO PRINCIPAL
                           </span>
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">
-                          Cantidad: {equipo.cantidad || 1}
-                        </p>
                         {(equipo.numero_serie || equipo.serial) && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            S/N: {equipo.numero_serie || equipo.serial}
+                          <p className="text-xs text-gray-600 mb-1">
+                            <span className="font-semibold">S/N:</span> {equipo.numero_serie || equipo.serial}
                           </p>
                         )}
                         {equipo.mac && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            MAC: {equipo.mac}
+                          <p className="text-xs text-gray-600 mb-1">
+                            <span className="font-semibold">MAC:</span> {equipo.mac}
                           </p>
+                        )}
+                        {equipo.estado && (
+                          <span className={`inline-block px-2 py-1 text-xs rounded mt-1 ${
+                            equipo.estado === 'disponible' ? 'bg-green-100 text-green-800' :
+                            equipo.estado === 'asignado' ? 'bg-blue-100 text-blue-800' :
+                            equipo.estado === 'en_uso' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {equipo.estado.replace('_', ' ').toUpperCase()}
+                          </span>
                         )}
                       </div>
                     </div>
                     {equipo.observaciones && (
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <p className="text-xs text-gray-600">
-                          <span className="font-medium">Observaciones:</span> {equipo.observaciones}
+                          <span className="font-medium">📝 Observaciones:</span> {equipo.observaciones}
                         </p>
                       </div>
                     )}
@@ -265,7 +330,6 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
               </div>
             </div>
           )}
-
           {/* Fotos */}
           {(fotos.antes || fotos.despues) && (
             <div className="bg-gray-50 rounded-lg p-5">
@@ -275,29 +339,35 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {fotos.antes && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">Antes de la Instalación</p>
+                  <div className="bg-white p-3 rounded-lg border border-gray-200">
+                    <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                      <ImageIcon size={16} className="mr-2" />
+                      Antes de la Instalación
+                    </p>
                     <img
                       src={fotos.antes}
                       alt="Antes de la instalación"
-                      className="w-full h-64 object-cover rounded-lg border border-gray-200 shadow-sm"
+                      className="w-full h-64 object-cover rounded-lg shadow-sm"
                       onError={(e) => {
                         console.error('❌ Error cargando imagen ANTES');
-                        e.target.style.display = 'none';
+                        e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE4IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+SW1hZ2VuIG5vIGRpc3BvbmlibGU8L3RleHQ+PC9zdmc+';
                       }}
                     />
                   </div>
                 )}
                 {fotos.despues && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">Después de la Instalación</p>
+                  <div className="bg-white p-3 rounded-lg border border-gray-200">
+                    <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                      <ImageIcon size={16} className="mr-2" />
+                      Después de la Instalación
+                    </p>
                     <img
                       src={fotos.despues}
                       alt="Después de la instalación"
-                      className="w-full h-64 object-cover rounded-lg border border-gray-200 shadow-sm"
+                      className="w-full h-64 object-cover rounded-lg shadow-sm"
                       onError={(e) => {
                         console.error('❌ Error cargando imagen DESPUÉS');
-                        e.target.style.display = 'none';
+                        e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE4IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+SW1hZ2VuIG5vIGRpc3BvbmlibGU8L3RleHQ+PC9zdmc+';
                       }}
                     />
                   </div>
@@ -305,7 +375,6 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
               </div>
             </div>
           )}
-
           {/* Observaciones */}
           {instalacion.observaciones && (
             <div className="bg-gray-50 rounded-lg p-5">
