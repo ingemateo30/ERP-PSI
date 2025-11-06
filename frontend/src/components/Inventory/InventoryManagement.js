@@ -72,17 +72,28 @@ const loadEquipment = useCallback(async () => {
   }
 }, [filters, user.rol]);
   // Cargar estadísticas
-  const loadStats = async () => {
+const loadStats = async () => {
   try {
     const response = await inventoryService.getStats();
     console.log('📊 Estadísticas recibidas:', response);
 
-    // ✅ Normalizar SIEMPRE la respuesta igual que con equipos
-    const stats = response.data ?? response.stats ?? response.message ?? response;
+    const raw = response.data ?? response.stats ?? response.message ?? response;
 
-    setStats(stats);
-    
-    console.log("📌 Estadísticas procesadas:", stats);
+    // ✅ Normalizar nombres y convertir a número
+    const normalized = {
+      totalEquipos: Number(raw.total ?? 0),
+      disponiblesEquipos: Number(raw.disponibles ?? 0),
+      asignadosEquipos: Number(raw.asignados ?? 0),
+      instaladosEquipos: Number(raw.instalados ?? 0),
+      reparacionEquipos: Number(raw.en_reparacion ?? 0),
+      danadosEquipos: Number(raw.danados ?? 0),
+      perdidosEquipos: Number(raw.perdidos ?? 0),
+      valorInventario: Number(raw.valor_inventario ?? 0)
+    };
+
+    setStats(normalized);
+
+    console.log("📌 Estadísticas procesadas (normalizadas):", normalized);
 
   } catch (error) {
     console.error('Error cargando estadísticas:', error);
