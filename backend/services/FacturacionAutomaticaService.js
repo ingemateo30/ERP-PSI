@@ -146,12 +146,10 @@ class FacturacionAutomaticaService {
             COUNT(DISTINCT sc.id) as servicios_activos
           FROM clientes c
           JOIN servicios_cliente sc ON c.id = sc.cliente_id 
-            AND sc.activo = 1 
             AND sc.estado = 'activo'
           JOIN planes_servicio ps ON sc.plan_id = ps.id
             AND ps.activo = 1
           LEFT JOIN facturas f ON c.id = f.cliente_id 
-            AND f.activo = '1'
             AND f.estado != 'anulada'
           WHERE c.estado = 'activo'
           GROUP BY c.id, c.identificacion, c.nombre, c.estrato, c.fecha_registro
