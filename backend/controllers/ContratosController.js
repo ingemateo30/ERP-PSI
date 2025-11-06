@@ -331,6 +331,12 @@ static async generarPDF(req, res) {
             }
 
             const empresa = empresaConfig[0];
+            // ✅ Calcular valor del servicio con IVA (19%)
+if (contratoData.servicio_precio) {
+    contratoData.servicio_precio_con_iva = contratoData.servicio_precio * 1.19;
+    contratoData.servicio_precio_con_iva = Number(contratoData.servicio_precio_con_iva.toFixed(2)); // redondear
+}
+
 
             // Generar HTML del contrato
             const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator');

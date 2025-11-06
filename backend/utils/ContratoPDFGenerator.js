@@ -370,23 +370,29 @@ class ContratoPDFGenerator {
         </div>`;
   }
 
-  static generarCondicionesComerciales(contratoData) {
-    return `
-        <div class="section-box">
-            <div class="section-title">CONDICIONES COMERCIALES</div>
-            <div class="section-title" style="font-size: 10px;">CARACTERÍSTICAS DEL PLAN</div>
-            <div class="text-content">
-                <strong>Plan:</strong> ${contratoData.plan_nombre || 'Plan de Servicio'}<br/>
-                <strong>Precio mensual:</strong> $${this.formatearPrecio(contratoData.plan_precio || 0)}<br/>
-                ${contratoData.velocidad_bajada ? `<strong>Velocidad de descarga:</strong> ${contratoData.velocidad_bajada} Mbps<br/>` : ''}
-                ${contratoData.velocidad_subida ? `<strong>Velocidad de subida:</strong> ${contratoData.velocidad_subida} Mbps<br/>` : ''}
-                ${contratoData.canales_tv ? `<strong>Canales de TV:</strong> ${contratoData.canales_tv}<br/>` : ''}
-                ${contratoData.plan_descripcion ? `<strong>Descripción:</strong> ${contratoData.plan_descripcion}<br/>` : ''}
-                <strong>Costo de instalación:</strong> $${this.formatearPrecio(contratoData.costo_instalacion || 0)}<br/>
-                ${contratoData.tipo_permanencia === 'con_permanencia' ? `<strong>Permanencia mínima:</strong> ${contratoData.permanencia_meses || 0} meses<br/>` : ''}
-            </div>
-        </div>`;
-  }
+ static generarCondicionesComerciales(contratoData) {
+  const valorSinIva = contratoData.plan_precio || 0;
+  const valorConIva = valorSinIva * 1.19;
+
+  return `
+    <div class="section-box">
+      <div class="section-title">CONDICIONES COMERCIALES</div>
+      <div class="section-title" style="font-size: 10px;">CARACTERÍSTICAS DEL PLAN</div>
+      <div class="text-content">
+        <strong>Plan:</strong> ${contratoData.plan_nombre || 'Plan de Servicio'}<br/>
+        <strong>Valor mensual (sin IVA):</strong> $${this.formatearPrecio(valorSinIva)}<br/>
+        <strong>Valor mensual (con IVA 19%):</strong> $${this.formatearPrecio(valorConIva)}<br/>
+        ${contratoData.velocidad_bajada ? `<strong>Velocidad de descarga:</strong> ${contratoData.velocidad_bajada} Mbps<br/>` : ''}
+        ${contratoData.velocidad_subida ? `<strong>Velocidad de subida:</strong> ${contratoData.velocidad_subida} Mbps<br/>` : ''}
+        ${contratoData.canales_tv ? `<strong>Canales de TV:</strong> ${contratoData.canales_tv}<br/>` : ''}
+        ${contratoData.plan_descripcion ? `<strong>Descripción:</strong> ${contratoData.plan_descripcion}<br/>` : ''}
+        <strong>Costo de instalación:</strong> $${this.formatearPrecio(contratoData.costo_instalacion || 0)}<br/>
+        ${contratoData.tipo_permanencia === 'con_permanencia' ? `<strong>Permanencia mínima:</strong> ${contratoData.permanencia_meses || 0} meses<br/>` : ''}
+      </div>
+    </div>`;
+}
+
+
 
   static generarObligacionesUsuario() {
     return `
