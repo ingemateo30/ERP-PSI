@@ -43,33 +43,26 @@ const loadEquipment = useCallback(async () => {
   try {
     setLoading(true);
     setError('');
-    
-    console.log('🔍 Cargando equipos con filtros:', filters);
-    
-    // Si es instalador, usar endpoint específico
+
     let response;
     if (user.rol === 'instalador') {
-      // ✅ Usar el servicio en lugar de fetch directo
       response = await inventoryService.getMisEquipos();
     } else {
-      // Admin y supervisor usan el servicio normal
       response = await inventoryService.getEquipment(filters);
     }
-    
+
     console.log('✅ Respuesta de equipos:', response);
-    
-    if (response && response.success) {
-      setEquipos(response.equipos || response.data || []);
-      setPagination(response.pagination || {});
-    } else {
-      console.warn('⚠️ Estructura de respuesta inesperada:', response);
-      setEquipos([]);
-      setPagination({});
-    }
-    
-    console.log('📦 Equipos procesados:', (response?.equipos || response?.data || []).length);
-    console.log('📄 Paginación:', response?.pagination || {});
-    
+
+    // ✅ Normalizar respuesta SIEMPRE de la misma forma
+    const equipos = response.equipos ?? response.data ?? [];
+    const pagination = response.pagination ?? {};
+
+    setEquipos(equipos);
+    setPagination(pagination);
+
+    console.log('📦 Equipos procesados:', equipos.length);
+    console.log('📄 Paginación:', pagination);
+
   } catch (error) {
     console.error('❌ Error cargando equipos:', error);
     inventoryService.handleError(error, setError);
@@ -79,24 +72,33 @@ const loadEquipment = useCallback(async () => {
   }
 }, [filters, user.rol]);
   // Cargar estadísticas
-  const loadStats = async () => {
-    try {
-      const response = await inventoryService.getStats();
-      console.log('📊 Estadísticas recibidas:', response);
-      
-      // Manejar la estructura de la respuesta
-      if (response.data) {
-        setStats(response.data);
-      } else if (response.message) {
-        setStats(response.message);
-      } else {
-        setStats(response);
-      }
-    } catch (error) {
-      console.error('Error cargando estadísticas:', error);
-      // No mostrar error por estadísticas, es opcional
-    }
-  };
+const loadStats = async () => {
+  try {
+    const response = await inventoryService.getStats();
+    console.log('📊 Estadísticas recibidas:', response);
+
+    const raw = response.data ?? response.stats ?? response.message ?? response;
+
+    // ✅ Normalizar nombres y convertir a número
+    const normalized = {
+      totalEquipos: Number(raw.total ?? 0),
+      disponiblesEquipos: Number(raw.disponibles ?? 0),
+      asignadosEquipos: Number(raw.asignados ?? 0),
+      instaladosEquipos: Number(raw.instalados ?? 0),
+      reparacionEquipos: Number(raw.en_reparacion ?? 0),
+      danadosEquipos: Number(raw.danados ?? 0),
+      perdidosEquipos: Number(raw.perdidos ?? 0),
+      valorInventario: Number(raw.valor_inventario ?? 0)
+    };
+
+    setStats(normalized);
+
+    console.log("📌 Estadísticas procesadas (normalizadas):", normalized);
+
+  } catch (error) {
+    console.error('Error cargando estadísticas:', error);
+  }
+};
  // Exportar equipos a CSV
   const handleExportarCSV = () => {
     try {
