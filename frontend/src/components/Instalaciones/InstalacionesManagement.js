@@ -132,26 +132,26 @@ const cargarDatos = useCallback(async () => {
     let response;
 
     // Si es instalador, usar endpoint específico
-if (user?.rol === 'instalador') {
-  console.log('👷 Instalador detectado, cargando solo mis instalaciones');
-  
-  // ✅ Usar el servicio en lugar de fetch directo
-  const apiResponse = await instalacionesService.getMisInstalaciones();
-  
-  response = {
-    success: true,
-    instalaciones: apiResponse.instalaciones || [],
-    pagination: {
-      total: apiResponse.instalaciones?.length || 0,
-      totalPages: 1
-    },
+    if (user?.rol === 'instalador') {
+      console.log('👷 Instalador detectado, cargando solo mis instalaciones');
+      
+      // ✅ Usar el servicio en lugar de fetch directo
+      const apiResponse = await instalacionesService.getMisInstalaciones();
+      
+      response = {
+        success: true,
+        instalaciones: apiResponse.instalaciones || [],
+        pagination: {
+          total: apiResponse.instalaciones?.length || 0,
+          totalPages: 1
+        },
         estadisticas: {
-          total: data.instalaciones?.length || 0,
-          programadas: data.instalaciones?.filter(i => i.estado === 'programada').length || 0,
-          en_proceso: data.instalaciones?.filter(i => i.estado === 'en_proceso').length || 0,
-          completadas: data.instalaciones?.filter(i => i.estado === 'completada').length || 0,
-          canceladas: data.instalaciones?.filter(i => i.estado === 'cancelada').length || 0,
-          vencidas: data.instalaciones?.filter(i => {
+          total: apiResponse.instalaciones?.length || 0,
+          programadas: apiResponse.instalaciones?.filter(i => i.estado === 'programada').length || 0,
+          en_proceso: apiResponse.instalaciones?.filter(i => i.estado === 'en_proceso').length || 0,
+          completadas: apiResponse.instalaciones?.filter(i => i.estado === 'completada').length || 0,
+          canceladas: apiResponse.instalaciones?.filter(i => i.estado === 'cancelada').length || 0,
+          vencidas: apiResponse.instalaciones?.filter(i => {
             if (i.estado !== 'programada') return false;
             const fechaProgramada = new Date(i.fecha_programada);
             const hoy = new Date();
@@ -171,28 +171,27 @@ if (user?.rol === 'instalador') {
       console.log('🔄 Cargando datos con parámetros:', parametros);
       response = await instalacionesService.getInstalaciones(parametros);
     }
-      if (response.success) {
-        setInstalaciones(response.instalaciones || []);
-        setPaginacion(prev => ({
-          ...prev,
-          total_registros: response.pagination?.total || 0,
-          total_paginas: response.pagination?.totalPages || 0
-        }));
-        setEstadisticas(response.estadisticas || {});
-        console.log('✅ Datos cargados correctamente:', response.instalaciones?.length, 'instalaciones');
-      } else {
-        throw new Error(response.message || 'Error cargando instalaciones');
-      }
-    } catch (error) {
-      console.error('❌ Error cargando instalaciones:', error);
-      setError(`Error cargando datos: ${error.message}`);
-      setInstalaciones([]);
-    } finally {
-      setCargando(false);
+    
+    if (response.success) {
+      setInstalaciones(response.instalaciones || []);
+      setPaginacion(prev => ({
+        ...prev,
+        total_registros: response.pagination?.total || 0,
+        total_paginas: response.pagination?.totalPages || 0
+      }));
+      setEstadisticas(response.estadisticas || {});
+      console.log('✅ Datos cargados correctamente:', response.instalaciones?.length, 'instalaciones');
+    } else {
+      throw new Error(response.message || 'Error cargando instalaciones');
     }
-  }, [filtros, paginacion.pagina_actual, paginacion.registros_por_pagina]);
-
-  const cargarInstaladores = useCallback(async () => {
+  } catch (error) {
+    console.error('❌ Error cargando instalaciones:', error);
+    setError(`Error cargando datos: ${error.message}`);
+    setInstalaciones([]);
+  } finally {
+    setCargando(false);
+  }
+}, [filtros, paginacion.pagina_actual, paginacion.registros_por_pagina, user]);  const cargarInstaladores = useCallback(async () => {
     try {
       const response = await instalacionesService.getInstaladores();
       if (response.success) {
