@@ -155,7 +155,7 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
   };
 
   // Iniciar instalación
-  const iniciarInstalacion = async () => {
+ const iniciarInstalacion = async () => {
     if (!fotoAntes && !previsualizacionAntes) {
       setError('Debes subir una foto del lugar antes de comenzar');
       return;
@@ -165,28 +165,39 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       setProcesando(true);
       setError(null);
 
+      const token = localStorage.getItem('accessToken');
       const formData = new FormData();
 
-if (fotoAntes) {
-  formData.append('foto_antes', fotoAntes);
-}
+      if (fotoAntes) {
+        formData.append('foto_antes', fotoAntes);
+      }
 
-const response = await apiService.post(
-  `/instalaciones/${instalacion.id}/iniciar`,
-  formData
-);
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/instalaciones/${instalacion.id}/iniciar`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+            // NO incluir Content-Type cuando envías FormData
+          },
+          body: formData
+        }
+      );
 
-      if (response.data.success) {
+      const data = await response.json();
+
+      if (data.success) {
         setSuccess('Instalación iniciada correctamente');
         setPaso(2);
+      } else {
+        setError(data.message || 'Error iniciando instalación');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Error iniciando instalación');
+      setError(err.message || 'Error iniciando instalación');
     } finally {
       setProcesando(false);
     }
   };
-
   // Guardar progreso (equipos y observaciones)
   const guardarProgreso = async () => {
     try {
@@ -198,11 +209,22 @@ const response = await apiService.post(
   observaciones: observaciones
 };
 
-const response = await apiService.put(
-  `/instalaciones/${instalacion.id}/actualizar`,
-  datos
+const token = localStorage.getItem('accessToken');
+const response = await fetch(
+  `${process.env.REACT_APP_API_URL}/instalaciones/${instalacion.id}/actualizar`,
+  {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(datos)
+  }
 );
-      if (response.data.success) {
+
+const data = await response.json();
+
+if (data.success) {
         setSuccess('Progreso guardado correctamente');
         setTimeout(() => setSuccess(null), 3000);
       }
@@ -214,7 +236,7 @@ const response = await apiService.put(
   };
 
   // Completar instalación
-  const completarInstalacion = async () => {
+ const completarInstalacion = async () => {
     if (!fotoDespues && !previsualizacionDespues) {
       setError('Debes subir una foto del trabajo terminado');
       return;
@@ -224,35 +246,46 @@ const response = await apiService.put(
       setProcesando(true);
       setError(null);
 
+      const token = localStorage.getItem('accessToken');
       const formData = new FormData();
 
-if (fotoDespues) {
-  formData.append('foto_despues', fotoDespues);
-}
+      if (fotoDespues) {
+        formData.append('foto_despues', fotoDespues);
+      }
 
-formData.append('equipos_instalados', JSON.stringify(equiposAsignados));
-formData.append('observaciones', observaciones);
-formData.append('estado', 'completada');
+      formData.append('equipos_instalados', JSON.stringify(equiposAsignados));
+      formData.append('observaciones', observaciones);
+      formData.append('estado', 'completada');
 
-const response = await apiService.post(
-  `/instalaciones/${instalacion.id}/completar`,
-  formData
-);
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/instalaciones/${instalacion.id}/completar`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+            // NO incluir Content-Type cuando envías FormData
+          },
+          body: formData
+        }
+      );
 
-      if (response.data.success) {
+      const data = await response.json();
+
+      if (data.success) {
         setSuccess('¡Instalación completada exitosamente!');
         setTimeout(() => {
           onSuccess?.();
           onClose();
         }, 2000);
+      } else {
+        setError(data.message || 'Error completando instalación');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Error completando instalación');
+      setError(err.message || 'Error completando instalación');
     } finally {
       setProcesando(false);
     }
   };
-
   // Cancelar instalación
   const cancelarInstalacion = async () => {
     if (!motivoCancelacion.trim()) {
