@@ -77,15 +77,23 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
 
   const cargarEquiposDisponibles = async () => {
   try {
-    const response = await apiService.get('/inventario/equipos/disponibles');
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-equipos`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
     
-    if (response.data.success) {
-      setEquiposDisponibles(response.data.data || []);
+    const data = await response.json();
+    
+    if (data.success) {
+      setEquiposDisponibles(data.equipos || []);
     }
-    } catch (err) {
-      console.error('Error cargando equipos:', err);
-    }
-  };
+  } catch (err) {
+    console.error('Error cargando equipos:', err);
+  }
+};
 
   // Manejar selección de fotos
   const manejarFotoAntes = (e) => {
