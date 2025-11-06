@@ -173,7 +173,7 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       }
 
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/instalaciones/${instalacion.id}/iniciar`,
+  `${process.env.REACT_APP_API_URL}/instalador/instalacion/${instalacion.id}/iniciar`,
         {
           method: 'POST',
           headers: {
@@ -211,7 +211,7 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
 
 const token = localStorage.getItem('accessToken');
 const response = await fetch(
-  `${process.env.REACT_APP_API_URL}/instalaciones/${instalacion.id}/actualizar`,
+  `${process.env.REACT_APP_API_URL}/instalador/instalacion/${instalacion.id}/actualizar`,
   {
     method: 'PUT',
     headers: {
@@ -258,7 +258,7 @@ if (data.success) {
       formData.append('estado', 'completada');
 
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/instalaciones/${instalacion.id}/completar`,
+  `${process.env.REACT_APP_API_URL}/instalador/instalacion/${instalacion.id}/completar`,
         {
           method: 'POST',
           headers: {
@@ -287,41 +287,52 @@ if (data.success) {
     }
   };
   // Cancelar instalación
-  const cancelarInstalacion = async () => {
-    if (!motivoCancelacion.trim()) {
-      setError('Debes especificar el motivo de la cancelación');
-      return;
-    }
+ const cancelarInstalacion = async () => {
+  if (!motivoCancelacion.trim()) {
+    setError('Debes especificar el motivo de la cancelación');
+    return;
+  }
 
-    try {
-      setProcesando(true);
-      setError(null);
+  try {
+    setProcesando(true);
+    setError(null);
 
-      const datos = {
-  estado: 'cancelada',
-  motivo_cancelacion: motivoCancelacion,
-  observaciones: observaciones
-};
+    const datos = {
+      estado: 'cancelada',
+      motivo_cancelacion: motivoCancelacion,
+      observaciones: observaciones
+    };
 
-const response = await apiService.put(
-  `/instalaciones/${instalacion.id}/actualizar`,
-  datos
-);
-
-      if (response.data.success) {
-        setSuccess('Instalación cancelada');
-        setTimeout(() => {
-          onSuccess?.();
-          onClose();
-        }, 2000);
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(
+      `${process.env.REACT_APP_API_URL}/instalador/instalacion/${instalacion.id}/cancelar`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(datos)
       }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error cancelando instalación');
-    } finally {
-      setProcesando(false);
-    }
-  };
+    );
 
+    const data = await response.json();
+
+    if (data.success) {
+      setSuccess('Instalación cancelada');
+      setTimeout(() => {
+        onSuccess?.();
+        onClose();
+      }, 2000);
+    } else {
+      setError(data.message || 'Error cancelando instalación');
+    }
+  } catch (err) {
+    setError(err.message || 'Error cancelando instalación');
+  } finally {
+    setProcesando(false);
+  }
+};
   const equiposFiltrados = equiposDisponibles.filter(equipo =>
     equipo.codigo.toLowerCase().includes(busquedaEquipo.toLowerCase()) ||
     equipo.nombre.toLowerCase().includes(busquedaEquipo.toLowerCase())
