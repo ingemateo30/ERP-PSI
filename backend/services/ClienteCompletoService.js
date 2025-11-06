@@ -1491,6 +1491,14 @@ const query = `
           contratoId,
           createdBy
         );
+        
+        const instalacionid = await this.generarOrdenInstalacionInterno(
+          conexion,
+          clienteId,
+          serviciosDeLaSede,
+          createdBy
+        );
+
 
         sedesCreadas.push({
           sede_nombre: sedeData.nombre_sede || `Sede ${i + 1}`,
@@ -1498,6 +1506,7 @@ const query = `
           servicios: serviciosDeLaSede,
           contrato_id: contratoId,
           factura_id: facturaId,
+          instalacion_id: instalacionid,
           total_servicios: serviciosDeLaSede.length
         });
       }
@@ -1511,6 +1520,7 @@ const query = `
           total_sedes: sedesCreadas.length,
           total_contratos: sedesCreadas.length, // 1 contrato por sede
           total_facturas: sedesCreadas.length,  // 1 factura por sede
+          total_instalaciones: sedesCreadas.length,  // 1 instalación por sede
           total_servicios: sedesCreadas.reduce((sum, sede) => sum + sede.total_servicios, 0)
         }
       };
