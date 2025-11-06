@@ -19,22 +19,54 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
 
   useEffect(() => {
     if (instalacion) {
+      console.log('🔍 MODAL DETALLE - Instalación completa:', instalacion);
+      
       // Parsear equipos
       try {
-        const equiposData = typeof instalacion.equipos_instalados === 'string'
-          ? JSON.parse(instalacion.equipos_instalados)
-          : instalacion.equipos_instalados;
-        setEquipos(equiposData || []);
+        let equiposData = null;
+        
+        // Intentar obtener equipos de diferentes campos posibles
+        if (instalacion.equipos_instalados) {
+          equiposData = typeof instalacion.equipos_instalados === 'string'
+            ? JSON.parse(instalacion.equipos_instalados)
+            : instalacion.equipos_instalados;
+        } else if (instalacion.equipos) {
+          equiposData = typeof instalacion.equipos === 'string'
+            ? JSON.parse(instalacion.equipos)
+            : instalacion.equipos;
+        }
+        
+        console.log('📦 MODAL DETALLE - Equipos parseados:', equiposData);
+        
+        // Asegurarse de que sea un array
+        if (Array.isArray(equiposData)) {
+          setEquipos(equiposData);
+        } else if (equiposData && typeof equiposData === 'object') {
+          // Si es un objeto único, convertirlo a array
+          setEquipos([equiposData]);
+        } else {
+          setEquipos([]);
+        }
       } catch (e) {
-        console.error('Error parseando equipos:', e);
+        console.error('❌ Error parseando equipos:', e);
         setEquipos([]);
       }
 
-      // Parsear fotos
+// Parsear fotos
       try {
-        const fotosData = typeof instalacion.fotos_instalacion === 'string'
-          ? JSON.parse(instalacion.fotos_instalacion)
-          : instalacion.fotos_instalacion;
+        let fotosData = null;
+        
+        if (instalacion.fotos_instalacion) {
+          fotosData = typeof instalacion.fotos_instalacion === 'string'
+            ? JSON.parse(instalacion.fotos_instalacion)
+            : instalacion.fotos_instalacion;
+        } else if (instalacion.fotos) {
+          fotosData = typeof instalacion.fotos === 'string'
+            ? JSON.parse(instalacion.fotos)
+            : instalacion.fotos;
+        }
+
+        console.log('📷 MODAL DETALLE - Fotos parseadas:', fotosData);
 
         if (fotosData && Array.isArray(fotosData)) {
           const fotoAntes = fotosData.find(f => 
@@ -49,9 +81,11 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
             antes: fotoAntes?.url || null,
             despues: fotoDespues?.url || null
           });
+        } else {
+          setFotos({ antes: null, despues: null });
         }
       } catch (e) {
-        console.error('Error parseando fotos:', e);
+        console.error('❌ Error parseando fotos:', e);
         setFotos({ antes: null, despues: null });
       }
     }
@@ -188,22 +222,28 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <p className="font-semibold text-gray-900">
-                          {equipo.equipo_codigo || 'Sin código'}
+                          {equipo.equipo_codigo || equipo.codigo || 'Sin código'}
                         </p>
                         <p className="text-sm text-gray-700">
-                          {equipo.equipo_nombre || equipo.nombre || 'Sin nombre'}
+                          {equipo.equipo_nombre || equipo.nombre || equipo.descripcion || 'Sin nombre'}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          {equipo.tipo || 'Sin tipo'} • {equipo.marca || 'Sin marca'}
+                          {equipo.tipo || equipo.tipo_equipo || 'Sin tipo'} • {equipo.marca || 'Sin marca'}
                         </p>
+                        {/* Mostrar si es el equipo principal */}
+                        {(equipo.es_principal || equipo.principal) && (
+                          <span className="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
+                            EQUIPO PRINCIPAL
+                          </span>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium text-gray-900">
                           Cantidad: {equipo.cantidad || 1}
                         </p>
-                        {equipo.numero_serie && (
+                        {(equipo.numero_serie || equipo.serial) && (
                           <p className="text-xs text-gray-500 mt-1">
-                            S/N: {equipo.numero_serie}
+                            S/N: {equipo.numero_serie || equipo.serial}
                           </p>
                         )}
                         {equipo.mac && (
@@ -231,7 +271,7 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
             <div className="bg-gray-50 rounded-lg p-5">
               <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
                 <ImageIcon className="mr-2" size={20} />
-                Fotografías
+                Fotografías de la Instalación
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {fotos.antes && (
@@ -239,8 +279,12 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
                     <p className="text-sm font-medium text-gray-700 mb-2">Antes de la Instalación</p>
                     <img
                       src={fotos.antes}
-                      alt="Antes"
-                      className="w-full h-64 object-cover rounded-lg border border-gray-200"
+                      alt="Antes de la instalación"
+                      className="w-full h-64 object-cover rounded-lg border border-gray-200 shadow-sm"
+                      onError={(e) => {
+                        console.error('❌ Error cargando imagen ANTES');
+                        e.target.style.display = 'none';
+                      }}
                     />
                   </div>
                 )}
@@ -249,8 +293,12 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
                     <p className="text-sm font-medium text-gray-700 mb-2">Después de la Instalación</p>
                     <img
                       src={fotos.despues}
-                      alt="Después"
-                      className="w-full h-64 object-cover rounded-lg border border-gray-200"
+                      alt="Después de la instalación"
+                      className="w-full h-64 object-cover rounded-lg border border-gray-200 shadow-sm"
+                      onError={(e) => {
+                        console.error('❌ Error cargando imagen DESPUÉS');
+                        e.target.style.display = 'none';
+                      }}
                     />
                   </div>
                 )}
