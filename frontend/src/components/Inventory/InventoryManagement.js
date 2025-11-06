@@ -76,7 +76,7 @@ const loadEquipment = useCallback(async () => {
 const loadStats = async () => {
     try {
       const response = await inventoryService.getStats();
-      console.log('📊 Estadísticas recibidas:', response);
+      console.log('📊 Estadísticas recibidas:', response.data);
       
       // Manejar la estructura de la respuesta
       if (response.data) {
