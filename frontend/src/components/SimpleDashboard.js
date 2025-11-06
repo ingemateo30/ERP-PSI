@@ -1,5 +1,5 @@
 // frontend/src/components/SimpleDashboard.js
-import ModalDetalleInstalacion from './ModalDetalleInstalacion';
+import ModalDetalleInstalacion from './Instalaciones/ModalDetalleInstalacion';
 import ModalCompletarInstalacion from './Instalador/ModalCompletarInstalacion';
 import React, { useState, useEffect } from 'react';
 import {
