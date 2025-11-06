@@ -31,67 +31,30 @@ class IncidenciasService {
         ];
     }
 
-    // ✅ MÉTODO CORREGIDO PARA HACER PETICIONES HTTP
-    async makeRequest(url, options = {}) {
-        try {
-            console.log(`🌐 IncidenciasService: ${options.method || 'GET'} ${url}`);
-
-            const token = authService.getToken();
-            if (!token) {
-                throw new Error('Token de autenticación requerido');
-            }
-
-            const config = {
-                method: options.method || 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                    ...options.headers
-                }
-            };
-
-            if (options.body) {
-                config.body = options.body;
-            }
-
-            console.log('📤 IncidenciasService - Configuración de petición:', {
-                url,
-                method: config.method,
-                hasToken: !!token,
-                hasBody: !!config.body
-            });
-
-            const response = await fetch(url, config);
-
-            // ✅ VERIFICAR TIPO DE CONTENIDO ANTES DE PROCESAR
-            const contentType = response.headers.get('content-type');
-            console.log('📥 IncidenciasService - Respuesta recibida:', {
-                status: response.status,
-                statusText: response.statusText,
-                contentType,
-                url: response.url
-            });
-
-            if (!contentType || !contentType.includes('application/json')) {
-                const textResponse = await response.text();
-                console.error('❌ Respuesta HTML recibida en lugar de JSON:', textResponse.substring(0, 200));
-                throw new Error(`El endpoint no fue encontrado`);
-            }
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(`Error del servidor: ${response.status} - ${errorData.message || response.statusText}`);
-            }
-
-            const data = await response.json();
-            console.log('✅ IncidenciasService - Respuesta exitosa:', data.message || 'Datos recibidos');
-            return data;
-
-        } catch (error) {
-            console.error('❌ Error en petición Incidencias:', error);
-            throw error;
+// ✅ MÉTODO CORREGIDO PARA HACER PETICIONES HTTP
+async makeRequest(url, options = {}) {
+    try {
+        const method = options.method || 'GET';
+        const body = options.body ? JSON.parse(options.body) : undefined;
+        
+        // Usar apiService en lugar de fetch
+        const apiService = require('./apiService').default;
+        
+        // Extraer solo el path de la URL
+        const path = url.replace(API_BASE_URL, '');
+        
+        if (method === 'GET') {
+            return await apiService.get(path);
+        } else if (method === 'POST') {
+            return await apiService.post(path, body);
+        } else if (method === 'PUT') {
+            return await apiService.put(path, body);
         }
+    } catch (error) {
+        console.error('❌ Error en petición:', error);
+        throw error;
     }
+}
 
     // ==========================================
     // MÉTODOS PRINCIPALES PARA INCIDENCIAS
