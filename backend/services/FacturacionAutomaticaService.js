@@ -491,9 +491,7 @@ class FacturacionAutomaticaService {
           JOIN planes_servicio ps ON sc.plan_id = ps.id
           JOIN clientes c ON sc.cliente_id = c.id
           WHERE sc.cliente_id = ?
-            AND sc.activo = 1
             AND sc.estado = 'activo'
-            AND ps.activo = 1
           ORDER BY ps.tipo ASC
         `, [clienteId]);
 
