@@ -320,10 +320,7 @@ router.get('/mis-incidencias', async (req, res) => {
         i.*,
         c.nombre as municipio_nombre,
         d.nombre as departamento_nombre,
-        TIMESTAMPDIFF(MINUTE, i.fecha_inicio, COALESCE(i.fecha_fin, NOW())) as duracion_minutos,
-        (SELECT COUNT(*) FROM clientes cl 
-         WHERE cl.municipio_id = i.municipio_id 
-         AND cl.estado = 'activo') as usuarios_afectados
+        TIMESTAMPDIFF(MINUTE, i.fecha_inicio, COALESCE(i.fecha_fin, NOW())) as duracion_minutos
       FROM incidencias_servicio i
       LEFT JOIN ciudades c ON i.municipio_id = c.id
       LEFT JOIN departamentos d ON c.departamento_id = d.id
@@ -340,7 +337,8 @@ router.get('/mis-incidencias', async (req, res) => {
     console.error('Error obteniendo incidencias:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener incidencias'
+      message: 'Error al obtener incidencias',
+      error: error.message
     });
   }
 });
@@ -356,8 +354,6 @@ router.get('/mis-incidencias/estadisticas', async (req, res) => {
         SUM(CASE WHEN estado = 'reportado' THEN 1 ELSE 0 END) as reportadas,
         SUM(CASE WHEN estado = 'en_atencion' THEN 1 ELSE 0 END) as en_atencion,
         SUM(CASE WHEN estado = 'resuelto' THEN 1 ELSE 0 END) as resueltas,
-        SUM(CASE WHEN estado = 'cerrado' THEN 1 ELSE 0 END) as cerradas,
-        SUM(CASE WHEN tipo_incidencia = 'emergencia' THEN 1 ELSE 0 END) as emergencias,
         AVG(TIMESTAMPDIFF(MINUTE, fecha_inicio, fecha_fin)) as tiempo_promedio_minutos
       FROM incidencias_servicio
       WHERE responsable_id = ?
@@ -370,8 +366,6 @@ router.get('/mis-incidencias/estadisticas', async (req, res) => {
         reportadas: 0,
         en_atencion: 0,
         resueltas: 0,
-        cerradas: 0,
-        emergencias: 0,
         tiempo_promedio_minutos: 0
       }
     });
@@ -380,10 +374,12 @@ router.get('/mis-incidencias/estadisticas', async (req, res) => {
     console.error('Error obteniendo estadísticas:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener estadísticas'
+      message: 'Error al obtener estadísticas',
+      error: error.message
     });
   }
 });
+
 
 // ==========================================
 // ESTADÍSTICAS DEL INSTALADOR
