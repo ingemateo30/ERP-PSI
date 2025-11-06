@@ -237,55 +237,54 @@ if (data.success) {
 
   // Completar instalación
  const completarInstalacion = async () => {
-    if (!fotoDespues && !previsualizacionDespues) {
-      setError('Debes subir una foto del trabajo terminado');
-      return;
-    }
+  if (!fotoDespues && !previsualizacionDespues) {
+    setError('Debes subir una foto del trabajo terminado');
+    return;
+  }
 
-    try {
-      setProcesando(true);
-      setError(null);
+  try {
+    setProcesando(true);
+    setError(null);
 
-      const token = localStorage.getItem('accessToken');
-      const formData = new FormData();
+    const token = localStorage.getItem('accessToken');
+    
+    // Preparar datos como lo hace ModalCompletarInstalacion
+    const formData = {
+      equipos: equiposAsignados.map(eq => eq.equipo_id), // Solo los IDs de equipos
+      foto: previsualizacionDespues || fotoPreview, // Base64
+      observaciones: observaciones
+    };
 
-      if (fotoDespues) {
-        formData.append('foto_despues', fotoDespues);
+    const response = await fetch(
+      `${process.env.REACT_APP_API_URL}/instalador/instalacion/${instalacion.id}/completar`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' // JSON, no FormData
+        },
+        body: JSON.stringify(formData)
       }
+    );
 
-      formData.append('equipos_instalados', JSON.stringify(equiposAsignados));
-      formData.append('observaciones', observaciones);
-      formData.append('estado', 'completada');
+    const data = await response.json();
 
-      const response = await fetch(
-  `${process.env.REACT_APP_API_URL}/instalador/instalacion/${instalacion.id}/completar`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-            // NO incluir Content-Type cuando envías FormData
-          },
-          body: formData
-        }
-      );
-
-      const data = await response.json();
-
-      if (data.success) {
-        setSuccess('¡Instalación completada exitosamente!');
-        setTimeout(() => {
-          onSuccess?.();
-          onClose();
-        }, 2000);
-      } else {
-        setError(data.message || 'Error completando instalación');
-      }
-    } catch (err) {
-      setError(err.message || 'Error completando instalación');
-    } finally {
-      setProcesando(false);
+    if (data.success) {
+      setSuccess('¡Instalación completada exitosamente!');
+      setTimeout(() => {
+        onSuccess?.();
+        onClose();
+      }, 2000);
+    } else {
+      setError(data.message || 'Error completando instalación');
     }
-  };
+  } catch (err) {
+    console.error('Error completando instalación:', err);
+    setError(err.message || 'Error completando instalación');
+  } finally {
+    setProcesando(false);
+  }
+};
   // Cancelar instalación
  const cancelarInstalacion = async () => {
   if (!motivoCancelacion.trim()) {
