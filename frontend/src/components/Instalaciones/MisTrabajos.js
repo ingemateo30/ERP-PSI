@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import IniciarInstalacion from './IniciarInstalacion';
-import ModalDetalleInstalacion from './ModalDetalleInstalacion';
+
 
 const MisTrabajos = () => {
   const { user } = useAuth();
