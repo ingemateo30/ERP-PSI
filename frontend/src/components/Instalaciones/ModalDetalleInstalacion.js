@@ -59,8 +59,9 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
         
         for (const equipoId of equiposIds) {
           try {
+            console.log(`🔍 Intentando cargar equipo ID: ${equipoId}`);
             const response = await fetch(
-              `${process.env.REACT_APP_API_URL}/inventory/${equipoId}`,
+              `${process.env.REACT_APP_API_URL}/equipos/${equipoId}`,
               {
                 headers: {
                   'Authorization': `Bearer ${token}`,
@@ -69,15 +70,30 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
               }
             );
             
+            console.log(`📊 Response status para equipo ${equipoId}:`, response.status);
+            
             if (response.ok) {
               const data = await response.json();
+              console.log(`📦 Data recibida para equipo ${equipoId}:`, data);
+              
               if (data.success && data.equipo) {
                 equiposCompletos.push(data.equipo);
-                console.log('✅ Equipo cargado:', data.equipo);
+                console.log('✅ Equipo cargado exitosamente:', data.equipo);
+              } else if (data.success && data.equipos) {
+                // Por si el backend retorna "equipos" en plural
+                equiposCompletos.push(data.equipos);
+                console.log('✅ Equipo cargado exitosamente (plural):', data.equipos);
+              } else if (data) {
+                // Por si solo retorna el objeto directo
+                equiposCompletos.push(data);
+                console.log('✅ Equipo cargado (directo):', data);
               }
+            } else {
+              const errorText = await response.text();
+              console.error(`❌ Error ${response.status} cargando equipo ${equipoId}:`, errorText);
             }
           } catch (error) {
-            console.error('❌ Error cargando equipo:', equipoId, error);
+            console.error('❌ Error de red cargando equipo:', equipoId, error);
           }
         }
         
@@ -87,7 +103,7 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
         setEquipos([]);
       }
 
-      // Parsear fotos
+// Parsear fotos
       try {
         let fotosData = null;
         
@@ -102,17 +118,21 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
         }
 
         console.log('📷 MODAL DETALLE - Fotos parseadas:', fotosData);
+        console.log('📷 MODAL DETALLE - Tipo de fotos:', typeof fotosData);
+        console.log('📷 MODAL DETALLE - Es array:', Array.isArray(fotosData));
 
         if (fotosData && Array.isArray(fotosData)) {
           // Si es un array de strings (base64 directo)
-          if (typeof fotosData[0] === 'string') {
+          if (typeof fotosData[0] === 'string' && fotosData[0].startsWith('data:image')) {
+            console.log('📷 Detectado: Array de strings base64');
             setFotos({
               antes: fotosData[0] || null,
               despues: fotosData[1] || null
             });
           } 
-          // Si es un array de objetos con descripcion y url
+          // Si es un array de objetos con descripcion y url/data
           else if (fotosData[0] && typeof fotosData[0] === 'object') {
+            console.log('📷 Detectado: Array de objetos');
             const fotoAntes = fotosData.find(f => 
               f.descripcion?.toLowerCase().includes('antes')
             );
@@ -121,12 +141,24 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
               f.descripcion?.toLowerCase().includes('despues')
             );
 
+            console.log('📷 Foto ANTES encontrada:', fotoAntes);
+            console.log('📷 Foto DESPUÉS encontrada:', fotoDespues);
+
             setFotos({
               antes: fotoAntes?.url || fotoAntes?.data || null,
               despues: fotoDespues?.url || fotoDespues?.data || null
             });
           }
+        } 
+        // Si no es array, verificar si es un objeto con las fotos directamente
+        else if (fotosData && typeof fotosData === 'object') {
+          console.log('📷 Detectado: Objeto con fotos');
+          setFotos({
+            antes: fotosData.antes || fotosData[0] || null,
+            despues: fotosData.despues || fotosData[1] || null
+          });
         } else {
+          console.log('📷 No se detectaron fotos válidas');
           setFotos({ antes: null, despues: null });
         }
       } catch (e) {
