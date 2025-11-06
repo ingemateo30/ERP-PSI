@@ -842,30 +842,40 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   </select>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Número de Identificación <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.identificacion}
-                    onChange={(e) => handleInputChange('identificacion', e.target.value)}
-                    disabled={modoAgregarServicio}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${errors.identificacion ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    placeholder="1234567890"
-                  />
-                  {errors.identificacion && (
-                    <p className="mt-1 text-sm text-red-600">{errors.identificacion}</p>
-                  )}
-                </div>
-                {verificacionCliente && !client && (
-                  <AlertaClienteExistente
-                    verificacion={verificacionCliente}
-                    onContinuarConCliente={manejarContinuarConClienteExistente}
-                    onCrearNuevo={manejarCrearNuevo}
-                    onVerHistorial={manejarVerHistorial}
-                  />
-                )}
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    Número de Identificación <span className="text-red-500">*</span>
+  </label>
+
+  <input
+    type="text"
+    value={formData.identificacion}
+    onChange={(e) => handleInputChange('identificacion', e.target.value)}
+    disabled={modoAgregarServicio}
+    className={`w-full max-w-[400px] px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 transition-all ${
+      errors.identificacion ? 'border-red-500' : 'border-gray-300'
+    }`}
+    placeholder="1234567890"
+  />
+
+  {errors.identificacion && (
+    <p className="mt-1 text-sm text-red-600 break-words max-w-[400px]">
+      {errors.identificacion}
+    </p>
+  )}
+
+  {/* 🔔 Ahora la alerta desplaza el contenido en lugar de flotar */}
+  {verificacionCliente && !client && (
+    <div className="mt-3 w-full max-w-[600px]">
+      <AlertaClienteExistente
+        verificacion={verificacionCliente}
+        onContinuarConCliente={manejarContinuarConClienteExistente}
+        onCrearNuevo={manejarCrearNuevo}
+        onVerHistorial={manejarVerHistorial}
+      />
+    </div>
+  )}
+</div>
+
 
                 {modoAgregarServicio && clienteSeleccionado && (
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">

@@ -1,4 +1,4 @@
-// frontend/src/components/Instalaciones/MisTrabajos.js
+import ModalDetalleInstalacion from './ModalDetalleInstalacion';// frontend/src/components/Instalaciones/MisTrabajos.js
 import apiService from '../../services/apiService';
 import React, { useState, useEffect } from 'react';
 import {
@@ -27,8 +27,14 @@ const MisTrabajos = () => {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState('pendiente');
+  
+  // Modal de Iniciar/Continuar
   const [mostrarModal, setMostrarModal] = useState(false);
   const [instalacionSeleccionada, setInstalacionSeleccionada] = useState(null);
+  
+  // Modal de Detalle (solo lectura)
+  const [modalDetalle, setModalDetalle] = useState(false);
+  const [instalacionDetalle, setInstalacionDetalle] = useState(null);
   const [estadisticas, setEstadisticas] = useState({
     pendientes: 0,
     en_proceso: 0,
@@ -352,13 +358,16 @@ const MisTrabajos = () => {
                     </button>
                   )}
 
-                  <button
-                    onClick={() => abrirModal(instalacion)}
-                    className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors font-medium"
-                  >
-                    <Eye size={18} />
-                    <span>Ver Detalles</span>
-                  </button>
+                 <button
+  onClick={() => {
+    setInstalacionDetalle(instalacion);
+    setModalDetalle(true);
+  }}
+  className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors font-medium"
+>
+  <Eye size={18} />
+  <span>Ver Detalles</span>
+</button>
                 </div>
               </div>
             </div>
@@ -372,6 +381,18 @@ const MisTrabajos = () => {
           instalacion={instalacionSeleccionada}
           onClose={cerrarModal}
           onSuccess={cargarTrabajos}
+        />
+      )}
+
+      {/* Modal de Detalle */}
+      {modalDetalle && instalacionDetalle && (
+        <ModalDetalleInstalacion
+          isOpen={modalDetalle}
+          onClose={() => {
+            setModalDetalle(false);
+            setInstalacionDetalle(null);
+          }}
+          instalacion={instalacionDetalle}
         />
       )}
     </div>
