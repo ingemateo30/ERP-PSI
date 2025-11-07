@@ -462,7 +462,7 @@ const cruzarPago = async () => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="text-sm text-gray-900">{factura.nombre_cliente}</div>
-                                            <div className="text-sm text-gray-500">{ffactura.identificacion_cliente}</div>
+                                            <div className="text-sm text-gray-500">{factura.identificacion_cliente}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {factura.fecha_pago ? new Date(factura.fecha_pago).toLocaleDateString() : 'N/A'}
