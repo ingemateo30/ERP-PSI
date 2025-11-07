@@ -91,12 +91,12 @@ const cargarFacturasPagadas = async () => {
     try {
         const params = {
             estado: 'pagada',
-            fecha_inicio: filtrosPagados.fecha_inicio,
-            fecha_fin: filtrosPagados.fecha_fin
+            fecha_inicio: filtrosPagadas.fecha_inicio,
+            fecha_fin: filtrosPagadas.fecha_fin
         };
 
-        if (filtrosPagados.search) params.search = filtrosPagados.search;
-        if (filtrosPagados.banco_id) params.banco_id = filtrosPagados.banco_id; // ✅ Agregar banco al query
+        if (filtrosPagadas.search) params.search = filtrosPagadas.search;
+        if (filtrosPagadas.banco_id) params.banco_id = filtrosPagadas.banco_id; // ✅ Agregar banco al query
 
         const queryString = new URLSearchParams(params).toString();
         const response = await apiService.get(`/facturacion/facturas?${queryString}`);
