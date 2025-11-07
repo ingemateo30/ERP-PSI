@@ -89,26 +89,34 @@ const CrucePagosBancarios = () => {
 
 const cargarFacturasPagadas = async () => {
     try {
+        setLoadingPagadas(true);
         const params = {
             estado: 'pagada',
             fecha_inicio: filtrosPagadas.fecha_inicio,
             fecha_fin: filtrosPagadas.fecha_fin
         };
 
-        if (filtrosPagadas.search) params.search = filtrosPagadas.search;
-        if (filtrosPagadas.banco_id) params.banco_id = filtrosPagadas.banco_id; // ✅ Agregar banco al query
+        if (filtrosPagadas.busqueda) params.search = filtrosPagadas.busqueda;  // ✅ CORREGIDO: era .search, debe ser .busqueda
+        if (filtrosPagadas.banco) params.banco_id = filtrosPagadas.banco;      // ✅ CORREGIDO: era .banco_id, debe ser .banco
 
         const queryString = new URLSearchParams(params).toString();
         const response = await apiService.get(`/facturacion/facturas?${queryString}`);
         
         if (response && response.success) {
-            setFacturasPagadas(response.data || []);
+            // ✅ IMPORTANTE: Extraer correctamente el array según la estructura del backend
+            const facturas = Array.isArray(response.data) 
+                ? response.data 
+                : (response.data?.facturas || []);
+            
+            setFacturasPagadas(facturas);
         }
     } catch (error) {
         console.error('Error cargando facturas pagadas:', error);
+        setFacturasPagadas([]); // ✅ Asegurar que sea array vacío en caso de error
+    } finally {
+        setLoadingPagadas(false);
     }
 };
-
     const abrirModalCruce = (factura) => {
         setFacturaSeleccionada(factura);
         setDatosPago({
