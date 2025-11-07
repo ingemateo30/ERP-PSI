@@ -1,11 +1,10 @@
 // frontend/src/components/Facturas/HistorialFacturacionWrapper.js
 // VERSIÓN CORREGIDA - Soluciona problemas de endpoints y carga de datos
-
 import React, { useState, useEffect } from 'react';
 import {
     Search, Users, FileText, AlertCircle, X, Eye, Calendar,
     ChevronDown, ChevronUp, DollarSign, Clock, CheckCircle,
-    Filter, RefreshCw, Download, PrinterIcon, Mail
+    Filter, RefreshCw, Download, PrinterIcon, Mail, Wifi, Tv
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -193,23 +192,27 @@ const cargarFacturasCliente = async () => {
     
     // Normalizar facturas (tanto reales como de prueba)
     const facturasNormalizadas = facturasCargadas.map(factura => ({
-      id: factura.id,
-      numero_factura: factura.numero_factura || `FAC-${factura.id}`,
-      cliente_id: factura.cliente_id || clienteSeleccionado.id,
-      fecha_factura: factura.fecha_factura || factura.fecha_emision,
-      fecha_emision: factura.fecha_emision || factura.fecha_factura,
-      fecha_vencimiento: factura.fecha_vencimiento,
-      periodo: factura.periodo,
-      total: parseFloat(factura.total || 0),
-      subtotal: parseFloat(factura.subtotal || 0),
-      iva: parseFloat(factura.iva || 0),
-      estado: factura.estado || 'pendiente',
-      observaciones: factura.observaciones,
-      items: factura.detalles || factura.items || [],
-      pagos: factura.pagos || [],
-      total_pagado: 0,
-      saldo_pendiente: parseFloat(factura.total || 0)
-    }));
+    id: factura.id,
+    numero_factura: factura.numero_factura || `FAC-${factura.id}`,
+    cliente_id: factura.cliente_id || clienteSeleccionado.id,
+    fecha_factura: factura.fecha_factura || factura.fecha_emision,
+    fecha_emision: factura.fecha_emision || factura.fecha_factura,
+    fecha_vencimiento: factura.fecha_vencimiento,
+    fecha_desde: factura.fecha_desde,  // ← AGREGAR
+    fecha_hasta: factura.fecha_hasta,  // ← AGREGAR
+    internet: factura.internet || 0,   // ← AGREGAR
+    television: factura.television || 0, // ← AGREGAR
+    periodo: factura.periodo,
+    total: parseFloat(factura.total || 0),
+    subtotal: parseFloat(factura.subtotal || 0),
+    iva: parseFloat(factura.iva || 0),
+    estado: factura.estado || 'pendiente',
+    observaciones: factura.observaciones,
+    items: factura.detalles || factura.items || [],
+    pagos: factura.pagos || [],
+    total_pagado: 0,
+    saldo_pendiente: parseFloat(factura.total || 0)
+}));
     
     // Calcular totales pagados para cada factura
     facturasNormalizadas.forEach(factura => {
@@ -551,7 +554,35 @@ const cargarFacturasCliente = async () => {
             case 'anulada': return 'text-gray-600 bg-gray-100';
             default: return 'text-blue-600 bg-blue-100';
         }
+
     };
+    // Función para obtener servicios facturados
+const obtenerServiciosFacturados = (factura) => {
+    const servicios = [];
+    const internet = parseFloat(factura.internet || 0);
+    const television = parseFloat(factura.television || 0);
+    
+    if (internet > 0) servicios.push('Internet');
+    if (television > 0) servicios.push('TV');
+    
+    return servicios.length > 0 ? servicios : ['N/A'];
+};
+
+// Función para formatear periodo facturado
+const formatearPeriodoFacturado = (factura) => {
+    const desde = factura.fecha_desde;
+    const hasta = factura.fecha_hasta;
+    
+    if (!desde || !hasta) return 'No definido';
+    
+    try {
+        const fechaDesde = format(new Date(desde), 'dd-MMM-yyyy', { locale: es });
+        const fechaHasta = format(new Date(hasta), 'dd-MMM-yyyy', { locale: es });
+        return `${fechaDesde} - ${fechaHasta}`;
+    } catch {
+        return 'Fecha inválida';
+    }
+};
 
     const descargarFactura = async (facturaId) => {
     try {
@@ -851,77 +882,100 @@ const cargarFacturasCliente = async () => {
 
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Factura
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Fecha
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Vencimiento
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Total
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Estado
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Acciones
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {facturas.map((factura) => (
-                                        <tr key={factura.id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm font-medium text-gray-900">
-                                                    {factura.numero_factura || `#${factura.id}`}
-                                                </div>
-                                                {factura.periodo && (
-                                                    <div className="text-sm text-gray-500">
-                                                        Período: {factura.periodo}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {formatearFecha(factura.fecha_factura || factura.fecha_emision)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {formatearFecha(factura.fecha_vencimiento)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                {formatearMoneda(factura.total)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEstadoColor(factura.estado)}`}>
-                                                    {factura.estado}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <div className="flex space-x-2">
-                                                    <button
-                                                        onClick={() => verDetalleFactura(factura)}
-                                                        className="text-[#0e6493] hover:text-[#0e6493]/80 transition-colors"
-                                                        title="Ver detalle"
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => descargarFactura(factura.id)}
-                                                        className="text-green-600 hover:text-green-800 transition-colors"
-                                                        title="Descargar PDF"
-                                                    >
-                                                        <Download className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+    <thead className="bg-gray-50">
+        <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Factura
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Fecha
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Vencimiento
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Periodo Facturado
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Servicios
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Total
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+            </th>
+        </tr>
+    </thead>
+    <tbody className="bg-white divide-y divide-gray-200">
+        {facturas.map((factura) => (
+            <tr key={factura.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                        {factura.numero_factura || `#${factura.id}`}
+                    </div>
+                    {factura.periodo && (
+                        <div className="text-sm text-gray-500">
+                            Período: {factura.periodo}
+                        </div>
+                    )}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatearFecha(factura.fecha_factura || factura.fecha_emision)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatearFecha(factura.fecha_vencimiento)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <div className="flex items-center">
+                        <Calendar className="w-4 h-4 text-gray-400 mr-1" />
+                        {formatearPeriodoFacturado(factura)}
+                    </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <div className="flex flex-wrap gap-1">
+                        {obtenerServiciosFacturados(factura).map((servicio, idx) => (
+                            <span key={idx} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {servicio === 'Internet' && <Wifi className="w-3 h-3 mr-1" />}
+                                {servicio === 'TV' && <Tv className="w-3 h-3 mr-1" />}
+                                {servicio}
+                            </span>
+                        ))}
+                    </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {formatearMoneda(factura.total)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEstadoColor(factura.estado)}`}>
+                        {factura.estado}
+                    </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
+                        <button
+                            onClick={() => verDetalleFactura(factura)}
+                            className="text-[#0e6493] hover:text-[#0e6493]/80 transition-colors"
+                            title="Ver detalle"
+                        >
+                            <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => descargarFactura(factura.id)}
+                            className="text-green-600 hover:text-green-800 transition-colors"
+                            title="Descargar PDF"
+                        >
+                            <Download className="w-4 h-4" />
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        ))}
+    </tbody>
+</table>
 
                             {facturas.length === 0 && !loadingFacturas && (
                                 <div className="text-center py-8">
