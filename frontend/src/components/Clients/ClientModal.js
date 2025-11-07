@@ -13,16 +13,15 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Función para formatear fechas
-  const formatDate = (dateString) => {
+const formatDate = (dateString) => {
   if (!dateString) return 'No especificada';
 
   try {
-    // Separar fecha y hora
+    // Tomar solo la parte de la fecha
     const [datePart] = dateString.split(' ');
     const [year, month, day] = datePart.split('-');
-    // Crear fecha en local usando solo año, mes y día
     const date = new Date(year, month - 1, day);
-    
+
     return date.toLocaleDateString('es-CO', {
       year: 'numeric',
       month: 'long',
@@ -32,6 +31,7 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
     return 'Fecha inválida';
   }
 };
+
 
   // Función para formatear teléfonos
   const formatPhone = (phone) => {
