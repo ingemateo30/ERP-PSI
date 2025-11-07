@@ -222,14 +222,21 @@ class PDFGenerator {
             .text(factura.identificacion_cliente || '1005450340', 30, y + 15)
             .text(factura.direccion_cliente || 'CR 14A 21-63 ARBOLEDAS', 30, y + 30);
 
-        // Período facturado (derecha)
-        doc.fontSize(8).font('Helvetica-Bold')
-            .text('PERIODO FACTURADO', 400, y)
-            .font('Helvetica')
-            .text('Desde', 400, y + 15)
-            .text('Hasta', 470, y + 15)
-            .text(this.formatearFecha(factura.fecha_desde) || '1-jul.-2025', 400, y + 30)
-            .text(this.formatearFecha(factura.fecha_hasta) || '31-jul.-2025', 470, y + 30);
+        // === PERIODO FACTURADO (derecha, actualizado y alineado) ===
+doc.fontSize(8).font('Helvetica-Bold')
+   .text('PERIODO FACTURADO', 400, y);
+
+y += 12; // Espacio debajo del título
+
+doc.font('Helvetica')
+   .text('Desde:', 400, y)
+   .text(this.formatearFecha(factura.fecha_desde) || '1-jul.-2025', 450, y);
+
+y += 12; // Espacio entre líneas
+
+doc.text('Hasta:', 400, y)
+   .text(this.formatearFecha(factura.fecha_hasta) || '31-jul.-2025', 450, y);
+
 
         y += 55;
 
