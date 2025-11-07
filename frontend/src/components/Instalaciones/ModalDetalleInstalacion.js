@@ -61,14 +61,14 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
           try {
             console.log(`🔍 Intentando cargar equipo ID: ${equipoId}`);
             const response = await fetch(
-              `${process.env.REACT_APP_API_URL}/equipos/${equipoId}`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
+  `${process.env.REACT_APP_API_URL}/inventario/equipos/${equipoId}`,
+  {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  }
+);
             
             console.log(`📊 Response status para equipo ${equipoId}:`, response.status);
             
