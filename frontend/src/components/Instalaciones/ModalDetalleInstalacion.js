@@ -369,11 +369,11 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
                   <div className="bg-white p-3 rounded-lg border border-gray-200">
                     <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
                       <ImageIcon size={16} className="mr-2" />
-                      Antes de la Instalación
+                     Instalación Completada
                     </p>
                     <img
                       src={fotos.antes}
-                      alt="Antes de la instalación"
+                      alt="Instalación completada"
                       className="w-full h-64 object-cover rounded-lg shadow-sm"
                       onError={(e) => {
                         console.error('❌ Error cargando imagen ANTES');
