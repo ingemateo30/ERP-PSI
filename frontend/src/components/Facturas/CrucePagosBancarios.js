@@ -173,8 +173,8 @@ const cruzarPago = async () => {
             facturasFiltradas.forEach(factura => {
                 const row = [
                     factura.numero_factura,
-                    `"${factura.cliente_nombre}"`,
-                    factura.cliente_identificacion,
+                    `"${factura.nombre_cliente}"`,
+                    factura.identificacion_cliente,
                     factura.total,
                     factura.fecha_vencimiento
                 ].join(',');
@@ -340,8 +340,8 @@ const cruzarPago = async () => {
                                             <div className="text-sm font-medium text-gray-900">{factura.numero_factura}</div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900">{factura.cliente_nombre}</div>
-                                            <div className="text-sm text-gray-500">{factura.cliente_identificacion}</div>
+                                            <div className="text-sm text-gray-900">{factura.nombre_cliente}</div>
+                                            <div className="text-sm text-gray-500">{factura.identificacion_cliente}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {new Date(factura.fecha_emision).toLocaleDateString()}
@@ -461,8 +461,8 @@ const cruzarPago = async () => {
                                             <div className="text-sm font-medium text-gray-900">{factura.numero_factura}</div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900">{factura.cliente_nombre}</div>
-                                            <div className="text-sm text-gray-500">{factura.cliente_identificacion}</div>
+                                            <div className="text-sm text-gray-900">{factura.nombre_cliente}</div>
+                                            <div className="text-sm text-gray-500">{ffactura.identificacion_cliente}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {factura.fecha_pago ? new Date(factura.fecha_pago).toLocaleDateString() : 'N/A'}
@@ -634,121 +634,126 @@ const cruzarPago = async () => {
             {/* Modal Detalle de Pago */}
             {mostrarModalDetalle && facturaSeleccionada && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-lg max-w-3xl w-full p-6">
-                        <div className="flex justify-between items-center mb-4">
+                    <div className="bg-white rounded-lg max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col">
+                        {/* Header fijo */}
+                        <div className="flex justify-between items-center p-6 border-b border-gray-200 flex-shrink-0">
                             <h2 className="text-xl font-bold">Detalle del Pago - {facturaSeleccionada?.numero_factura}</h2>
                             <button
                                 onClick={() => setMostrarModalDetalle(false)}
-                                className="text-gray-400 hover:text-gray-600"
+                                className="text-gray-400 hover:text-gray-600 flex-shrink-0"
                             >
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
 
-                        <div className="space-y-6">
-                            {/* Información de la Factura */}
-                            <div className="bg-blue-50 p-4 rounded-lg">
-                                <h3 className="text-lg font-semibold text-blue-900 mb-3">Información de la Factura</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <span className="text-sm text-blue-700">Número de Factura:</span>
-                                        <p className="font-medium text-blue-900">{facturaSeleccionada?.numero_factura}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-blue-700">Cliente:</span>
-                                        <p className="font-medium text-blue-900">{facturaSeleccionada?.cliente_nombre}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-blue-700">Identificación:</span>
-                                        <p className="font-medium text-blue-900">{facturaSeleccionada?.cliente_identificacion}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-blue-700">Fecha Emisión:</span>
-                                        <p className="font-medium text-blue-900">
-                                            {new Date(facturaSeleccionada?.fecha_emision).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-blue-700">Total Factura:</span>
-                                        <p className="font-bold text-lg text-blue-900">
-                                            ${parseFloat(facturaSeleccionada?.total || 0).toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-blue-700">Estado:</span>
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">
-                                            Pagada
-                                        </span>
+                        {/* Contenido con scroll */}
+                        <div className="overflow-y-auto flex-1 p-6">
+                            <div className="space-y-6">
+                                {/* Información de la Factura */}
+                                <div className="bg-blue-50 p-4 rounded-lg">
+                                    <h3 className="text-lg font-semibold text-blue-900 mb-3">Información de la Factura</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <span className="text-sm text-blue-700">Número de Factura:</span>
+                                            <p className="font-medium text-blue-900">{facturaSeleccionada?.numero_factura}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-blue-700">Cliente:</span>
+                                            <p className="font-medium text-blue-900">{facturaSeleccionada?.nombre_cliente || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-blue-700">Identificación:</span>
+                                            <p className="font-medium text-blue-900">{facturaSeleccionada?.identificacion_cliente || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-blue-700">Fecha Emisión:</span>
+                                            <p className="font-medium text-blue-900">
+                                                {new Date(facturaSeleccionada?.fecha_emision).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-blue-700">Total Factura:</span>
+                                            <p className="font-bold text-lg text-blue-900">
+                                                ${parseFloat(facturaSeleccionada?.total || 0).toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-blue-700">Estado:</span>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">
+                                                Pagada
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
+
+                                {/* Información del Pago */}
+                                <div className="bg-green-50 p-4 rounded-lg">
+                                    <h3 className="text-lg font-semibold text-green-900 mb-3">Detalles del Pago</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <span className="text-sm text-green-700">Fecha de Pago:</span>
+                                            <p className="font-medium text-green-900">
+                                                {facturaSeleccionada?.fecha_pago 
+                                                    ? new Date(facturaSeleccionada.fecha_pago).toLocaleDateString() 
+                                                    : 'N/A'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-green-700">Método de Pago:</span>
+                                            <p className="font-medium text-green-900 capitalize">
+                                                {facturaSeleccionada?.metodo_pago || 'N/A'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-green-700">Banco:</span>
+                                            <p className="font-medium text-green-900">
+                                                {facturaSeleccionada?.banco_nombre || bancos.find(b => b.id === facturaSeleccionada?.banco_id)?.nombre || 'N/A'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-green-700">Referencia:</span>
+                                            <p className="font-medium text-green-900">
+                                                {facturaSeleccionada?.referencia_pago || 'N/A'}
+                                            </p>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <span className="text-sm text-green-700">Valor Pagado:</span>
+                                            <p className="font-bold text-xl text-green-900">
+                                                ${parseFloat(facturaSeleccionada?.valor_pagado || facturaSeleccionada?.total || 0).toLocaleString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Observaciones */}
+                                {facturaSeleccionada?.observaciones && (
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Observaciones</h3>
+                                        <p className="text-gray-700">{facturaSeleccionada.observaciones}</p>
+                                    </div>
+                                )}
+
+                                {/* Servicios de la Factura */}
+                                {facturaSeleccionada?.servicios && (
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Servicios Incluidos</h3>
+                                        <div className="space-y-2">
+                                            {JSON.parse(facturaSeleccionada.servicios).map((servicio, index) => (
+                                                <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
+                                                    <span className="text-gray-700">{servicio.descripcion || servicio.plan_nombre}</span>
+                                                    <span className="font-medium text-gray-900">
+                                                        ${parseFloat(servicio.valor || 0).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-
-                            {/* Información del Pago */}
-                            <div className="bg-green-50 p-4 rounded-lg">
-                                <h3 className="text-lg font-semibold text-green-900 mb-3">Detalles del Pago</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <span className="text-sm text-green-700">Fecha de Pago:</span>
-                                        <p className="font-medium text-green-900">
-                                            {facturaSeleccionada?.fecha_pago 
-                                                ? new Date(facturaSeleccionada.fecha_pago).toLocaleDateString() 
-                                                : 'N/A'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-green-700">Método de Pago:</span>
-                                        <p className="font-medium text-green-900 capitalize">
-                                            {facturaSeleccionada?.metodo_pago || 'N/A'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-green-700">Banco:</span>
-                                        <p className="font-medium text-green-900">
-                                            {bancos.find(b => b.id === facturaSeleccionada?.banco_id)?.nombre || 'N/A'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-green-700">Referencia:</span>
-                                        <p className="font-medium text-green-900">
-                                            {facturaSeleccionada?.referencia_pago || 'N/A'}
-                                        </p>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <span className="text-sm text-green-700">Valor Pagado:</span>
-                                        <p className="font-bold text-xl text-green-900">
-                                            ${parseFloat(facturaSeleccionada?.valor_pagado || facturaSeleccionada?.total || 0).toLocaleString()}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Observaciones */}
-                            {facturaSeleccionada?.observaciones && (
-                                <div className="bg-gray-50 p-4 rounded-lg">
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Observaciones</h3>
-                                    <p className="text-gray-700">{facturaSeleccionada.observaciones}</p>
-                                </div>
-                            )}
-
-                            {/* Servicios de la Factura */}
-                            {facturaSeleccionada?.servicios && (
-                                <div className="bg-gray-50 p-4 rounded-lg">
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Servicios Incluidos</h3>
-                                    <div className="space-y-2">
-                                        {JSON.parse(facturaSeleccionada.servicios).map((servicio, index) => (
-                                            <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
-                                                <span className="text-gray-700">{servicio.descripcion || servicio.plan_nombre}</span>
-                                                <span className="font-medium text-gray-900">
-                                                    ${parseFloat(servicio.valor || 0).toLocaleString()}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
-                        <div className="flex justify-end gap-2 pt-4 border-t mt-6">
+                        {/* Footer fijo */}
+                        <div className="flex justify-end gap-2 p-6 border-t border-gray-200 flex-shrink-0">
                             <button
                                 onClick={() => setMostrarModalDetalle(false)}
                                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
