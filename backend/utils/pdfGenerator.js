@@ -225,7 +225,7 @@ class PDFGenerator {
 doc.fontSize(8).font('Helvetica-Bold')
    .text('PERIODO FACTURADO', 400, y);
 
-y += 22; // ⬅️ Aumentamos el espacio antes de las fechas
+y += 60; // ⬅️ Aumentamos el espacio antes de las fechas
 
 doc.font('Helvetica')
    .text('Desde', 400, y)
