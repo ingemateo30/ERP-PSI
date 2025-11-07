@@ -276,7 +276,6 @@ router.post('/', async (req, res) => {
         });
     }
 });
-
 // Actualizar PQR
 router.put('/:id', async (req, res) => {
     try {
@@ -297,8 +296,7 @@ router.put('/:id', async (req, res) => {
             respuesta,
             usuario_asignado,
             satisfaccion_cliente,
-            notas_internas,
-            canal_respuesta
+            notas_internas
         } = req.body;
 
         // Verificar que la PQR existe
@@ -325,7 +323,6 @@ router.put('/:id', async (req, res) => {
         if (respuesta) { updateFields.push('respuesta = ?'); params.push(respuesta); }
         if (satisfaccion_cliente) { updateFields.push('satisfaccion_cliente = ?'); params.push(satisfaccion_cliente); }
         if (notas_internas) { updateFields.push('notas_internas = ?'); params.push(notas_internas); }
-        if (canal_respuesta) { updateFields.push('canal_respuesta = ?'); params.push(canal_respuesta); }
 
         // Estado
         if (estado) {
@@ -352,8 +349,7 @@ router.put('/:id', async (req, res) => {
         if (usuario_asignado) {
             updateFields.push('usuario_asignado = ?');
             params.push(usuario_asignado);
-
-            updateFields.push('fecha_asignacion = NOW()');
+            // ❌ Eliminado fecha_asignacion porque no existe en la tabla
         }
 
         if (updateFields.length === 0) {
@@ -372,9 +368,6 @@ router.put('/:id', async (req, res) => {
         // 🔍 LOG 2: Revisar query y parámetros
         console.log('🔍 updateFields:', updateFields);
         console.log('🔍 params:', params);
-        const numPlaceholders = (updateFields.join(', ').match(/\?/g) || []).length;
-        console.log('🔍 Placeholders (?) en query:', numPlaceholders);
-        console.log('🔍 Cantidad de params:', params.length);
 
         const query = `UPDATE pqr SET ${updateFields.join(', ')} WHERE id = ?`;
         console.log('🔍 Query final:', query);
@@ -387,18 +380,18 @@ router.put('/:id', async (req, res) => {
         });
 
     } catch (error) {
-    console.error('❌ Error actualizando PQR:', error);
-    console.error('❌ Error código SQL:', error.code);
-    console.error('❌ Error sqlMessage:', error.sqlMessage);
-    console.error('❌ Error stack:', error.stack);
-    res.status(500).json({ 
-        success: false,
-        error: 'Error actualizando PQR',
-        details: error.sqlMessage // <-- así ves MySQL exacto
-    });
-}
-
+        console.error('❌ Error actualizando PQR:', error);
+        console.error('❌ Error código SQL:', error.code);
+        console.error('❌ Error sqlMessage:', error.sqlMessage);
+        console.error('❌ Error stack:', error.stack);
+        res.status(500).json({ 
+            success: false,
+            error: 'Error actualizando PQR',
+            details: error.sqlMessage
+        });
+    }
 });
+
 
 // Eliminar PQR
 router.delete('/:id', requireRole('administrador'), async (req, res) => {
