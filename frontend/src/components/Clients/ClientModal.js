@@ -17,11 +17,20 @@ const formatDate = (dateString) => {
   if (!dateString) return 'No especificada';
 
   try {
-    // Tomar solo la parte de la fecha
-    const [datePart] = dateString.split(' ');
-    const [year, month, day] = datePart.split('-');
+    // Si viene con hora (por ejemplo: "2025-11-07T15:11:08Z" o "2025-11-07 15:11:08")
+    // tomamos solo la parte de la fecha para evitar desfaces por zona horaria
+    const datePart = dateString.split('T')[0].split(' ')[0];
+    const [year, month, day] = datePart.split('-').map(Number);
+
+    if (!year || !month || !day) return 'Fecha inválida';
+
+    // Crear fecha sin usar zona horaria (local fija)
     const date = new Date(year, month - 1, day);
 
+    // Validar que sea una fecha válida
+    if (isNaN(date.getTime())) return 'Fecha inválida';
+
+    // Formato colombiano legible
     return date.toLocaleDateString('es-CO', {
       year: 'numeric',
       month: 'long',
@@ -31,6 +40,7 @@ const formatDate = (dateString) => {
     return 'Fecha inválida';
   }
 };
+
 
 
   // Función para formatear teléfonos
