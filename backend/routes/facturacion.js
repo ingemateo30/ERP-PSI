@@ -96,39 +96,40 @@ router.get('/facturas', async (req, res) => {
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     // Obtener facturas paginadas con nombre del banco
-    const facturas = await Database.query(`
-      SELECT 
-        f.id,
-        f.numero_factura,
-        f.cliente_id,
-        f.identificacion_cliente,
-        f.nombre_cliente,
-        f.periodo_facturacion,
-        f.fecha_emision,
-        f.fecha_vencimiento,
-        f.fecha_pago,
-        f.subtotal,
-        f.iva,
-        f.total,
-        f.estado,
-        f.metodo_pago,
-        f.referencia_pago,
-        f.banco_id,
-        b.nombre as banco_nombre,
-        f.observaciones,
-        DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencimiento,
-        CASE 
-          WHEN f.estado = 'pagada' THEN 'Pagada'
-          WHEN f.estado = 'anulada' THEN 'Anulada'
-          WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 THEN 'Vencida'
-          ELSE 'Vigente'
-        END as estado_descripcion
-      FROM facturas f
-      LEFT JOIN bancos b ON f.banco_id = b.id
-      ${whereClause}
-      ORDER BY f.${sortColumn} ${sortDirection}
-      LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}
-    `, queryParams); 
+    // Obtener facturas paginadas con nombre del banco Y datos del cliente
+const facturas = await Database.query(`
+  SELECT 
+    f.id,
+    f.numero_factura,
+    f.cliente_id,
+    f.identificacion_cliente,        -- ✅ AGREGADO
+    f.nombre_cliente,                -- ✅ AGREGADO
+    f.periodo_facturacion,
+    f.fecha_emision,
+    f.fecha_vencimiento,
+    f.fecha_pago,
+    f.subtotal,
+    f.iva,
+    f.total,
+    f.estado,
+    f.metodo_pago,
+    f.referencia_pago,
+    f.banco_id,
+    b.nombre as banco_nombre,
+    f.observaciones,
+    DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencimiento,
+    CASE 
+      WHEN f.estado = 'pagada' THEN 'Pagada'
+      WHEN f.estado = 'anulada' THEN 'Anulada'
+      WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 THEN 'Vencida'
+      ELSE 'Vigente'
+    END as estado_descripcion
+  FROM facturas f
+  LEFT JOIN bancos b ON f.banco_id = b.id
+  ${whereClause}
+  ORDER BY f.${sortColumn} ${sortDirection}
+  LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}
+`, queryParams);
 
     res.json({
       success: true,
