@@ -14,19 +14,24 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
 
   // Función para formatear fechas
   const formatDate = (dateString) => {
-    if (!dateString) return 'No especificada';
+  if (!dateString) return 'No especificada';
+
+  try {
+    // Separar fecha y hora
+    const [datePart] = dateString.split(' ');
+    const [year, month, day] = datePart.split('-');
+    // Crear fecha en local usando solo año, mes y día
+    const date = new Date(year, month - 1, day);
     
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    } catch (error) {
-      return 'Fecha inválida';
-    }
-  };
+    return date.toLocaleDateString('es-CO', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch (error) {
+    return 'Fecha inválida';
+  }
+};
 
   // Función para formatear teléfonos
   const formatPhone = (phone) => {
