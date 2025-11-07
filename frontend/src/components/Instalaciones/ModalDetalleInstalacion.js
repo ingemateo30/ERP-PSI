@@ -61,7 +61,7 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
           try {
             console.log(`🔍 Intentando cargar equipo ID: ${equipoId}`);
             const response = await fetch(
-  `${process.env.REACT_APP_API_URL}/inventario/equipos/${equipoId}`,
+  `${process.env.REACT_APP_API_URL}/inventory/equipment/${equipoId}`,
   {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -76,8 +76,8 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
               const data = await response.json();
               console.log(`📦 Data recibida para equipo ${equipoId}:`, data);
               
-              if (data.success && data.equipo) {
-                equiposCompletos.push(data.equipo);
+              if (data.success && data.data) {
+  equiposCompletos.push(data.data);
                 console.log('✅ Equipo cargado exitosamente:', data.equipo);
               } else if (data.success && data.equipos) {
                 // Por si el backend retorna "equipos" en plural
