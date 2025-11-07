@@ -574,14 +574,9 @@ router.get('/automatica/estadisticas-ultimo-proceso',
 
 
 // ==========================================
-// ENDPOINT: REGISTRAR PAGO
+// ENDPOINT: REGISTRAR PAGO - CORREGIDO
 // ==========================================
 
-/**
- * @route POST /api/v1/facturacion/facturas/:id/pagar
- * @desc Registrar pago de factura
- * @access Administrador, Supervisor
- */
 router.post('/facturas/:id/pagar', requireRole('administrador', 'supervisor'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -590,7 +585,8 @@ router.post('/facturas/:id/pagar', requireRole('administrador', 'supervisor'), a
       metodo_pago,
       referencia_pago,
       observaciones,
-      fecha_pago
+      fecha_pago,
+      banco_id  // ✅ AGREGAR ESTE CAMPO
     } = req.body;
     const usuario_id = req.user.id;
 
@@ -635,30 +631,38 @@ router.post('/facturas/:id/pagar', requireRole('administrador', 'supervisor'), a
       });
     }
 
-    // Registrar el pago (simulado por ahora)
     const fechaPagoFinal = fecha_pago || new Date().toISOString().split('T')[0];
     
-    // Simular registro de pago
+    // ✅ CORRECCIÓN: Actualizar TODOS los campos del pago
     let nuevoEstado = 'pendiente';
     if (parseFloat(valor_pagado) >= parseFloat(facturaData.total)) {
       nuevoEstado = 'pagada';
       
-      // Actualizar factura como pagada
+      // ✅ Actualizar factura con TODOS los datos del pago
       await Database.query(`
         UPDATE facturas 
-        SET estado = 'pagada', fecha_pago = ?
+        SET 
+          estado = 'pagada', 
+          fecha_pago = ?,
+          metodo_pago = ?,
+          referencia_pago = ?,
+          banco_id = ?,
+          observaciones = ?
         WHERE id = ?
-      `, [fechaPagoFinal, id]);
+      `, [fechaPagoFinal, metodo_pago, referencia_pago, banco_id, observaciones, id]);
     }
 
     res.json({
       success: true,
       data: {
-        pago_id: Date.now(), // ID simulado
+        pago_id: Date.now(),
         factura_id: id,
         nuevo_estado: nuevoEstado,
         valor_pagado: parseFloat(valor_pagado),
-        saldo_pendiente: Math.max(0, parseFloat(facturaData.total) - parseFloat(valor_pagado))
+        saldo_pendiente: Math.max(0, parseFloat(facturaData.total) - parseFloat(valor_pagado)),
+        metodo_pago: metodo_pago,
+        banco_id: banco_id,
+        referencia_pago: referencia_pago
       },
       message: `Pago registrado exitosamente. Factura ${nuevoEstado === 'pagada' ? 'pagada completamente' : 'con pago parcial'}`
     });

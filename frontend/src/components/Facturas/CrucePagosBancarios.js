@@ -128,31 +128,30 @@ const CrucePagosBancarios = () => {
         setMostrarModalDetalle(true);
     };
 
-    const cruzarPago = async () => {
-        try {
-            const response = await apiService.post(`/facturacion/facturas/${facturaSeleccionada.id}/pagar`, {
-                valor_pagado: parseFloat(datosPago.monto),
-                metodo_pago: datosPago.metodo_pago,
-                referencia_pago: datosPago.referencia,
-                fecha_pago: datosPago.fecha_pago,
-                observaciones: datosPago.observaciones,
-                banco_id: datosPago.banco_id
-            });
+const cruzarPago = async () => {
+    try {
+        const response = await apiService.post(`/facturacion/facturas/${facturaSeleccionada.id}/pagar`, {
+            valor_pagado: parseFloat(datosPago.monto),
+            metodo_pago: datosPago.metodo_pago,
+            referencia_pago: datosPago.referencia,
+            fecha_pago: datosPago.fecha_pago,
+            observaciones: datosPago.observaciones,
+            banco_id: parseInt(datosPago.banco_id)  // ✅ Asegurar que sea número
+        });
 
-            if (response && response.success) {
-                alert('Pago cruzado exitosamente');
-                setMostrarModalCruce(false);
-                cargarFacturasPendientes();
-                cargarFacturasPagadas();
-            } else {
-                alert('Error: ' + (response?.message || 'Error desconocido'));
-            }
-        } catch (error) {
-            console.error('Error cruzando pago:', error);
-            alert('Error al cruzar el pago: ' + error.message);
+        if (response && response.success) {
+            alert('Pago cruzado exitosamente');
+            setMostrarModalCruce(false);
+            cargarFacturasPendientes();
+            cargarFacturasPagadas();
+        } else {
+            alert('Error: ' + (response?.message || 'Error desconocido'));
         }
-    };
-
+    } catch (error) {
+        console.error('Error cruzando pago:', error);
+        alert('Error al cruzar el pago: ' + error.message);
+    }
+};
     const exportarPorBanco = async (bancoId) => {
         try {
             const banco = bancos.find(b => b.id === bancoId);
