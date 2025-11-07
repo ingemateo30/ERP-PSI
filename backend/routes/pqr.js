@@ -354,10 +354,10 @@ router.put('/:id', async (req, res) => {
                     FROM pqr WHERE id = ?
                 `;
                 const [tiempoResult] = await db.query(tiempoQuery, [id]);
-                if (tiempoResult) {
-                    updateFields.push('tiempo_respuesta_horas = ?');
-                    params.push(tiempoResult.horas);
-                }
+if (tiempoResult && tiempoResult.horas !== null) {
+    updateFields.push('tiempo_respuesta_horas = ?');
+    params.push(tiempoResult.horas);
+}
             }
         }
         
