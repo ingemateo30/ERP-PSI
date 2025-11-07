@@ -1,6 +1,6 @@
 // frontend/src/components/Facturas/CrucePagosBancarios.js
 import React, { useState, useEffect } from 'react';
-import apiService from '../../services/apiService'; // ← AGREGAR ESTA LÍNEA
+import apiService from '../../services/apiService';
 import {
     DollarSign,
     Calendar,
@@ -12,19 +12,30 @@ import {
     Building,
     FileText,
     CreditCard,
-    AlertCircle
+    AlertCircle,
+    Eye,
+    History
 } from 'lucide-react';
 
 const CrucePagosBancarios = () => {
     const [facturasPendientes, setFacturasPendientes] = useState([]);
+    const [facturasPagadas, setFacturasPagadas] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [loadingPagadas, setLoadingPagadas] = useState(false);
     const [filtros, setFiltros] = useState({
         banco: '',
         fecha_inicio: new Date(new Date().setDate(1)).toISOString().split('T')[0],
         fecha_fin: new Date().toISOString().split('T')[0],
         busqueda: ''
     });
+    const [filtrosPagadas, setFiltrosPagadas] = useState({
+        banco: '',
+        fecha_inicio: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
+        fecha_fin: new Date().toISOString().split('T')[0],
+        busqueda: ''
+    });
     const [mostrarModalCruce, setMostrarModalCruce] = useState(false);
+    const [mostrarModalDetalle, setMostrarModalDetalle] = useState(false);
     const [facturaSeleccionada, setFacturaSeleccionada] = useState(null);
     const [datosPago, setDatosPago] = useState({
         monto: '',
@@ -49,27 +60,56 @@ const CrucePagosBancarios = () => {
         cargarFacturasPendientes();
     }, [filtros]);
 
-   const cargarFacturasPendientes = async () => {
-    try {
-        setLoading(true);
-        const params = new URLSearchParams({
-            estado: 'pendiente',
-            fecha_inicio: filtros.fecha_inicio,
-            fecha_fin: filtros.fecha_fin,
-            ...(filtros.busqueda && { search: filtros.busqueda })
-        });
+    useEffect(() => {
+        cargarFacturasPagadas();
+    }, [filtrosPagadas]);
 
-        const response = await apiService.get(`/facturacion/facturas?${params}`);
-        
-        if (response && response.success) {
-            const facturas = Array.isArray(response.data) ? response.data : (response.data?.facturas || response.data?.data || []); setFacturasPendientes(facturas);
+    const cargarFacturasPendientes = async () => {
+        try {
+            setLoading(true);
+            const params = new URLSearchParams({
+                estado: 'pendiente',
+                fecha_inicio: filtros.fecha_inicio,
+                fecha_fin: filtros.fecha_fin,
+                ...(filtros.busqueda && { search: filtros.busqueda })
+            });
+
+            const response = await apiService.get(`/facturacion/facturas?${params}`);
+            
+            if (response && response.success) {
+                const facturas = Array.isArray(response.data) ? response.data : (response.data?.facturas || response.data?.data || []);
+                setFacturasPendientes(facturas);
+            }
+        } catch (error) {
+            console.error('Error cargando facturas:', error);
+        } finally {
+            setLoading(false);
         }
-    } catch (error) {
-        console.error('Error cargando facturas:', error);
-    } finally {
-        setLoading(false);
-    }
-};
+    };
+
+    const cargarFacturasPagadas = async () => {
+        try {
+            setLoadingPagadas(true);
+            const params = new URLSearchParams({
+                estado: 'pagada',
+                fecha_inicio: filtrosPagadas.fecha_inicio,
+                fecha_fin: filtrosPagadas.fecha_fin,
+                ...(filtrosPagadas.busqueda && { search: filtrosPagadas.busqueda })
+            });
+
+            const response = await apiService.get(`/facturacion/facturas?${params}`);
+            
+            if (response && response.success) {
+                const facturas = Array.isArray(response.data) ? response.data : (response.data?.facturas || response.data?.data || []);
+                setFacturasPagadas(facturas);
+            }
+        } catch (error) {
+            console.error('Error cargando facturas pagadas:', error);
+        } finally {
+            setLoadingPagadas(false);
+        }
+    };
+
     const abrirModalCruce = (factura) => {
         setFacturaSeleccionada(factura);
         setDatosPago({
@@ -82,29 +122,37 @@ const CrucePagosBancarios = () => {
         });
         setMostrarModalCruce(true);
     };
-const cruzarPago = async () => {
-    try {
-        const response = await apiService.post(`/facturacion/facturas/${facturaSeleccionada.id}/pagar`, {
-            valor_pagado: parseFloat(datosPago.monto),
-            metodo_pago: datosPago.metodo_pago,
-            referencia_pago: datosPago.referencia,
-            fecha_pago: datosPago.fecha_pago,
-            observaciones: datosPago.observaciones,
-            banco_id: datosPago.banco_id
-        });
 
-        if (response && response.success) {
-            alert('Pago cruzado exitosamente');
-            setMostrarModalCruce(false);
-            cargarFacturasPendientes();
-        } else {
-            alert('Error: ' + (response?.message || 'Error desconocido'));
+    const abrirModalDetalle = (factura) => {
+        setFacturaSeleccionada(factura);
+        setMostrarModalDetalle(true);
+    };
+
+    const cruzarPago = async () => {
+        try {
+            const response = await apiService.post(`/facturacion/facturas/${facturaSeleccionada.id}/pagar`, {
+                valor_pagado: parseFloat(datosPago.monto),
+                metodo_pago: datosPago.metodo_pago,
+                referencia_pago: datosPago.referencia,
+                fecha_pago: datosPago.fecha_pago,
+                observaciones: datosPago.observaciones,
+                banco_id: datosPago.banco_id
+            });
+
+            if (response && response.success) {
+                alert('Pago cruzado exitosamente');
+                setMostrarModalCruce(false);
+                cargarFacturasPendientes();
+                cargarFacturasPagadas();
+            } else {
+                alert('Error: ' + (response?.message || 'Error desconocido'));
+            }
+        } catch (error) {
+            console.error('Error cruzando pago:', error);
+            alert('Error al cruzar el pago: ' + error.message);
         }
-    } catch (error) {
-        console.error('Error cruzando pago:', error);
-        alert('Error al cruzar el pago: ' + error.message);
-    }
-};
+    };
+
     const exportarPorBanco = async (bancoId) => {
         try {
             const banco = bancos.find(b => b.id === bancoId);
@@ -138,7 +186,7 @@ const cruzarPago = async () => {
         }
     };
 
-    const facturasFiltradas = facturasPendientes.filter(f => {
+    const facturasPendientesFiltradas = facturasPendientes.filter(f => {
         if (filtros.banco && f.banco_id !== parseInt(filtros.banco)) return false;
         if (filtros.busqueda) {
             const busqueda = filtros.busqueda.toLowerCase();
@@ -151,8 +199,22 @@ const cruzarPago = async () => {
         return true;
     });
 
+    const facturasPagadasFiltradas = facturasPagadas.filter(f => {
+        if (filtrosPagadas.banco && f.banco_id !== parseInt(filtrosPagadas.banco)) return false;
+        if (filtrosPagadas.busqueda) {
+            const busqueda = filtrosPagadas.busqueda.toLowerCase();
+            return (
+                f.numero_factura?.toLowerCase().includes(busqueda) ||
+                f.cliente_nombre?.toLowerCase().includes(busqueda) ||
+                f.cliente_identificacion?.includes(busqueda)
+            );
+        }
+        return true;
+    });
+
     return (
         <div className="p-6 space-y-6">
+            {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Cruce de Pagos Bancarios</h1>
@@ -183,8 +245,13 @@ const cruzarPago = async () => {
                 </div>
             </div>
 
+            {/* FACTURAS PENDIENTES */}
             <div className="bg-white rounded-lg shadow-md p-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-orange-500" />
+                    Facturas Pendientes de Pago
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Fecha Inicio
@@ -238,53 +305,33 @@ const cruzarPago = async () => {
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Factura
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Cliente
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Fecha
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Vencimiento
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Total
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Acciones
-                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Factura</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimiento</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {loading ? (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
-                                        Cargando...
-                                    </td>
+                                    <td colSpan="6" className="px-6 py-4 text-center text-gray-500">Cargando...</td>
                                 </tr>
-                            ) : facturasFiltradas.length === 0 ? (
+                            ) : facturasPendientesFiltradas.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
-                                        No hay facturas pendientes
-                                    </td>
+                                    <td colSpan="6" className="px-6 py-4 text-center text-gray-500">No hay facturas pendientes</td>
                                 </tr>
                             ) : (
-                                facturasFiltradas.map(factura => (
+                                facturasPendientesFiltradas.map(factura => (
                                     <tr key={factura.id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-gray-900">
-                                                {factura.numero_factura}
-                                            </div>
+                                            <div className="text-sm font-medium text-gray-900">{factura.numero_factura}</div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="text-sm text-gray-900">{factura.cliente_nombre}</div>
@@ -318,6 +365,131 @@ const cruzarPago = async () => {
                 </div>
             </div>
 
+            {/* HISTORIAL DE PAGOS CRUZADOS */}
+            <div className="bg-white rounded-lg shadow-md p-4">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <History className="w-5 h-5 text-green-500" />
+                    Historial de Pagos Cruzados
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Fecha Inicio
+                        </label>
+                        <input
+                            type="date"
+                            value={filtrosPagadas.fecha_inicio}
+                            onChange={(e) => setFiltrosPagadas({ ...filtrosPagadas, fecha_inicio: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Fecha Fin
+                        </label>
+                        <input
+                            type="date"
+                            value={filtrosPagadas.fecha_fin}
+                            onChange={(e) => setFiltrosPagadas({ ...filtrosPagadas, fecha_fin: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Banco
+                        </label>
+                        <select
+                            value={filtrosPagadas.banco}
+                            onChange={(e) => setFiltrosPagadas({ ...filtrosPagadas, banco: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg"
+                        >
+                            <option value="">Todos los bancos</option>
+                            {bancos.map(banco => (
+                                <option key={banco.id} value={banco.id}>{banco.nombre}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Buscar
+                        </label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Factura, cliente..."
+                                value={filtrosPagadas.busqueda}
+                                onChange={(e) => setFiltrosPagadas({ ...filtrosPagadas, busqueda: e.target.value })}
+                                className="w-full pl-10 pr-3 py-2 border rounded-lg"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Factura</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha Pago</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Método</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Banco</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {loadingPagadas ? (
+                                <tr>
+                                    <td colSpan="7" className="px-6 py-4 text-center text-gray-500">Cargando...</td>
+                                </tr>
+                            ) : facturasPagadasFiltradas.length === 0 ? (
+                                <tr>
+                                    <td colSpan="7" className="px-6 py-4 text-center text-gray-500">No hay pagos registrados</td>
+                                </tr>
+                            ) : (
+                                facturasPagadasFiltradas.map(factura => (
+                                    <tr key={factura.id} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm font-medium text-gray-900">{factura.numero_factura}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm text-gray-900">{factura.cliente_nombre}</div>
+                                            <div className="text-sm text-gray-500">{factura.cliente_identificacion}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {factura.fecha_pago ? new Date(factura.fecha_pago).toLocaleDateString() : 'N/A'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {factura.metodo_pago || 'N/A'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {bancos.find(b => b.id === factura.banco_id)?.nombre || 'N/A'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm font-medium text-green-600">
+                                                ${parseFloat(factura.total).toLocaleString()}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <button
+                                                onClick={() => abrirModalDetalle(factura)}
+                                                className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                                Ver Detalle
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Modal Cruzar Pago */}
             {mostrarModalCruce && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-lg max-w-2xl w-full p-6">
@@ -448,6 +620,135 @@ const cruzarPago = async () => {
                                     Confirmar Pago
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Detalle de Pago */}
+            {mostrarModalDetalle && facturaSeleccionada && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg max-w-3xl w-full p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold">Detalle del Pago - {facturaSeleccionada?.numero_factura}</h2>
+                            <button
+                                onClick={() => setMostrarModalDetalle(false)}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-6">
+                            {/* Información de la Factura */}
+                            <div className="bg-blue-50 p-4 rounded-lg">
+                                <h3 className="text-lg font-semibold text-blue-900 mb-3">Información de la Factura</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <span className="text-sm text-blue-700">Número de Factura:</span>
+                                        <p className="font-medium text-blue-900">{facturaSeleccionada?.numero_factura}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-blue-700">Cliente:</span>
+                                        <p className="font-medium text-blue-900">{facturaSeleccionada?.cliente_nombre}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-blue-700">Identificación:</span>
+                                        <p className="font-medium text-blue-900">{facturaSeleccionada?.cliente_identificacion}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-blue-700">Fecha Emisión:</span>
+                                        <p className="font-medium text-blue-900">
+                                            {new Date(facturaSeleccionada?.fecha_emision).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-blue-700">Total Factura:</span>
+                                        <p className="font-bold text-lg text-blue-900">
+                                            ${parseFloat(facturaSeleccionada?.total || 0).toLocaleString()}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-blue-700">Estado:</span>
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">
+                                            Pagada
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Información del Pago */}
+                            <div className="bg-green-50 p-4 rounded-lg">
+                                <h3 className="text-lg font-semibold text-green-900 mb-3">Detalles del Pago</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <span className="text-sm text-green-700">Fecha de Pago:</span>
+                                        <p className="font-medium text-green-900">
+                                            {facturaSeleccionada?.fecha_pago 
+                                                ? new Date(facturaSeleccionada.fecha_pago).toLocaleDateString() 
+                                                : 'N/A'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-green-700">Método de Pago:</span>
+                                        <p className="font-medium text-green-900 capitalize">
+                                            {facturaSeleccionada?.metodo_pago || 'N/A'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-green-700">Banco:</span>
+                                        <p className="font-medium text-green-900">
+                                            {bancos.find(b => b.id === facturaSeleccionada?.banco_id)?.nombre || 'N/A'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-green-700">Referencia:</span>
+                                        <p className="font-medium text-green-900">
+                                            {facturaSeleccionada?.referencia_pago || 'N/A'}
+                                        </p>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <span className="text-sm text-green-700">Valor Pagado:</span>
+                                        <p className="font-bold text-xl text-green-900">
+                                            ${parseFloat(facturaSeleccionada?.valor_pagado || facturaSeleccionada?.total || 0).toLocaleString()}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Observaciones */}
+                            {facturaSeleccionada?.observaciones && (
+                                <div className="bg-gray-50 p-4 rounded-lg">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Observaciones</h3>
+                                    <p className="text-gray-700">{facturaSeleccionada.observaciones}</p>
+                                </div>
+                            )}
+
+                            {/* Servicios de la Factura */}
+                            {facturaSeleccionada?.servicios && (
+                                <div className="bg-gray-50 p-4 rounded-lg">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Servicios Incluidos</h3>
+                                    <div className="space-y-2">
+                                        {JSON.parse(facturaSeleccionada.servicios).map((servicio, index) => (
+                                            <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
+                                                <span className="text-gray-700">{servicio.descripcion || servicio.plan_nombre}</span>
+                                                <span className="font-medium text-gray-900">
+                                                    ${parseFloat(servicio.valor || 0).toLocaleString()}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-4 border-t mt-6">
+                            <button
+                                onClick={() => setMostrarModalDetalle(false)}
+                                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                            >
+                                Cerrar
+                            </button>
                         </div>
                     </div>
                 </div>
