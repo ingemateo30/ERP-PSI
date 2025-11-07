@@ -18,7 +18,7 @@ import {
   Eye
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import IniciarInstalacion from './IniciarInstalacion';
+import ModalCompletarInstalacion from '../Instalador/ModalCompletarInstalacion';
 
 
 const MisTrabajos = () => {
@@ -29,7 +29,7 @@ const MisTrabajos = () => {
   const [filtroEstado, setFiltroEstado] = useState('pendiente');
   
   // Modal de Iniciar/Continuar
-  const [mostrarModal, setMostrarModal] = useState(false);
+  const [modalCompletarOpen, setModalCompletarOpen] = useState(false);
   const [instalacionSeleccionada, setInstalacionSeleccionada] = useState(null);
   
   // Modal de Detalle (solo lectura)
@@ -106,16 +106,15 @@ const MisTrabajos = () => {
     return hoy === fechaComparar;
   };
 
-  const abrirModal = (instalacion) => {
-    setInstalacionSeleccionada(instalacion);
-    setMostrarModal(true);
-  };
-
-  const cerrarModal = () => {
-    setMostrarModal(false);
-    setInstalacionSeleccionada(null);
-    cargarTrabajos(); // Recargar después de cerrar
-  };
+const abrirModal = (instalacion) => {
+  setInstalacionSeleccionada(instalacion);
+  setModalCompletarOpen(true);
+};
+const cerrarModal = () => {
+  setModalCompletarOpen(false);
+  setInstalacionSeleccionada(null);
+  cargarTrabajos();
+};
 
   const getEstadoColor = (estado) => {
     const colores = {
@@ -376,13 +375,12 @@ const MisTrabajos = () => {
       )}
 
       {/* Modal de Instalación */}
-      {mostrarModal && instalacionSeleccionada && (
-        <IniciarInstalacion
-          instalacion={instalacionSeleccionada}
-          onClose={cerrarModal}
-          onSuccess={cargarTrabajos}
-        />
-      )}
+      <ModalCompletarInstalacion
+  isOpen={modalCompletarOpen}
+  onClose={cerrarModal}
+  instalacion={instalacionSeleccionada}
+  onSuccess={cargarTrabajos}
+/>
 
       {/* Modal de Detalle */}
       {modalDetalle && instalacionDetalle && (
