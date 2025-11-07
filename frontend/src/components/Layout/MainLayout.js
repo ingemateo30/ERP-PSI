@@ -159,7 +159,7 @@ const esAdministrador = rol === 'administrador';
       icon: <Loader2 size={22} />,
       label: 'Incidencias',
       path: '/incidencias',
-      permission: 'instalador,supervisor,administrador'
+      permission: 'supervisor,administrador'
     },
     {
       icon: <Mail size={22} />,
