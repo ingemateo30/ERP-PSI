@@ -24,15 +24,13 @@ const AsignarInstaladorModal = ({
         }
     }, [visible, instalacion]);
 
-    useEffect(() => {
+useEffect(() => {
         if (busqueda.trim() === '') {
             setInstaladoresFiltrados(instaladores);
         } else {
             const filtrados = instaladores.filter(instalador =>
-                (instalador.nombre_completo?.toLowerCase().includes(busqueda.toLowerCase())) ||
-                (instalador.nombres?.toLowerCase().includes(busqueda.toLowerCase())) ||
-                (instalador.apellidos?.toLowerCase().includes(busqueda.toLowerCase())) ||
-                (instalador.identificacion?.includes(busqueda))
+                (instalador.nombre?.toLowerCase().includes(busqueda.toLowerCase())) ||
+                (instalador.telefono?.includes(busqueda))
             );
             setInstaladoresFiltrados(filtrados);
         }
@@ -88,10 +86,7 @@ const AsignarInstaladorModal = ({
                 </div>
 
                 {/* Contenido */}
-<div 
-    className="p-6 overflow-y-auto" 
-    style={{ maxHeight: 'calc(90vh - 128px)' }} // ajusta 128px según la altura de header + footer
->
+                <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 200px)' }}>
     {/* Error */}
     {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center">
