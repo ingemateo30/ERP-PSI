@@ -281,6 +281,11 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        
+        // 🔍 LOG 1: Ver qué llega
+        console.log('🔍 PUT /pqr/:id - ID:', id);
+        console.log('🔍 Body recibido:', JSON.stringify(req.body, null, 2));
+        
         const {
             tipo,
             categoria,
@@ -354,10 +359,10 @@ router.put('/:id', async (req, res) => {
                     FROM pqr WHERE id = ?
                 `;
                 const [tiempoResult] = await db.query(tiempoQuery, [id]);
-if (tiempoResult && tiempoResult.horas !== null) {
-    updateFields.push('tiempo_respuesta_horas = ?');
-    params.push(tiempoResult.horas);
-}
+                if (tiempoResult && tiempoResult.horas !== null) {
+                    updateFields.push('tiempo_respuesta_horas = ?');
+                    params.push(tiempoResult.horas);
+                }
             }
         }
         
@@ -397,7 +402,16 @@ if (tiempoResult && tiempoResult.horas !== null) {
         updateFields.push('updated_at = NOW()');
         params.push(id);
         
+        // 🔍 LOG 2: Ver query antes de ejecutar
+        console.log('🔍 updateFields:', updateFields);
+        console.log('🔍 params:', params);
+        const numPlaceholders = (updateFields.join(', ').match(/\?/g) || []).length;
+        console.log('🔍 Placeholders (?) en query:', numPlaceholders);
+        console.log('🔍 Cantidad de params:', params.length);
+        
         const query = `UPDATE pqr SET ${updateFields.join(', ')} WHERE id = ?`;
+        console.log('🔍 Query final:', query);
+        
         await db.query(query, params);
         
         res.json({ 
@@ -406,14 +420,14 @@ if (tiempoResult && tiempoResult.horas !== null) {
         });
         
     } catch (error) {
-        console.error('Error actualizando PQR:', error);
+        console.error('❌ Error actualizando PQR:', error);
+        console.error('❌ Error stack:', error.stack);
         res.status(500).json({ 
             success: false,
             error: 'Error actualizando PQR' 
         });
     }
 });
-
 // Eliminar PQR
 router.delete('/:id', requireRole('administrador'), async (req, res) => {
     try {
