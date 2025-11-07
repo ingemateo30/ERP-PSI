@@ -88,14 +88,17 @@ const AsignarInstaladorModal = ({
                 </div>
 
                 {/* Contenido */}
-                <div className="p-6">
-                    {/* Error */}
-                    {error && (
-                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center">
-                            <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
-                            <span className="text-red-700 text-sm">{error}</span>
-                        </div>
-                    )}
+<div 
+    className="p-6 overflow-y-auto" 
+    style={{ maxHeight: 'calc(90vh - 128px)' }} // ajusta 128px según la altura de header + footer
+>
+    {/* Error */}
+    {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center">
+            <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
+            <span className="text-red-700 text-sm">{error}</span>
+        </div>
+    )}
 
                     {/* Búsqueda */}
                     <div className="mb-4">
