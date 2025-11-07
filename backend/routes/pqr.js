@@ -281,11 +281,11 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         // 🔍 LOG 1: Ver qué llega
         console.log('🔍 PUT /pqr/:id - ID:', id);
         console.log('🔍 Body recibido:', JSON.stringify(req.body, null, 2));
-        
+
         const {
             tipo,
             categoria,
@@ -300,60 +300,42 @@ router.put('/:id', async (req, res) => {
             notas_internas,
             canal_respuesta
         } = req.body;
-        
+
         // Verificar que la PQR existe
-        const checkQuery = 'SELECT id, estado as estado_anterior FROM pqr WHERE id = ?';
+        const checkQuery = 'SELECT id, estado as estado_anterior, fecha_recepcion FROM pqr WHERE id = ?';
         const [existing] = await db.query(checkQuery, [id]);
-        
+
         if (!existing) {
             return res.status(404).json({ 
                 success: false,
                 error: 'PQR no encontrada' 
             });
         }
-        
+
         const updateFields = [];
         const params = [];
-        
-        if (tipo) {
-            updateFields.push('tipo = ?');
-            params.push(tipo);
-        }
-        
-        if (categoria) {
-            updateFields.push('categoria = ?');
-            params.push(categoria);
-        }
-        
-        if (medio_recepcion) {
-            updateFields.push('medio_recepcion = ?');
-            params.push(medio_recepcion);
-        }
-        
-        if (asunto) {
-            updateFields.push('asunto = ?');
-            params.push(asunto);
-        }
-        
-        if (descripcion) {
-            updateFields.push('descripcion = ?');
-            params.push(descripcion);
-        }
-        
-        if (prioridad) {
-            updateFields.push('prioridad = ?');
-            params.push(prioridad);
-        }
-        
+
+        // Campos que pueden actualizarse directamente
+        if (tipo) { updateFields.push('tipo = ?'); params.push(tipo); }
+        if (categoria) { updateFields.push('categoria = ?'); params.push(categoria); }
+        if (medio_recepcion) { updateFields.push('medio_recepcion = ?'); params.push(medio_recepcion); }
+        if (asunto) { updateFields.push('asunto = ?'); params.push(asunto); }
+        if (descripcion) { updateFields.push('descripcion = ?'); params.push(descripcion); }
+        if (prioridad) { updateFields.push('prioridad = ?'); params.push(prioridad); }
+        if (respuesta) { updateFields.push('respuesta = ?'); params.push(respuesta); }
+        if (satisfaccion_cliente) { updateFields.push('satisfaccion_cliente = ?'); params.push(satisfaccion_cliente); }
+        if (notas_internas) { updateFields.push('notas_internas = ?'); params.push(notas_internas); }
+        if (canal_respuesta) { updateFields.push('canal_respuesta = ?'); params.push(canal_respuesta); }
+
+        // Estado
         if (estado) {
             updateFields.push('estado = ?');
             params.push(estado);
-            
-            // Si se resuelve o cierra, agregar fecha de respuesta
+
+            // Si se resuelve o cierra, agregar fecha de respuesta y tiempo
             if (estado === 'resuelto' || estado === 'cerrado') {
                 updateFields.push('fecha_respuesta = NOW()');
-                
-                // Calcular tiempo de respuesta
+
                 const tiempoQuery = `
                     SELECT TIMESTAMPDIFF(HOUR, fecha_recepcion, NOW()) as horas
                     FROM pqr WHERE id = ?
@@ -365,60 +347,45 @@ router.put('/:id', async (req, res) => {
                 }
             }
         }
-        
-        if (respuesta) {
-            updateFields.push('respuesta = ?');
-            params.push(respuesta);
-        }
-        
+
+        // Usuario asignado
         if (usuario_asignado) {
             updateFields.push('usuario_asignado = ?');
-            updateFields.push('fecha_asignacion = NOW()');
             params.push(usuario_asignado);
+
+            updateFields.push('fecha_asignacion = NOW()');
         }
-        
-        if (satisfaccion_cliente) {
-            updateFields.push('satisfaccion_cliente = ?');
-            params.push(satisfaccion_cliente);
-        }
-        
-        if (notas_internas) {
-            updateFields.push('notas_internas = ?');
-            params.push(notas_internas);
-        }
-        
-        if (canal_respuesta) {
-            updateFields.push('canal_respuesta = ?');
-            params.push(canal_respuesta);
-        }
-        
+
         if (updateFields.length === 0) {
             return res.status(400).json({ 
                 success: false,
                 error: 'No hay campos para actualizar' 
             });
         }
-        
+
+        // Siempre actualizar updated_at
         updateFields.push('updated_at = NOW()');
+
+        // Agregar id al final de params para el WHERE
         params.push(id);
-        
-        // 🔍 LOG 2: Ver query antes de ejecutar
+
+        // 🔍 LOG 2: Revisar query y parámetros
         console.log('🔍 updateFields:', updateFields);
         console.log('🔍 params:', params);
         const numPlaceholders = (updateFields.join(', ').match(/\?/g) || []).length;
         console.log('🔍 Placeholders (?) en query:', numPlaceholders);
         console.log('🔍 Cantidad de params:', params.length);
-        
+
         const query = `UPDATE pqr SET ${updateFields.join(', ')} WHERE id = ?`;
         console.log('🔍 Query final:', query);
-        
+
         await db.query(query, params);
-        
+
         res.json({ 
             success: true,
             message: 'PQR actualizada exitosamente' 
         });
-        
+
     } catch (error) {
         console.error('❌ Error actualizando PQR:', error);
         console.error('❌ Error stack:', error.stack);
@@ -428,6 +395,7 @@ router.put('/:id', async (req, res) => {
         });
     }
 });
+
 // Eliminar PQR
 router.delete('/:id', requireRole('administrador'), async (req, res) => {
     try {
