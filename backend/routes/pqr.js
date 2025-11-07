@@ -387,13 +387,17 @@ router.put('/:id', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Error actualizando PQR:', error);
-        console.error('❌ Error stack:', error.stack);
-        res.status(500).json({ 
-            success: false,
-            error: 'Error actualizando PQR' 
-        });
-    }
+    console.error('❌ Error actualizando PQR:', error);
+    console.error('❌ Error código SQL:', error.code);
+    console.error('❌ Error sqlMessage:', error.sqlMessage);
+    console.error('❌ Error stack:', error.stack);
+    res.status(500).json({ 
+        success: false,
+        error: 'Error actualizando PQR',
+        details: error.sqlMessage // <-- así ves MySQL exacto
+    });
+}
+
 });
 
 // Eliminar PQR
