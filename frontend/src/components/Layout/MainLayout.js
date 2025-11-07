@@ -80,7 +80,7 @@ const esAdministrador = rol === 'administrador';
       icon: <Users size={22} />,
       label: 'Clientes',
       path: '/clients',
-      permission: 'instalador,supervisor,administrador'
+      permission: 'supervisor,administrador'
     }
   ];
 
