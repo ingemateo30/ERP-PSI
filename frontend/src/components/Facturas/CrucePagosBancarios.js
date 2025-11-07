@@ -87,28 +87,27 @@ const CrucePagosBancarios = () => {
         }
     };
 
-    const cargarFacturasPagadas = async () => {
-        try {
-            setLoadingPagadas(true);
-            const params = new URLSearchParams({
-                estado: 'pagada',
-                fecha_inicio: filtrosPagadas.fecha_inicio,
-                fecha_fin: filtrosPagadas.fecha_fin,
-                ...(filtrosPagadas.busqueda && { search: filtrosPagadas.busqueda })
-            });
+const cargarFacturasPagadas = async () => {
+    try {
+        const params = {
+            estado: 'pagada',
+            fecha_inicio: filtrosPagados.fecha_inicio,
+            fecha_fin: filtrosPagados.fecha_fin
+        };
 
-            const response = await apiService.get(`/facturacion/facturas?${params}`);
-            
-            if (response && response.success) {
-                const facturas = Array.isArray(response.data) ? response.data : (response.data?.facturas || response.data?.data || []);
-                setFacturasPagadas(facturas);
-            }
-        } catch (error) {
-            console.error('Error cargando facturas pagadas:', error);
-        } finally {
-            setLoadingPagadas(false);
+        if (filtrosPagados.search) params.search = filtrosPagados.search;
+        if (filtrosPagados.banco_id) params.banco_id = filtrosPagados.banco_id; // ✅ Agregar banco al query
+
+        const queryString = new URLSearchParams(params).toString();
+        const response = await apiService.get(`/facturacion/facturas?${queryString}`);
+        
+        if (response && response.success) {
+            setFacturasPagadas(response.data || []);
         }
-    };
+    } catch (error) {
+        console.error('Error cargando facturas pagadas:', error);
+    }
+};
 
     const abrirModalCruce = (factura) => {
         setFacturaSeleccionada(factura);

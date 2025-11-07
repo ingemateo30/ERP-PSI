@@ -28,6 +28,8 @@ router.get('/facturas', async (req, res) => {
       estado,
       cliente_id,
       numero_factura,
+      banco_id,        // ✅ NUEVO: Filtro por banco
+      search,          // ✅ NUEVO: Búsqueda general
       sort_by = 'fecha_emision',
       sort_order = 'DESC'
     } = req.query;
@@ -63,6 +65,19 @@ router.get('/facturas', async (req, res) => {
       queryParams.push(`%${numero_factura}%`);
     }
 
+    // ✅ NUEVO: Filtro por banco
+    if (banco_id) {
+      whereConditions.push('f.banco_id = ?');
+      queryParams.push(banco_id);
+    }
+
+    // ✅ NUEVO: Búsqueda general (número factura, nombre cliente, identificación)
+    if (search) {
+      whereConditions.push('(f.numero_factura LIKE ? OR f.nombre_cliente LIKE ? OR f.identificacion_cliente LIKE ?)');
+      const searchTerm = `%${search}%`;
+      queryParams.push(searchTerm, searchTerm, searchTerm);
+    }
+
     const whereClause = whereConditions.length > 0 ? 
       `WHERE ${whereConditions.join(' AND ')}` : '';
 
@@ -80,7 +95,7 @@ router.get('/facturas', async (req, res) => {
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // Obtener facturas paginadas
+    // Obtener facturas paginadas con nombre del banco
     const facturas = await Database.query(`
       SELECT 
         f.id,
@@ -97,6 +112,10 @@ router.get('/facturas', async (req, res) => {
         f.total,
         f.estado,
         f.metodo_pago,
+        f.referencia_pago,
+        f.banco_id,
+        b.nombre as banco_nombre,
+        f.observaciones,
         DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencimiento,
         CASE 
           WHEN f.estado = 'pagada' THEN 'Pagada'
@@ -105,6 +124,7 @@ router.get('/facturas', async (req, res) => {
           ELSE 'Vigente'
         END as estado_descripcion
       FROM facturas f
+      LEFT JOIN bancos b ON f.banco_id = b.id
       ${whereClause}
       ORDER BY f.${sortColumn} ${sortDirection}
       LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}
@@ -135,7 +155,6 @@ router.get('/facturas', async (req, res) => {
     });
   }
 });
-
 // ==========================================
 // ENDPOINT: OBTENER FACTURA POR ID
 // ==========================================
@@ -586,7 +605,7 @@ router.post('/facturas/:id/pagar', requireRole('administrador', 'supervisor'), a
       referencia_pago,
       observaciones,
       fecha_pago,
-      banco_id  // ✅ AGREGAR ESTE CAMPO
+      banco_id  // ✅ IMPORTANTE: Recibir banco_id
     } = req.body;
     const usuario_id = req.user.id;
 
@@ -633,12 +652,12 @@ router.post('/facturas/:id/pagar', requireRole('administrador', 'supervisor'), a
 
     const fechaPagoFinal = fecha_pago || new Date().toISOString().split('T')[0];
     
-    // ✅ CORRECCIÓN: Actualizar TODOS los campos del pago
+    // ✅ CORRECCIÓN: Actualizar con banco_id, metodo_pago y referencia_pago
     let nuevoEstado = 'pendiente';
     if (parseFloat(valor_pagado) >= parseFloat(facturaData.total)) {
       nuevoEstado = 'pagada';
       
-      // ✅ Actualizar factura con TODOS los datos del pago
+      // ✅ UPDATE con TODOS los campos del pago
       await Database.query(`
         UPDATE facturas 
         SET 
@@ -647,9 +666,16 @@ router.post('/facturas/:id/pagar', requireRole('administrador', 'supervisor'), a
           metodo_pago = ?,
           referencia_pago = ?,
           banco_id = ?,
-          observaciones = ?
+          observaciones = COALESCE(?, observaciones)
         WHERE id = ?
-      `, [fechaPagoFinal, metodo_pago, referencia_pago, banco_id, observaciones, id]);
+      `, [
+        fechaPagoFinal, 
+        metodo_pago, 
+        referencia_pago || null, 
+        banco_id || null, 
+        observaciones || null, 
+        id
+      ]);
     }
 
     res.json({
@@ -676,7 +702,6 @@ router.post('/facturas/:id/pagar', requireRole('administrador', 'supervisor'), a
     });
   }
 });
-
 // ==========================================
 // ENDPOINT: INFORMACIÓN DEL MÓDULO
 // ==========================================
