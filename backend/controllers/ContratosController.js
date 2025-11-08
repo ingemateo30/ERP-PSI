@@ -262,7 +262,6 @@ static async obtenerTodos(req, res) {
 static async generarPDF(req, res) {
     try {
         const { id } = req.params;
-
         console.log(`📄 Generando PDF del contrato ID: ${id}`);
 
         if (!id || isNaN(id)) {
@@ -272,34 +271,22 @@ static async generarPDF(req, res) {
             });
         }
 
-        // Consulta para obtener datos del contrato
-       const contratos = await Database.query(`
-    SELECT 
-        c.*,
-        cl.nombre as cliente_nombre,
-        cl.identificacion as cliente_identificacion,
-        cl.telefono as cliente_telefono,
-        cl.correo as cliente_email,
-        cl.direccion as cliente_direccion,
-        cl.barrio as cliente_barrio,
-        cl.estrato as cliente_estrato,
-        sc.plan_id,
-        ps.nombre as servicio_nombre,
-        ps.tipo as servicio_tipo,
-        ps.precio as servicio_precio,
-        ps.precio_internet,
-        ps.precio_television,
-        ps.descripcion as servicio_descripcion,
-        ps.velocidad_bajada,
-        ps.velocidad_subida,
-        ps.canales_tv
-    FROM contratos c
-    INNER JOIN clientes cl ON c.cliente_id = cl.id
-    LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
-    LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-    WHERE c.id = ? AND c.estado IN ('activo', 'anulado', 'terminado')
-    LIMIT 1
-`, [id]);
+        // 🔥 NUEVA CONSULTA: Obtener TODOS los servicios del cliente
+        const contratos = await Database.query(`
+            SELECT 
+                c.*,
+                cl.nombre as cliente_nombre,
+                cl.identificacion as cliente_identificacion,
+                cl.telefono as cliente_telefono,
+                cl.correo as cliente_email,
+                cl.direccion as cliente_direccion,
+                cl.barrio as cliente_barrio,
+                cl.estrato as cliente_estrato
+            FROM contratos c
+            INNER JOIN clientes cl ON c.cliente_id = cl.id
+            WHERE c.id = ? AND c.estado IN ('activo', 'anulado', 'terminado')
+            LIMIT 1
+        `, [id]);
 
         if (!contratos || contratos.length === 0) {
             return res.status(404).json({
@@ -310,6 +297,96 @@ static async generarPDF(req, res) {
 
         const contratoData = contratos[0];
         console.log(`✅ Contrato encontrado: ${contratoData.numero_contrato}`);
+
+        // 🔥 OBTENER TODOS LOS SERVICIOS DEL CLIENTE
+        let servicios_ids = [];
+        try {
+            if (contratoData.servicio_id) {
+                if (contratoData.servicio_id.startsWith('[')) {
+                    servicios_ids = JSON.parse(contratoData.servicio_id);
+                } else {
+                    servicios_ids = [parseInt(contratoData.servicio_id)];
+                }
+            }
+        } catch (e) {
+            console.error('Error parseando servicio_id:', e);
+            servicios_ids = [];
+        }
+
+        console.log('🔍 Servicios IDs:', servicios_ids);
+
+        // Obtener detalles de TODOS los servicios
+        let serviciosDetalles = [];
+        if (servicios_ids.length > 0) {
+            const placeholders = servicios_ids.map(() => '?').join(',');
+            serviciosDetalles = await Database.query(`
+                SELECT 
+                    sc.*,
+                    ps.nombre as plan_nombre,
+                    ps.tipo as plan_tipo,
+                    ps.precio,
+                    ps.precio_internet,
+                    ps.precio_television,
+                    ps.velocidad_bajada,
+                    ps.velocidad_subida,
+                    ps.canales_tv,
+                    ps.descripcion
+                FROM servicios_cliente sc
+                INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
+                WHERE sc.id IN (${placeholders})
+            `, servicios_ids);
+        }
+
+        console.log('📦 Servicios encontrados:', serviciosDetalles.length);
+
+        // 🔥 PROCESAR SERVICIOS: Separar Internet y TV
+        let internetData = null;
+        let televisionData = null;
+
+        serviciosDetalles.forEach(servicio => {
+            console.log(`📋 Servicio: ${servicio.plan_nombre} - Tipo: ${servicio.plan_tipo}`);
+            
+            if (servicio.plan_tipo === 'internet') {
+                internetData = {
+                    nombre: servicio.plan_nombre,
+                    precio_sin_iva: parseFloat(servicio.precio_internet || servicio.precio || 0),
+                    velocidad_bajada: servicio.velocidad_bajada,
+                    velocidad_subida: servicio.velocidad_subida,
+                    descripcion: servicio.descripcion
+                };
+            } else if (servicio.plan_tipo === 'television') {
+                televisionData = {
+                    nombre: servicio.plan_nombre,
+                    precio_sin_iva: parseFloat(servicio.precio_television || servicio.precio || 0),
+                    canales: servicio.canales_tv,
+                    descripcion: servicio.descripcion
+                };
+            } else if (servicio.plan_tipo === 'combo') {
+                // Si es combo, usar los precios separados
+                internetData = {
+                    nombre: `${servicio.plan_nombre} (Internet)`,
+                    precio_sin_iva: parseFloat(servicio.precio_internet || 0),
+                    velocidad_bajada: servicio.velocidad_bajada,
+                    velocidad_subida: servicio.velocidad_subida
+                };
+                televisionData = {
+                    nombre: `${servicio.plan_nombre} (TV)`,
+                    precio_sin_iva: parseFloat(servicio.precio_television || 0),
+                    canales: servicio.canales_tv
+                };
+            }
+        });
+
+        // Agregar al contratoData
+        contratoData.internet_data = internetData;
+        contratoData.television_data = televisionData;
+        
+        // Para compatibilidad con el generador
+        contratoData.precio_internet = internetData ? internetData.precio_sin_iva : 0;
+        contratoData.precio_television = televisionData ? televisionData.precio_sin_iva : 0;
+
+        console.log('💰 Internet:', contratoData.precio_internet);
+        console.log('📺 TV:', contratoData.precio_television);
 
         let pdfBuffer;
 
@@ -333,12 +410,6 @@ static async generarPDF(req, res) {
             }
 
             const empresa = empresaConfig[0];
-            // ✅ Calcular valor del servicio con IVA (19%)
-if (contratoData.servicio_precio) {
-    contratoData.servicio_precio_con_iva = contratoData.servicio_precio * 1.19;
-    contratoData.servicio_precio_con_iva = Number(contratoData.servicio_precio_con_iva.toFixed(2)); // redondear
-}
-
 
             // Generar HTML del contrato
             const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator');
@@ -346,11 +417,10 @@ if (contratoData.servicio_precio) {
 
             // Generar PDF con Puppeteer
             const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: '/usr/bin/google-chrome',
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    // ... otras opciones
-});
+                headless: true,
+                executablePath: '/usr/bin/google-chrome',
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
 
             const page = await browser.newPage();
             await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
@@ -369,47 +439,31 @@ if (contratoData.servicio_precio) {
 
             await browser.close();
 
-            // ✅ ÚNICO BLOQUE para guardar el PDF
+            // Guardar el PDF
             try {
-                console.log('📁 Creando directorio de uploads...');
-
                 const uploadsDir = path.join(__dirname, '..', 'uploads', 'contratos');
-                console.log('🔍 Directorio de uploads:', uploadsDir);
-
-                // Crear directorio si no existe
+                
                 if (!fs.existsSync(uploadsDir)) {
-                    console.log('📂 Creando directorio:', uploadsDir);
                     fs.mkdirSync(uploadsDir, { recursive: true });
-                    console.log('✅ Directorio creado exitosamente');
-                } else {
-                    console.log('📂 Directorio ya existe');
                 }
 
                 const nombrePDF = `contrato_${contratoData.numero_contrato}_original.pdf`;
                 const rutaPDF = path.join(uploadsDir, nombrePDF);
 
-                console.log('💾 Guardando PDF en:', rutaPDF);
-
-                // Guardar archivo PDF
                 fs.writeFileSync(rutaPDF, pdfBuffer);
                 console.log('✅ PDF guardado exitosamente');
 
-                // Actualizar ruta en base de datos
                 await Database.query(`
                     UPDATE contratos SET documento_pdf_path = ? WHERE id = ?
                 `, [rutaPDF, id]);
 
-                console.log('💾 Ruta actualizada en base de datos');
-
             } catch (dirError) {
-                console.error('❌ Error creando directorio o guardando archivo:', dirError);
-                console.log('⚠️ Continuando sin guardar archivo físico...');
+                console.error('❌ Error guardando archivo:', dirError);
             }
         }
 
         console.log(`✅ PDF generado exitosamente (${pdfBuffer.length} bytes)`);
 
-        // Headers para servir el PDF
         const filename = `contrato_${contratoData.numero_contrato || id}.pdf`;
 
         res.setHeader('Content-Type', 'application/pdf');
@@ -418,7 +472,6 @@ if (contratoData.servicio_precio) {
         res.setHeader('Cache-Control', 'public, max-age=3600');
         res.setHeader('Accept-Ranges', 'bytes');
 
-        // Enviar el PDF
         res.end(pdfBuffer, 'binary');
 
         console.log(`📎 PDF del contrato servido: ${filename}`);
