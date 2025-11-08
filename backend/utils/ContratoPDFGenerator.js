@@ -229,6 +229,14 @@ class ContratoPDFGenerator {
             text-align: center;
             margin-top: 10px;
         }
+        
+        .observaciones-box {
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #fffbf0;
+            border-left: 3px solid #ffa500;
+            font-size: 9px;
+        }
     </style>
 </head>
 <body>
@@ -282,7 +290,7 @@ class ContratoPDFGenerator {
             </div>
             <div class="company-info">
                 <div class="company-title">PROVEEDOR DE TELECOMUNICACIONES</div>
-                <div class="company-subtitle">NIT: ${empresaData.empresa_nit || '901.582.657-3'}</div>
+                <div class="company-subtitle">NIT: ${empresaData.empresa_nit || '901582657-3'}</div>
             </div>
             <div class="contract-title">
                 CONTRATO ÚNICO DE SERVICIOS FIJOS.<br/>
@@ -336,7 +344,20 @@ class ContratoPDFGenerator {
         </div>`;
   }
 
-static generarSeccionServicio(contratoData, servicios) {
+  static generarSeccionServicio(contratoData, servicios) {
+    // Limpiar observaciones si vienen como JSON
+    let observacionesLimpias = '';
+    if (contratoData.observaciones) {
+        try {
+            const obs = JSON.parse(contratoData.observaciones);
+            if (obs.observaciones_adicionales) {
+                observacionesLimpias = obs.observaciones_adicionales;
+            }
+        } catch {
+            observacionesLimpias = contratoData.observaciones;
+        }
+    }
+
     return `
         <div class="section-box">
             <div class="section-title">EL SERVICIO</div>
@@ -366,31 +387,61 @@ static generarSeccionServicio(contratoData, servicios) {
                 Usted se compromete a pagar oportunamente el precio acordado. 
                 El servicio se activará a más tardar el <strong>3</strong> día(s) hábiles.
             </div>
-            ${contratoData.observaciones ? `
-            <div class="text-content" style="margin-top: 10px; padding: 8px; background-color: #fffbf0; border-left: 3px solid #ffa500;">
-                <strong>📋 Observaciones del Servicio:</strong><br/>
-                ${contratoData.observaciones}
+            ${observacionesLimpias ? `
+            <div class="observaciones-box">
+                <strong>Observaciones del Servicio:</strong><br/>
+                ${observacionesLimpias}
             </div>
             ` : ''}
         </div>`;
-}
+  }
 
- static generarCondicionesComerciales(contratoData) {
-    // Obtener valores de Internet y TV desde planes_servicio
+  static generarCondicionesComerciales(contratoData) {
     const precioInternet = parseFloat(contratoData.precio_internet || 0);
     const precioTelevision = parseFloat(contratoData.precio_television || 0);
     
-    // Calcular totales
     const valorSinIva = precioInternet + precioTelevision;
     const ivaInternet = precioInternet * 0.19;
     const ivaTelevision = precioTelevision * 0.19;
     const ivaTotal = ivaInternet + ivaTelevision;
     const valorConIva = valorSinIva + ivaTotal;
 
-    // Determinar qué servicios tiene
     const tieneInternet = precioInternet > 0;
     const tieneTelevision = precioTelevision > 0;
     const tieneAmbos = tieneInternet && tieneTelevision;
+
+    let preciosHTML = '';
+
+    if (tieneAmbos) {
+        // COMBO
+        preciosHTML = `
+            <strong>Servicio de Internet (sin IVA):</strong> $${this.formatearPrecio(precioInternet)}<br/>
+            <strong>Servicio de Televisión (sin IVA):</strong> $${this.formatearPrecio(precioTelevision)}<br/>
+            <strong>Subtotal (sin IVA):</strong> $${this.formatearPrecio(valorSinIva)}<br/>
+            <strong>IVA (19%):</strong> $${this.formatearPrecio(ivaTotal)}<br/>
+            <strong>Valor mensual total (con IVA):</strong> $${this.formatearPrecio(valorConIva)}<br/>
+        `;
+    } else if (tieneInternet) {
+        // SOLO INTERNET
+        preciosHTML = `
+            <strong>Valor mensual (sin IVA):</strong> $${this.formatearPrecio(precioInternet)}<br/>
+            <strong>IVA (19%):</strong> $${this.formatearPrecio(ivaInternet)}<br/>
+            <strong>Valor mensual (con IVA 19%):</strong> $${this.formatearPrecio(precioInternet + ivaInternet)}<br/>
+        `;
+    } else if (tieneTelevision) {
+        // SOLO TV
+        preciosHTML = `
+            <strong>Valor mensual (sin IVA):</strong> $${this.formatearPrecio(precioTelevision)}<br/>
+            <strong>IVA (19%):</strong> $${this.formatearPrecio(ivaTelevision)}<br/>
+            <strong>Valor mensual (con IVA 19%):</strong> $${this.formatearPrecio(precioTelevision + ivaTelevision)}<br/>
+        `;
+    } else {
+        // NO HAY PRECIOS
+        preciosHTML = `
+            <strong>Valor mensual (sin IVA):</strong> $0<br/>
+            <strong>Valor mensual (con IVA 19%):</strong> $0<br/>
+        `;
+    }
 
     return `
         <div class="section-box">
@@ -398,102 +449,16 @@ static generarSeccionServicio(contratoData, servicios) {
             <div class="section-title" style="font-size: 10px;">CARACTERÍSTICAS DEL PLAN</div>
             <div class="text-content">
                 <strong>Plan:</strong> ${contratoData.servicio_nombre || 'Plan de Servicio'}<br/>
-                
-                ${tieneAmbos ? `
-                    <!-- PLAN COMBO - Internet + TV -->
-                    <div style="margin: 10px 0; padding: 10px; background-color: #f0f8ff; border: 2px solid #0066cc; border-radius: 5px;">
-                        <strong style="color: #0066cc; font-size: 11px;">📦 PLAN COMBO (Internet + Televisión)</strong><br/>
-                        <div style="margin-left: 15px; margin-top: 8px; font-size: 9px;">
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <tr>
-                                    <td style="padding: 3px 0;"><strong>🌐 Internet:</strong></td>
-                                    <td style="text-align: right; padding: 3px 0;">$${this.formatearPrecio(precioInternet)}</td>
-                                    <td style="text-align: right; padding: 3px 0; color: #666;">(sin IVA)</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 3px 0;"><strong>📺 Televisión:</strong></td>
-                                    <td style="text-align: right; padding: 3px 0;">$${this.formatearPrecio(precioTelevision)}</td>
-                                    <td style="text-align: right; padding: 3px 0; color: #666;">(sin IVA)</td>
-                                </tr>
-                                <tr style="border-top: 1px dashed #ccc;">
-                                    <td style="padding: 5px 0 3px 0;"><strong>Subtotal:</strong></td>
-                                    <td style="text-align: right; padding: 5px 0 3px 0;"><strong>$${this.formatearPrecio(valorSinIva)}</strong></td>
-                                    <td style="text-align: right; padding: 5px 0 3px 0;"></td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 3px 0;">IVA (19%):</td>
-                                    <td style="text-align: right; padding: 3px 0;">$${this.formatearPrecio(ivaTotal)}</td>
-                                    <td style="text-align: right; padding: 3px 0;"></td>
-                                </tr>
-                                <tr style="border-top: 2px solid #0066cc; background-color: #e6f2ff;">
-                                    <td style="padding: 5px 0;"><strong style="font-size: 10px;">TOTAL MENSUAL:</strong></td>
-                                    <td style="text-align: right; padding: 5px 0;"><strong style="font-size: 10px; color: #0066cc;">$${this.formatearPrecio(valorConIva)}</strong></td>
-                                    <td style="text-align: right; padding: 5px 0;"></td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
-                ` : ''}
-                
-                ${tieneInternet && !tieneAmbos ? `
-                    <!-- SOLO INTERNET -->
-                    <div style="margin: 10px 0; padding: 10px; background-color: #f0f8ff; border: 2px solid #0066cc; border-radius: 5px;">
-                        <strong style="color: #0066cc; font-size: 11px;">🌐 SERVICIO DE INTERNET</strong><br/>
-                        <div style="margin-left: 15px; margin-top: 8px; font-size: 9px;">
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <tr>
-                                    <td style="padding: 3px 0;">Valor mensual (sin IVA):</td>
-                                    <td style="text-align: right; padding: 3px 0;"><strong>$${this.formatearPrecio(precioInternet)}</strong></td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 3px 0;">IVA (19%):</td>
-                                    <td style="text-align: right; padding: 3px 0;">$${this.formatearPrecio(ivaInternet)}</td>
-                                </tr>
-                                <tr style="border-top: 2px solid #0066cc; background-color: #e6f2ff;">
-                                    <td style="padding: 5px 0;"><strong style="font-size: 10px;">TOTAL MENSUAL:</strong></td>
-                                    <td style="text-align: right; padding: 5px 0;"><strong style="font-size: 10px; color: #0066cc;">$${this.formatearPrecio(precioInternet + ivaInternet)}</strong></td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
-                ` : ''}
-                
-                ${tieneTelevision && !tieneAmbos ? `
-                    <!-- SOLO TELEVISIÓN -->
-                    <div style="margin: 10px 0; padding: 10px; background-color: #fff5f0; border: 2px solid #e74c3c; border-radius: 5px;">
-                        <strong style="color: #e74c3c; font-size: 11px;">📺 SERVICIO DE TELEVISIÓN</strong><br/>
-                        <div style="margin-left: 15px; margin-top: 8px; font-size: 9px;">
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <tr>
-                                    <td style="padding: 3px 0;">Valor mensual (sin IVA):</td>
-                                    <td style="text-align: right; padding: 3px 0;"><strong>$${this.formatearPrecio(precioTelevision)}</strong></td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 3px 0;">IVA (19%):</td>
-                                    <td style="text-align: right; padding: 3px 0;">$${this.formatearPrecio(ivaTelevision)}</td>
-                                </tr>
-                                <tr style="border-top: 2px solid #e74c3c; background-color: #ffe6e6;">
-                                    <td style="padding: 5px 0;"><strong style="font-size: 10px;">TOTAL MENSUAL:</strong></td>
-                                    <td style="text-align: right; padding: 5px 0;"><strong style="font-size: 10px; color: #e74c3c;">$${this.formatearPrecio(precioTelevision + ivaTelevision)}</strong></td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
-                ` : ''}
-                
-                <div style="margin-top: 10px;">
-                    ${contratoData.velocidad_bajada ? `<strong>Velocidad de descarga:</strong> ${contratoData.velocidad_bajada} Mbps<br/>` : ''}
-                    ${contratoData.velocidad_subida ? `<strong>Velocidad de subida:</strong> ${contratoData.velocidad_subida} Mbps<br/>` : ''}
-                    ${contratoData.canales_tv ? `<strong>Canales de TV:</strong> ${contratoData.canales_tv}<br/>` : ''}
-                    ${contratoData.servicio_descripcion ? `<strong>Descripción:</strong> ${contratoData.servicio_descripcion}<br/>` : ''}
-                    <strong>Costo de instalación:</strong> $${this.formatearPrecio(contratoData.costo_instalacion || 0)}<br/>
-                    ${contratoData.tipo_permanencia === 'con_permanencia' ? `<strong>Permanencia mínima:</strong> ${contratoData.permanencia_meses || 0} meses<br/>` : ''}
-                </div>
+                ${preciosHTML}
+                ${contratoData.velocidad_bajada ? `<strong>Velocidad de descarga:</strong> ${contratoData.velocidad_bajada} Mbps<br/>` : ''}
+                ${contratoData.velocidad_subida ? `<strong>Velocidad de subida:</strong> ${contratoData.velocidad_subida} Mbps<br/>` : ''}
+                ${contratoData.canales_tv ? `<strong>Canales de TV:</strong> ${contratoData.canales_tv}<br/>` : ''}
+                ${contratoData.servicio_descripcion ? `<strong>Descripción:</strong> ${contratoData.servicio_descripcion}<br/>` : ''}
+                <strong>Costo de instalación:</strong> $${this.formatearPrecio(contratoData.costo_instalacion || 0)}<br/>
+                ${contratoData.tipo_permanencia === 'con_permanencia' ? `<strong>Permanencia mínima:</strong> ${contratoData.permanencia_meses || 0} meses<br/>` : ''}
             </div>
         </div>`;
-}
-
-
+  }
 
   static generarObligacionesUsuario() {
     return `
@@ -608,7 +573,7 @@ static generarSeccionServicio(contratoData, servicios) {
     </div>`;
   }
 
-static determinarServicios(contratoData) {
+  static determinarServicios(contratoData) {
     const precioInternet = parseFloat(contratoData.precio_internet || 0);
     const precioTelevision = parseFloat(contratoData.precio_television || 0);
 
@@ -617,23 +582,6 @@ static determinarServicios(contratoData) {
         television: precioTelevision > 0,
         publicidad: false
     };
-
-    if (contratoData.plan_tipo) {
-      switch (contratoData.plan_tipo.toLowerCase()) {
-        case 'internet':
-          servicios.internet = true;
-          break;
-        case 'television':
-          servicios.television = true;
-          break;
-        case 'combo':
-          servicios.internet = true;
-          servicios.television = true;
-          break;
-      }
-    }
-
-    return servicios;
   }
 
   static formatearPrecio(precio) {

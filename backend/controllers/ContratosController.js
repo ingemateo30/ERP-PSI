@@ -273,7 +273,7 @@ static async generarPDF(req, res) {
         }
 
         // Consulta para obtener datos del contrato
-        const contratos = await Database.query(`
+       const contratos = await Database.query(`
     SELECT 
         c.*,
         cl.nombre as cliente_nombre,
@@ -287,9 +287,9 @@ static async generarPDF(req, res) {
         ps.nombre as servicio_nombre,
         ps.tipo as servicio_tipo,
         ps.precio as servicio_precio,
-        ps.descripcion as servicio_descripcion,
         ps.precio_internet,
         ps.precio_television,
+        ps.descripcion as servicio_descripcion,
         ps.velocidad_bajada,
         ps.velocidad_subida,
         ps.canales_tv
