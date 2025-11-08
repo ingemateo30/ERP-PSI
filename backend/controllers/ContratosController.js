@@ -274,30 +274,32 @@ static async generarPDF(req, res) {
 
         // Consulta para obtener datos del contrato
         const contratos = await Database.query(`
-            SELECT 
-                c.*,
-                cl.nombre as cliente_nombre,
-                cl.identificacion as cliente_identificacion,
-                cl.telefono as cliente_telefono,
-                cl.correo as cliente_email,
-                cl.direccion as cliente_direccion,
-                cl.barrio as cliente_barrio,
-                cl.estrato as cliente_estrato,
-                sc.plan_id,
-                ps.nombre as servicio_nombre,
-                ps.tipo as servicio_tipo,
-                ps.precio as servicio_precio,
-                ps.descripcion as servicio_descripcion,
-                ps.velocidad_bajada,
-                ps.velocidad_subida,
-                ps.canales_tv
-            FROM contratos c
-            INNER JOIN clientes cl ON c.cliente_id = cl.id
-            LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
-            LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-            WHERE c.id = ? AND c.estado IN ('activo', 'anulado', 'terminado')
-            LIMIT 1
-        `, [id]);
+    SELECT 
+        c.*,
+        cl.nombre as cliente_nombre,
+        cl.identificacion as cliente_identificacion,
+        cl.telefono as cliente_telefono,
+        cl.correo as cliente_email,
+        cl.direccion as cliente_direccion,
+        cl.barrio as cliente_barrio,
+        cl.estrato as cliente_estrato,
+        sc.plan_id,
+        ps.nombre as servicio_nombre,
+        ps.tipo as servicio_tipo,
+        ps.precio as servicio_precio,
+        ps.descripcion as servicio_descripcion,
+        ps.precio_internet,
+        ps.precio_television,
+        ps.velocidad_bajada,
+        ps.velocidad_subida,
+        ps.canales_tv
+    FROM contratos c
+    INNER JOIN clientes cl ON c.cliente_id = cl.id
+    LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
+    LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+    WHERE c.id = ? AND c.estado IN ('activo', 'anulado', 'terminado')
+    LIMIT 1
+`, [id]);
 
         if (!contratos || contratos.length === 0) {
             return res.status(404).json({
