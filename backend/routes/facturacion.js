@@ -45,7 +45,7 @@ router.get('/facturas', async (req, res) => {
     let whereConditions = ['f.activo = 1'];
     let queryParams = [];
 
-    if (fecha_desde && fecha_hasta) {
+    if (fecha_inicio && fecha_fin) {
       whereConditions.push('f.fecha_emision BETWEEN ? AND ?');
       queryParams.push(fecha_inicio, fecha_fin);
     }
