@@ -90,29 +90,38 @@ const CrucePagosBancarios = () => {
 const cargarFacturasPagadas = async () => {
     try {
         setLoadingPagadas(true);
-        const params = {
+        
+        // Construir parámetros correctamente
+        const params = new URLSearchParams({
             estado: 'pagada',
             fecha_inicio: filtrosPagadas.fecha_inicio,
             fecha_fin: filtrosPagadas.fecha_fin
-        };
+        });
 
-        if (filtrosPagadas.busqueda) params.search = filtrosPagadas.busqueda;  // ✅ CORREGIDO: era .search, debe ser .busqueda
-        if (filtrosPagadas.banco) params.banco_id = filtrosPagadas.banco;      // ✅ CORREGIDO: era .banco_id, debe ser .banco
+        // Agregar filtros opcionales si existen
+        if (filtrosPagadas.busqueda) {
+            params.append('search', filtrosPagadas.busqueda);
+        }
+        if (filtrosPagadas.banco) {
+            params.append('banco_id', filtrosPagadas.banco);
+        }
 
-        const queryString = new URLSearchParams(params).toString();
-        const response = await apiService.get(`/facturacion/facturas?${queryString}`);
+        // Hacer la petición al backend
+        const response = await apiService.get(`/facturacion/facturas?${params.toString()}`);
         
         if (response && response.success) {
-            // ✅ IMPORTANTE: Extraer correctamente el array según la estructura del backend
+            // Extraer correctamente el array según la estructura del backend
             const facturas = Array.isArray(response.data) 
                 ? response.data 
                 : (response.data?.facturas || []);
             
             setFacturasPagadas(facturas);
+        } else {
+            setFacturasPagadas([]);
         }
     } catch (error) {
         console.error('Error cargando facturas pagadas:', error);
-        setFacturasPagadas([]); // ✅ Asegurar que sea array vacío en caso de error
+        setFacturasPagadas([]); // Asegurar que sea array vacío en caso de error
     } finally {
         setLoadingPagadas(false);
     }
