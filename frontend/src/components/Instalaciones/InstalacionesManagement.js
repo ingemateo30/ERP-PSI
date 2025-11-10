@@ -673,18 +673,6 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
                   {procesando ? 'Exportando...' : 'Exportar'}
                 </button>
               )}
-
-              {/* Botón crear - Solo admin y supervisor */}
-{(user?.rol === 'administrador' || user?.rol === 'supervisor') && (
-  <button
-    onClick={() => abrirModal('crear')}
-    disabled={procesando}
-    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-  >
-    <Plus className="w-4 h-4 mr-2" />
-    Generar Instalación
-  </button>
-)}
             </div>
           </div>
         </div>
