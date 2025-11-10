@@ -378,7 +378,7 @@ const FacturacionAutomatica = () => {
                       
                       {/* Fila expandida con detalle */}
                       {expandedCliente === cliente.cliente_id && (
-                        <tr className="bg-gradient-to-r from-gray-50 to-blue-50">
+                        <tr className="bg-white border-t-2 border-gray-200">
                           <td colSpan="8" className="px-6 py-6">
                             <div className="space-y-6 animate-fadeIn">
                               {/* Servicios */}
@@ -389,7 +389,7 @@ const FacturacionAutomatica = () => {
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                   {cliente.servicios.map((servicio, idx) => (
-                                    <div key={idx} className="flex justify-between items-center bg-gradient-to-r from-gray-50 to-blue-50 p-3 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                                    <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-200 hover:shadow-md hover:bg-gray-50 transition-all">
                                       <span className="text-sm font-medium text-gray-800">{servicio.nombre}</span>
                                       <div className="text-right">
                                         <span className="text-sm font-bold text-gray-900">
@@ -412,7 +412,7 @@ const FacturacionAutomatica = () => {
                                   <DollarSign className="w-4 h-4 mr-2 text-green-600" />
                                   Conceptos a Facturar
                                 </h4>
-                                <div className="bg-gray-50 rounded-lg border border-gray-200 divide-y divide-gray-200">
+                                <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
                                   {cliente.conceptos.map((concepto, idx) => (
                                     <div key={idx} className="flex justify-between items-center p-3 hover:bg-blue-50 transition-colors">
                                       <span className="text-sm font-medium text-gray-800">{concepto.concepto}</span>
@@ -432,7 +432,7 @@ const FacturacionAutomatica = () => {
                               </div>
 
                               {/* Totales */}
-                              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-lg border-2 border-blue-300 shadow-md">
+                             <div className="bg-white p-5 rounded-lg border-2 border-blue-300 shadow-md">
                                 <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center">
                                   <CheckCircle className="w-4 h-4 mr-2 text-blue-600" />
                                   Resumen de Totales
@@ -467,7 +467,7 @@ const FacturacionAutomatica = () => {
                                       <span className="text-sm font-bold text-gray-800">IVA:</span>
                                       <span className="text-sm font-bold text-gray-900">{formatearMoneda(cliente.totales.iva)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center bg-blue-200 -mx-5 -mb-5 px-5 py-3 rounded-b-lg mt-3">
+                                    <div className="flex justify-between items-center bg-gray-100 -mx-5 -mb-5 px-5 py-3 rounded-b-lg mt-3 border-t-2 border-gray-300">
                                       <span className="text-lg font-extrabold text-gray-900">TOTAL:</span>
                                       <span className="text-xl font-extrabold text-blue-700">{formatearMoneda(cliente.totales.total)}</span>
                                     </div>
@@ -523,7 +523,7 @@ const FacturacionAutomatica = () => {
       {resultado && (
         <Card className={`shadow-xl border-t-4 ${resultado.success !== false ? 'border-green-500' : 'border-red-500'}`}>
           <CardContent className="p-6">
-            <div className={`rounded-xl p-6 ${resultado.success !== false ? 'bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300' : 'bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-300'}`}>
+            <div className={`rounded-xl p-6 bg-white ${resultado.success !== false ? 'border-2 border-green-300' : 'border-2 border-red-300'}`}>
               <div className="flex items-center mb-4">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${resultado.success !== false ? 'bg-green-200' : 'bg-red-200'}`}>
                   {resultado.success !== false ? (
