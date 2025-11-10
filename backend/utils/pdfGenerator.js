@@ -433,7 +433,7 @@ class PDFGenerator {
     static async generarCodigoBarras(doc, x, y, factura) {
         try {
             // Tu código EAN-13 de GS1 Colombia (REEMPLAZA CON EL TUYO REAL)
-            const numeroLocalizacion = '7709998000452';
+            const numeroLocalizacion = '7709998284111';
             
             // Obtener datos de la factura
             const referenciaPago = factura.identificacion_cliente || factura.codigo_cliente || '1005450340';
