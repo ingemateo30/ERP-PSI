@@ -114,7 +114,7 @@ const FacturacionAutomatica = () => {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6 bg-white min-h-screen">
       {/* Encabezado de la página */}
       <div className="mb-8">
         <div className="flex items-center space-x-3 mb-2">
