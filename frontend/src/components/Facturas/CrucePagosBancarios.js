@@ -128,6 +128,8 @@ const CrucePagosBancarios = () => {
                 const facturas = Array.isArray(response.data) 
                     ? response.data 
                     : (response.data?.facturas || []);
+                     console.log('📦 FACTURAS RECIBIDAS:', facturas.length); // ⬅️ AGREGAR
+            console.log('📦 PRIMERA FACTURA:', facturas[0]);
                 
                 setFacturasPagadas(facturas);
             } else {
