@@ -206,8 +206,6 @@ const ClientsManagement = () => {
   </h1>
   <p className="text-gray-600 mt-1">
     {user?.rol === 'instalador' 
-      ? `${pagination.total || 0} clientes con instalaciones` 
-      : `${pagination.total || 0} clientes registrados`
     }
   </p>
 </div>
