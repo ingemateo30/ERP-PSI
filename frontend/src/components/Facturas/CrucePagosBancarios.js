@@ -201,31 +201,7 @@ const cruzarPago = async () => {
         }
     };
 
-    const facturasPendientesFiltradas = facturasPendientes.filter(f => {
-        if (filtros.banco && f.banco_id !== parseInt(filtros.banco)) return false;
-        if (filtros.busqueda) {
-            const busqueda = filtros.busqueda.toLowerCase();
-            return (
-                f.numero_factura?.toLowerCase().includes(busqueda) ||
-                f.cliente_nombre?.toLowerCase().includes(busqueda) ||
-                f.cliente_identificacion?.includes(busqueda)
-            );
-        }
-        return true;
-    });
-
-    const facturasPagadasFiltradas = facturasPagadas.filter(f => {
-        if (filtrosPagadas.banco && f.banco_id !== parseInt(filtrosPagadas.banco)) return false;
-        if (filtrosPagadas.busqueda) {
-            const busqueda = filtrosPagadas.busqueda.toLowerCase();
-            return (
-                f.numero_factura?.toLowerCase().includes(busqueda) ||
-                f.cliente_nombre?.toLowerCase().includes(busqueda) ||
-                f.cliente_identificacion?.includes(busqueda)
-            );
-        }
-        return true;
-    });
+   
 
     return (
         <div className="p-6 space-y-6">
