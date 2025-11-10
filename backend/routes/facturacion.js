@@ -23,8 +23,8 @@ router.get('/facturas', async (req, res) => {
     const { 
       page = 1, 
       limit = 20,
-      fecha_desde,
-      fecha_hasta,
+      fecha_inicio,
+      fecha_fin,
       estado,
       cliente_id,
       numero_factura,
@@ -47,7 +47,7 @@ router.get('/facturas', async (req, res) => {
 
     if (fecha_desde && fecha_hasta) {
       whereConditions.push('f.fecha_emision BETWEEN ? AND ?');
-      queryParams.push(fecha_desde, fecha_hasta);
+      queryParams.push(fecha_inicio, fecha_fin);
     }
 
     if (estado) {
