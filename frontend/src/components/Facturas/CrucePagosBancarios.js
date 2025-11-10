@@ -57,11 +57,29 @@ const CrucePagosBancarios = () => {
     ];
 
     useEffect(() => {
-        cargarFacturasPendientes();
+        // Agregar debounce para evitar múltiples peticiones
+        const timer = setTimeout(() => {
+            cargarFacturasPendientes();
+        }, 300);
+        
+        return () => clearTimeout(timer);
     }, [filtros]);
 
     useEffect(() => {
-        cargarFacturasPagadas();
+        // Validar fechas antes de cargar
+        if (filtrosPagadas.fecha_inicio && filtrosPagadas.fecha_fin) {
+            const fechaInicio = new Date(filtrosPagadas.fecha_inicio);
+            const fechaFin = new Date(filtrosPagadas.fecha_fin);
+            
+            // Solo cargar si la fecha fin es mayor o igual a la fecha inicio
+            if (fechaFin >= fechaInicio) {
+                const timer = setTimeout(() => {
+                    cargarFacturasPagadas();
+                }, 300);
+                
+                return () => clearTimeout(timer);
+            }
+        }
     }, [filtrosPagadas]);
 
     const cargarFacturasPendientes = async () => {
@@ -87,45 +105,42 @@ const CrucePagosBancarios = () => {
         }
     };
 
-const cargarFacturasPagadas = async () => {
-    try {
-        setLoadingPagadas(true);
-        
-        // Construir parámetros correctamente
-        const params = new URLSearchParams({
-            estado: 'pagada',
-            fecha_inicio: filtrosPagadas.fecha_inicio,
-            fecha_fin: filtrosPagadas.fecha_fin
-        });
-
-        // Agregar filtros opcionales si existen
-        if (filtrosPagadas.busqueda) {
-            params.append('search', filtrosPagadas.busqueda);
-        }
-        if (filtrosPagadas.banco) {
-            params.append('banco_id', filtrosPagadas.banco);
-        }
-
-        // Hacer la petición al backend
-        const response = await apiService.get(`/facturacion/facturas?${params.toString()}`);
-        
-        if (response && response.success) {
-            // Extraer correctamente el array según la estructura del backend
-            const facturas = Array.isArray(response.data) 
-                ? response.data 
-                : (response.data?.facturas || []);
+    const cargarFacturasPagadas = async () => {
+        try {
+            setLoadingPagadas(true);
             
-            setFacturasPagadas(facturas);
-        } else {
+            const params = new URLSearchParams({
+                estado: 'pagada',
+                fecha_inicio: filtrosPagadas.fecha_inicio,
+                fecha_fin: filtrosPagadas.fecha_fin
+            });
+
+            if (filtrosPagadas.busqueda) {
+                params.append('search', filtrosPagadas.busqueda);
+            }
+            if (filtrosPagadas.banco) {
+                params.append('banco_id', filtrosPagadas.banco);
+            }
+
+            const response = await apiService.get(`/facturacion/facturas?${params.toString()}`);
+            
+            if (response && response.success) {
+                const facturas = Array.isArray(response.data) 
+                    ? response.data 
+                    : (response.data?.facturas || []);
+                
+                setFacturasPagadas(facturas);
+            } else {
+                setFacturasPagadas([]);
+            }
+        } catch (error) {
+            console.error('Error cargando facturas pagadas:', error);
             setFacturasPagadas([]);
+        } finally {
+            setLoadingPagadas(false);
         }
-    } catch (error) {
-        console.error('Error cargando facturas pagadas:', error);
-        setFacturasPagadas([]); // Asegurar que sea array vacío en caso de error
-    } finally {
-        setLoadingPagadas(false);
-    }
-};
+    };
+
     const abrirModalCruce = (factura) => {
         setFacturaSeleccionada(factura);
         setDatosPago({
@@ -144,30 +159,31 @@ const cargarFacturasPagadas = async () => {
         setMostrarModalDetalle(true);
     };
 
-const cruzarPago = async () => {
-    try {
-        const response = await apiService.post(`/facturacion/facturas/${facturaSeleccionada.id}/pagar`, {
-            valor_pagado: parseFloat(datosPago.monto),
-            metodo_pago: datosPago.metodo_pago,
-            referencia_pago: datosPago.referencia,
-            fecha_pago: datosPago.fecha_pago,
-            observaciones: datosPago.observaciones,
-            banco_id: parseInt(datosPago.banco_id)  // ✅ Asegurar que sea número
-        });
+    const cruzarPago = async () => {
+        try {
+            const response = await apiService.post(`/facturacion/facturas/${facturaSeleccionada.id}/pagar`, {
+                valor_pagado: parseFloat(datosPago.monto),
+                metodo_pago: datosPago.metodo_pago,
+                referencia_pago: datosPago.referencia,
+                fecha_pago: datosPago.fecha_pago,
+                observaciones: datosPago.observaciones,
+                banco_id: parseInt(datosPago.banco_id)
+            });
 
-        if (response && response.success) {
-            alert('Pago cruzado exitosamente');
-            setMostrarModalCruce(false);
-            cargarFacturasPendientes();
-            cargarFacturasPagadas();
-        } else {
-            alert('Error: ' + (response?.message || 'Error desconocido'));
+            if (response && response.success) {
+                alert('Pago cruzado exitosamente');
+                setMostrarModalCruce(false);
+                cargarFacturasPendientes();
+                cargarFacturasPagadas();
+            } else {
+                alert('Error: ' + (response?.message || 'Error desconocido'));
+            }
+        } catch (error) {
+            console.error('Error cruzando pago:', error);
+            alert('Error al cruzar el pago: ' + error.message);
         }
-    } catch (error) {
-        console.error('Error cruzando pago:', error);
-        alert('Error al cruzar el pago: ' + error.message);
-    }
-};
+    };
+
     const exportarPorBanco = async (bancoId) => {
         try {
             const banco = bancos.find(b => b.id === bancoId);
@@ -274,7 +290,21 @@ const cruzarPago = async () => {
                         <input
                             type="date"
                             value={filtros.fecha_inicio}
-                            onChange={(e) => setFiltros({ ...filtros, fecha_inicio: e.target.value })}
+                            onChange={(e) => {
+                                const nuevaFechaInicio = e.target.value;
+                                const fechaFin = new Date(filtros.fecha_fin);
+                                const fechaInicio = new Date(nuevaFechaInicio);
+                                
+                                if (fechaInicio > fechaFin) {
+                                    setFiltros({ 
+                                        ...filtros, 
+                                        fecha_inicio: nuevaFechaInicio,
+                                        fecha_fin: nuevaFechaInicio
+                                    });
+                                } else {
+                                    setFiltros({ ...filtros, fecha_inicio: nuevaFechaInicio });
+                                }
+                            }}
                             className="w-full px-3 py-2 border rounded-lg"
                         />
                     </div>
@@ -285,7 +315,22 @@ const cruzarPago = async () => {
                         <input
                             type="date"
                             value={filtros.fecha_fin}
-                            onChange={(e) => setFiltros({ ...filtros, fecha_fin: e.target.value })}
+                            onChange={(e) => {
+                                const nuevaFechaFin = e.target.value;
+                                const fechaInicio = new Date(filtros.fecha_inicio);
+                                const fechaFin = new Date(nuevaFechaFin);
+                                
+                                if (fechaFin < fechaInicio) {
+                                    setFiltros({ 
+                                        ...filtros, 
+                                        fecha_inicio: nuevaFechaFin,
+                                        fecha_fin: nuevaFechaFin
+                                    });
+                                } else {
+                                    setFiltros({ ...filtros, fecha_fin: nuevaFechaFin });
+                                }
+                            }}
+                            min={filtros.fecha_inicio}
                             className="w-full px-3 py-2 border rounded-lg"
                         />
                     </div>
@@ -394,7 +439,22 @@ const cruzarPago = async () => {
                         <input
                             type="date"
                             value={filtrosPagadas.fecha_inicio}
-                            onChange={(e) => setFiltrosPagadas({ ...filtrosPagadas, fecha_inicio: e.target.value })}
+                            onChange={(e) => {
+                                const nuevaFechaInicio = e.target.value;
+                                const fechaFin = new Date(filtrosPagadas.fecha_fin);
+                                const fechaInicio = new Date(nuevaFechaInicio);
+                                
+                                // Si fecha inicio es mayor que fecha fin, ajustar fecha fin
+                                if (fechaInicio > fechaFin) {
+                                    setFiltrosPagadas({ 
+                                        ...filtrosPagadas, 
+                                        fecha_inicio: nuevaFechaInicio,
+                                        fecha_fin: nuevaFechaInicio
+                                    });
+                                } else {
+                                    setFiltrosPagadas({ ...filtrosPagadas, fecha_inicio: nuevaFechaInicio });
+                                }
+                            }}
                             className="w-full px-3 py-2 border rounded-lg"
                         />
                     </div>
@@ -405,7 +465,23 @@ const cruzarPago = async () => {
                         <input
                             type="date"
                             value={filtrosPagadas.fecha_fin}
-                            onChange={(e) => setFiltrosPagadas({ ...filtrosPagadas, fecha_fin: e.target.value })}
+                            onChange={(e) => {
+                                const nuevaFechaFin = e.target.value;
+                                const fechaInicio = new Date(filtrosPagadas.fecha_inicio);
+                                const fechaFin = new Date(nuevaFechaFin);
+                                
+                                // Si fecha fin es menor que fecha inicio, ajustar fecha inicio
+                                if (fechaFin < fechaInicio) {
+                                    setFiltrosPagadas({ 
+                                        ...filtrosPagadas, 
+                                        fecha_inicio: nuevaFechaFin,
+                                        fecha_fin: nuevaFechaFin
+                                    });
+                                } else {
+                                    setFiltrosPagadas({ ...filtrosPagadas, fecha_fin: nuevaFechaFin });
+                                }
+                            }}
+                            min={filtrosPagadas.fecha_inicio}
                             className="w-full px-3 py-2 border rounded-lg"
                         />
                     </div>
