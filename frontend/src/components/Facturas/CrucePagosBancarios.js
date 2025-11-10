@@ -218,8 +218,8 @@ const CrucePagosBancarios = () => {
     };
 
     const facturasPendientesFiltradas = facturasPendientes.filter(f => {
-        if (filtros.banco && f.banco_id !== parseInt(filtros.banco)) return false;
-        if (filtros.busqueda) {
+    // Solo filtrar por búsqueda local, las fechas y banco ya vienen del servidor
+    if (filtros.busqueda) {
             const busqueda = filtros.busqueda.toLowerCase();
             return (
                 f.numero_factura?.toLowerCase().includes(busqueda) ||
@@ -231,8 +231,8 @@ const CrucePagosBancarios = () => {
     });
 
     const facturasPagadasFiltradas = facturasPagadas.filter(f => {
-        if (filtrosPagadas.banco && f.banco_id !== parseInt(filtrosPagadas.banco)) return false;
-        if (filtrosPagadas.busqueda) {
+    // El filtro de banco ya se aplica en el servidor, no filtrar aquí
+    if (filtrosPagadas.busqueda) {
             const busqueda = filtrosPagadas.busqueda.toLowerCase();
             return (
                 f.numero_factura?.toLowerCase().includes(busqueda) ||
