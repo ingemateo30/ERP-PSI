@@ -567,8 +567,13 @@ router.get('/:id/pdf', async (req, res) => {
         } catch (logoError) {
             console.warn('⚠️ Error cargando logo:', logoError.message);
         }
+// Fragmento mejorado para la ruta GET /:id/pdf
+// Reemplazar solo la sección del htmlContent
 
-        const htmlContent = `
+// Fragmento mejorado para la ruta GET /:id/pdf
+// Reemplazar solo la sección del htmlContent
+
+const htmlContent = `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -595,7 +600,7 @@ router.get('/:id/pdf', async (req, res) => {
         .psi-container {
             width: 216mm;
             height: 93mm;
-            padding: 5mm 6mm;
+            padding: 2mm 4mm;
             position: relative;
             background: white;
         }
@@ -605,212 +610,184 @@ router.get('/:id/pdf', async (req, res) => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 3mm;
-            padding-bottom: 2mm;
+            margin-bottom: 1.5mm;
+            padding-bottom: 1mm;
             border-bottom: 2px solid #000;
         }
         
         .left-header {
             display: flex;
             align-items: center;
-            gap: 4mm;
+            gap: 2mm;
         }
         
         .logo-section {
-            width: 20mm;
-            height: 14mm;
+            width: 14mm;
+            height: 10mm;
             display: flex;
             align-items: center;
             justify-content: center;
-            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 2px solid #0056b3; background: #f0f5ff; border-radius: 2mm;'}
+            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 2px solid #000; background: white;'}
         }
         
         .company-info {
             display: flex;
             flex-direction: column;
-            gap: 0.8mm;
+            gap: 0.3mm;
         }
         
         .company-name {
-            font-size: 10px;
+            font-size: 8px;
             font-weight: bold;
-            color: #0056b3;
-            letter-spacing: 0.3px;
+            color: #000;
+            letter-spacing: 0.2px;
         }
         
         .company-details {
-            font-size: 7px;
+            font-size: 6px;
             color: #333;
-            line-height: 1.3;
+            line-height: 1.2;
         }
         
         .right-header {
             text-align: right;
-            background: #f8f9fa;
-            padding: 2mm 3mm;
-            border-radius: 2mm;
-            border-left: 3px solid #0056b3;
+            background: #f5f5f5;
+            padding: 1mm 2mm;
+            border: 1px solid #000;
         }
         
         .order-title {
-            font-size: 11px;
+            font-size: 8px;
             font-weight: bold;
-            color: #0056b3;
-            margin-bottom: 1mm;
+            color: #000;
+            margin-bottom: 0.5mm;
         }
         
         .order-number {
-            font-size: 14px;
+            font-size: 10px;
             font-weight: bold;
             color: #000;
-            margin-bottom: 1mm;
+            margin-bottom: 0.5mm;
         }
         
         .order-date {
-            font-size: 7px;
-            color: #666;
+            font-size: 6px;
+            color: #333;
         }
         
         /* SECCIÓN CLIENTE */
         .client-section {
-            background: #f8f9fa;
-            padding: 2.5mm 3mm;
-            border-radius: 2mm;
-            margin-bottom: 2.5mm;
-            border-left: 3px solid #0056b3;
+            background: white;
+            padding: 1.5mm 2mm;
+            margin-bottom: 1.5mm;
+            border: 1px solid #000;
         }
         
         .section-title {
-            font-size: 9px;
+            font-size: 7px;
             font-weight: bold;
-            color: #0056b3;
-            margin-bottom: 2mm;
+            color: #000;
+            margin-bottom: 1mm;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 0.5mm;
         }
         
         .client-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 2mm 4mm;
+            gap: 1mm 3mm;
         }
         
         .info-field {
             display: flex;
             align-items: center;
-            gap: 2mm;
+            gap: 1mm;
         }
         
         .info-label {
             font-weight: bold;
-            font-size: 8px;
-            color: #333;
-            min-width: 22mm;
+            font-size: 7px;
+            color: #000;
+            min-width: 18mm;
         }
         
         .info-value {
             flex: 1;
-            font-size: 9px;
+            font-size: 7px;
             color: #000;
-            padding: 1mm 2mm;
+            padding: 0.5mm 1mm;
             background: white;
-            border-radius: 1mm;
-            border: 1px solid #dee2e6;
+            border-bottom: 1px solid #000;
         }
         
         /* SECCIÓN PROGRAMACIÓN */
         .scheduling-section {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 3mm;
-            margin-bottom: 2.5mm;
+            gap: 2mm;
+            margin-bottom: 1.5mm;
         }
         
         .schedule-box {
-            background: #fff3cd;
-            padding: 2mm 3mm;
-            border-radius: 2mm;
-            border-left: 3px solid #ffc107;
+            background: #f5f5f5;
+            padding: 1mm 2mm;
+            border: 1px solid #000;
         }
         
         .schedule-box .section-title {
-            color: #856404;
-            font-size: 8px;
-            margin-bottom: 1.5mm;
+            color: #000;
+            font-size: 7px;
+            margin-bottom: 0.5mm;
         }
         
         /* SECCIÓN SERVICIOS */
         .services-section {
-            background: #d1ecf1;
-            padding: 2.5mm 3mm;
-            border-radius: 2mm;
-            margin-bottom: 2.5mm;
-            border-left: 3px solid #17a2b8;
-        }
-        
-        .services-section .section-title {
-            color: #0c5460;
+            background: white;
+            padding: 1.5mm 2mm;
+            margin-bottom: 1.5mm;
+            border: 1px solid #000;
         }
         
         .services-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
-            gap: 2mm;
+            gap: 1mm;
         }
         
         .service-field {
             display: flex;
             align-items: center;
-            gap: 1.5mm;
+            gap: 1mm;
         }
         
         .service-label {
             font-weight: bold;
-            font-size: 8px;
-            color: #0c5460;
+            font-size: 7px;
+            color: #000;
         }
         
         .service-value {
             flex: 1;
-            font-size: 8px;
-            padding: 1mm 2mm;
+            font-size: 7px;
+            padding: 0.5mm 1mm;
             background: white;
-            border-radius: 1mm;
-            border: 1px solid #bee5eb;
-        }
-        
-        /* SECCIÓN TÉCNICA */
-        .technical-section {
-            background: #d4edda;
-            padding: 2.5mm 3mm;
-            border-radius: 2mm;
-            margin-bottom: 2.5mm;
-            border-left: 3px solid #28a745;
-        }
-        
-        .technical-section .section-title {
-            color: #155724;
-        }
-        
-        .technical-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2mm 3mm;
+            border-bottom: 1px solid #000;
         }
         
         /* OBSERVACIONES */
         .observations-section {
-            margin-bottom: 3mm;
+            margin-bottom: 2mm;
         }
         
         .observations-box {
             background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 2mm;
-            padding: 2mm;
-            min-height: 12mm;
-            font-size: 8px;
-            line-height: 1.4;
+            border: 1px solid #000;
+            padding: 1.5mm;
+            min-height: 10mm;
+            font-size: 7px;
+            line-height: 1.3;
         }
         
         /* FIRMAS MEJORADAS */
@@ -818,32 +795,32 @@ router.get('/:id/pdf', async (req, res) => {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 4mm;
-            margin-top: auto;
+            margin-top: 3mm;
         }
         
         .signature-block {
             text-align: center;
-            padding: 2mm;
-            background: #f8f9fa;
-            border-radius: 2mm;
+            padding: 1.5mm;
+            background: white;
+            border: 1px solid #000;
         }
         
         .signature-line {
             border-top: 2px solid #000;
-            margin-bottom: 1.5mm;
-            height: 8mm;
+            margin-bottom: 1mm;
+            height: 12mm;
         }
         
         .signature-label {
-            font-size: 8px;
+            font-size: 7px;
             font-weight: bold;
-            color: #333;
+            color: #000;
             text-transform: uppercase;
         }
         
         .signature-sublabel {
             font-size: 6px;
-            color: #666;
+            color: #333;
             margin-top: 0.5mm;
         }
         
@@ -895,7 +872,7 @@ router.get('/:id/pdf', async (req, res) => {
 
         <!-- INFORMACIÓN DEL CLIENTE -->
         <div class="client-section">
-            <div class="section-title">📋 Información del Cliente</div>
+            <div class="section-title">Información del Cliente</div>
             <div class="client-grid">
                 <div class="info-field">
                     <span class="info-label">Nombre:</span>
@@ -919,22 +896,21 @@ router.get('/:id/pdf', async (req, res) => {
         <!-- PROGRAMACIÓN -->
         <div class="scheduling-section">
             <div class="schedule-box">
-                <div class="section-title">📅 Fecha Programada</div>
+                <div class="section-title">Fecha Programada</div>
                 <div class="info-field">
-                    <span class="info-value" style="text-align: center; font-weight: bold; background: white;">
+                    <span class="info-value" style="text-align: center; font-weight: bold; background: white; font-size: 7px;">
                         ${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO', { 
-                            weekday: 'long', 
                             year: 'numeric', 
-                            month: 'long', 
+                            month: 'short', 
                             day: 'numeric' 
                         }) : ''}
                     </span>
                 </div>
             </div>
             <div class="schedule-box">
-                <div class="section-title">⏰ Hora Programada</div>
+                <div class="section-title">Hora Programada</div>
                 <div class="info-field">
-                    <span class="info-value" style="text-align: center; font-weight: bold; font-size: 11px; background: white;">
+                    <span class="info-value" style="text-align: center; font-weight: bold; font-size: 9px; background: white;">
                         ${instalacion.hora_programada || ''}
                     </span>
                 </div>
@@ -943,7 +919,7 @@ router.get('/:id/pdf', async (req, res) => {
 
         <!-- SERVICIOS A INSTALAR -->
         <div class="services-section">
-            <div class="section-title">🌐 Servicios a Instalar</div>
+            <div class="section-title">Servicios a Instalar</div>
             <div class="services-grid">
                 <div class="service-field">
                     <span class="service-label">Internet:</span>
@@ -957,33 +933,24 @@ router.get('/:id/pdf', async (req, res) => {
                     <span class="service-label">Telefonía:</span>
                     <span class="service-value"></span>
                 </div>
-            </div>
-        </div>
-
-        <!-- INFORMACIÓN TÉCNICA -->
-        <div class="technical-section">
-            <div class="section-title">🔧 Información Técnica</div>
-            <div class="technical-grid">
                 <div class="service-field">
-                    <span class="service-label" style="color: #155724;">Poste:</span>
-                    <span class="service-value" style="border-color: #c3e6cb;"></span>
+                    <span class="service-label">Poste:</span>
+                    <span class="service-value"></span>
                 </div>
                 <div class="service-field">
-                    <span class="service-label" style="color: #155724;">Amarre:</span>
-                    <span class="service-value" style="border-color: #c3e6cb;"></span>
+                    <span class="service-label">Amarre:</span>
+                    <span class="service-value"></span>
                 </div>
-                <div class="service-field" style="grid-column: 1 / -1;">
-                    <span class="service-label" style="color: #155724;">Instalador:</span>
-                    <span class="service-value" style="border-color: #c3e6cb; font-weight: bold;">
-                        ${instalacion.instalador_nombre_completo || 'Por asignar'}
-                    </span>
+                <div class="service-field">
+                    <span class="service-label">Instalador:</span>
+                    <span class="service-value" style="font-weight: bold;">${instalacion.instalador_nombre_completo || 'Por asignar'}</span>
                 </div>
             </div>
         </div>
 
         <!-- OBSERVACIONES -->
         <div class="observations-section">
-            <div class="section-title">📝 Observaciones</div>
+            <div class="section-title">Observaciones</div>
             <div class="observations-box">
                 ${instalacion.observaciones || 'Sin observaciones adicionales'}
             </div>
