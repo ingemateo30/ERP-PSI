@@ -319,20 +319,21 @@ router.get('/overview', requireRole(['administrador', 'supervisor']), async (req
 
     // Conteos básicos
     const [counts] = await Database.query(`
-      SELECT 
-        (SELECT COUNT(*) FROM departamentos) as departamentos,
-        (SELECT COUNT(*) FROM ciudades) as ciudades,
-        (SELECT COUNT(*) FROM sectores WHERE activo = 1) as sectores_activos,
-        (SELECT COUNT(*) FROM sectores) as sectores_total,
-        (SELECT COUNT(*) FROM bancos WHERE activo = 1) as bancos_activos,
-        (SELECT COUNT(*) FROM bancos) as bancos_total,
-        (SELECT COUNT(*) FROM planes_servicio WHERE activo = 1) as planes_activos,
-        (SELECT COUNT(*) FROM planes_servicio) as planes_total,
-        (SELECT COUNT(*) FROM conceptos_facturacion WHERE activo = 1) as conceptos_activos,
-        (SELECT COUNT(*) FROM sistema_usuarios WHERE activo = 1) as usuarios_activos,
-        (SELECT COUNT(*) FROM clientes WHERE estado = 'activo') as clientes_activos,
-        (SELECT COUNT(*) FROM clientes) as clientes_total
-    `);
+  SELECT 
+    (SELECT COUNT(*) FROM departamentos) as departamentos,
+    (SELECT COUNT(*) FROM ciudades) as ciudades,
+    (SELECT COUNT(*) FROM sectores WHERE activo = 1) as sectores_activos,
+    (SELECT COUNT(*) FROM sectores) as sectores_total,
+    (SELECT COUNT(*) FROM bancos WHERE activo = 1) as bancos_activos,
+    (SELECT COUNT(*) FROM bancos) as bancos_total,
+    (SELECT COUNT(*) FROM planes_servicio WHERE activo = 1) as planes_activos,
+    (SELECT COUNT(*) FROM planes_servicio) as planes_total,
+    (SELECT COUNT(*) FROM conceptos_facturacion WHERE activo = 1) as conceptos_activos,
+    (SELECT COUNT(*) FROM sistema_usuarios) as total_usuarios,
+    (SELECT COUNT(*) FROM sistema_usuarios WHERE activo = 1) as usuarios_activos,
+    (SELECT COUNT(*) FROM clientes WHERE estado = 'activo') as clientes_activos,
+    (SELECT COUNT(*) FROM clientes) as clientes_total
+`);
 
     // Verificar nivel de configuración
     const isConfigured = company && company.empresa_nombre && company.empresa_nit;
