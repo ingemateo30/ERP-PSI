@@ -345,11 +345,13 @@ console.log('✅ Rutas de instalador cargadas: /api/v1/instalador');
     console.log('⚠️ Rutas de reportes generales no disponibles (opcional)');
   }
 
-  console.log('✅ Todas las rutas cargadas exitosamente');
- console.log('📊 Cargando rutas de estadísticas...');
-  const estadisticasRoutes = require('./routes/estadisticas'); // ✅ BIEN (dentro del try)
+// Rutas de estadísticas
+  console.log('📊 Cargando rutas de estadísticas...');
+  const estadisticasRoutes = require('./routes/estadisticas');
   app.use('/api/v1/estadisticas', estadisticasRoutes);
   console.log('✅ Rutas de estadísticas cargadas: /api/v1/estadisticas');
+
+  console.log('✅ Todas las rutas cargadas exitosamente');
 
 } catch (error) {
   console.error('❌ Error cargando rutas:', error.message);
