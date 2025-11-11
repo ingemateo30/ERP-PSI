@@ -216,21 +216,6 @@ class PDFGenerator {
 
         const yFinTablaConceptos = y + alturaFila + 5;
 
-        // PERIODO FACTURADO (título sin recuadro, más pequeño)
-        doc.fontSize(7).font('Helvetica-Bold')
-            .text('PERIODO FACTURADO', xDerecha, yDerecha + 2, { align: 'center', width: anchoDerecha });
-
-        yDerecha += 12;
-
-        // Subtítulos "Desde" y "Hasta" (sin recuadro, más pequeños)
-        const anchoRecuadroFecha2 = (anchoDerecha - 5) / 2; // Dividir en dos columnas
-        doc.fontSize(6).font('Helvetica')
-            .text('Desde', xDerecha, yDerecha, { align: 'center', width: anchoRecuadroFecha2 })
-            .text('Hasta', xDerecha + anchoRecuadroFecha2 + 5, yDerecha, { align: 'center', width: anchoRecuadroFecha2 });
-
-        yDerecha += 10;
-
-
         // Recuadros con fechas lado a lado
         // Fecha desde (recuadro izquierdo)
         doc.rect(xDerecha, yDerecha, anchoRecuadroFecha, 22).stroke('#000000');
