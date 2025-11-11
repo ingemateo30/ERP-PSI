@@ -100,7 +100,7 @@ class PDFGenerator {
         doc.fontSize(9).font('Helvetica-Bold')
             .text('FACTURA DE VENTA', 460, y + 5)
             .fontSize(10).text(factura.numero_factura || 'FAC000011', 460, y + 18);
-        
+
         doc.fontSize(7).font('Helvetica')
             .text('Referencia de pago:', 460, y + 32)
             .font('Helvetica-Bold')
@@ -115,11 +115,11 @@ class PDFGenerator {
             .text(`ID Cliente ${factura.identificacion_cliente || '1005450340'} / ${factura.codigo_cliente || '200'}`, xOffset, y + 14)
             .text(`Dirección: ${factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN'}`, xOffset, y + 26);
 
-        y += 50;
+        y += 45;
 
         // === DISEÑO DE DOS COLUMNAS: TABLA A LA IZQUIERDA, FECHAS A LA DERECHA ===
         const yTablaInicio = y;
-        
+
         // COLUMNA IZQUIERDA: TABLA DE CONCEPTOS (ocupa la mitad)
         const alturaEncabezado = 18;
         const alturaFila = 18;
@@ -128,24 +128,66 @@ class PDFGenerator {
         const colSaldo = 230;
         const anchoTabla = 250; // Mitad de la página
 
+        // COLUMNA DERECHA: PERIODO FACTURADO (más arriba y más centrado)
+        const xDerecha = colConcepto + anchoTabla + 40;
+        const anchoDerecha = 235;
+        let yDerecha = yTablaInicio - 5; // Más arriba
+
+        // PERIODO FACTURADO (título sin recuadro, más pequeño)
+        doc.fontSize(7).font('Helvetica-Bold')
+            .text('PERIODO FACTURADO', xDerecha, yDerecha, { align: 'center', width: anchoDerecha });
+
+        yDerecha += 12;
+
+        // Subtítulos "Desde" y "Hasta" (sin recuadro, más pequeños)
+        const anchoRecuadroFecha = (anchoDerecha - 5) / 2; // Dividir en dos columnas
+        doc.fontSize(6).font('Helvetica')
+            .text('Desde', xDerecha, yDerecha, { align: 'center', width: anchoRecuadroFecha })
+            .text('Hasta', xDerecha + anchoRecuadroFecha + 5, yDerecha, { align: 'center', width: anchoRecuadroFecha });
+
+        yDerecha += 10;
+
+        // Recuadros con fechas lado a lado
+        // Fecha desde (recuadro izquierdo)
+        doc.rect(xDerecha, yDerecha, anchoRecuadroFecha, 22).stroke('#000000');
+        doc.fontSize(8).font('Helvetica-Bold')
+            .text(this.formatearFecha(factura.fecha_desde) || '8-nov.-2025', xDerecha + 2, yDerecha + 8, { align: 'center', width: anchoRecuadroFecha - 4 });
+
+        // Fecha hasta (recuadro derecho)
+        doc.rect(xDerecha + anchoRecuadroFecha + 5, yDerecha, anchoRecuadroFecha, 22).stroke('#000000');
+        doc.fontSize(8).font('Helvetica-Bold')
+            .text(this.formatearFecha(factura.fecha_hasta) || '7-dic.-2025', xDerecha + anchoRecuadroFecha + 7, yDerecha + 8, { align: 'center', width: anchoRecuadroFecha - 4 });
+
+        yDerecha += 32;
+
+        // PAGAR ANTES DE - Recuadro grande con título y fecha juntos
+        const alturaRecuadroPago = 35;
+        doc.rect(xDerecha, yDerecha, anchoDerecha, alturaRecuadroPago).stroke('#000000');
+
+        doc.fontSize(8).font('Helvetica-Bold')
+            .text('PAGAR ANTES DE', xDerecha + 5, yDerecha + 6, { align: 'center', width: anchoDerecha - 10 });
+
+        doc.fontSize(10).font('Helvetica-Bold')
+            .text(this.formatearFecha(factura.fecha_vencimiento) || '16-nov.-2025', xDerecha + 5, yDerecha + 18, { align: 'center', width: anchoDerecha - 10 });
+
+        // AHORA DIBUJAR LA TABLA
         // Encabezado de tabla con bordes
-        doc.rect(colConcepto, y, anchoTabla, alturaEncabezado).stroke('#000000');
-        
+        doc.rect(colConcepto, yTablaInicio, anchoTabla, alturaEncabezado).stroke('#000000');
+
         // Líneas divisorias verticales
-        doc.moveTo(colValor, y).lineTo(colValor, y + alturaEncabezado).stroke('#000000');
-        doc.moveTo(colSaldo, y).lineTo(colSaldo, y + alturaEncabezado).stroke('#000000');
+        doc.moveTo(colValor, yTablaInicio).lineTo(colValor, yTablaInicio + alturaEncabezado).stroke('#000000');
+        doc.moveTo(colSaldo, yTablaInicio).lineTo(colSaldo, yTablaInicio + alturaEncabezado).stroke('#000000');
 
         // Texto del encabezado
         doc.fontSize(7).font('Helvetica-Bold')
-            .text('Concepto', colConcepto + 5, y + 6)
-            .text('Valor Mes', colValor + 5, y + 6)
-            .text('Saldo', colSaldo + 5, y + 6);
+            .text('Concepto', colConcepto + 5, yTablaInicio + 6)
+            .text('Valor Mes', colValor + 5, yTablaInicio + 6)
+            .text('Saldo', colSaldo + 5, yTablaInicio + 6);
 
-        y += alturaEncabezado;
+        y = yTablaInicio + alturaEncabezado;
 
         // Datos de conceptos
         const conceptos = this.obtenerConceptosSimples(factura);
-        const yConceptosInicio = y;
 
         conceptos.forEach((concepto, index) => {
             // Bordes de la fila
@@ -162,12 +204,17 @@ class PDFGenerator {
             y += alturaFila;
         });
 
-        const yFinTablaConceptos = y;
+        // Fila del TOTAL (con bordes)
+        const totalPagar = this.formatearMoneda(factura.total);
+        doc.rect(colConcepto, y, anchoTabla, alturaFila + 5).stroke('#000000');
+        doc.moveTo(colValor, y).lineTo(colValor, y + alturaFila + 5).stroke('#000000');
+        doc.moveTo(colSaldo, y).lineTo(colSaldo, y + alturaFila + 5).stroke('#000000');
 
-        // COLUMNA DERECHA: PERIODO FACTURADO Y PAGAR ANTES DE (con recuadros según imagen)
-        const xDerecha = colConcepto + anchoTabla + 30;
-        const anchoDerecha = 245;
-        let yDerecha = yTablaInicio;
+        doc.fontSize(8).font('Helvetica-Bold').fillColor('#000000')
+            .text('TOTAL', colConcepto + 5, y + 8)
+            .fontSize(10).text(totalPagar, colValor + 5, y + 8);
+
+        const yFinTablaConceptos = y + alturaFila + 5;
 
         // PERIODO FACTURADO (título sin recuadro, más pequeño)
         doc.fontSize(7).font('Helvetica-Bold')
@@ -176,12 +223,13 @@ class PDFGenerator {
         yDerecha += 12;
 
         // Subtítulos "Desde" y "Hasta" (sin recuadro, más pequeños)
-        const anchoRecuadroFecha = (anchoDerecha - 5) / 2; // Dividir en dos columnas
+        const anchoRecuadroFecha2 = (anchoDerecha - 5) / 2; // Dividir en dos columnas
         doc.fontSize(6).font('Helvetica')
-            .text('Desde', xDerecha, yDerecha, { align: 'center', width: anchoRecuadroFecha })
-            .text('Hasta', xDerecha + anchoRecuadroFecha + 5, yDerecha, { align: 'center', width: anchoRecuadroFecha });
+            .text('Desde', xDerecha, yDerecha, { align: 'center', width: anchoRecuadroFecha2 })
+            .text('Hasta', xDerecha + anchoRecuadroFecha2 + 5, yDerecha, { align: 'center', width: anchoRecuadroFecha2 });
 
         yDerecha += 10;
+
 
         // Recuadros con fechas lado a lado
         // Fecha desde (recuadro izquierdo)
@@ -197,12 +245,12 @@ class PDFGenerator {
         yDerecha += 32;
 
         // PAGAR ANTES DE - Recuadro grande con título y fecha juntos
-        const alturaRecuadroPago = 35;
-        doc.rect(xDerecha, yDerecha, anchoDerecha, alturaRecuadroPago).stroke('#000000');
-        
+        const alturaRecuadroPagoOriginal = 35;
+        doc.rect(xDerecha, yDerecha, anchoDerecha, alturaRecuadroPagoOriginal).stroke('#000000');
+
         doc.fontSize(8).font('Helvetica-Bold')
             .text('PAGAR ANTES DE', xDerecha + 5, yDerecha + 6, { align: 'center', width: anchoDerecha - 10 });
-        
+
         doc.fontSize(10).font('Helvetica-Bold')
             .text(this.formatearFecha(factura.fecha_vencimiento) || '16-nov.-2025', xDerecha + 5, yDerecha + 18, { align: 'center', width: anchoDerecha - 10 });
 
@@ -210,18 +258,17 @@ class PDFGenerator {
         y = Math.max(yFinTablaConceptos, yDerecha + 25);
 
         // === BARRA NEGRA DE LADO A LADO CON TOTAL A PAGAR ===
-        const totalPagar = this.formatearMoneda(factura.total);
         doc.rect(xOffset, y, anchoUtil, 25).fillAndStroke('#000000', '#000000');
 
-        doc.fontSize(9).font('Helvetica-Bold').fillColor('#ffffff')
-            .text('Pague su factura y evite suspensiones - Valor Reconexión $11.900', xOffset + 10, y + 8);
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#ffffff')
+            .text('Pague su factura y evite suspensiones - Valor Reconexión $11.900', xOffset + 10, y + 8, { align: 'center', width: anchoUtil - 20 });
 
         y += 30;
 
-        // === MENSAJE DE PAGO (sin recuadro negro) ===
+        // === MENSAJE DE PAGO (sin recuadro negro, centrado y más grande) ===
         doc.fillColor('#000000')
-            .fontSize(7).font('Helvetica')
-            .text('Pague en: Caja Social (corresponsales), Finecoop, Comultrasan, efecty convenio No113760, Ahorramas o en línea (PSE) en www.psi.net.co', xOffset, y);
+            .fontSize(8).font('Helvetica')
+            .text('Pague en: Caja Social (corresponsales), Finecoop, Comultrasan, efecty convenio No113760, Ahorramas o en línea (PSE) en www.psi.net.co', xOffset, y, { align: 'center', width: anchoUtil });
 
         // === TEXTO VERTICAL EN EL COSTADO DERECHO ===
         doc.save();
@@ -235,6 +282,7 @@ class PDFGenerator {
 
         return y + 20;
     }
+
 
 
     /**
@@ -293,7 +341,7 @@ class PDFGenerator {
 
         // === CÓDIGO DE BARRAS EN ESTE CUPÓN ===
         await this.generarCodigoBarras(doc, 200, y, factura);
-        
+
         y += 70;
 
         // Mensaje de pago en línea
@@ -344,10 +392,10 @@ class PDFGenerator {
         const xRecuadro = (612 - anchoRecuadro) / 2; // Centrado
 
         doc.rect(xRecuadro, y, anchoRecuadro, altoRecuadro).stroke('#000000');
-        
+
         doc.fontSize(9).font('Helvetica-Bold')
             .text('Referencia de pago', xRecuadro + 10, y + 10);
-        
+
         doc.fontSize(14).font('Helvetica-Bold')
             .text(factura.identificacion_cliente || '1005450340', xRecuadro + 10, y + 28);
 
@@ -382,7 +430,7 @@ class PDFGenerator {
         try {
             // Intentar cargar el logo real
             const logoPath = path.join(__dirname, '..', 'public', 'logo2.png');
-            
+
             if (fs.existsSync(logoPath)) {
                 doc.image(logoPath, x, y, { width: 80, height: 45 });
                 console.log('✅ Logo PSI cargado desde:', logoPath);
@@ -453,7 +501,7 @@ class PDFGenerator {
             }
 
             // Construir cadena según estándar (sin paréntesis en el símbolo)
-            const cadenaCompleta = 
+            const cadenaCompleta =
                 `415${numeroLocalizacion}` +      // (415) + 13 dígitos EAN-13
                 `8020${referenciaAjustada}` +     // (8020) + referencia
                 `3900${valorAjustado}` +          // (3900) + valor
@@ -520,7 +568,7 @@ class PDFGenerator {
         try {
             // Tu código EAN-13 de GS1 Colombia (REEMPLAZA CON EL TUYO REAL)
             const numeroLocalizacion = '7709998284111';
-            
+
             // Obtener datos de la factura
             const referenciaPago = factura.identificacion_cliente || factura.codigo_cliente || '1005450340';
             const valorPagar = Math.round(parseFloat(factura.total) || 62097);
@@ -673,7 +721,7 @@ class PDFGenerator {
                 identificacion_cliente: '1005450340',
                 codigo_cliente: '200',
                 direccion_cliente: 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN',
-                internet: 59900, 
+                internet: 59900,
                 interes: 2197,
                 total: 62097
             };
