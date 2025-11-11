@@ -38,18 +38,129 @@ const SimpleDashboard = () => {
         </MainLayout>
     );
 };
-
 // ===================================
-// DASHBOARD PARA ADMINISTRADORES
+// DASHBOARD PARA ADMINISTRADORES CON DATOS REALES
 // ===================================
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
     
+    // Estados para datos reales
+    const [loading, setLoading] = useState(true);
+    const [adminStats, setAdminStats] = useState({
+        totalUsuarios: 0,
+        usuariosActivos: 0,
+        configuracionCompleta: 0,
+        ultimoBackup: 'Cargando...'
+    });
+    const [configuracionPendiente, setConfiguracionPendiente] = useState([]);
+
+    // Cargar datos reales al montar el componente
+    useEffect(() => {
+        cargarDatosAdmin();
+    }, []);
+
+    const cargarDatosAdmin = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('accessToken');
+            
+            if (!token) {
+                console.error('❌ No hay token disponible');
+                setLoading(false);
+                return;
+            }
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+
+            // 1. Obtener estadísticas de configuración
+            const configResponse = await fetch(`${process.env.REACT_APP_API_URL}/config/overview`, {
+                headers
+            });
+            const configData = await configResponse.json();
+            
+            console.log('📊 Config Overview:', configData);
+
+            if (configData.success) {
+                const overview = configData.overview;
+                
+                // Actualizar estadísticas
+                setAdminStats(prev => ({
+                    ...prev,
+                    totalUsuarios: overview.total_usuarios || 0,
+                    usuariosActivos: overview.usuarios_activos || 0,
+                    configuracionCompleta: Math.round(overview.porcentaje_completado || 0)
+                }));
+
+                // Actualizar estado de configuración
+                const modulosConfig = [
+                    { 
+                        modulo: 'Configuración de Empresa', 
+                        completado: overview.empresa_configurada ? 100 : 0, 
+                        urgente: !overview.empresa_configurada 
+                    },
+                    { 
+                        modulo: 'Bancos y Formas de Pago', 
+                        completado: Math.round((overview.bancos_activos / Math.max(overview.total_bancos, 1)) * 100), 
+                        urgente: overview.bancos_activos === 0 
+                    },
+                    { 
+                        modulo: 'Conceptos de Facturación', 
+                        completado: Math.round((overview.conceptos_activos / Math.max(overview.total_conceptos, 1)) * 100), 
+                        urgente: overview.conceptos_activos === 0 
+                    },
+                    { 
+                        modulo: 'Planes de Servicio', 
+                        completado: Math.round((overview.planes_activos / Math.max(overview.total_planes, 1)) * 100), 
+                        urgente: overview.planes_activos === 0 
+                    }
+                ];
+                
+                setConfiguracionPendiente(modulosConfig);
+            }
+
+            // 2. Obtener información del último backup
+            try {
+                const backupResponse = await fetch(`${process.env.REACT_APP_API_URL}/sistema/backup/ultimo`, {
+                    headers
+                });
+                const backupData = await backupResponse.json();
+                
+                console.log('💾 Último Backup:', backupData);
+
+                if (backupData.success && backupData.ultimo_backup) {
+                    setAdminStats(prev => ({
+                        ...prev,
+                        ultimoBackup: backupData.ultimo_backup.tiempo_transcurrido || 'Hace mucho'
+                    }));
+                } else {
+                    setAdminStats(prev => ({
+                        ...prev,
+                        ultimoBackup: 'Sin backups'
+                    }));
+                }
+            } catch (error) {
+                console.error('❌ Error obteniendo último backup:', error);
+                setAdminStats(prev => ({
+                    ...prev,
+                    ultimoBackup: 'Error al cargar'
+                }));
+            }
+
+        } catch (error) {
+            console.error('❌ Error cargando datos del admin:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    
     // Función para generar backup
     const generarBackup = async () => {
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('accessToken');
             
             const response = await fetch(`${process.env.REACT_APP_API_URL}/sistema/backup/generar`, {
                 method: 'POST',
@@ -63,6 +174,8 @@ const AdminDashboard = () => {
             
             if (data.success) {
                 alert(`✅ Backup generado exitosamente!\n\n📁 Archivo: ${data.archivo}\n💾 Tamaño: ${data.tamano}\n📅 Fecha: ${data.fecha}`);
+                // Recargar datos después de generar backup
+                cargarDatosAdmin();
             } else {
                 alert('❌ Error al generar backup: ' + data.message);
             }
@@ -73,19 +186,6 @@ const AdminDashboard = () => {
         }
     };
 
-    const adminStats = {
-        totalUsuarios: 12,
-        usuariosActivos: 10,
-        configuracionCompleta: 85,
-        ultimoBackup: '2 horas'
-    };
-
-    const configuracionPendiente = [
-        { modulo: 'Configuración de Empresa', completado: 90, urgente: false },
-        { modulo: 'Bancos y Formas de Pago', completado: 75, urgente: true },
-        { modulo: 'Conceptos de Facturación', completado: 60, urgente: false },
-        { modulo: 'Planes de Servicio', completado: 40, urgente: true }
-    ];
     return (
         <>
             {/* Welcome Message específico para Admin */}
@@ -97,7 +197,7 @@ const AdminDashboard = () => {
                     ¡Hola, {currentUser?.nombre || 'Usuario'}!
                 </h1>
                 <p className="text-lg md:text-xl mb-4 md:mb-6 opacity-90">
-                    ¿Qué quieres hacer hoy?,gestiona y configura todo el sistema
+                    ¿Qué quieres hacer hoy?, gestiona y configura todo el sistema
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
@@ -125,90 +225,99 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
-            {/* Stats Cards para Admin */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <StatCard
-                    title="Total Usuarios"
-                    value={adminStats.totalUsuarios}
-                    icon={<Users size={24} className="text-[#0e6493]" />}
-                    change="+2"
-                    color="#0e6493"
-                />
-                <StatCard
-                    title="Usuarios Activos"
-                    value={adminStats.usuariosActivos}
-                    icon={<UserCheck size={24} className="text-[#10b981]" />}
-                    change="83%"
-                    color="#10b981"
-                />
-                <StatCard
-                    title="Config. Completa"
-                    value={`${adminStats.configuracionCompleta}%`}
-                    icon={<Settings size={24} className="text-[#f59e0b]" />}
-                    change="+15%"
-                    color="#f59e0b"
-                />
-                <StatCard
-                    title="Último Backup"
-                    value={adminStats.ultimoBackup}
-                    icon={<Database size={24} className="text-[#6366f1]" />}
-                    change="OK"
-                    color="#6366f1"
-                />
-            </div>
-
-            {/* Configuración pendiente */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 className="text-lg font-semibold text-[#0e6493] mb-4">Estado de Configuración</h2>
-                <div className="space-y-4">
-                    {configuracionPendiente.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div className="flex items-center space-x-3">
-                                <div className={`w-3 h-3 rounded-full ${item.urgente ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                                <span className="font-medium">{item.modulo}</span>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                                <div className="w-32 bg-gray-200 rounded-full h-2">
-                                    <div
-                                        className="bg-[#0e6493] h-2 rounded-full transition-all"
-                                        style={{ width: `${item.completado}%` }}
-                                    ></div>
-                                </div>
-                                <span className="text-sm text-gray-600 min-w-[3rem]">{item.completado}%</span>
-                            </div>
-                        </div>
-                    ))}
+            {/* Loading State */}
+            {loading ? (
+                <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#0e6493] mx-auto mb-4"></div>
+                    <p className="text-gray-500">Cargando estadísticas...</p>
                 </div>
-            </div>
+            ) : (
+                <>
+                    {/* Stats Cards para Admin con datos reales */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <StatCard
+                            title="Total Usuarios"
+                            value={adminStats.totalUsuarios}
+                            icon={<Users size={24} className="text-[#0e6493]" />}
+                            change="Registrados"
+                            color="#0e6493"
+                        />
+                        <StatCard
+                            title="Usuarios Activos"
+                            value={adminStats.usuariosActivos}
+                            icon={<UserCheck size={24} className="text-[#10b981]" />}
+                            change={`${Math.round((adminStats.usuariosActivos / Math.max(adminStats.totalUsuarios, 1)) * 100)}%`}
+                            color="#10b981"
+                        />
+                        <StatCard
+                            title="Config. Completa"
+                            value={`${adminStats.configuracionCompleta}%`}
+                            icon={<Settings size={24} className="text-[#f59e0b]" />}
+                            change={adminStats.configuracionCompleta < 100 ? 'Pendiente' : 'Completo'}
+                            color="#f59e0b"
+                        />
+                        <StatCard
+                            title="Último Backup"
+                            value={adminStats.ultimoBackup}
+                            icon={<Database size={24} className="text-[#6366f1]" />}
+                            change="Automático"
+                            color="#6366f1"
+                        />
+                    </div>
 
-            {/* Accesos rápidos para admin */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <QuickAccessCard
-                    title="Gestión de Usuarios"
-                    description="Administrar usuarios y permisos"
-                    icon={<Shield size={32} className="text-[#0e6493]" />}
-                    onClick={() => navigate('/admin/users')}
-                    color="#0e6493"
-                />
-                <QuickAccessCard
-                    title="Configuración Global"
-                    description="Configurar parámetros del sistema"
-                    icon={<Settings size={32} className="text-[#e21f25]" />}
-                    onClick={() => navigate('/config')}
-                    color="#e21f25"
-                />
-                <QuickAccessCard
-    title="Respaldos y Seguridad"
-    description="Generar backup de la base de datos"
-    icon={<Database size={32} className="text-[#10b981]" />}
-    onClick={generarBackup}
-    color="#10b981"
-/>
-            </div>
+                    {/* Configuración pendiente con datos reales */}
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h2 className="text-lg font-semibold text-[#0e6493] mb-4">Estado de Configuración</h2>
+                        <div className="space-y-4">
+                            {configuracionPendiente.map((item, index) => (
+                                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                                    <div className="flex items-center space-x-3">
+                                        <div className={`w-3 h-3 rounded-full ${item.urgente ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                                        <span className="font-medium">{item.modulo}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-4">
+                                        <div className="w-32 bg-gray-200 rounded-full h-2">
+                                            <div
+                                                className="bg-[#0e6493] h-2 rounded-full transition-all"
+                                                style={{ width: `${item.completado}%` }}
+                                            ></div>
+                                        </div>
+                                        <span className="text-sm text-gray-600 min-w-[3rem]">{item.completado}%</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Accesos rápidos para admin */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <QuickAccessCard
+                            title="Gestión de Usuarios"
+                            description="Administrar usuarios y permisos"
+                            icon={<Shield size={32} className="text-[#0e6493]" />}
+                            onClick={() => navigate('/admin/users')}
+                            color="#0e6493"
+                        />
+                        <QuickAccessCard
+                            title="Configuración Global"
+                            description="Configurar parámetros del sistema"
+                            icon={<Settings size={32} className="text-[#e21f25]" />}
+                            onClick={() => navigate('/config')}
+                            color="#e21f25"
+                        />
+                        <QuickAccessCard
+                            title="Respaldos y Seguridad"
+                            description="Generar backup de la base de datos"
+                            icon={<Database size={32} className="text-[#10b981]" />}
+                            onClick={generarBackup}
+                            color="#10b981"
+                        />
+                    </div>
+                </>
+            )}
         </>
     );
 };
-
 // ===================================
 // DASHBOARD PARA SUPERVISORES
 // ===================================
