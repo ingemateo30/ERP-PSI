@@ -567,8 +567,10 @@ router.get('/:id/pdf', async (req, res) => {
         } catch (logoError) {
             console.warn('⚠️ Error cargando logo:', logoError.message);
         }
+// Fragmento mejorado para la ruta GET /:id/pdf
+// Reemplazar solo la sección del htmlContent
 
-        const htmlContent = `
+const htmlContent = `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -595,7 +597,7 @@ router.get('/:id/pdf', async (req, res) => {
         .psi-container {
             width: 216mm;
             height: 93mm;
-            padding: 5mm 6mm;
+            padding: 2mm 4mm;
             position: relative;
             background: white;
         }
@@ -605,116 +607,116 @@ router.get('/:id/pdf', async (req, res) => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 3mm;
-            padding-bottom: 2mm;
-            border-bottom: 2px solid #000;
+            margin-bottom: 1.5mm;
+            padding-bottom: 1mm;
+            border-bottom: 1.5px solid #000;
         }
         
         .left-header {
             display: flex;
             align-items: center;
-            gap: 4mm;
+            gap: 2mm;
         }
         
         .logo-section {
-            width: 20mm;
-            height: 14mm;
+            width: 14mm;
+            height: 10mm;
             display: flex;
             align-items: center;
             justify-content: center;
-            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 2px solid #0056b3; background: #f0f5ff; border-radius: 2mm;'}
+            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 1.5px solid #0056b3; background: #f0f5ff; border-radius: 1mm;'}
         }
         
         .company-info {
             display: flex;
             flex-direction: column;
-            gap: 0.8mm;
+            gap: 0.3mm;
         }
         
         .company-name {
-            font-size: 10px;
+            font-size: 8px;
             font-weight: bold;
             color: #0056b3;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.2px;
         }
         
         .company-details {
-            font-size: 7px;
+            font-size: 6px;
             color: #333;
-            line-height: 1.3;
+            line-height: 1.2;
         }
         
         .right-header {
             text-align: right;
             background: #f8f9fa;
-            padding: 2mm 3mm;
-            border-radius: 2mm;
-            border-left: 3px solid #0056b3;
+            padding: 1mm 2mm;
+            border-radius: 1mm;
+            border-left: 2px solid #0056b3;
         }
         
         .order-title {
-            font-size: 11px;
+            font-size: 8px;
             font-weight: bold;
             color: #0056b3;
-            margin-bottom: 1mm;
+            margin-bottom: 0.5mm;
         }
         
         .order-number {
-            font-size: 14px;
+            font-size: 10px;
             font-weight: bold;
             color: #000;
-            margin-bottom: 1mm;
+            margin-bottom: 0.5mm;
         }
         
         .order-date {
-            font-size: 7px;
+            font-size: 6px;
             color: #666;
         }
         
         /* SECCIÓN CLIENTE */
         .client-section {
             background: #f8f9fa;
-            padding: 2.5mm 3mm;
-            border-radius: 2mm;
-            margin-bottom: 2.5mm;
-            border-left: 3px solid #0056b3;
+            padding: 1.5mm 2mm;
+            border-radius: 1mm;
+            margin-bottom: 1.5mm;
+            border-left: 2px solid #0056b3;
         }
         
         .section-title {
-            font-size: 9px;
+            font-size: 7px;
             font-weight: bold;
             color: #0056b3;
-            margin-bottom: 2mm;
+            margin-bottom: 1mm;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
         }
         
         .client-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 2mm 4mm;
+            gap: 1mm 3mm;
         }
         
         .info-field {
             display: flex;
             align-items: center;
-            gap: 2mm;
+            gap: 1mm;
         }
         
         .info-label {
             font-weight: bold;
-            font-size: 8px;
+            font-size: 7px;
             color: #333;
-            min-width: 22mm;
+            min-width: 18mm;
         }
         
         .info-value {
             flex: 1;
-            font-size: 9px;
+            font-size: 7px;
             color: #000;
-            padding: 1mm 2mm;
+            padding: 0.5mm 1mm;
             background: white;
-            border-radius: 1mm;
+            border-radius: 0.5mm;
             border: 1px solid #dee2e6;
         }
         
@@ -722,30 +724,30 @@ router.get('/:id/pdf', async (req, res) => {
         .scheduling-section {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 3mm;
-            margin-bottom: 2.5mm;
+            gap: 2mm;
+            margin-bottom: 1.5mm;
         }
         
         .schedule-box {
             background: #fff3cd;
-            padding: 2mm 3mm;
-            border-radius: 2mm;
-            border-left: 3px solid #ffc107;
+            padding: 1mm 2mm;
+            border-radius: 1mm;
+            border-left: 2px solid #ffc107;
         }
         
         .schedule-box .section-title {
             color: #856404;
-            font-size: 8px;
-            margin-bottom: 1.5mm;
+            font-size: 7px;
+            margin-bottom: 0.5mm;
         }
         
         /* SECCIÓN SERVICIOS */
         .services-section {
             background: #d1ecf1;
-            padding: 2.5mm 3mm;
-            border-radius: 2mm;
-            margin-bottom: 2.5mm;
-            border-left: 3px solid #17a2b8;
+            padding: 1.5mm 2mm;
+            border-radius: 1mm;
+            margin-bottom: 1.5mm;
+            border-left: 2px solid #17a2b8;
         }
         
         .services-section .section-title {
@@ -755,37 +757,37 @@ router.get('/:id/pdf', async (req, res) => {
         .services-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
-            gap: 2mm;
+            gap: 1mm;
         }
         
         .service-field {
             display: flex;
             align-items: center;
-            gap: 1.5mm;
+            gap: 1mm;
         }
         
         .service-label {
             font-weight: bold;
-            font-size: 8px;
+            font-size: 7px;
             color: #0c5460;
         }
         
         .service-value {
             flex: 1;
-            font-size: 8px;
-            padding: 1mm 2mm;
+            font-size: 7px;
+            padding: 0.5mm 1mm;
             background: white;
-            border-radius: 1mm;
+            border-radius: 0.5mm;
             border: 1px solid #bee5eb;
         }
         
         /* SECCIÓN TÉCNICA */
         .technical-section {
             background: #d4edda;
-            padding: 2.5mm 3mm;
-            border-radius: 2mm;
-            margin-bottom: 2.5mm;
-            border-left: 3px solid #28a745;
+            padding: 1.5mm 2mm;
+            border-radius: 1mm;
+            margin-bottom: 1.5mm;
+            border-left: 2px solid #28a745;
         }
         
         .technical-section .section-title {
@@ -795,56 +797,56 @@ router.get('/:id/pdf', async (req, res) => {
         .technical-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 2mm 3mm;
+            gap: 1mm 2mm;
         }
         
         /* OBSERVACIONES */
         .observations-section {
-            margin-bottom: 3mm;
+            margin-bottom: 1.5mm;
         }
         
         .observations-box {
             background: white;
             border: 1px solid #dee2e6;
-            border-radius: 2mm;
-            padding: 2mm;
-            min-height: 12mm;
-            font-size: 8px;
-            line-height: 1.4;
+            border-radius: 1mm;
+            padding: 1mm;
+            min-height: 6mm;
+            font-size: 7px;
+            line-height: 1.3;
         }
         
         /* FIRMAS MEJORADAS */
         .signatures {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 4mm;
+            gap: 2mm;
             margin-top: auto;
         }
         
         .signature-block {
             text-align: center;
-            padding: 2mm;
+            padding: 1mm;
             background: #f8f9fa;
-            border-radius: 2mm;
+            border-radius: 1mm;
         }
         
         .signature-line {
-            border-top: 2px solid #000;
-            margin-bottom: 1.5mm;
-            height: 8mm;
+            border-top: 1.5px solid #000;
+            margin-bottom: 0.5mm;
+            height: 5mm;
         }
         
         .signature-label {
-            font-size: 8px;
+            font-size: 7px;
             font-weight: bold;
             color: #333;
             text-transform: uppercase;
         }
         
         .signature-sublabel {
-            font-size: 6px;
+            font-size: 5px;
             color: #666;
-            margin-top: 0.5mm;
+            margin-top: 0.3mm;
         }
         
         @page {
@@ -921,11 +923,10 @@ router.get('/:id/pdf', async (req, res) => {
             <div class="schedule-box">
                 <div class="section-title">📅 Fecha Programada</div>
                 <div class="info-field">
-                    <span class="info-value" style="text-align: center; font-weight: bold; background: white;">
+                    <span class="info-value" style="text-align: center; font-weight: bold; background: white; font-size: 7px;">
                         ${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO', { 
-                            weekday: 'long', 
                             year: 'numeric', 
-                            month: 'long', 
+                            month: 'short', 
                             day: 'numeric' 
                         }) : ''}
                     </span>
@@ -934,7 +935,7 @@ router.get('/:id/pdf', async (req, res) => {
             <div class="schedule-box">
                 <div class="section-title">⏰ Hora Programada</div>
                 <div class="info-field">
-                    <span class="info-value" style="text-align: center; font-weight: bold; font-size: 11px; background: white;">
+                    <span class="info-value" style="text-align: center; font-weight: bold; font-size: 9px; background: white;">
                         ${instalacion.hora_programada || ''}
                     </span>
                 </div>
