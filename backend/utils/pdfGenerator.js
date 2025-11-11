@@ -362,7 +362,7 @@ class PDFGenerator {
         y += altoRecuadro + 20;
 
         // Mensaje de pago
-        doc.fontSize(16).font('Helvetica-Bold')
+        doc.fontSize(14).font('Helvetica-Bold')
             .text('Pague la factura en línea www.psi.net.co', xOffset, y, { align: 'center', width: 535 });
 
         y += 15;
@@ -540,9 +540,9 @@ class PDFGenerator {
 
             // Texto legible con paréntesis (según estándar)
             const codigoLegible = `(415)${numeroLocalizacion}(8020)${referenciaPago}(3900)${valorPagar}(96)${fechaMaximaPago}`;
-            doc.fontSize(5).font('Helvetica')
+            doc.fontSize(7).font('Helvetica')
                 .text(codigoLegible, x - 50, y + 55, {
-                    width: 350,
+                    width: 300,
                     align: 'center'
                 });
 
