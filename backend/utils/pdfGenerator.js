@@ -306,6 +306,9 @@ class PDFGenerator {
 
         y += 70;
 
+        
+
+        return y + 20;
     }
 
     /**
