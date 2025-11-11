@@ -191,38 +191,72 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   // RECONOCIMIENTO DE VOZ
   // ==========================================
 
+  const [voiceSupported, setVoiceSupported] = useState(false);
+
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      setVoiceSupported(true);
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
       recognitionRef.current.lang = 'es-ES';
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.maxAlternatives = 1;
+
+      recognitionRef.current.onstart = () => {
+        console.log('Reconocimiento de voz iniciado');
+        setIsListening(true);
+      };
 
       recognitionRef.current.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
+        console.log('Texto reconocido:', transcript);
         setSearchQuery(transcript);
         setIsListening(false);
       };
 
-      recognitionRef.current.onerror = () => {
+      recognitionRef.current.onerror = (event) => {
+        console.error('Error en reconocimiento de voz:', event.error);
         setIsListening(false);
+        
+        // Mostrar mensaje de error al usuario
+        if (event.error === 'not-allowed') {
+          alert('Por favor permite el acceso al micrófono para usar la búsqueda por voz');
+        } else if (event.error === 'no-speech') {
+          alert('No se detectó ninguna voz. Intenta de nuevo.');
+        }
       };
 
       recognitionRef.current.onend = () => {
+        console.log('Reconocimiento de voz finalizado');
         setIsListening(false);
       };
     }
   }, []);
 
   const toggleVoiceSearch = () => {
-    if (!recognitionRef.current) return;
+    if (!recognitionRef.current) {
+      alert('Tu navegador no soporta reconocimiento de voz. Intenta usar Chrome, Edge o Safari.');
+      return;
+    }
 
     if (isListening) {
+      console.log('Deteniendo reconocimiento de voz');
       recognitionRef.current.stop();
       setIsListening(false);
     } else {
-      recognitionRef.current.start();
-      setIsListening(true);
+      console.log('Iniciando reconocimiento de voz');
+      try {
+        // Asegurar que el buscador esté abierto
+        if (!searchOpen) {
+          setSearchOpen(true);
+        }
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('Error al iniciar reconocimiento:', error);
+        setIsListening(false);
+        alert('Error al iniciar el reconocimiento de voz. Intenta de nuevo.');
+      }
     }
   };
 
@@ -565,22 +599,27 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onFocus={() => setSearchOpen(true)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Buscar... (Ctrl+K)"
-                    className="pl-10 pr-20 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]/70 w-40 lg:w-80 transition-all"
-                    style={{ borderColor: '#0e6493' }}
+                    placeholder={isListening ? "Escuchando..." : "Buscar... (Ctrl+K)"}
+                    className={`pl-10 pr-20 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
+                      isListening 
+                        ? 'ring-2 ring-red-500 border-red-500 bg-red-50' 
+                        : 'focus:ring-[#0e6493]/70'
+                    } w-40 lg:w-80`}
+                    style={{ borderColor: isListening ? '#ef4444' : '#0e6493' }}
+                    readOnly={isListening}
                   />
                   <div className="absolute left-3 top-2.5 text-gray-400">
                     <Search size={18} />
                   </div>
                   
                   {/* Botón de voz */}
-                  {recognitionRef.current && (
+                  {voiceSupported && (
                     <button
                       onClick={toggleVoiceSearch}
                       className={`absolute right-12 top-2 p-1 rounded transition-colors ${
                         isListening ? 'text-red-500 animate-pulse' : 'text-gray-400 hover:text-gray-600'
                       }`}
-                      title="Búsqueda por voz"
+                      title={isListening ? "Escuchando... (click para detener)" : "Búsqueda por voz"}
                     >
                       {isListening ? <Mic size={18} /> : <MicOff size={18} />}
                     </button>
@@ -838,18 +877,31 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Buscar..."
-                  className="w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]/70"
+                  className="w-full pl-10 pr-20 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]/70"
                   autoFocus
                 />
                 <div className="absolute left-3 top-3.5 text-gray-400">
                   <Search size={20} />
                 </div>
+                
+                {/* Botón de voz móvil */}
+                {voiceSupported && (
+                  <button
+                    onClick={toggleVoiceSearch}
+                    className={`absolute right-12 top-2.5 p-1 rounded transition-colors ${
+                      isListening ? 'text-red-500 animate-pulse' : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    {isListening ? <Mic size={20} /> : <MicOff size={20} />}
+                  </button>
+                )}
+                
                 <button
                   onClick={() => {
                     setSearchOpen(false);
                     setSearchQuery('');
                   }}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
                 >
                   <X size={20} />
                 </button>
