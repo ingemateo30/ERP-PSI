@@ -78,7 +78,7 @@ class PDFGenerator {
     /**
      * Dibuja el cupón principal (parte superior) - Solo tabla con bordes, fechas a la derecha sin cuadro.
      */
-      static generarCuponPrincipal(doc, factura, empresa, yInicial) {
+    static generarCuponPrincipal(doc, factura, empresa, yInicial) {
         let y = yInicial;
         const xOffset = 30;
         const pageWidth = 570;
@@ -164,41 +164,47 @@ class PDFGenerator {
 
         const yFinTablaConceptos = y;
 
-        // COLUMNA DERECHA: PERIODO FACTURADO Y PAGAR ANTES DE (con recuadros)
+        // COLUMNA DERECHA: PERIODO FACTURADO Y PAGAR ANTES DE (con recuadros según imagen)
         const xDerecha = colConcepto + anchoTabla + 30;
         const anchoDerecha = 245;
         let yDerecha = yTablaInicio;
 
-        // PERIODO FACTURADO (título sin recuadro)
-        doc.fontSize(8).font('Helvetica-Bold')
+        // PERIODO FACTURADO (título sin recuadro, más pequeño)
+        doc.fontSize(7).font('Helvetica-Bold')
             .text('PERIODO FACTURADO', xDerecha, yDerecha + 2, { align: 'center', width: anchoDerecha });
 
-        yDerecha += 18;
+        yDerecha += 12;
 
-        // Fecha desde (con recuadro)
-        doc.rect(xDerecha, yDerecha, anchoDerecha, 22).stroke('#000000');
-        doc.fontSize(7).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_desde) || '8-nov.-2025', xDerecha + 5, yDerecha + 8, { align: 'center', width: anchoDerecha - 10 });
+        // Subtítulos "Desde" y "Hasta" (sin recuadro, más pequeños)
+        const anchoRecuadroFecha = (anchoDerecha - 5) / 2; // Dividir en dos columnas
+        doc.fontSize(6).font('Helvetica')
+            .text('Desde', xDerecha, yDerecha, { align: 'center', width: anchoRecuadroFecha })
+            .text('Hasta', xDerecha + anchoRecuadroFecha + 5, yDerecha, { align: 'center', width: anchoRecuadroFecha });
 
-        yDerecha += 25;
+        yDerecha += 10;
 
-        // Fecha hasta (con recuadro)
-        doc.rect(xDerecha, yDerecha, anchoDerecha, 22).stroke('#000000');
-        doc.fontSize(7).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_hasta) || '7-dic.-2025', xDerecha + 5, yDerecha + 8, { align: 'center', width: anchoDerecha - 10 });
-
-        yDerecha += 30;
-
-        // PAGAR ANTES DE (título sin recuadro)
+        // Recuadros con fechas lado a lado
+        // Fecha desde (recuadro izquierdo)
+        doc.rect(xDerecha, yDerecha, anchoRecuadroFecha, 22).stroke('#000000');
         doc.fontSize(8).font('Helvetica-Bold')
-            .text('PAGAR ANTES DE', xDerecha, yDerecha, { align: 'center', width: anchoDerecha });
+            .text(this.formatearFecha(factura.fecha_desde) || '1-nov.-2025', xDerecha + 2, yDerecha + 8, { align: 'center', width: anchoRecuadroFecha - 4 });
 
-        yDerecha += 15;
-
-        // Fecha de vencimiento (con recuadro)
-        doc.rect(xDerecha, yDerecha, anchoDerecha, 22).stroke('#000000');
+        // Fecha hasta (recuadro derecho)
+        doc.rect(xDerecha + anchoRecuadroFecha + 5, yDerecha, anchoRecuadroFecha, 22).stroke('#000000');
         doc.fontSize(8).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_vencimiento) || '13-nov.-2025', xDerecha + 5, yDerecha + 8, { align: 'center', width: anchoDerecha - 10 });
+            .text(this.formatearFecha(factura.fecha_hasta) || '30-nov.-2025', xDerecha + anchoRecuadroFecha + 7, yDerecha + 8, { align: 'center', width: anchoRecuadroFecha - 4 });
+
+        yDerecha += 32;
+
+        // PAGAR ANTES DE - Recuadro grande con título y fecha juntos
+        const alturaRecuadroPago = 35;
+        doc.rect(xDerecha, yDerecha, anchoDerecha, alturaRecuadroPago).stroke('#000000');
+        
+        doc.fontSize(8).font('Helvetica-Bold')
+            .text('PAGAR ANTES DE', xDerecha + 5, yDerecha + 6, { align: 'center', width: anchoDerecha - 10 });
+        
+        doc.fontSize(10).font('Helvetica-Bold')
+            .text(this.formatearFecha(factura.fecha_vencimiento) || '16-nov.-2025', xDerecha + 5, yDerecha + 18, { align: 'center', width: anchoDerecha - 10 });
 
         // Continuar después de la tabla de conceptos
         y = Math.max(yFinTablaConceptos, yDerecha + 25);
@@ -229,6 +235,7 @@ class PDFGenerator {
 
         return y + 20;
     }
+
 
     /**
      * Dibuja el cupón para el cliente (parte media) - Con código de barras incluido.
