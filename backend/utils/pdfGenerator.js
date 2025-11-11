@@ -534,13 +534,13 @@ class PDFGenerator {
 
             // Insertar en el PDF
             doc.image(codigoBarrasBuffer, x - 50, y, {
-                width: 350,
+                width: 300,
                 height: 50
             });
 
             // Texto legible con paréntesis (según estándar)
             const codigoLegible = `(415)${numeroLocalizacion}(8020)${referenciaPago}(3900)${valorPagar}(96)${fechaMaximaPago}`;
-            doc.fontSize(7).font('Helvetica')
+            doc.fontSize(5).font('Helvetica')
                 .text(codigoLegible, x - 50, y + 55, {
                     width: 350,
                     align: 'center'
