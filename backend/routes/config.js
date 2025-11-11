@@ -2012,20 +2012,35 @@ router.delete('/service-plans/:id', requireRole(['administrador']), async (req, 
       });
     }
 
-    // Soft delete
-    await Database.query(`
-      UPDATE planes_servicio 
-      SET activo = 0, updated_at = NOW() 
+    // ✅ CAMBIO: Hard delete en lugar de soft delete
+    const result = await Database.query(`
+      DELETE FROM planes_servicio 
       WHERE id = ?
     `, [id]);
 
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Plan no encontrado'
+      });
+    }
+
     res.json({
       success: true,
-      message: 'Plan eliminado exitosamente'
+      message: 'Plan eliminado permanentemente'
     });
 
   } catch (error) {
     console.error('❌ Error eliminando plan:', error);
+    
+    // Si hay error de foreign key, informar claramente
+    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+      return res.status(400).json({
+        success: false,
+        message: 'No se puede eliminar el plan porque tiene registros asociados'
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Error eliminando plan de servicio',
@@ -2033,7 +2048,6 @@ router.delete('/service-plans/:id', requireRole(['administrador']), async (req, 
     });
   }
 });
-
 router.patch('/service-plans/:id/toggle-status', requireRole(['administrador']), async (req, res) => {
   try {
     const { id } = req.params;
