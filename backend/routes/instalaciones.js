@@ -570,6 +570,9 @@ router.get('/:id/pdf', async (req, res) => {
 // Fragmento mejorado para la ruta GET /:id/pdf
 // Reemplazar solo la sección del htmlContent
 
+// Fragmento mejorado para la ruta GET /:id/pdf
+// Reemplazar solo la sección del htmlContent
+
 const htmlContent = `
 <!DOCTYPE html>
 <html lang="es">
@@ -609,7 +612,7 @@ const htmlContent = `
             align-items: center;
             margin-bottom: 1.5mm;
             padding-bottom: 1mm;
-            border-bottom: 1.5px solid #000;
+            border-bottom: 2px solid #000;
         }
         
         .left-header {
@@ -624,7 +627,7 @@ const htmlContent = `
             display: flex;
             align-items: center;
             justify-content: center;
-            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 1.5px solid #0056b3; background: #f0f5ff; border-radius: 1mm;'}
+            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 2px solid #000; background: white;'}
         }
         
         .company-info {
@@ -636,7 +639,7 @@ const htmlContent = `
         .company-name {
             font-size: 8px;
             font-weight: bold;
-            color: #0056b3;
+            color: #000;
             letter-spacing: 0.2px;
         }
         
@@ -648,16 +651,15 @@ const htmlContent = `
         
         .right-header {
             text-align: right;
-            background: #f8f9fa;
+            background: #f5f5f5;
             padding: 1mm 2mm;
-            border-radius: 1mm;
-            border-left: 2px solid #0056b3;
+            border: 1px solid #000;
         }
         
         .order-title {
             font-size: 8px;
             font-weight: bold;
-            color: #0056b3;
+            color: #000;
             margin-bottom: 0.5mm;
         }
         
@@ -670,25 +672,26 @@ const htmlContent = `
         
         .order-date {
             font-size: 6px;
-            color: #666;
+            color: #333;
         }
         
         /* SECCIÓN CLIENTE */
         .client-section {
-            background: #f8f9fa;
+            background: white;
             padding: 1.5mm 2mm;
-            border-radius: 1mm;
             margin-bottom: 1.5mm;
-            border-left: 2px solid #0056b3;
+            border: 1px solid #000;
         }
         
         .section-title {
             font-size: 7px;
             font-weight: bold;
-            color: #0056b3;
+            color: #000;
             margin-bottom: 1mm;
             text-transform: uppercase;
             letter-spacing: 0.3px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 0.5mm;
         }
         
         .client-grid {
@@ -706,7 +709,7 @@ const htmlContent = `
         .info-label {
             font-weight: bold;
             font-size: 7px;
-            color: #333;
+            color: #000;
             min-width: 18mm;
         }
         
@@ -716,8 +719,7 @@ const htmlContent = `
             color: #000;
             padding: 0.5mm 1mm;
             background: white;
-            border-radius: 0.5mm;
-            border: 1px solid #dee2e6;
+            border-bottom: 1px solid #000;
         }
         
         /* SECCIÓN PROGRAMACIÓN */
@@ -729,29 +731,23 @@ const htmlContent = `
         }
         
         .schedule-box {
-            background: #fff3cd;
+            background: #f5f5f5;
             padding: 1mm 2mm;
-            border-radius: 1mm;
-            border-left: 2px solid #ffc107;
+            border: 1px solid #000;
         }
         
         .schedule-box .section-title {
-            color: #856404;
+            color: #000;
             font-size: 7px;
             margin-bottom: 0.5mm;
         }
         
         /* SECCIÓN SERVICIOS */
         .services-section {
-            background: #d1ecf1;
+            background: white;
             padding: 1.5mm 2mm;
-            border-radius: 1mm;
             margin-bottom: 1.5mm;
-            border-left: 2px solid #17a2b8;
-        }
-        
-        .services-section .section-title {
-            color: #0c5460;
+            border: 1px solid #000;
         }
         
         .services-grid {
@@ -769,7 +765,7 @@ const htmlContent = `
         .service-label {
             font-weight: bold;
             font-size: 7px;
-            color: #0c5460;
+            color: #000;
         }
         
         .service-value {
@@ -777,40 +773,19 @@ const htmlContent = `
             font-size: 7px;
             padding: 0.5mm 1mm;
             background: white;
-            border-radius: 0.5mm;
-            border: 1px solid #bee5eb;
-        }
-        
-        /* SECCIÓN TÉCNICA */
-        .technical-section {
-            background: #d4edda;
-            padding: 1.5mm 2mm;
-            border-radius: 1mm;
-            margin-bottom: 1.5mm;
-            border-left: 2px solid #28a745;
-        }
-        
-        .technical-section .section-title {
-            color: #155724;
-        }
-        
-        .technical-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1mm 2mm;
+            border-bottom: 1px solid #000;
         }
         
         /* OBSERVACIONES */
         .observations-section {
-            margin-bottom: 1.5mm;
+            margin-bottom: 2mm;
         }
         
         .observations-box {
             background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 1mm;
-            padding: 1mm;
-            min-height: 6mm;
+            border: 1px solid #000;
+            padding: 1.5mm;
+            min-height: 10mm;
             font-size: 7px;
             line-height: 1.3;
         }
@@ -819,34 +794,34 @@ const htmlContent = `
         .signatures {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 2mm;
-            margin-top: auto;
+            gap: 4mm;
+            margin-top: 3mm;
         }
         
         .signature-block {
             text-align: center;
-            padding: 1mm;
-            background: #f8f9fa;
-            border-radius: 1mm;
+            padding: 1.5mm;
+            background: white;
+            border: 1px solid #000;
         }
         
         .signature-line {
-            border-top: 1.5px solid #000;
-            margin-bottom: 0.5mm;
-            height: 5mm;
+            border-top: 2px solid #000;
+            margin-bottom: 1mm;
+            height: 12mm;
         }
         
         .signature-label {
             font-size: 7px;
             font-weight: bold;
-            color: #333;
+            color: #000;
             text-transform: uppercase;
         }
         
         .signature-sublabel {
-            font-size: 5px;
-            color: #666;
-            margin-top: 0.3mm;
+            font-size: 6px;
+            color: #333;
+            margin-top: 0.5mm;
         }
         
         @page {
@@ -897,7 +872,7 @@ const htmlContent = `
 
         <!-- INFORMACIÓN DEL CLIENTE -->
         <div class="client-section">
-            <div class="section-title">📋 Información del Cliente</div>
+            <div class="section-title">Información del Cliente</div>
             <div class="client-grid">
                 <div class="info-field">
                     <span class="info-label">Nombre:</span>
@@ -921,7 +896,7 @@ const htmlContent = `
         <!-- PROGRAMACIÓN -->
         <div class="scheduling-section">
             <div class="schedule-box">
-                <div class="section-title">📅 Fecha Programada</div>
+                <div class="section-title">Fecha Programada</div>
                 <div class="info-field">
                     <span class="info-value" style="text-align: center; font-weight: bold; background: white; font-size: 7px;">
                         ${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO', { 
@@ -933,7 +908,7 @@ const htmlContent = `
                 </div>
             </div>
             <div class="schedule-box">
-                <div class="section-title">⏰ Hora Programada</div>
+                <div class="section-title">Hora Programada</div>
                 <div class="info-field">
                     <span class="info-value" style="text-align: center; font-weight: bold; font-size: 9px; background: white;">
                         ${instalacion.hora_programada || ''}
@@ -944,7 +919,7 @@ const htmlContent = `
 
         <!-- SERVICIOS A INSTALAR -->
         <div class="services-section">
-            <div class="section-title">🌐 Servicios a Instalar</div>
+            <div class="section-title">Servicios a Instalar</div>
             <div class="services-grid">
                 <div class="service-field">
                     <span class="service-label">Internet:</span>
@@ -958,33 +933,24 @@ const htmlContent = `
                     <span class="service-label">Telefonía:</span>
                     <span class="service-value"></span>
                 </div>
-            </div>
-        </div>
-
-        <!-- INFORMACIÓN TÉCNICA -->
-        <div class="technical-section">
-            <div class="section-title">🔧 Información Técnica</div>
-            <div class="technical-grid">
                 <div class="service-field">
-                    <span class="service-label" style="color: #155724;">Poste:</span>
-                    <span class="service-value" style="border-color: #c3e6cb;"></span>
+                    <span class="service-label">Poste:</span>
+                    <span class="service-value"></span>
                 </div>
                 <div class="service-field">
-                    <span class="service-label" style="color: #155724;">Amarre:</span>
-                    <span class="service-value" style="border-color: #c3e6cb;"></span>
+                    <span class="service-label">Amarre:</span>
+                    <span class="service-value"></span>
                 </div>
-                <div class="service-field" style="grid-column: 1 / -1;">
-                    <span class="service-label" style="color: #155724;">Instalador:</span>
-                    <span class="service-value" style="border-color: #c3e6cb; font-weight: bold;">
-                        ${instalacion.instalador_nombre_completo || 'Por asignar'}
-                    </span>
+                <div class="service-field">
+                    <span class="service-label">Instalador:</span>
+                    <span class="service-value" style="font-weight: bold;">${instalacion.instalador_nombre_completo || 'Por asignar'}</span>
                 </div>
             </div>
         </div>
 
         <!-- OBSERVACIONES -->
         <div class="observations-section">
-            <div class="section-title">📝 Observaciones</div>
+            <div class="section-title">Observaciones</div>
             <div class="observations-box">
                 ${instalacion.observaciones || 'Sin observaciones adicionales'}
             </div>
