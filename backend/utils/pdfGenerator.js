@@ -306,8 +306,6 @@ class PDFGenerator {
         y += 70;
 
         // Mensaje de pago en línea
-        doc.fontSize(8).font('Helvetica')
-            .text('Pague la factura en línea www.psi.net.co', xOffset, y, { align: 'center', width: 535 });
 
         return y + 20;
     }
@@ -360,21 +358,15 @@ class PDFGenerator {
         doc.fontSize(16).font('Helvetica-Bold')
             .text(factura.identificacion_cliente || '123223', xRecuadro + 10, y + 32, { align: 'center', width: anchoRecuadro - 20 });
 
-        // Texto "Banco" a la IZQUIERDA del recuadro, PEQUEÑO
-        doc.fontSize(7).font('Helvetica')
-            .text('Banco', xRecuadro - 40, y + 25);
-
+       
         y += altoRecuadro + 20;
 
         // Mensaje de pago
-        doc.fontSize(9).font('Helvetica')
-            .text('Pague en: Caja Social (corresponsales), Finecoop, Comultrasan, efecty convenio No113760', xOffset, y, { align: 'center', width: 535 });
+        doc.fontSize(16).font('Helvetica-Bold')
+            .text('Pague la factura en línea www.psi.net.co', xOffset, y, { align: 'center', width: 535 });
 
         y += 15;
 
-        // Dirección empresa
-        doc.fontSize(7).font('Helvetica')
-            .text('Carrera 9 No. 9-94 WHATSAPP 3184550936', xOffset, y, { align: 'center', width: 535 });
 
         return y + 20;
     }
