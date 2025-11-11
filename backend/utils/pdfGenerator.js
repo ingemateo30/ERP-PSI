@@ -165,7 +165,7 @@ class PDFGenerator {
         doc.rect(xDerecha, yDerecha, anchoDerecha, alturaRecuadroPago).stroke('#000000');
         
         // Texto centrado en el recuadro
-        doc.fontSize(8).font('Helvetica-Bold')
+        doc.fontSize(12).font('Helvetica-Bold')
             .text('PAGAR ANTES DE  ' + (this.formatearFecha(factura.fecha_vencimiento) || '13-nov.-2025'), xDerecha + 5, yDerecha + 8, { align: 'center', width: anchoDerecha - 10 });
 
         // AHORA DIBUJAR LA TABLA
@@ -216,14 +216,14 @@ class PDFGenerator {
 
 
         // Continuar después de la tabla de conceptos con más separación
-        y = Math.max(yFinTablaConceptos, yDerecha + 30) + 20; // Más separación entre recuadros y barra negra
+        y = Math.max(yFinTablaConceptos, yDerecha + 30) + 10; // Más separación entre recuadros y barra negra
 
         // Continuar después de la tabla de conceptos
 
         // === BARRA NEGRA DE LADO A LADO CON TOTAL A PAGAR ===
         doc.rect(xOffset, y, anchoUtil, 25).fillAndStroke('#000000', '#000000');
 
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#ffffff')
+        doc.fontSize(14).font('Helvetica-Bold').fillColor('#ffffff')
             .text('Pague su factura y evite suspensiones - Valor Reconexión $11.900', xOffset + 10, y + 8, { align: 'center', width: anchoUtil - 20 });
 
         y += 30;
