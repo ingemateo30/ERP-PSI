@@ -1,12 +1,14 @@
 // frontend/src/components/Layout/MainLayout.js
-// VERSIÓN CORREGIDA CON ASIDE ORGANIZADO EN GRUPOS Y BÚSQUEDA FUNCIONAL
+// VERSIÓN CON BUSCADOR AVANZADO Y FUNCIONALIDADES INNOVADORAS
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Bell, Menu, Search, Settings, User, Activity,
-  Users, Calendar, ChevronDown, X, LogOut, Loader2,
-  TrendingUp, UserCheck, Wifi, Building2, CreditCard,
-  Package, FileText, Wrench, BarChart3, Home, Mail,PieChartIcon
+  Users, Calendar, ChevronUp, LogOut, ChevronDown, X,
+  DollarSign, TrendingUp, UserCheck, Wifi, Loader2,
+  Building2, CreditCard, MapPin, PieChart as PieChartIcon,
+  Package, FileText, Wrench, BarChart3, Home, Mail,
+  Clock, Zap, Hash, ArrowRight, Mic, MicOff
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -18,39 +20,291 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   
-  // ==========================================
-  // ESTADOS PARA LA BÚSQUEDA
-  // ==========================================
-  const [searchText, setSearchText] = useState('');
-  const [filteredPages, setFilteredPages] = useState([]);
-  const [showResults, setShowResults] = useState(false);
-  const searchRef = useRef(null); // Ref para cerrar el dropdown de búsqueda al hacer clic fuera
-  // ==========================================
+  // Estados del buscador avanzado
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchHistory, setSearchHistory] = useState([]);
+  const [isListening, setIsListening] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  
+  const searchRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   const { currentUser, logout, hasPermission, userRole } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  // Obtener rol normalizado
+  
   const rol = (userRole || '').toLowerCase().trim();
   const esAdministrador = rol === 'administrador';
 
-  // [Tus efectos de estilos y resize se mantienen aquí...]
+  // ==========================================
+  // DEFINICIÓN DE PÁGINAS Y COMANDOS
+  // ==========================================
+
+  const paginasDelSistema = [
+    { icon: <Home size={18} />, label: 'Dashboard', path: '/dashboard', keywords: ['inicio', 'home', 'principal'], color: 'blue' },
+    { icon: <Users size={18} />, label: 'Clientes', path: '/clients', keywords: ['clientes', 'usuarios', 'customers'], color: 'green' },
+    { icon: <Activity size={18} />, label: 'Facturación Automática', path: '/facturacion-automatica', keywords: ['facturas', 'billing', 'automatico'], color: 'purple' },
+    { icon: <TrendingUp size={18} />, label: 'Facturas', path: '/facturas', keywords: ['facturas', 'invoices', 'cobros'], color: 'yellow' },
+    { icon: <FileText size={18} />, label: 'Contratos', path: '/contratos', keywords: ['contratos', 'contracts', 'acuerdos'], color: 'orange' },
+    { icon: <CreditCard size={18} />, label: 'Pagos', path: '/cruce-pagos', keywords: ['pagos', 'payments', 'cruce'], color: 'green' },
+    { icon: <FileText size={18} />, label: 'Historial Facturas', path: '/historial-facturas', keywords: ['historial', 'history'], color: 'gray' },
+    { icon: <Wifi size={18} />, label: 'Planes de Servicio', path: '/config/service-plans', keywords: ['planes', 'servicios', 'plans'], color: 'blue' },
+    { icon: <Wrench size={18} />, label: 'Instalaciones', path: '/instalaciones', keywords: ['instalaciones', 'installation', 'instalar'], color: 'red' },
+    { icon: <Package size={18} />, label: 'Inventario', path: '/inventory', keywords: ['inventario', 'stock', 'productos'], color: 'indigo' },
+    { icon: <Calendar size={18} />, label: 'Calendario', path: '/calendar', keywords: ['calendario', 'calendar', 'agenda'], color: 'pink' },
+    { icon: <FileText size={18} />, label: 'PQR', path: '/pqr', keywords: ['pqr', 'quejas', 'reclamos', 'peticiones'], color: 'red' },
+    { icon: <Loader2 size={18} />, label: 'Incidencias', path: '/incidencias', keywords: ['incidencias', 'issues', 'problemas'], color: 'orange' },
+    { icon: <Mail size={18} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', keywords: ['correo', 'email', 'plantillas'], color: 'blue' },
+    { icon: <PieChartIcon size={18} />, label: 'Reportes', path: '/reportes-regulatorios', keywords: ['reportes', 'reports', 'regulatorios'], color: 'purple' },
+    { icon: <BarChart3 size={18} />, label: 'Estadísticas', path: '/reports', keywords: ['estadisticas', 'stats', 'analytics'], color: 'green' },
+    { icon: <UserCheck size={18} />, label: 'Usuarios Sistema', path: '/admin/users', keywords: ['usuarios', 'admin', 'sistema'], color: 'blue' },
+    { icon: <FileText size={18} />, label: 'Firma de Contratos', path: '/firma-contratos', keywords: ['firma', 'signature', 'contratos'], color: 'indigo' },
+    { icon: <Settings size={18} />, label: 'Configuración', path: '/config', keywords: ['configuracion', 'settings', 'config'], color: 'gray' },
+    { icon: <User size={18} />, label: 'Mi Perfil', path: '/profile', keywords: ['perfil', 'profile', 'cuenta'], color: 'blue' },
+  ];
+
+  const comandosRapidos = [
+    { icon: <Zap size={18} />, label: 'Nuevo Cliente', action: () => navigate('/clients?action=new'), keywords: ['nuevo', 'cliente', 'crear'], color: 'green' },
+    { icon: <FileText size={18} />, label: 'Nueva Factura', action: () => navigate('/facturas?action=new'), keywords: ['nueva', 'factura', 'crear'], color: 'blue' },
+    { icon: <Wrench size={18} />, label: 'Nueva Instalación', action: () => navigate('/instalaciones?action=new'), keywords: ['nueva', 'instalacion', 'crear'], color: 'red' },
+    { icon: <Calendar size={18} />, label: 'Ver Calendario Hoy', action: () => navigate('/calendar'), keywords: ['calendario', 'hoy', 'agenda'], color: 'pink' },
+    { icon: <LogOut size={18} />, label: 'Cerrar Sesión', action: logout, keywords: ['salir', 'logout', 'cerrar'], color: 'red' },
+  ];
+
+  // ==========================================
+  // BÚSQUEDA DE CLIENTES (SIMULADA)
+  // ==========================================
+
+  const buscarClientes = async (query) => {
+    try {
+      const response = await fetch(`/api/clients/search?q=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.map(cliente => ({
+          icon: <Users size={18} />,
+          label: cliente.nombre,
+          sublabel: `ID: ${cliente.identificacion} - ${cliente.email}`,
+          path: `/clients/${cliente.id}`,
+          type: 'cliente',
+          color: 'green'
+        }));
+      }
+    } catch (error) {
+      console.log('Error buscando clientes:', error);
+    }
+    return [];
+  };
+
+  // ==========================================
+  // LÓGICA DE BÚSQUEDA
+  // ==========================================
+
+  useEffect(() => {
+    const performSearch = async () => {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        return;
+      }
+
+      setSearchLoading(true);
+      const query = searchQuery.toLowerCase();
+      let results = [];
+
+      // 1. Buscar en páginas del sistema
+      const paginasEncontradas = paginasDelSistema.filter(pagina => {
+        const matchLabel = pagina.label.toLowerCase().includes(query);
+        const matchKeywords = pagina.keywords.some(kw => kw.includes(query));
+        return matchLabel || matchKeywords;
+      }).map(p => ({ ...p, type: 'pagina' }));
+
+      results = [...paginasEncontradas];
+
+      // 2. Buscar en comandos rápidos
+      if (query.startsWith('/') || query.startsWith('>')) {
+        const comandosEncontrados = comandosRapidos.filter(cmd =>
+          cmd.label.toLowerCase().includes(query.slice(1)) ||
+          cmd.keywords.some(kw => kw.includes(query.slice(1)))
+        ).map(c => ({ ...c, type: 'comando' }));
+        results = [...comandosEncontrados, ...results];
+      }
+
+      // 3. Buscar clientes si hay más de 2 caracteres
+      if (query.length > 2 && !query.startsWith('/') && !query.startsWith('>')) {
+        const clientes = await buscarClientes(query);
+        results = [...results, ...clientes];
+      }
+
+      setSearchResults(results.slice(0, 8)); // Limitar a 8 resultados
+      setSearchLoading(false);
+      setSelectedIndex(0);
+    };
+
+    const debounce = setTimeout(performSearch, 300);
+    return () => clearTimeout(debounce);
+  }, [searchQuery]);
+
+  // ==========================================
+  // HISTORIAL DE BÚSQUEDA
+  // ==========================================
+
+  useEffect(() => {
+    const saved = localStorage.getItem('searchHistory');
+    if (saved) {
+      setSearchHistory(JSON.parse(saved));
+    }
+  }, []);
+
+  const agregarAlHistorial = (item) => {
+    const newHistory = [item, ...searchHistory.filter(h => h.path !== item.path)].slice(0, 5);
+    setSearchHistory(newHistory);
+    localStorage.setItem('searchHistory', JSON.stringify(newHistory));
+  };
+
+  // ==========================================
+  // RECONOCIMIENTO DE VOZ
+  // ==========================================
+
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.lang = 'es-ES';
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setSearchQuery(transcript);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onerror = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, []);
+
+  const toggleVoiceSearch = () => {
+    if (!recognitionRef.current) return;
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
+
+  // ==========================================
+  // NAVEGACIÓN CON TECLADO
+  // ==========================================
+
+  const handleKeyDown = (e) => {
+    if (!searchOpen) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedIndex(prev => (prev < searchResults.length - 1 ? prev + 1 : prev));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (searchResults[selectedIndex]) {
+          handleSelectResult(searchResults[selectedIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setSearchOpen(false);
+        setSearchQuery('');
+        break;
+    }
+  };
+
+  const handleSelectResult = (result) => {
+    if (result.type === 'comando') {
+      result.action();
+    } else {
+      navigate(result.path);
+      agregarAlHistorial(result);
+    }
+    setSearchOpen(false);
+    setSearchQuery('');
+    if (isMobile) setSidebarOpen(false);
+  };
+
+  // ==========================================
+  // ATAJOS DE TECLADO GLOBALES
+  // ==========================================
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      // Ctrl/Cmd + K para abrir búsqueda
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+        setTimeout(() => searchInputRef.current?.focus(), 100);
+      }
+    };
+
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  // ==========================================
+  // CERRAR AL HACER CLICK FUERA
+  // ==========================================
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setSearchOpen(false);
+      }
+      if (profileOpen && !e.target.closest('.profile-menu')) {
+        setProfileOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [profileOpen]);
+
+  // ==========================================
+  // ESTILOS Y RESPONSIVE
+  // ==========================================
+
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
       .scrollbar-hide {
-        -ms-overflow-style: none; /* Internet Explorer 10+ */
-        scrollbar-width: none;  /* Firefox */
+        -ms-overflow-style: none;
+        scrollbar-width: none;
       }
       .scrollbar-hide::-webkit-scrollbar {
-        display: none;  /* Safari and Chrome */
+        display: none;
+      }
+      .search-highlight {
+        animation: pulse 0.3s ease-in-out;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
       }
     `;
     document.head.appendChild(style);
-
-    return () => {
-      document.head.removeChild(style);
-    };
+    return () => document.head.removeChild(style);
   }, []);
 
   useEffect(() => {
@@ -70,17 +324,12 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     if (isMobile && sidebarOpen) {
       setSidebarOpen(false);
     }
-    // Cerrar el perfil y la búsqueda
-    setProfileOpen(false);
-    setShowResults(false);
   };
-  // [Fin de tus efectos]
 
   // ==========================================
-  // MENÚ ORGANIZADO Y CONSOLIDADO
+  // MENÚ ORGANIZADO POR GRUPOS
   // ==========================================
 
-  // Definición de grupos (sin cambios, necesaria para construir el ALL_PAGES)
   const gestionPrincipal = [
     { icon: <Home size={22} />, label: 'Dashboard', path: '/dashboard', permission: null },
     { icon: <Users size={22} />, label: 'Clientes', path: '/clients', permission: 'supervisor,administrador' }
@@ -118,16 +367,6 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <Settings size={22} />, label: 'Configuración', path: '/config', permission: 'administrador' }
   ];
 
-  const ALL_PAGES = [
-    ...gestionPrincipal,
-    ...facturacionFinanzas,
-    ...serviciosOperaciones,
-    ...atencionCliente,
-    ...reportesAnalisis,
-    ...administracion
-  ];
-
-  // Filtrar items por permisos (sin cambios, usado para el Sidebar)
   const filtrarPorPermisos = (items) => {
     return items.filter(item => !item.permission || hasPermission(item.permission));
   };
@@ -146,9 +385,6 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     if (isMobile) {
       setSidebarOpen(false);
     }
-    // Cierra la búsqueda si navegas desde el sidebar
-    setSearchText('');
-    setShowResults(false);
   };
 
   const isActivePath = (path) => {
@@ -158,52 +394,20 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     return location.pathname.startsWith(path);
   };
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Cierre del menú de perfil
-      if (profileOpen && !event.target.closest('.profile-menu')) {
-        setProfileOpen(false);
-      }
-      // Cierre del menú de búsqueda
-      if (searchRef.current && !searchRef.current.contains(event.target)) {
-        setShowResults(false);
-      }
+  const getColorClasses = (color) => {
+    const colors = {
+      blue: 'bg-blue-100 text-blue-600',
+      green: 'bg-green-100 text-green-600',
+      purple: 'bg-purple-100 text-purple-600',
+      yellow: 'bg-yellow-100 text-yellow-600',
+      orange: 'bg-orange-100 text-orange-600',
+      red: 'bg-red-100 text-red-600',
+      indigo: 'bg-indigo-100 text-indigo-600',
+      pink: 'bg-pink-100 text-pink-600',
+      gray: 'bg-gray-100 text-gray-600'
     };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [profileOpen]); // Agregué profileOpen para evitar el warning de ESLint.
-
-  // ==========================================
-  // LÓGICA DE FILTRADO PARA LA BÚSQUEDA
-  // ==========================================
-  useEffect(() => {
-    if (searchText.length > 0) {
-      // Filtramos solo las páginas a las que el usuario tiene permiso de acceder
-      const accessiblePages = ALL_PAGES.filter(page =>
-        !page.permission || hasPermission(page.permission)
-      );
-
-      const results = accessiblePages.filter(page =>
-        page.label.toLowerCase().includes(searchText.toLowerCase()) ||
-        page.path.toLowerCase().includes(searchText.toLowerCase())
-      );
-      
-      setFilteredPages(results);
-      setShowResults(true);
-    } else {
-      setFilteredPages([]);
-      setShowResults(false);
-    }
-  }, [searchText, ALL_PAGES, hasPermission]);
-
-
-  const handleSearchNavigation = (path) => {
-    navigate(path);
-    setSearchText(''); // Limpia la búsqueda
-    setShowResults(false); // Oculta los resultados
+    return colors[color] || colors.blue;
   };
-
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
@@ -214,9 +418,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
         ></div>
       )}
 
-      {/* Sidebar (Código sin cambios) */}
-      <div className={`fixed md:relative z-30 backdrop-blur-xl bg-gradient-to-b from-[#0e6493]/95 to-[#0e6493]/85 border border-white/10 shadow-lg transition-all duration-300 ease-in-out h-screen flex flex-col ${sidebarOpen ? 'translate-x-0 w-64' : 'translate-x-0 md:translate-x-0 w-0 md:w-20'
-        } overflow-hidden`}>
+      {/* Sidebar */}
+      <div className={`fixed md:relative z-30 backdrop-blur-xl bg-gradient-to-b from-[#0e6493]/95 to-[#0e6493]/85 border border-white/10 shadow-lg transition-all duration-300 ease-in-out h-screen flex flex-col ${sidebarOpen ? 'translate-x-0 w-64' : 'translate-x-0 md:translate-x-0 w-0 md:w-20'} overflow-hidden`}>
         {isMobile && sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(false)}
@@ -234,6 +437,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                   {grupo.titulo}
                 </div>
               )}
+
               {grupo.items.map((item, index) => (
                 <div
                   key={`${grupoIndex}-${index}`}
@@ -302,49 +506,169 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
             </div>
 
             <div className="flex items-center space-x-2 md:space-x-4">
-              
-              {/* ========================================== */}
-              {/* BARRA DE BÚSQUEDA INTERACTIVA (MODIFICADA) */}
-              {/* ========================================== */}
-              <div className="hidden md:block relative" ref={searchRef}>
-                <input
-                  type="text"
-                  placeholder="Buscar páginas..."
-                  className="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]/70 w-40 lg:w-64 transition-all"
-                  style={{ borderColor: '#0e6493' }}
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  onFocus={() => searchText.length > 0 && setShowResults(true)}
-                />
-                <div className="absolute left-3 top-2.5 text-gray-400">
-                  <Search size={18} />
+              {/* BUSCADOR AVANZADO */}
+              <div className="relative" ref={searchRef}>
+                <div className="hidden md:block relative">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setSearchOpen(true)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Buscar... (Ctrl+K)"
+                    className="pl-10 pr-20 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]/70 w-40 lg:w-80 transition-all"
+                    style={{ borderColor: '#0e6493' }}
+                  />
+                  <div className="absolute left-3 top-2.5 text-gray-400">
+                    <Search size={18} />
+                  </div>
+                  
+                  {/* Botón de voz */}
+                  {recognitionRef.current && (
+                    <button
+                      onClick={toggleVoiceSearch}
+                      className={`absolute right-12 top-2 p-1 rounded transition-colors ${
+                        isListening ? 'text-red-500 animate-pulse' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                      title="Búsqueda por voz"
+                    >
+                      {isListening ? <Mic size={18} /> : <MicOff size={18} />}
+                    </button>
+                  )}
+                  
+                  {/* Indicador de carga */}
+                  {searchLoading && (
+                    <div className="absolute right-3 top-2.5 text-[#0e6493]">
+                      <Loader2 size={18} className="animate-spin" />
+                    </div>
+                  )}
+                  
+                  {/* Contador de resultados */}
+                  {!searchLoading && searchQuery && (
+                    <div className="absolute right-3 top-2.5 text-xs text-gray-400">
+                      {searchResults.length}
+                    </div>
+                  )}
                 </div>
 
-                {/* Dropdown de Resultados */}
-                {showResults && (
-                  <div className={`absolute z-20 mt-2 w-64 bg-white border border-[#0e6493] rounded-lg shadow-xl overflow-hidden max-h-80 overflow-y-auto`}>
-                    {filteredPages.length > 0 ? (
-                      filteredPages.map((page) => (
-                        <div
-                          key={page.path}
-                          className="px-4 py-3 hover:bg-[#e0f2fe] cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
-                          onClick={() => handleSearchNavigation(page.path)}
-                        >
-                          <span className="font-semibold text-gray-800 block">{page.label}</span>
-                          <span className="text-xs text-[#0e6493] block">{page.path}</span>
+                {/* Panel de resultados */}
+                {searchOpen && (
+                  <div className="absolute top-full mt-2 right-0 w-96 bg-white rounded-lg shadow-2xl border border-gray-200 max-h-96 overflow-y-auto z-50">
+                    {/* Ayuda rápida */}
+                    {!searchQuery && (
+                      <div className="p-4 border-b border-gray-100">
+                        <div className="text-xs text-gray-500 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Hash size={14} />
+                            <span>Escribe para buscar páginas, clientes...</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Zap size={14} />
+                            <span>Usa <code className="px-1 bg-gray-100 rounded">/</code> o <code className="px-1 bg-gray-100 rounded">&gt;</code> para comandos</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">↑↓</kbd>
+                            <span>Navegar</span>
+                            <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Enter</kbd>
+                            <span>Seleccionar</span>
+                          </div>
                         </div>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3 text-sm text-gray-500 text-center">
-                        No se encontró **"{searchText}"**.
+                      </div>
+                    )}
+
+                    {/* Historial de búsqueda */}
+                    {!searchQuery && searchHistory.length > 0 && (
+                      <div className="p-2">
+                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 flex items-center gap-2">
+                          <Clock size={14} />
+                          Búsquedas recientes
+                        </div>
+                        {searchHistory.map((item, index) => (
+                          <div
+                            key={index}
+                            onClick={() => handleSelectResult(item)}
+                            className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
+                          >
+                            <div className={`p-2 rounded-lg ${getColorClasses(item.color)}`}>
+                              {item.icon}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">
+                                {item.label}
+                              </div>
+                            </div>
+                            <ArrowRight size={16} className="text-gray-400" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Resultados de búsqueda */}
+                    {searchQuery && searchResults.length > 0 && (
+                      <div className="p-2">
+                        {searchResults.map((result, index) => (
+                          <div
+                            key={index}
+                            onClick={() => handleSelectResult(result)}
+                            className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${
+                              selectedIndex === index
+                                ? 'bg-[#0e6493]/10 border border-[#0e6493]/20'
+                                : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className={`p-2 rounded-lg ${getColorClasses(result.color)}`}>
+                              {result.icon}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">
+                                {result.label}
+                              </div>
+                              {result.sublabel && (
+                                <div className="text-xs text-gray-500 truncate">
+                                  {result.sublabel}
+                                </div>
+                              )}
+                            </div>
+                            {result.type === 'comando' && (
+                              <Zap size={16} className="text-yellow-500" />
+                            )}
+                            {result.type === 'cliente' && (
+                              <span className="text-xs text-gray-400 px-2 py-1 bg-gray-100 rounded">
+                                Cliente
+                              </span>
+                            )}
+                            {result.type === 'pagina' && (
+                              <ArrowRight size={16} className="text-gray-400" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Sin resultados */}
+                    {searchQuery && searchResults.length === 0 && !searchLoading && (
+                      <div className="p-8 text-center">
+                        <Search size={48} className="mx-auto text-gray-300 mb-3" />
+                        <p className="text-gray-500 text-sm">
+                          No se encontraron resultados para "{searchQuery}"
+                        </p>
+                        <p className="text-gray-400 text-xs mt-2">
+                          Intenta con otros términos de búsqueda
+                        </p>
                       </div>
                     )}
                   </div>
                 )}
               </div>
-              {/* ========================================== */}
 
-              <button className="md:hidden p-2 rounded-full hover:bg-gray-100">
+              <button 
+                onClick={() => {
+                  setSearchOpen(true);
+                  setTimeout(() => searchInputRef.current?.focus(), 100);
+                }}
+                className="md:hidden p-2 rounded-full hover:bg-gray-100"
+              >
                 <Search size={20} />
               </button>
 
@@ -355,7 +679,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
               <div className="w-px h-6 bg-gray-300 hidden sm:block"></div>
 
-              {/* Menú de perfil (Código sin cambios) */}
+              {/* Menú de perfil */}
               <div className="relative profile-menu">
                 <button
                   onClick={() => setProfileOpen(!profileOpen)}
@@ -414,7 +738,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
           </div>
         </header>
 
-        {/* Content Area (Código sin cambios) */}
+        {/* Content Area */}
         <main className="flex-1 overflow-auto bg-gray-50 p-6">
           {showWelcome && (
             <div className="mb-6 bg-gradient-to-r from-[#0e6493] to-[#0a5273] text-white p-6 rounded-lg shadow-lg">
@@ -427,15 +751,115 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
               <p className="text-blue-200 text-sm mt-1">
                 Rol: <span className="font-semibold capitalize">{userRole}</span>
               </p>
+              <div className="mt-3 flex items-center gap-2 text-sm text-blue-100">
+                <Search size={16} />
+                <span>Presiona <kbd className="px-2 py-0.5 bg-white/20 rounded text-xs">Ctrl+K</kbd> para búsqueda rápida</span>
+              </div>
             </div>
           )}
-
 
           <div className="bg-white rounded-lg shadow-sm min-h-full">
             {children}
           </div>
         </main>
       </div>
+
+      {/* Modal de búsqueda para móvil */}
+      {isMobile && searchOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-20 px-4">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl">
+            <div className="p-4 border-b border-gray-200">
+              <div className="relative">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Buscar..."
+                  className="w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]/70"
+                  autoFocus
+                />
+                <div className="absolute left-3 top-3.5 text-gray-400">
+                  <Search size={20} />
+                </div>
+                <button
+                  onClick={() => {
+                    setSearchOpen(false);
+                    setSearchQuery('');
+                  }}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-96 overflow-y-auto">
+              {/* Resultados móvil */}
+              {searchQuery && searchResults.length > 0 && (
+                <div className="p-2">
+                  {searchResults.map((result, index) => (
+                    <div
+                      key={index}
+                      onClick={() => handleSelectResult(result)}
+                      className="flex items-center gap-3 px-3 py-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
+                    >
+                      <div className={`p-2 rounded-lg ${getColorClasses(result.color)}`}>
+                        {result.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">
+                          {result.label}
+                        </div>
+                        {result.sublabel && (
+                          <div className="text-xs text-gray-500 truncate">
+                            {result.sublabel}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Historial móvil */}
+              {!searchQuery && searchHistory.length > 0 && (
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-gray-500">
+                    Recientes
+                  </div>
+                  {searchHistory.map((item, index) => (
+                    <div
+                      key={index}
+                      onClick={() => handleSelectResult(item)}
+                      className="flex items-center gap-3 px-3 py-3 hover:bg-gray-50 rounded-lg cursor-pointer"
+                    >
+                      <div className={`p-2 rounded-lg ${getColorClasses(item.color)}`}>
+                        {item.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">
+                          {item.label}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!searchQuery && searchHistory.length === 0 && (
+                <div className="p-8 text-center">
+                  <Search size={48} className="mx-auto text-gray-300 mb-3" />
+                  <p className="text-gray-500 text-sm">
+                    Comienza a buscar páginas o clientes
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
