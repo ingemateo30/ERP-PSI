@@ -76,7 +76,7 @@ class PDFGenerator {
     }
 
     /**
-     * Dibuja el cupón principal (parte superior) - Solo tabla con bordes, fechas a la derecha sin cuadro.
+     * Dibuja el cupón principal (parte superior) - Diseño reorganizado con tabla centrada a la izquierda y fechas en recuadros a la derecha.
      */
     static generarCuponPrincipal(doc, factura, empresa, yInicial) {
         let y = yInicial;
@@ -100,7 +100,7 @@ class PDFGenerator {
         doc.fontSize(9).font('Helvetica-Bold')
             .text('FACTURA DE VENTA', 460, y + 5)
             .fontSize(10).text(factura.numero_factura || 'FAC000011', 460, y + 18);
-
+        
         doc.fontSize(7).font('Helvetica')
             .text('Referencia de pago:', 460, y + 32)
             .font('Helvetica-Bold')
@@ -111,7 +111,7 @@ class PDFGenerator {
         // === INFORMACIÓN DEL CLIENTE ===
         doc.fontSize(10).font('Helvetica-Bold')
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', xOffset, y)
-            .fontSize(8).font('Helvetica')
+            .fontSize(10).font('Helvetica')
             .text(`ID Cliente ${factura.identificacion_cliente || '1005450340'} / ${factura.codigo_cliente || '200'}`, xOffset, y + 14)
             .text(`Dirección: ${factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN'}`, xOffset, y + 26);
 
@@ -119,7 +119,7 @@ class PDFGenerator {
 
         // === DISEÑO DE DOS COLUMNAS: TABLA A LA IZQUIERDA, FECHAS A LA DERECHA ===
         const yTablaInicio = y;
-
+        
         // COLUMNA IZQUIERDA: TABLA DE CONCEPTOS (ocupa la mitad)
         const alturaEncabezado = 18;
         const alturaFila = 18;
@@ -128,10 +128,10 @@ class PDFGenerator {
         const colSaldo = 230;
         const anchoTabla = 250; // Mitad de la página
 
-        // COLUMNA DERECHA: PERIODO FACTURADO (más arriba y más centrado)
+        // COLUMNA DERECHA: PERIODO FACTURADO (mucho más arriba)
         const xDerecha = colConcepto + anchoTabla + 40;
         const anchoDerecha = 235;
-        let yDerecha = yTablaInicio - 5; // Más arriba
+        let yDerecha = yTablaInicio - 20; // Mucho más arriba
 
         // PERIODO FACTURADO (título sin recuadro, más pequeño)
         doc.fontSize(7).font('Helvetica-Bold')
@@ -160,21 +160,19 @@ class PDFGenerator {
 
         yDerecha += 32;
 
-        // PAGAR ANTES DE - Recuadro grande con título y fecha juntos
-        const alturaRecuadroPago = 35;
+        // PAGAR ANTES DE - Recuadro con título y fecha EN UNA SOLA FILA CENTRADO
+        const alturaRecuadroPago = 25;
         doc.rect(xDerecha, yDerecha, anchoDerecha, alturaRecuadroPago).stroke('#000000');
-
-        doc.fontSize(8).font('Helvetica-Bold')
-            .text('PAGAR ANTES DE', xDerecha + 5, yDerecha + 6, { align: 'center', width: anchoDerecha - 10 });
-
-        doc.fontSize(10).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_vencimiento) || '16-nov.-2025', xDerecha + 5, yDerecha + 18, { align: 'center', width: anchoDerecha - 10 });
+        
+        // Texto centrado en el recuadro
+        doc.fontSize(12).font('Helvetica-Bold')
+            .text('PAGAR ANTES DE  ' + (this.formatearFecha(factura.fecha_vencimiento) || '13-nov.-2025'), xDerecha + 5, yDerecha + 8, { align: 'center', width: anchoDerecha - 10 });
 
         // AHORA DIBUJAR LA TABLA
-        // Encabezado de tabla con bordes
+        // Encabezado de tabla con bordes NEGROS
         doc.rect(colConcepto, yTablaInicio, anchoTabla, alturaEncabezado).stroke('#000000');
-
-        // Líneas divisorias verticales
+        
+        // Líneas divisorias verticales NEGRAS
         doc.moveTo(colValor, yTablaInicio).lineTo(colValor, yTablaInicio + alturaEncabezado).stroke('#000000');
         doc.moveTo(colSaldo, yTablaInicio).lineTo(colSaldo, yTablaInicio + alturaEncabezado).stroke('#000000');
 
@@ -186,14 +184,14 @@ class PDFGenerator {
 
         y = yTablaInicio + alturaEncabezado;
 
-        // Datos de conceptos
+        // Datos de conceptos CON LÍNEAS NEGRAS
         const conceptos = this.obtenerConceptosSimples(factura);
 
         conceptos.forEach((concepto, index) => {
-            // Bordes de la fila
-            doc.rect(colConcepto, y, anchoTabla, alturaFila).stroke('#cccccc');
-            doc.moveTo(colValor, y).lineTo(colValor, y + alturaFila).stroke('#cccccc');
-            doc.moveTo(colSaldo, y).lineTo(colSaldo, y + alturaFila).stroke('#cccccc');
+            // Bordes de la fila NEGROS
+            doc.rect(colConcepto, y, anchoTabla, alturaFila).stroke('#000000');
+            doc.moveTo(colValor, y).lineTo(colValor, y + alturaFila).stroke('#000000');
+            doc.moveTo(colSaldo, y).lineTo(colSaldo, y + alturaFila).stroke('#000000');
 
             // Contenido de la fila
             doc.fontSize(7).font('Helvetica')
@@ -204,7 +202,7 @@ class PDFGenerator {
             y += alturaFila;
         });
 
-        // Fila del TOTAL (con bordes)
+        // Fila del TOTAL (con bordes NEGROS)
         const totalPagar = this.formatearMoneda(factura.total);
         doc.rect(colConcepto, y, anchoTabla, alturaFila + 5).stroke('#000000');
         doc.moveTo(colValor, y).lineTo(colValor, y + alturaFila + 5).stroke('#000000');
@@ -216,51 +214,16 @@ class PDFGenerator {
 
         const yFinTablaConceptos = y + alturaFila + 5;
 
-        // PERIODO FACTURADO (título sin recuadro, más pequeño)
-        doc.fontSize(7).font('Helvetica-Bold')
-            .text('PERIODO FACTURADO', xDerecha, yDerecha + 2, { align: 'center', width: anchoDerecha });
 
-        yDerecha += 12;
-
-        // Subtítulos "Desde" y "Hasta" (sin recuadro, más pequeños)
-        const anchoRecuadroFecha2 = (anchoDerecha - 5) / 2; // Dividir en dos columnas
-        doc.fontSize(6).font('Helvetica')
-            .text('Desde', xDerecha, yDerecha, { align: 'center', width: anchoRecuadroFecha2 })
-            .text('Hasta', xDerecha + anchoRecuadroFecha2 + 5, yDerecha, { align: 'center', width: anchoRecuadroFecha2 });
-
-        yDerecha += 10;
-
-
-        // Recuadros con fechas lado a lado
-        // Fecha desde (recuadro izquierdo)
-        doc.rect(xDerecha, yDerecha, anchoRecuadroFecha, 22).stroke('#000000');
-        doc.fontSize(8).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_desde) || '1-nov.-2025', xDerecha + 2, yDerecha + 8, { align: 'center', width: anchoRecuadroFecha - 4 });
-
-        // Fecha hasta (recuadro derecho)
-        doc.rect(xDerecha + anchoRecuadroFecha + 5, yDerecha, anchoRecuadroFecha, 22).stroke('#000000');
-        doc.fontSize(8).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_hasta) || '30-nov.-2025', xDerecha + anchoRecuadroFecha + 7, yDerecha + 8, { align: 'center', width: anchoRecuadroFecha - 4 });
-
-        yDerecha += 32;
-
-        // PAGAR ANTES DE - Recuadro grande con título y fecha juntos
-        const alturaRecuadroPagoOriginal = 35;
-        doc.rect(xDerecha, yDerecha, anchoDerecha, alturaRecuadroPagoOriginal).stroke('#000000');
-
-        doc.fontSize(8).font('Helvetica-Bold')
-            .text('PAGAR ANTES DE', xDerecha + 5, yDerecha + 6, { align: 'center', width: anchoDerecha - 10 });
-
-        doc.fontSize(10).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_vencimiento) || '16-nov.-2025', xDerecha + 5, yDerecha + 18, { align: 'center', width: anchoDerecha - 10 });
+        // Continuar después de la tabla de conceptos con más separación
+        y = Math.max(yFinTablaConceptos, yDerecha + 30) + 10; // Más separación entre recuadros y barra negra
 
         // Continuar después de la tabla de conceptos
-        y = Math.max(yFinTablaConceptos, yDerecha + 25);
 
         // === BARRA NEGRA DE LADO A LADO CON TOTAL A PAGAR ===
         doc.rect(xOffset, y, anchoUtil, 25).fillAndStroke('#000000', '#000000');
 
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#ffffff')
+        doc.fontSize(14).font('Helvetica-Bold').fillColor('#ffffff')
             .text('Pague su factura y evite suspensiones - Valor Reconexión $11.900', xOffset + 10, y + 8, { align: 'center', width: anchoUtil - 20 });
 
         y += 30;
@@ -283,8 +246,6 @@ class PDFGenerator {
         return y + 20;
     }
 
-
-
     /**
      * Dibuja el cupón para el cliente (parte media) - Con código de barras incluido.
      */
@@ -296,8 +257,8 @@ class PDFGenerator {
         this.dibujarLogoPSIReal(doc, xOffset, y);
 
         // Información empresa
-        doc.fontSize(9).font('Helvetica-Bold')
-            .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 140, y + 8);
+        doc.fontSize(7).font('Helvetica-Bold')
+        .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 140, y + 8, { align: 'center', width: 300 });
 
         // FACTURA DE VENTA
         doc.fontSize(10).font('Helvetica-Bold')
@@ -309,7 +270,7 @@ class PDFGenerator {
         // Información del cliente
         doc.fontSize(11).font('Helvetica-Bold')
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', xOffset, y)
-            .fontSize(9).font('Helvetica')
+            .fontSize(11).font('Helvetica')
             .text(factura.identificacion_cliente || '1005450340', xOffset, y + 15)
             .text(factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN', xOffset, y + 30);
 
@@ -341,12 +302,10 @@ class PDFGenerator {
 
         // === CÓDIGO DE BARRAS EN ESTE CUPÓN ===
         await this.generarCodigoBarras(doc, 200, y, factura);
-
+        
         y += 70;
 
         // Mensaje de pago en línea
-        doc.fontSize(8).font('Helvetica')
-            .text('Pague la factura en línea www.psi.net.co', xOffset, y, { align: 'center', width: 535 });
 
         return y + 20;
     }
@@ -362,8 +321,8 @@ class PDFGenerator {
         this.dibujarLogoPSIReal(doc, xOffset, y);
 
         // Información empresa
-        doc.fontSize(9).font('Helvetica-Bold')
-            .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 140, y + 8);
+      doc.fontSize(7).font('Helvetica-Bold')
+        .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 140, y + 8, { align: 'center', width: 300 });
 
         // FACTURA DE VENTA y NÚMERO
         doc.fontSize(10).font('Helvetica-Bold')
@@ -375,7 +334,7 @@ class PDFGenerator {
         // Información del cliente
         doc.fontSize(11).font('Helvetica-Bold')
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', xOffset, y)
-            .fontSize(9).font('Helvetica')
+            .fontSize(11).font('Helvetica')
             .text(factura.identificacion_cliente || '1005450340', xOffset, y + 15)
             .text(factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN', xOffset, y + 30);
 
@@ -386,37 +345,28 @@ class PDFGenerator {
 
         y += 65;
 
-        // === RECUADRO DE REFERENCIA DE PAGO ===
-        const anchoRecuadro = 250;
-        const altoRecuadro = 50;
-        const xRecuadro = (612 - anchoRecuadro) / 2; // Centrado
+        // === RECUADRO DE REFERENCIA DE PAGO - BIEN CENTRADO Y LETRA MÁS GRANDE ===
+        const anchoRecuadro = 280;
+        const altoRecuadro = 60;
+        const xRecuadro = (612 - anchoRecuadro) / 2; // Centrado en la página
 
         doc.rect(xRecuadro, y, anchoRecuadro, altoRecuadro).stroke('#000000');
+        
+        doc.fontSize(10).font('Helvetica-Bold')
+            .text('Referencia de pago', xRecuadro + 10, y + 15, { align: 'center', width: anchoRecuadro - 20 });
+        
+        doc.fontSize(16).font('Helvetica-Bold')
+            .text(factura.identificacion_cliente || '123223', xRecuadro + 10, y + 32, { align: 'center', width: anchoRecuadro - 20 });
 
-        doc.fontSize(9).font('Helvetica-Bold')
-            .text('Referencia de pago', xRecuadro + 10, y + 10);
-
-        doc.fontSize(14).font('Helvetica-Bold')
-            .text(factura.identificacion_cliente || '1005450340', xRecuadro + 10, y + 28);
-
-        // Texto "Banco" a la izquierda del recuadro
-        doc.save();
-        doc.translate(xRecuadro - 25, y + 25);
-        doc.rotate(-90);
-        doc.fontSize(12).font('Helvetica-Bold').text('Banco', 0, 0);
-        doc.restore();
-
+       
         y += altoRecuadro + 20;
 
         // Mensaje de pago
-        doc.fontSize(9).font('Helvetica')
-            .text('Pague en: Caja Social (corresponsales), Finecoop, Comultrasan, efecty convenio No113760', xOffset, y, { align: 'center', width: 535 });
+        doc.fontSize(14).font('Helvetica-Bold')
+            .text('Pague la factura en línea www.psi.net.co', xOffset, y, { align: 'center', width: 535 });
 
         y += 15;
 
-        // Dirección empresa
-        doc.fontSize(7).font('Helvetica')
-            .text('Carrera 9 No. 9-94 WHATSAPP 3184550936', xOffset, y, { align: 'center', width: 535 });
 
         return y + 20;
     }
@@ -430,7 +380,7 @@ class PDFGenerator {
         try {
             // Intentar cargar el logo real
             const logoPath = path.join(__dirname, '..', 'public', 'logo2.png');
-
+            
             if (fs.existsSync(logoPath)) {
                 doc.image(logoPath, x, y, { width: 80, height: 45 });
                 console.log('✅ Logo PSI cargado desde:', logoPath);
@@ -501,7 +451,7 @@ class PDFGenerator {
             }
 
             // Construir cadena según estándar (sin paréntesis en el símbolo)
-            const cadenaCompleta =
+            const cadenaCompleta = 
                 `415${numeroLocalizacion}` +      // (415) + 13 dígitos EAN-13
                 `8020${referenciaAjustada}` +     // (8020) + referencia
                 `3900${valorAjustado}` +          // (3900) + valor
@@ -568,7 +518,7 @@ class PDFGenerator {
         try {
             // Tu código EAN-13 de GS1 Colombia (REEMPLAZA CON EL TUYO REAL)
             const numeroLocalizacion = '7709998284111';
-
+            
             // Obtener datos de la factura
             const referenciaPago = factura.identificacion_cliente || factura.codigo_cliente || '1005450340';
             const valorPagar = Math.round(parseFloat(factura.total) || 62097);
@@ -584,7 +534,7 @@ class PDFGenerator {
 
             // Insertar en el PDF
             doc.image(codigoBarrasBuffer, x - 50, y, {
-                width: 350,
+                width: 300,
                 height: 50
             });
 
@@ -592,7 +542,7 @@ class PDFGenerator {
             const codigoLegible = `(415)${numeroLocalizacion}(8020)${referenciaPago}(3900)${valorPagar}(96)${fechaMaximaPago}`;
             doc.fontSize(7).font('Helvetica')
                 .text(codigoLegible, x - 50, y + 55, {
-                    width: 350,
+                    width: 300,
                     align: 'center'
                 });
 
@@ -721,7 +671,7 @@ class PDFGenerator {
                 identificacion_cliente: '1005450340',
                 codigo_cliente: '200',
                 direccion_cliente: 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN',
-                internet: 59900,
+                internet: 59900, 
                 interes: 2197,
                 total: 62097
             };
