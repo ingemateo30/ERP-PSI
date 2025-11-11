@@ -85,7 +85,7 @@ const AdminDashboard = () => {
             console.log('📊 Config Overview:', configData);
 
             if (configData.success) {
-                const overview = configData.overview;
+                const overview = configData.data;
                 
                 // Actualizar estadísticas
                 setAdminStats(prev => ({
