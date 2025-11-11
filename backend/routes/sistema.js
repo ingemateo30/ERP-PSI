@@ -1,13 +1,8 @@
-// backend/routes/sistema.js - ARCHIVO COMPLETO CORREGIDO
-
 const express = require('express');
 const router = express.Router();
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-
-// IMPORTANTE: Importar middlewares de autenticación
-const { authenticateToken, requireRole } = require('../middleware/auth');
 
 // Generar Backup
 router.post('/backup/generar', async (req, res) => {
@@ -54,6 +49,8 @@ router.post('/backup/generar', async (req, res) => {
     });
   }
 });
+// backend/routes/sistema.js
+// AGREGAR ESTE ENDPOINT AL ARCHIVO EXISTENTE
 
 /**
  * @route GET /api/v1/sistema/backup/ultimo
@@ -145,3 +142,5 @@ router.get('/backup/ultimo', authenticateToken, requireRole(['administrador']), 
     });
   }
 });
+
+module.exports = router;
