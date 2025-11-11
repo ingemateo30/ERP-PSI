@@ -258,7 +258,7 @@ class PDFGenerator {
 
         // Información empresa
         doc.fontSize(9).font('Helvetica-Bold')
-            .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 140, y + 8);
+        .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 140, y + 8, { align: 'center', width: 300 });
 
         // FACTURA DE VENTA
         doc.fontSize(10).font('Helvetica-Bold')
@@ -321,8 +321,8 @@ class PDFGenerator {
         this.dibujarLogoPSIReal(doc, xOffset, y);
 
         // Información empresa
-        doc.fontSize(9).font('Helvetica-Bold')
-            .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 140, y + 8);
+      doc.fontSize(9).font('Helvetica-Bold')
+        .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 140, y + 8, { align: 'center', width: 300 });
 
         // FACTURA DE VENTA y NÚMERO
         doc.fontSize(10).font('Helvetica-Bold')
