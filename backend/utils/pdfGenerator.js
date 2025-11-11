@@ -215,44 +215,6 @@ class PDFGenerator {
             .fontSize(10).text(totalPagar, colValor + 5, y + 8);
 
         const yFinTablaConceptos = y + alturaFila + 5;
-
-        // PERIODO FACTURADO (título sin recuadro, más pequeño)
-        doc.fontSize(7).font('Helvetica-Bold')
-            .text('PERIODO FACTURADO', xDerecha, yDerecha + 2, { align: 'center', width: anchoDerecha });
-
-        yDerecha += 12;
-
-        // Subtítulos "Desde" y "Hasta" (sin recuadro, más pequeños)
-        const anchoRecuadroFecha2 = (anchoDerecha - 5) / 2; // Dividir en dos columnas
-        doc.fontSize(6).font('Helvetica')
-            .text('Desde', xDerecha, yDerecha, { align: 'center', width: anchoRecuadroFecha2 })
-            .text('Hasta', xDerecha + anchoRecuadroFecha2 + 5, yDerecha, { align: 'center', width: anchoRecuadroFecha2 });
-
-        yDerecha += 10;
-
-        // Recuadros con fechas lado a lado
-        // Fecha desde (recuadro izquierdo)
-        doc.rect(xDerecha, yDerecha, anchoRecuadroFecha, 22).stroke('#000000');
-        doc.fontSize(8).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_desde) || '1-nov.-2025', xDerecha + 2, yDerecha + 8, { align: 'center', width: anchoRecuadroFecha - 4 });
-
-        // Fecha hasta (recuadro derecho)
-        doc.rect(xDerecha + anchoRecuadroFecha + 5, yDerecha, anchoRecuadroFecha, 22).stroke('#000000');
-        doc.fontSize(8).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_hasta) || '30-nov.-2025', xDerecha + anchoRecuadroFecha + 7, yDerecha + 8, { align: 'center', width: anchoRecuadroFecha - 4 });
-
-        yDerecha += 32;
-
-        // PAGAR ANTES DE - Recuadro grande con título y fecha juntos
-        const alturaRecuadroPago2 = 35;
-        doc.rect(xDerecha, yDerecha, anchoDerecha, alturaRecuadroPago2).stroke('#000000');
-
-        doc.fontSize(8).font('Helvetica-Bold')
-            .text('PAGAR ANTES DE', xDerecha + 5, yDerecha + 6, { align: 'center', width: anchoDerecha - 10 });
-        
-        doc.fontSize(10).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_vencimiento) || '16-nov.-2025', xDerecha + 5, yDerecha + 18, { align: 'center', width: anchoDerecha - 10 });
-
         // Continuar después de la tabla de conceptos
         y = Math.max(yFinTablaConceptos, yDerecha + 25);
 
