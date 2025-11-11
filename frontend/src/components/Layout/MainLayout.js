@@ -1,13 +1,12 @@
 // frontend/src/components/Layout/MainLayout.js
-// VERSIÓN CORREGIDA CON ASIDE ORGANIZADO EN GRUPOS
+// VERSIÓN CORREGIDA CON ASIDE ORGANIZADO EN GRUPOS Y BÚSQUEDA FUNCIONAL
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Bell, Menu, Search, Settings, User, Activity,
-  Users, Calendar, ChevronUp, LogOut, ChevronDown, X,
-  DollarSign, TrendingUp, UserCheck, Wifi, Loader2,
-  Building2, CreditCard, MapPin, PieChart as PieChartIcon,
-  Package, FileText, Wrench, BarChart3, Home, Mail
+  Users, Calendar, ChevronDown, X, LogOut, Loader2,
+  TrendingUp, UserCheck, Wifi, Building2, CreditCard,
+  Package, FileText, Wrench, BarChart3, Home, Mail,PieChartIcon
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -18,20 +17,29 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // ==========================================
+  // ESTADOS PARA LA BÚSQUEDA
+  // ==========================================
+  const [searchText, setSearchText] = useState('');
+  const [filteredPages, setFilteredPages] = useState([]);
+  const [showResults, setShowResults] = useState(false);
+  const searchRef = useRef(null); // Ref para cerrar el dropdown de búsqueda al hacer clic fuera
+  // ==========================================
 
   const { currentUser, logout, hasPermission, userRole } = useAuth();
-const location = useLocation();
-const navigate = useNavigate();
-// Obtener rol normalizado
-const rol = (userRole || '').toLowerCase().trim();
-const esAdministrador = rol === 'administrador';
+  const location = useLocation();
+  const navigate = useNavigate();
+  // Obtener rol normalizado
+  const rol = (userRole || '').toLowerCase().trim();
+  const esAdministrador = rol === 'administrador';
 
-  // Estilos CSS para ocultar scrollbar
+  // [Tus efectos de estilos y resize se mantienen aquí...]
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
       .scrollbar-hide {
-        -ms-overflow-style: none;  /* Internet Explorer 10+ */
+        -ms-overflow-style: none; /* Internet Explorer 10+ */
         scrollbar-width: none;  /* Firefox */
       }
       .scrollbar-hide::-webkit-scrollbar {
@@ -62,152 +70,64 @@ const esAdministrador = rol === 'administrador';
     if (isMobile && sidebarOpen) {
       setSidebarOpen(false);
     }
+    // Cerrar el perfil y la búsqueda
+    setProfileOpen(false);
+    setShowResults(false);
   };
+  // [Fin de tus efectos]
 
   // ==========================================
-  // MENÚ ORGANIZADO POR GRUPOS
+  // MENÚ ORGANIZADO Y CONSOLIDADO
   // ==========================================
 
-  // GRUPO 1: GESTIÓN PRINCIPAL
+  // Definición de grupos (sin cambios, necesaria para construir el ALL_PAGES)
   const gestionPrincipal = [
-    {
-      icon: <Home size={22} />,
-      label: 'Dashboard',
-      path: '/dashboard',
-      permission: null
-    },
-    {
-      icon: <Users size={22} />,
-      label: 'Clientes',
-      path: '/clients',
-      permission: 'supervisor,administrador'
-    }
+    { icon: <Home size={22} />, label: 'Dashboard', path: '/dashboard', permission: null },
+    { icon: <Users size={22} />, label: 'Clientes', path: '/clients', permission: 'supervisor,administrador' }
   ];
 
-  // GRUPO 2: FACTURACIÓN Y FINANZAS
   const facturacionFinanzas = [
-    {
-      icon: <Activity size={22} />,
-      label: 'Facturación Automática',
-      path: '/facturacion-automatica',
-      permission: 'supervisor,administrador'
-    },
-    {
-      icon: <TrendingUp size={22} />,
-      label: 'Facturas',
-      path: '/facturas',
-      permission: 'supervisor,administrador'
-    },
-    {
-      icon: <FileText size={22} />,
-      label: 'Contratos',
-      path: '/contratos',
-      permission: 'supervisor,administrador'
-    },
-    {
-      icon: <CreditCard size={22} />,
-      label: 'Pagos',
-      path: '/cruce-pagos',
-      permission: 'supervisor,administrador'
-    },
-    {
-      icon: <FileText size={22} />,
-      label: 'Historial Facturas',
-      path: '/historial-facturas',
-      permission: 'supervisor,administrador'
-    }
-    
+    { icon: <Activity size={22} />, label: 'Facturación Automática', path: '/facturacion-automatica', permission: 'supervisor,administrador' },
+    { icon: <TrendingUp size={22} />, label: 'Facturas', path: '/facturas', permission: 'supervisor,administrador' },
+    { icon: <FileText size={22} />, label: 'Contratos', path: '/contratos', permission: 'supervisor,administrador' },
+    { icon: <CreditCard size={22} />, label: 'Pagos', path: '/cruce-pagos', permission: 'supervisor,administrador' },
+    { icon: <FileText size={22} />, label: 'Historial Facturas', path: '/historial-facturas', permission: 'supervisor,administrador' }
   ];
 
-  // GRUPO 3: SERVICIOS Y OPERACIONES
   const serviciosOperaciones = [
-    {
-      icon: <Wifi size={22} />,
-      label: 'Planes de Servicio',
-      path: '/config/service-plans',
-      permission: 'supervisor,administrador'
-    },
-    {
-      icon: <Wrench size={22} />,
-      label: 'Instalaciones',
-      path: '/instalaciones',
-      permission: 'instalador,supervisor,administrador'
-    },
-    {
-      icon: <Package size={22} />,
-      label: 'Inventario',
-      path: '/inventory',
-      permission: 'instalador,supervisor,administrador'
-    },
-    {
-      icon: <Calendar size={22} />,
-      label: 'Calendario',
-      path: '/calendar',
-      permission: 'instalador,supervisor,administrador'
-    }
+    { icon: <Wifi size={22} />, label: 'Planes de Servicio', path: '/config/service-plans', permission: 'supervisor,administrador' },
+    { icon: <Wrench size={22} />, label: 'Instalaciones', path: '/instalaciones', permission: 'instalador,supervisor,administrador' },
+    { icon: <Package size={22} />, label: 'Inventario', path: '/inventory', permission: 'instalador,supervisor,administrador' },
+    { icon: <Calendar size={22} />, label: 'Calendario', path: '/calendar', permission: 'instalador,supervisor,administrador' }
   ];
 
-  // GRUPO 4: ATENCIÓN AL CLIENTE
   const atencionCliente = [
-    {
-      icon: <FileText size={22} />,
-      label: 'PQR',
-      path: '/pqr',
-      permission: 'supervisor,administrador'
-    },
-    {
-      icon: <Loader2 size={22} />,
-      label: 'Incidencias',
-      path: '/incidencias',
-      permission: 'supervisor,administrador'
-    },
-    {
-      icon: <Mail size={22} />,
-      label: 'Plantillas Correo',
-      path: '/config/plantillas-correo',
-      permission: 'supervisor,administrador'
-    }
+    { icon: <FileText size={22} />, label: 'PQR', path: '/pqr', permission: 'supervisor,administrador' },
+    { icon: <Loader2 size={22} />, label: 'Incidencias', path: '/incidencias', permission: 'supervisor,administrador' },
+    { icon: <Mail size={22} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', permission: 'supervisor,administrador' }
   ];
 
-  // GRUPO 5: REPORTES Y ANÁLISIS
   const reportesAnalisis = [
-    {
-      icon: <PieChartIcon size={22} />,
-      label: 'Reportes',
-      path: '/reportes-regulatorios',
-      permission: 'administrador'
-    },
-    {
-      icon: <BarChart3 size={22} />,
-      label: 'Estadísticas',
-      path: '/reports',
-      permission: 'administrador'
-    }
+    { icon: <PieChartIcon size={22} />, label: 'Reportes', path: '/reportes-regulatorios', permission: 'administrador' },
+    { icon: <BarChart3 size={22} />, label: 'Estadísticas', path: '/reports', permission: 'administrador' }
   ];
 
-  // GRUPO 6: ADMINISTRACIÓN
   const administracion = [
-    {
-      icon: <UserCheck size={22} />,
-      label: 'Usuarios Sistema',
-      path: '/admin/users',
-      permission: 'administrador'
-    },
-    {
-      icon: <FileText size={22} />,
-      label: 'Firma de Contratos',
-      path: '/firma-contratos',
-      permission: 'administrador'
-    },
-    {
-      icon: <Settings size={22} />,
-      label: 'Configuración',
-      path: '/config',
-      permission: 'administrador'
-    }
+    { icon: <UserCheck size={22} />, label: 'Usuarios Sistema', path: '/admin/users', permission: 'administrador' },
+    { icon: <FileText size={22} />, label: 'Firma de Contratos', path: '/firma-contratos', permission: 'administrador' },
+    { icon: <Settings size={22} />, label: 'Configuración', path: '/config', permission: 'administrador' }
   ];
 
-  // Filtrar items por permisos
+  const ALL_PAGES = [
+    ...gestionPrincipal,
+    ...facturacionFinanzas,
+    ...serviciosOperaciones,
+    ...atencionCliente,
+    ...reportesAnalisis,
+    ...administracion
+  ];
+
+  // Filtrar items por permisos (sin cambios, usado para el Sidebar)
   const filtrarPorPermisos = (items) => {
     return items.filter(item => !item.permission || hasPermission(item.permission));
   };
@@ -219,13 +139,16 @@ const esAdministrador = rol === 'administrador';
     { titulo: 'Atención', items: filtrarPorPermisos(atencionCliente) },
     { titulo: 'Reportes', items: filtrarPorPermisos(reportesAnalisis) },
     { titulo: 'Admin', items: filtrarPorPermisos(administracion) }
-  ].filter(grupo => grupo.items.length > 0); // Solo mostrar grupos con items
+  ].filter(grupo => grupo.items.length > 0);
 
   const handleMenuClick = (path) => {
     navigate(path);
     if (isMobile) {
       setSidebarOpen(false);
     }
+    // Cierra la búsqueda si navegas desde el sidebar
+    setSearchText('');
+    setShowResults(false);
   };
 
   const isActivePath = (path) => {
@@ -237,14 +160,50 @@ const esAdministrador = rol === 'administrador';
 
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Cierre del menú de perfil
       if (profileOpen && !event.target.closest('.profile-menu')) {
         setProfileOpen(false);
+      }
+      // Cierre del menú de búsqueda
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowResults(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [profileOpen]);
+  }, [profileOpen]); // Agregué profileOpen para evitar el warning de ESLint.
+
+  // ==========================================
+  // LÓGICA DE FILTRADO PARA LA BÚSQUEDA
+  // ==========================================
+  useEffect(() => {
+    if (searchText.length > 0) {
+      // Filtramos solo las páginas a las que el usuario tiene permiso de acceder
+      const accessiblePages = ALL_PAGES.filter(page =>
+        !page.permission || hasPermission(page.permission)
+      );
+
+      const results = accessiblePages.filter(page =>
+        page.label.toLowerCase().includes(searchText.toLowerCase()) ||
+        page.path.toLowerCase().includes(searchText.toLowerCase())
+      );
+      
+      setFilteredPages(results);
+      setShowResults(true);
+    } else {
+      setFilteredPages([]);
+      setShowResults(false);
+    }
+  }, [searchText, ALL_PAGES, hasPermission]);
+
+
+  const handleSearchNavigation = (path) => {
+    navigate(path);
+    setSearchText(''); // Limpia la búsqueda
+    setShowResults(false); // Oculta los resultados
+  };
+
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
@@ -255,7 +214,7 @@ const esAdministrador = rol === 'administrador';
         ></div>
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar (Código sin cambios) */}
       <div className={`fixed md:relative z-30 backdrop-blur-xl bg-gradient-to-b from-[#0e6493]/95 to-[#0e6493]/85 border border-white/10 shadow-lg transition-all duration-300 ease-in-out h-screen flex flex-col ${sidebarOpen ? 'translate-x-0 w-64' : 'translate-x-0 md:translate-x-0 w-0 md:w-20'
         } overflow-hidden`}>
         {isMobile && sidebarOpen && (
@@ -270,14 +229,11 @@ const esAdministrador = rol === 'administrador';
         <nav className="mt-16 flex-1 px-2 overflow-y-auto scrollbar-hide">
           {grupos.map((grupo, grupoIndex) => (
             <div key={grupoIndex} className="mb-4">
-              {/* Título del grupo - Solo cuando sidebar está abierto */}
               {sidebarOpen && grupo.items.length > 0 && (
                 <div className="px-3 py-2 text-xs font-semibold text-white/60 uppercase tracking-wider border-b border-white/10 mb-2">
                   {grupo.titulo}
                 </div>
               )}
-
-              {/* Items del grupo */}
               {grupo.items.map((item, index) => (
                 <div
                   key={`${grupoIndex}-${index}`}
@@ -297,14 +253,12 @@ const esAdministrador = rol === 'administrador';
           ))}
         </nav>
 
-        {/* Notificaciones de configuración - Solo para administrador */}
-{sidebarOpen && esAdministrador && (
-  <div className="px-2 pb-2">
-    <ConfigSidebarNotification />
-  </div>
-)}
+        {sidebarOpen && esAdministrador && (
+          <div className="px-2 pb-2">
+            <ConfigSidebarNotification />
+          </div>
+        )}
 
-        {/* Botón de logout - Siempre visible en la parte inferior */}
         <div className="p-4 border-t border-white/10 mt-auto flex-shrink-0">
           {sidebarOpen ? (
             <LogoutButton variant="ghost" className="text-white hover:bg-white/20 w-full justify-start" />
@@ -348,17 +302,47 @@ const esAdministrador = rol === 'administrador';
             </div>
 
             <div className="flex items-center space-x-2 md:space-x-4">
-              <div className="hidden md:block relative">
+              
+              {/* ========================================== */}
+              {/* BARRA DE BÚSQUEDA INTERACTIVA (MODIFICADA) */}
+              {/* ========================================== */}
+              <div className="hidden md:block relative" ref={searchRef}>
                 <input
                   type="text"
-                  placeholder="Buscar..."
+                  placeholder="Buscar páginas..."
                   className="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]/70 w-40 lg:w-64 transition-all"
                   style={{ borderColor: '#0e6493' }}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  onFocus={() => searchText.length > 0 && setShowResults(true)}
                 />
                 <div className="absolute left-3 top-2.5 text-gray-400">
                   <Search size={18} />
                 </div>
+
+                {/* Dropdown de Resultados */}
+                {showResults && (
+                  <div className={`absolute z-20 mt-2 w-64 bg-white border border-[#0e6493] rounded-lg shadow-xl overflow-hidden max-h-80 overflow-y-auto`}>
+                    {filteredPages.length > 0 ? (
+                      filteredPages.map((page) => (
+                        <div
+                          key={page.path}
+                          className="px-4 py-3 hover:bg-[#e0f2fe] cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
+                          onClick={() => handleSearchNavigation(page.path)}
+                        >
+                          <span className="font-semibold text-gray-800 block">{page.label}</span>
+                          <span className="text-xs text-[#0e6493] block">{page.path}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                        No se encontró **"{searchText}"**.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+              {/* ========================================== */}
 
               <button className="md:hidden p-2 rounded-full hover:bg-gray-100">
                 <Search size={20} />
@@ -371,7 +355,7 @@ const esAdministrador = rol === 'administrador';
 
               <div className="w-px h-6 bg-gray-300 hidden sm:block"></div>
 
-              {/* Menú de perfil */}
+              {/* Menú de perfil (Código sin cambios) */}
               <div className="relative profile-menu">
                 <button
                   onClick={() => setProfileOpen(!profileOpen)}
@@ -394,29 +378,28 @@ const esAdministrador = rol === 'administrador';
                       <p className="text-xs text-gray-500 capitalize">{currentUser?.rol}</p>
                     </div>
                     <button
-  onClick={() => {
-    navigate('/profile');
-    setProfileOpen(false);
-  }}
-  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
->
-  <User size={16} className="mr-2" />
-  Mi Perfil
-</button>
+                      onClick={() => {
+                        navigate('/profile');
+                        setProfileOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
+                    >
+                      <User size={16} className="mr-2" />
+                      Mi Perfil
+                    </button>
 
-{/* Configuración - Solo para administrador */}
-{esAdministrador && (
-  <button
-    onClick={() => {
-      navigate('/config');
-      setProfileOpen(false);
-    }}
-    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
-  >
-    <Settings size={16} className="mr-2" />
-    Configuración
-  </button>
-)}
+                    {esAdministrador && (
+                      <button
+                        onClick={() => {
+                          navigate('/config');
+                          setProfileOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
+                      >
+                        <Settings size={16} className="mr-2" />
+                        Configuración
+                      </button>
+                    )}
                     <div className="border-t border-gray-100 mt-1">
                       <LogoutButton 
                         variant="ghost" 
@@ -431,21 +414,21 @@ const esAdministrador = rol === 'administrador';
           </div>
         </header>
 
-        {/* Content Area */}
+        {/* Content Area (Código sin cambios) */}
         <main className="flex-1 overflow-auto bg-gray-50 p-6">
           {showWelcome && (
-  <div className="mb-6 bg-gradient-to-r from-[#0e6493] to-[#0a5273] text-white p-6 rounded-lg shadow-lg">
-    <h1 className="text-2xl font-bold mb-2">
-      ¡Bienvenido, {currentUser?.nombre}!
-    </h1>
-    <p className="text-blue-100">
-      Sistema de gestión para empresa de internet y televisión
-    </p>
-    <p className="text-blue-200 text-sm mt-1">
-      Rol: <span className="font-semibold capitalize">{userRole}</span>
-    </p>
-  </div>
-)}
+            <div className="mb-6 bg-gradient-to-r from-[#0e6493] to-[#0a5273] text-white p-6 rounded-lg shadow-lg">
+              <h1 className="text-2xl font-bold mb-2">
+                ¡Bienvenido, {currentUser?.nombre}!
+              </h1>
+              <p className="text-blue-100">
+                Sistema de gestión para empresa de internet y televisión
+              </p>
+              <p className="text-blue-200 text-sm mt-1">
+                Rol: <span className="font-semibold capitalize">{userRole}</span>
+              </p>
+            </div>
+          )}
 
 
           <div className="bg-white rounded-lg shadow-sm min-h-full">
