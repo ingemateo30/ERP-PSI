@@ -144,7 +144,17 @@ router.post('/instalacion/:id/iniciar', async (req, res) => {
 router.post('/instalacion/:id/completar', async (req, res) => {
   try {
     const { id } = req.params;
-    const { equipos, foto, observaciones } = req.body;
+    const { equipos, foto, observaciones, ip_asignada, tap } = req.body;
+    
+    // ✅ LOGS DE DEBUG
+    console.log('🔍 ========== COMPLETAR INSTALACIÓN ==========');
+    console.log('📦 Body completo:', JSON.stringify(req.body, null, 2));
+    console.log('🔑 Instalación ID:', id);
+    console.log('🔑 Equipos:', equipos);
+    console.log('🔑 IP Asignada:', ip_asignada);
+    console.log('🔑 TAP:', tap);
+    console.log('🔑 Instalador ID:', req.user.id);
+    console.log('============================================');
     
     const horaFin = new Date().toTimeString().split(' ')[0];
     const fechaRealizada = new Date().toISOString().split('T')[0];
@@ -173,13 +183,57 @@ router.post('/instalacion/:id/completar', async (req, res) => {
       }
     }
     
+    // ✅ ACTUALIZAR IP Y TAP EN LA TABLA CLIENTES
+    if (ip_asignada || tap) {
+      console.log('🔄 Actualizando cliente con IP y TAP...');
+      
+      // Obtener el cliente_id de la instalación
+      const [instalacion] = await Database.query(
+        'SELECT cliente_id FROM instalaciones WHERE id = ?',
+        [id]
+      );
+      
+      if (instalacion && instalacion.cliente_id) {
+        const updateFields = [];
+        const updateValues = [];
+        
+        if (ip_asignada) {
+          updateFields.push('ip_asignada = ?');
+          updateValues.push(ip_asignada);
+          console.log('📍 IP a actualizar:', ip_asignada);
+        }
+        
+        if (tap) {
+          updateFields.push('tap = ?');
+          updateValues.push(tap);
+          console.log('🔑 TAP a actualizar:', tap);
+        }
+        
+        if (updateFields.length > 0) {
+          updateValues.push(instalacion.cliente_id);
+          
+          const updateQuery = `UPDATE clientes SET ${updateFields.join(', ')} WHERE id = ?`;
+          console.log('📝 Query de actualización:', updateQuery);
+          console.log('📝 Valores:', updateValues);
+          
+          await Database.query(updateQuery, updateValues);
+          
+          console.log(`✅ Cliente ${instalacion.cliente_id} actualizado - IP: ${ip_asignada || 'N/A'}, TAP: ${tap || 'N/A'}`);
+        }
+      } else {
+        console.error('❌ No se encontró cliente_id en la instalación');
+      }
+    } else {
+      console.log('⚠️ No se recibieron IP ni TAP para actualizar');
+    }
+    
     res.json({
       success: true,
       message: 'Instalación completada exitosamente'
     });
     
   } catch (error) {
-    console.error('Error completando instalación:', error);
+    console.error('❌ Error completando instalación:', error);
     res.status(500).json({
       success: false,
       message: 'Error al completar instalación',
