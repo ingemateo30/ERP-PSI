@@ -160,15 +160,13 @@ class PDFGenerator {
 
         yDerecha += 32;
 
-        // PAGAR ANTES DE - Recuadro con título y fecha EN UNA SOLA FILA
+        // PAGAR ANTES DE - Recuadro con título y fecha EN UNA SOLA FILA CENTRADO
         const alturaRecuadroPago = 25;
         doc.rect(xDerecha, yDerecha, anchoDerecha, alturaRecuadroPago).stroke('#000000');
         
-        // Texto en una sola línea
+        // Texto centrado en el recuadro
         doc.fontSize(8).font('Helvetica-Bold')
-            .text('PAGAR ANTES DE', xDerecha + 5, yDerecha + 8)
-            .fontSize(9).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_vencimiento) || '13-nov.-2025', xDerecha + 85, yDerecha + 8);
+            .text('PAGAR ANTES DE  ' + (this.formatearFecha(factura.fecha_vencimiento) || '13-nov.-2025'), xDerecha + 5, yDerecha + 8, { align: 'center', width: anchoDerecha - 10 });
 
         // AHORA DIBUJAR LA TABLA
         // Encabezado de tabla con bordes NEGROS
@@ -215,8 +213,12 @@ class PDFGenerator {
             .fontSize(10).text(totalPagar, colValor + 5, y + 8);
 
         const yFinTablaConceptos = y + alturaFila + 5;
+
+
+        // Continuar después de la tabla de conceptos con más separación
+        y = Math.max(yFinTablaConceptos, yDerecha + 30) + 20; // Más separación entre recuadros y barra negra
+
         // Continuar después de la tabla de conceptos
-        y = Math.max(yFinTablaConceptos, yDerecha + 25);
 
         // === BARRA NEGRA DE LADO A LADO CON TOTAL A PAGAR ===
         doc.rect(xOffset, y, anchoUtil, 25).fillAndStroke('#000000', '#000000');
