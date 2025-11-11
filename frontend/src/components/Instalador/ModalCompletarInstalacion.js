@@ -1,7 +1,7 @@
 // frontend/src/components/Instalador/ModalCompletarInstalacion.js
 
 import React, { useState, useEffect } from 'react';
-import { X, Camera, Upload, Package, CheckCircle } from 'lucide-react';
+import { X, Camera, Upload, Package, CheckCircle, Wifi, Lock } from 'lucide-react';
 
 const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -10,16 +10,30 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
   const [foto, setFoto] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
   const [observaciones, setObservaciones] = useState('');
+  
+  // ✅ NUEVOS CAMPOS
+  const [ipAsignada, setIpAsignada] = useState('');
+  const [tap, setTap] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       cargarEquiposDisponibles();
+      // Cargar datos existentes si los hay
+      if (instalacion?.observaciones) {
+        setObservaciones(instalacion.observaciones);
+      }
+      if (instalacion?.ip_asignada) {
+        setIpAsignada(instalacion.ip_asignada);
+      }
+      if (instalacion?.tap) {
+        setTap(instalacion.tap);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, instalacion]);
 
   const cargarEquiposDisponibles = async () => {
     try {
-      const token = localStorage.getItem('accessToken'); // ✅ CAMBIO 1
+      const token = localStorage.getItem('accessToken');
       const response = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-equipos`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -61,6 +75,18 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
     });
   };
 
+  // ✅ FUNCIÓN DE VALIDACIÓN DE IP
+  const validarIP = (ip) => {
+    const regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (!regex.test(ip)) return false;
+    
+    const partes = ip.split('.');
+    return partes.every(parte => {
+      const num = parseInt(parte);
+      return num >= 0 && num <= 255;
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -74,20 +100,44 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
       return;
     }
 
+    // ✅ VALIDACIONES DE IP Y TAP
+    if (!ipAsignada.trim()) {
+      alert('❌ Debes ingresar la IP asignada al cliente');
+      return;
+    }
+
+    if (!validarIP(ipAsignada)) {
+      alert('❌ La IP ingresada no es válida (formato: 192.168.1.100)');
+      return;
+    }
+
+    if (!tap.trim()) {
+      alert('❌ Debes ingresar la contraseña del router (TAP)');
+      return;
+    }
+
+    if (tap.length < 8) {
+      alert('❌ La contraseña del router debe tener al menos 8 caracteres');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('accessToken'); // ✅ CAMBIO 2
+      const token = localStorage.getItem('accessToken');
       if (!token) {
         console.error('❌ No hay token');
         alert('❌ No estás autenticado. Por favor inicia sesión nuevamente.');
         return;
       }
       
+      // ✅ PAYLOAD CON IP Y TAP
       const formData = {
         equipos: equiposSeleccionados,
         foto: fotoPreview, // Base64
-        observaciones
+        observaciones,
+        ip_asignada: ipAsignada.trim(),
+        tap: tap.trim()
       };
 
       const response = await fetch(
@@ -124,6 +174,8 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
     setFotoPreview(null);
     setEquiposSeleccionados([]);
     setObservaciones('');
+    setIpAsignada('');
+    setTap('');
     onClose();
   };
 
@@ -229,6 +281,38 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
                 ))}
               </div>
             )}
+          </div>
+
+          {/* ✅ CAMPO IP ASIGNADA */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Wifi size={16} className="inline mr-1" />
+              IP Asignada *
+            </label>
+            <input
+              type="text"
+              value={ipAsignada}
+              onChange={(e) => setIpAsignada(e.target.value)}
+              placeholder="Ej: 192.168.1.100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">Formato: 192.168.X.X</p>
+          </div>
+
+          {/* ✅ CAMPO CONTRASEÑA ROUTER (TAP) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Lock size={16} className="inline mr-1" />
+              Contraseña del Router (TAP) *
+            </label>
+            <input
+              type="text"
+              value={tap}
+              onChange={(e) => setTap(e.target.value)}
+              placeholder="Contraseña WiFi del router"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">Mínimo 8 caracteres</p>
           </div>
 
           {/* Observaciones */}

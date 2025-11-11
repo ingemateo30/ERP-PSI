@@ -845,6 +845,38 @@ static async obtenerInstalacionCompleta(connection, instalacionId) {
            WHERE id = ? AND estado != 'activo'`,
                     [instalacionActual.servicio_cliente_id]
                 );
+                // ✅✅✅ INSERTAR AQUÍ TODO EL CÓDIGO NUEVO ✅✅✅
+    // Actualizar IP y TAP en la tabla clientes si vienen en el request
+    const { ip_asignada, tap } = req.body;
+    
+    if (ip_asignada || tap) {
+        const updateClienteFields = [];
+        const updateClienteValues = [];
+        
+        if (ip_asignada) {
+            updateClienteFields.push('ip_asignada = ?');
+            updateClienteValues.push(ip_asignada);
+        }
+        
+        if (tap) {
+            updateClienteFields.push('tap = ?');
+            updateClienteValues.push(tap);
+        }
+        
+        if (updateClienteFields.length > 0) {
+            updateClienteValues.push(instalacionActual.cliente_id);
+            
+            await connection.query(
+                `UPDATE clientes SET ${updateClienteFields.join(', ')} WHERE id = ?`,
+                updateClienteValues
+            );
+            
+            console.log(`✅ Actualizado cliente ${instalacionActual.cliente_id} - IP: ${ip_asignada || 'N/A'}, TAP: ${tap || 'N/A'}`);
+        }
+    }
+    // ✅✅✅ FIN DEL CÓDIGO NUEVO ✅✅✅
+
+
             }
 
             if (estado === 'cancelada') {
