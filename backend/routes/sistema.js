@@ -145,3 +145,4 @@ router.get('/backup/ultimo', authenticateToken, requireRole(['administrador']), 
     });
   }
 });
+module.exports = router;
