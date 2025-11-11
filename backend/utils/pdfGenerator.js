@@ -78,45 +78,55 @@ class PDFGenerator {
     /**
      * Dibuja el cupón principal (parte superior) - Solo tabla con bordes, fechas a la derecha sin cuadro.
      */
-    static generarCuponPrincipal(doc, factura, empresa, yInicial) {
+      static generarCuponPrincipal(doc, factura, empresa, yInicial) {
         let y = yInicial;
         const xOffset = 30;
         const pageWidth = 570;
+        const anchoUtil = 550; // Ancho útil considerando márgenes
 
         // === ENCABEZADO CON LOGO PSI ===
         this.dibujarLogoPSIReal(doc, xOffset, y);
 
-        // Información de la empresa (centro-derecha)
+        // Información de la empresa CENTRADA y más pequeña
+        const centroX = 306; // Centro de la página (612/2)
+        doc.fontSize(7).font('Helvetica-Bold')
+            .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 150, y + 5, { align: 'center', width: 300 })
+            .fontSize(6).font('Helvetica')
+            .text(`NIT: ${empresa.empresa_nit || '901582657-3'}`, 150, y + 15, { align: 'center', width: 300 })
+            .text('Registro único de TIC No. 96006732', 150, y + 23, { align: 'center', width: 300 })
+            .text('vigilado y regulado por el MINTIC', 150, y + 31, { align: 'center', width: 300 });
+
+        // FACTURA DE VENTA y NÚMERO con Referencia de pago (esquina superior derecha, más separado)
         doc.fontSize(9).font('Helvetica-Bold')
-            .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 140, y + 8)
-            .fontSize(8).font('Helvetica')
-            .text(`NIT: ${empresa.empresa_nit || '901.582.657-3'}`, 140, y + 22)
-            .text('Registro único de TIC No. 96006732', 140, y + 34)
-            .text('vigilado y regulado por el MINTIC', 140, y + 46);
+            .text('FACTURA DE VENTA', 460, y + 5)
+            .fontSize(10).text(factura.numero_factura || 'FAC000011', 460, y + 18);
+        
+        doc.fontSize(7).font('Helvetica')
+            .text('Referencia de pago:', 460, y + 32)
+            .font('Helvetica-Bold')
+            .text(factura.identificacion_cliente || '1005450340', 460, y + 42);
 
-        // FACTURA DE VENTA y NÚMERO (esquina superior derecha)
-        doc.fontSize(10).font('Helvetica-Bold')
-            .text('FACTURA DE VENTA', 470, y + 8, { align: 'right', width: pageWidth - 470 - xOffset })
-            .fontSize(11).text(factura.numero_factura || '10P 00090951', 470, y + 24, { align: 'right', width: pageWidth - 470 - xOffset });
-
-        y += 70;
+        y += 65;
 
         // === INFORMACIÓN DEL CLIENTE ===
-        doc.fontSize(11).font('Helvetica-Bold')
+        doc.fontSize(10).font('Helvetica-Bold')
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', xOffset, y)
-            .fontSize(9).font('Helvetica')
-            .text(`ID Cliente ${factura.identificacion_cliente || '1005450340'} / ${factura.codigo_cliente || '200'}`, xOffset, y + 15)
-            .text(`Dirección: ${factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN'}`, xOffset, y + 30);
+            .fontSize(8).font('Helvetica')
+            .text(`ID Cliente ${factura.identificacion_cliente || '1005450340'} / ${factura.codigo_cliente || '200'}`, xOffset, y + 14)
+            .text(`Dirección: ${factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN'}`, xOffset, y + 26);
 
-        y += 55;
+        y += 50;
 
-        // === TABLA DE CONCEPTOS (solo Concepto, Valor Mes, Saldo) ===
+        // === DISEÑO DE DOS COLUMNAS: TABLA A LA IZQUIERDA, FECHAS A LA DERECHA ===
+        const yTablaInicio = y;
+        
+        // COLUMNA IZQUIERDA: TABLA DE CONCEPTOS (ocupa la mitad)
         const alturaEncabezado = 18;
         const alturaFila = 18;
-        const colConcepto = 30;
-        const colValor = 280;
-        const colSaldo = 380;
-        const anchoTabla = 450; // Ancho de la tabla reducido
+        const colConcepto = xOffset;
+        const colValor = 170;
+        const colSaldo = 230;
+        const anchoTabla = 250; // Mitad de la página
 
         // Encabezado de tabla con bordes
         doc.rect(colConcepto, y, anchoTabla, alturaEncabezado).stroke('#000000');
@@ -126,23 +136,16 @@ class PDFGenerator {
         doc.moveTo(colSaldo, y).lineTo(colSaldo, y + alturaEncabezado).stroke('#000000');
 
         // Texto del encabezado
-        doc.fontSize(8).font('Helvetica-Bold')
+        doc.fontSize(7).font('Helvetica-Bold')
             .text('Concepto', colConcepto + 5, y + 6)
             .text('Valor Mes', colValor + 5, y + 6)
             .text('Saldo', colSaldo + 5, y + 6);
-
-        // === PERIODO FACTURADO Y PAGAR ANTES DE (A LA DERECHA, SIN CUADRO) ===
-        const xDerecha = colConcepto + anchoTabla + 20;
-        doc.fontSize(8).font('Helvetica-Bold')
-            .text('PERIODO FACTURADO', xDerecha, y + 2);
-        doc.fontSize(7).font('Helvetica')
-            .text(`${this.formatearFecha(factura.fecha_desde) || '1-nov.-2025'}`, xDerecha, y + 13);
-        doc.text(`${this.formatearFecha(factura.fecha_hasta) || '30-nov.-2025'}`, xDerecha, y + 23);
 
         y += alturaEncabezado;
 
         // Datos de conceptos
         const conceptos = this.obtenerConceptosSimples(factura);
+        const yConceptosInicio = y;
 
         conceptos.forEach((concepto, index) => {
             // Bordes de la fila
@@ -151,7 +154,7 @@ class PDFGenerator {
             doc.moveTo(colSaldo, y).lineTo(colSaldo, y + alturaFila).stroke('#cccccc');
 
             // Contenido de la fila
-            doc.fontSize(8).font('Helvetica')
+            doc.fontSize(7).font('Helvetica')
                 .text(concepto.nombre, colConcepto + 5, y + 6)
                 .text(this.formatearPesos(concepto.valor), colValor + 5, y + 6)
                 .text('0', colSaldo + 5, y + 6);
@@ -159,31 +162,70 @@ class PDFGenerator {
             y += alturaFila;
         });
 
-        // Fila del TOTAL A PAGAR (Resaltada)
+        const yFinTablaConceptos = y;
+
+        // COLUMNA DERECHA: PERIODO FACTURADO Y PAGAR ANTES DE (con recuadros)
+        const xDerecha = colConcepto + anchoTabla + 30;
+        const anchoDerecha = 245;
+        let yDerecha = yTablaInicio;
+
+        // PERIODO FACTURADO (título sin recuadro)
+        doc.fontSize(8).font('Helvetica-Bold')
+            .text('PERIODO FACTURADO', xDerecha, yDerecha + 2, { align: 'center', width: anchoDerecha });
+
+        yDerecha += 18;
+
+        // Fecha desde (con recuadro)
+        doc.rect(xDerecha, yDerecha, anchoDerecha, 22).stroke('#000000');
+        doc.fontSize(7).font('Helvetica-Bold')
+            .text(this.formatearFecha(factura.fecha_desde) || '8-nov.-2025', xDerecha + 5, yDerecha + 8, { align: 'center', width: anchoDerecha - 10 });
+
+        yDerecha += 25;
+
+        // Fecha hasta (con recuadro)
+        doc.rect(xDerecha, yDerecha, anchoDerecha, 22).stroke('#000000');
+        doc.fontSize(7).font('Helvetica-Bold')
+            .text(this.formatearFecha(factura.fecha_hasta) || '7-dic.-2025', xDerecha + 5, yDerecha + 8, { align: 'center', width: anchoDerecha - 10 });
+
+        yDerecha += 30;
+
+        // PAGAR ANTES DE (título sin recuadro)
+        doc.fontSize(8).font('Helvetica-Bold')
+            .text('PAGAR ANTES DE', xDerecha, yDerecha, { align: 'center', width: anchoDerecha });
+
+        yDerecha += 15;
+
+        // Fecha de vencimiento (con recuadro)
+        doc.rect(xDerecha, yDerecha, anchoDerecha, 22).stroke('#000000');
+        doc.fontSize(8).font('Helvetica-Bold')
+            .text(this.formatearFecha(factura.fecha_vencimiento) || '13-nov.-2025', xDerecha + 5, yDerecha + 8, { align: 'center', width: anchoDerecha - 10 });
+
+        // Continuar después de la tabla de conceptos
+        y = Math.max(yFinTablaConceptos, yDerecha + 25);
+
+        // === BARRA NEGRA DE LADO A LADO CON TOTAL A PAGAR ===
         const totalPagar = this.formatearMoneda(factura.total);
-        doc.rect(colConcepto, y, anchoTabla, alturaFila + 5).fillAndStroke('#000000', '#000000');
+        doc.rect(xOffset, y, anchoUtil, 25).fillAndStroke('#000000', '#000000');
 
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#ffffff')
-            .text('TOTAL A PAGAR', colConcepto + 5, y + 8)
-            .fontSize(14).text(totalPagar, colSaldo - 40, y + 6, { align: 'right', width: 130 });
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#ffffff')
+            .text('Pague su factura y evite suspensiones - Valor Reconexión $11.900', xOffset + 10, y + 8);
 
-        // PAGAR ANTES DE (a la derecha del total, sin cuadro)
-        doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
-            .text('PAGAR ANTES DE', xDerecha, y + 2);
-        doc.fontSize(9).font('Helvetica-Bold')
-            .text(this.formatearFecha(factura.fecha_vencimiento) || '16-nov.-2025', xDerecha, y + 15);
+        y += 30;
 
-        y += alturaFila + 10;
-
-        // === MENSAJES INFORMATIVOS ===
+        // === MENSAJE DE PAGO (sin recuadro negro) ===
         doc.fillColor('#000000')
-            .fontSize(8).font('Helvetica-Bold')
-            .text('Pague su factura y evite suspensiones - Valor Reconexión $11.900', xOffset, y);
-
-        y += 15;
-
-        doc.fontSize(7).font('Helvetica')
+            .fontSize(7).font('Helvetica')
             .text('Pague en: Caja Social (corresponsales), Finecoop, Comultrasan, efecty convenio No113760, Ahorramas o en línea (PSE) en www.psi.net.co', xOffset, y);
+
+        // === TEXTO VERTICAL EN EL COSTADO DERECHO ===
+        doc.save();
+        doc.translate(580, yTablaInicio + 60);
+        doc.rotate(-90);
+        doc.fontSize(5).font('Helvetica')
+            .text('vigilado y regulado por el MINTIC', 0, 0);
+        doc.fontSize(5)
+            .text('Facturación desde 10.001 hasta 37600 prefijo 10 del 26-SEP-2022', 0, 8);
+        doc.restore();
 
         return y + 20;
     }
