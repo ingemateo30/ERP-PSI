@@ -87,15 +87,15 @@ const AdminDashboard = () => {
             if (configData.success) {
                 const overview = configData.data;
                 
-                // Actualizar estadísticas
+                // ✅ ACTUALIZAR: Leer desde contadores
                 setAdminStats(prev => ({
                     ...prev,
-                    totalUsuarios: overview.total_usuarios || 0,
-                    usuariosActivos: overview.usuarios_activos || 0,
+                    totalUsuarios: overview.contadores?.total_usuarios || 0,
+                    usuariosActivos: overview.contadores?.usuarios_activos || 0,
                     configuracionCompleta: Math.round(overview.porcentaje_completado || 0)
                 }));
 
-                // Actualizar estado de configuración
+                // ✅ ACTUALIZAR: Leer desde contadores
                 const modulosConfig = [
                     { 
                         modulo: 'Configuración de Empresa', 
@@ -104,18 +104,24 @@ const AdminDashboard = () => {
                     },
                     { 
                         modulo: 'Bancos y Formas de Pago', 
-                        completado: Math.round((overview.bancos_activos / Math.max(overview.total_bancos, 1)) * 100), 
-                        urgente: overview.bancos_activos === 0 
+                        completado: overview.contadores?.bancos_activos 
+                            ? Math.round((overview.contadores.bancos_activos / Math.max(overview.contadores.bancos_total || 1, 1)) * 100) 
+                            : 0, 
+                        urgente: overview.contadores?.bancos_activos === 0 
                     },
                     { 
                         modulo: 'Conceptos de Facturación', 
-                        completado: Math.round((overview.conceptos_activos / Math.max(overview.total_conceptos, 1)) * 100), 
-                        urgente: overview.conceptos_activos === 0 
+                        completado: overview.contadores?.conceptos_activos 
+                            ? Math.round((overview.contadores.conceptos_activos / Math.max(overview.contadores.conceptos_activos, 1)) * 100) 
+                            : 0, 
+                        urgente: overview.contadores?.conceptos_activos === 0 
                     },
                     { 
                         modulo: 'Planes de Servicio', 
-                        completado: Math.round((overview.planes_activos / Math.max(overview.total_planes, 1)) * 100), 
-                        urgente: overview.planes_activos === 0 
+                        completado: overview.contadores?.planes_activos 
+                            ? Math.round((overview.contadores.planes_activos / Math.max(overview.contadores.planes_total || 1, 1)) * 100) 
+                            : 0, 
+                        urgente: overview.contadores?.planes_activos === 0 
                     }
                 ];
                 
@@ -318,26 +324,67 @@ const AdminDashboard = () => {
         </>
     );
 };
+
 // ===================================
-// DASHBOARD PARA SUPERVISORES
+// DASHBOARD PARA SUPERVISORES CON DATOS REALES
 // ===================================
 const SupervisorDashboard = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
+    
+    const [loading, setLoading] = useState(true);
+    const [supervisorStats, setSupervisorStats] = useState({
+        clientesActivos: 0,
+        facturacionMes: 0,
+        serviciosActivos: 0,
+        tasaCobranza: 0
+    });
+    const [reportesRecientes, setReportesRecientes] = useState([]);
 
-    const supervisorStats = {
-        clientesActivos: 324,
-        facturacionMes: 24780000,
-        serviciosActivos: 298,
-        tasaCobranza: 96.2
+    useEffect(() => {
+        cargarDatosSupervisor();
+    }, []);
+
+    const cargarDatosSupervisor = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('accessToken');
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+
+            // Obtener estadísticas del dashboard (usar el endpoint de estadísticas si existe)
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/config/overview`, {
+                headers
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                const overview = data.data;
+                
+                setSupervisorStats({
+                    clientesActivos: overview.contadores?.clientes_activos || 0,
+                    facturacionMes: 0, // Agregar endpoint específico de facturación
+                    serviciosActivos: overview.contadores?.planes_activos || 0,
+                    tasaCobranza: 0 // Agregar endpoint específico de cobranza
+                });
+            }
+
+            // Simular reportes recientes (reemplazar con endpoint real cuando esté disponible)
+            setReportesRecientes([
+                { nombre: 'Facturación Mes Actual', fecha: new Date().toISOString().split('T')[0], estado: 'Completado' },
+                { nombre: 'Clientes Activos', fecha: new Date().toISOString().split('T')[0], estado: 'En proceso' },
+                { nombre: 'Servicios por Sector', fecha: new Date().toISOString().split('T')[0], estado: 'Pendiente' },
+                { nombre: 'Ingresos Mensuales', fecha: new Date().toISOString().split('T')[0], estado: 'Completado' }
+            ]);
+
+        } catch (error) {
+            console.error('❌ Error cargando datos del supervisor:', error);
+        } finally {
+            setLoading(false);
+        }
     };
-
-    const reportesRecientes = [
-        { nombre: 'Facturación Mayo', fecha: '2024-05-31', estado: 'Completado' },
-        { nombre: 'Clientes Morosos', fecha: '2024-06-01', estado: 'Pendiente' },
-        { nombre: 'Servicios Activos', fecha: '2024-06-02', estado: 'En proceso' },
-        { nombre: 'Ingresos por Sector', fecha: '2024-06-03', estado: 'Completado' }
-    ];
 
     return (
         <>
@@ -350,7 +397,7 @@ const SupervisorDashboard = () => {
                     ¡Hola, {currentUser?.nombre || 'Usuario'}!
                 </h1>
                 <p className="text-lg md:text-xl mb-4 md:mb-6 opacity-90">
-                    ¿Qué quieres hacer hoy?,Controla las operaciones del negocio
+                    ¿Qué quieres hacer hoy?, Controla las operaciones del negocio
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
@@ -378,77 +425,87 @@ const SupervisorDashboard = () => {
                 </div>
             </div>
 
-            {/* Stats Cards para Supervisor */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <StatCard
-                    title="Clientes Activos"
-                    value={supervisorStats.clientesActivos.toLocaleString()}
-                    icon={<Users size={24} className="text-[#0e6493]" />}
-                    change="+8%"
-                    color="#0e6493"
-                />
-                <StatCard
-                    title="Facturación Mes"
-                    value={`$${supervisorStats.facturacionMes.toLocaleString()}`}
-                    icon={<DollarSign size={24} className="text-[#10b981]" />}
-                    change="+12%"
-                    color="#10b981"
-                />
-                <StatCard
-                    title="Servicios Activos"
-                    value={supervisorStats.serviciosActivos.toLocaleString()}
-                    icon={<Wifi size={24} className="text-[#6366f1]" />}
-                    change="+5%"
-                    color="#6366f1"
-                />
-                <StatCard
-                    title="Tasa Cobranza"
-                    value={`${supervisorStats.tasaCobranza}%`}
-                    icon={<TrendingUp size={24} className="text-[#f59e0b]" />}
-                    change="+2%"
-                    color="#f59e0b"
-                />
-            </div>
+            {/* Loading State */}
+            {loading ? (
+                <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#0e6493] mx-auto mb-4"></div>
+                    <p className="text-gray-500">Cargando estadísticas...</p>
+                </div>
+            ) : (
+                <>
+                    {/* Stats Cards para Supervisor */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <StatCard
+                            title="Clientes Activos"
+                            value={supervisorStats.clientesActivos.toLocaleString()}
+                            icon={<Users size={24} className="text-[#0e6493]" />}
+                            change="Total"
+                            color="#0e6493"
+                        />
+                        <StatCard
+                            title="Facturación Mes"
+                            value={`$${supervisorStats.facturacionMes.toLocaleString()}`}
+                            icon={<DollarSign size={24} className="text-[#10b981]" />}
+                            change="Mes actual"
+                            color="#10b981"
+                        />
+                        <StatCard
+                            title="Servicios Activos"
+                            value={supervisorStats.serviciosActivos.toLocaleString()}
+                            icon={<Wifi size={24} className="text-[#6366f1]" />}
+                            change="Planes"
+                            color="#6366f1"
+                        />
+                        <StatCard
+                            title="Tasa Cobranza"
+                            value={`${supervisorStats.tasaCobranza}%`}
+                            icon={<TrendingUp size={24} className="text-[#f59e0b]" />}
+                            change="Promedio"
+                            color="#f59e0b"
+                        />
+                    </div>
 
-            {/* Reportes recientes */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                {/* Gráfico de ingresos */}
-                <div className="bg-white rounded-lg shadow-md p-4">
-                    <h2 className="text-lg font-semibold mb-4 text-[#0e6493]">Ingresos del Mes</h2>
-                    <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                        <div className="text-center">
-                            <TrendingUp size={48} className="mx-auto text-gray-400 mb-2" />
-                            <p className="text-gray-500">Gráfico de ingresos</p>
-                            <p className="text-sm text-gray-400">Datos actualizados</p>
+                    {/* Reportes recientes */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        {/* Gráfico de ingresos */}
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <h2 className="text-lg font-semibold mb-4 text-[#0e6493]">Ingresos del Mes</h2>
+                            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+                                <div className="text-center">
+                                    <TrendingUp size={48} className="mx-auto text-gray-400 mb-2" />
+                                    <p className="text-gray-500">Gráfico de ingresos</p>
+                                    <p className="text-sm text-gray-400">Datos actualizados</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Reportes recientes */}
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <h2 className="text-lg font-semibold mb-4 text-[#0e6493]">Reportes Recientes</h2>
+                            <div className="space-y-3">
+                                {reportesRecientes.map((reporte, index) => (
+                                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                                        <div>
+                                            <p className="font-medium text-gray-900">{reporte.nombre}</p>
+                                            <p className="text-sm text-gray-500">{reporte.fecha}</p>
+                                        </div>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                            reporte.estado === 'Completado' ? 'bg-green-100 text-green-800' :
+                                            reporte.estado === 'En proceso' ? 'bg-yellow-100 text-yellow-800' :
+                                            'bg-red-100 text-red-800'
+                                        }`}>
+                                            {reporte.estado}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                {/* Reportes recientes */}
-                <div className="bg-white rounded-lg shadow-md p-4">
-                    <h2 className="text-lg font-semibold mb-4 text-[#0e6493]">Reportes Recientes</h2>
-                    <div className="space-y-3">
-                        {reportesRecientes.map((reporte, index) => (
-                            <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                                <div>
-                                    <p className="font-medium text-gray-900">{reporte.nombre}</p>
-                                    <p className="text-sm text-gray-500">{reporte.fecha}</p>
-                                </div>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${reporte.estado === 'Completado' ? 'bg-green-100 text-green-800' :
-                                    reporte.estado === 'En proceso' ? 'bg-yellow-100 text-yellow-800' :
-                                        'bg-red-100 text-red-800'
-                                    }`}>
-                                    {reporte.estado}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
+                </>
+            )}
         </>
     );
 };
-
 // ===================================
 // DASHBOARD PARA INSTALADORES
 // ===================================
