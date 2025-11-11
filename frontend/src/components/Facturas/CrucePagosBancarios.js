@@ -105,44 +105,45 @@ const CrucePagosBancarios = () => {
         }
     };
 
-    const cargarFacturasPagadas = async () => {
-        try {
-            setLoadingPagadas(true);
-            
-            const params = new URLSearchParams({
-                estado: 'pagada',
-                fecha_inicio: filtrosPagadas.fecha_inicio,
-                fecha_fin: filtrosPagadas.fecha_fin
-            });
+   const cargarFacturasPagadas = async () => {
+    try {
+        setLoadingPagadas(true);
+        
+        const params = new URLSearchParams({
+            estado: 'pagada',
+            // ✅ CAMBIO: Usar fecha_pago_inicio y fecha_pago_fin para filtrar por fecha del pago
+            fecha_pago_inicio: filtrosPagadas.fecha_inicio,
+            fecha_pago_fin: filtrosPagadas.fecha_fin
+        });
 
-            if (filtrosPagadas.busqueda) {
-                params.append('search', filtrosPagadas.busqueda);
-            }
-            if (filtrosPagadas.banco) {
-                params.append('banco_id', filtrosPagadas.banco);
-            }
-
-            const response = await apiService.get(`/facturacion/facturas?${params.toString()}`);
-            
-            if (response && response.success) {
-                const facturas = Array.isArray(response.data) 
-                    ? response.data 
-                    : (response.data?.facturas || []);
-                     console.log('📦 FACTURAS RECIBIDAS:', facturas.length); // ⬅️ AGREGAR
-            console.log('📦 PRIMERA FACTURA:', facturas[0]);
-                
-                setFacturasPagadas(facturas);
-            } else {
-                setFacturasPagadas([]);
-            }
-        } catch (error) {
-            console.error('Error cargando facturas pagadas:', error);
-            setFacturasPagadas([]);
-        } finally {
-            setLoadingPagadas(false);
+        if (filtrosPagadas.busqueda) {
+            params.append('search', filtrosPagadas.busqueda);
         }
-    };
+        if (filtrosPagadas.banco) {
+            params.append('banco_id', filtrosPagadas.banco);
+        }
 
+        const response = await apiService.get(`/facturacion/facturas?${params.toString()}`);
+        
+        if (response && response.success) {
+            const facturas = Array.isArray(response.data) 
+                ? response.data 
+                : (response.data?.facturas || []);
+            
+            console.log('💳 PAGOS RECIBIDOS:', facturas.length);
+            console.log('💳 PRIMER PAGO:', facturas[0]);
+            
+            setFacturasPagadas(facturas);
+        } else {
+            setFacturasPagadas([]);
+        }
+    } catch (error) {
+        console.error('❌ Error cargando facturas pagadas:', error);
+        setFacturasPagadas([]);
+    } finally {
+        setLoadingPagadas(false);
+    }
+};
     const abrirModalCruce = (factura) => {
         setFacturaSeleccionada(factura);
         setDatosPago({

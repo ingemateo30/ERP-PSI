@@ -25,11 +25,13 @@ router.get('/facturas', async (req, res) => {
       limit = 20,
       fecha_inicio,
       fecha_fin,
+      fecha_pago_inicio,  // ✅ NUEVO: Filtro por fecha de pago
+      fecha_pago_fin,     // ✅ NUEVO: Filtro por fecha de pago
       estado,
       cliente_id,
       numero_factura,
-      banco_id,        // ✅ NUEVO: Filtro por banco
-      search,          // ✅ NUEVO: Búsqueda general
+      banco_id,
+      search,
       sort_by = 'fecha_emision',
       sort_order = 'DESC'
     } = req.query;
@@ -38,14 +40,17 @@ router.get('/facturas', async (req, res) => {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // CORREGIDO: Usar Database.query en lugar de Database.conexion
     const { Database } = require('../models/Database');
 
     // Construir WHERE clause dinámicamente
     let whereConditions = ['f.activo = 1'];
     let queryParams = [];
 
-    if (fecha_inicio && fecha_fin) {
+    // ✅ MODIFICADO: Priorizar fecha_pago si existe, sino usar fecha_emision
+    if (fecha_pago_inicio && fecha_pago_fin) {
+      whereConditions.push('f.fecha_pago BETWEEN ? AND ?');
+      queryParams.push(fecha_pago_inicio, fecha_pago_fin);
+    } else if (fecha_inicio && fecha_fin) {
       whereConditions.push('f.fecha_emision BETWEEN ? AND ?');
       queryParams.push(fecha_inicio, fecha_fin);
     }
@@ -65,13 +70,11 @@ router.get('/facturas', async (req, res) => {
       queryParams.push(`%${numero_factura}%`);
     }
 
-    // ✅ NUEVO: Filtro por banco
     if (banco_id) {
       whereConditions.push('f.banco_id = ?');
       queryParams.push(banco_id);
     }
 
-    // ✅ NUEVO: Búsqueda general (número factura, nombre cliente, identificación)
     if (search) {
       whereConditions.push('(f.numero_factura LIKE ? OR f.nombre_cliente LIKE ? OR f.identificacion_cliente LIKE ?)');
       const searchTerm = `%${search}%`;
@@ -91,45 +94,44 @@ router.get('/facturas', async (req, res) => {
     const total = totalResult[0]?.total || 0;
 
     // Validar columna de ordenamiento
-    const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento'];
+    const validSortColumns = ['fecha_emision', 'numero_factura', 'total', 'estado', 'fecha_vencimiento', 'fecha_pago'];
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // Obtener facturas paginadas con nombre del banco
-    // Obtener facturas paginadas con nombre del banco Y datos del cliente
-const facturas = await Database.query(`
-  SELECT 
-    f.id,
-    f.numero_factura,
-    f.cliente_id,
-    f.identificacion_cliente,        -- ✅ AGREGADO
-    f.nombre_cliente,                -- ✅ AGREGADO
-    f.periodo_facturacion,
-    f.fecha_emision,
-    f.fecha_vencimiento,
-    f.fecha_pago,
-    f.subtotal,
-    f.iva,
-    f.total,
-    f.estado,
-    f.metodo_pago,
-    f.referencia_pago,
-    f.banco_id,
-    b.nombre as banco_nombre,
-    f.observaciones,
-    DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencimiento,
-    CASE 
-      WHEN f.estado = 'pagada' THEN 'Pagada'
-      WHEN f.estado = 'anulada' THEN 'Anulada'
-      WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 THEN 'Vencida'
-      ELSE 'Vigente'
-    END as estado_descripcion
-  FROM facturas f
-  LEFT JOIN bancos b ON f.banco_id = b.id
-  ${whereClause}
-  ORDER BY f.${sortColumn} ${sortDirection}
-  LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}
-`, queryParams);
+    // Obtener facturas paginadas
+    const facturas = await Database.query(`
+      SELECT 
+        f.id,
+        f.numero_factura,
+        f.cliente_id,
+        f.identificacion_cliente,
+        f.nombre_cliente,
+        f.periodo_facturacion,
+        f.fecha_emision,
+        f.fecha_vencimiento,
+        f.fecha_pago,
+        f.subtotal,
+        f.iva,
+        f.total,
+        f.estado,
+        f.metodo_pago,
+        f.referencia_pago,
+        f.banco_id,
+        b.nombre as banco_nombre,
+        f.observaciones,
+        DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencimiento,
+        CASE 
+          WHEN f.estado = 'pagada' THEN 'Pagada'
+          WHEN f.estado = 'anulada' THEN 'Anulada'
+          WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 THEN 'Vencida'
+          ELSE 'Vigente'
+        END as estado_descripcion
+      FROM facturas f
+      LEFT JOIN bancos b ON f.banco_id = b.id
+      ${whereClause}
+      ORDER BY f.${sortColumn} ${sortDirection}
+      LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}
+    `, queryParams);
 
     res.json({
       success: true,
@@ -154,6 +156,63 @@ const facturas = await Database.query(`
       message: 'Error obteniendo facturas',
       error: error.message
     });
+  }
+});
+/**
+ * @route GET /api/v1/facturacion/pagos
+ * @desc Obtener historial de pagos registrados
+ */
+router.get('/pagos', async (req, res) => {
+  try {
+    const { fecha_inicio, fecha_fin, banco_id, search } = req.query;
+    
+    let whereConditions = ['f.estado = "pagada"', 'f.activo = 1', 'f.fecha_pago IS NOT NULL'];
+    let params = [];
+
+    if (fecha_inicio && fecha_fin) {
+      whereConditions.push('f.fecha_pago BETWEEN ? AND ?');
+      params.push(fecha_inicio, fecha_fin);
+    }
+
+    if (banco_id) {
+      whereConditions.push('f.banco_id = ?');
+      params.push(banco_id);
+    }
+
+    if (search) {
+      whereConditions.push('(f.numero_factura LIKE ? OR f.nombre_cliente LIKE ? OR f.referencia_pago LIKE ?)');
+      const term = `%${search}%`;
+      params.push(term, term, term);
+    }
+
+    const { Database } = require('../models/Database');
+    
+    const pagos = await Database.query(`
+      SELECT 
+        f.id,
+        f.numero_factura,
+        f.nombre_cliente,
+        f.identificacion_cliente,
+        f.fecha_pago,
+        f.metodo_pago,
+        f.referencia_pago,
+        f.banco_id,
+        b.nombre as banco_nombre,
+        f.total,
+        f.observaciones
+      FROM facturas f
+      LEFT JOIN bancos b ON f.banco_id = b.id
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY f.fecha_pago DESC
+    `, params);
+
+    res.json({
+      success: true,
+      data: pagos
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo pagos:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 // ==========================================
