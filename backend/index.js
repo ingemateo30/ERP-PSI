@@ -297,7 +297,8 @@ app.use('/api/inventario', inventarioRoutes);
   console.log('✅ Rutas de cliente completo cargadas: /api/v1/clientes-completo');
 
 console.log('💾 Cargando rutas de sistema (backups)...');
-app.use('/api/v1/sistema', require('./routes/sistema'));
+const sistema = require('./routes/sistema');
+app.use('/api/v1/sistema', sistema);
 console.log('✅ Rutas de sistema cargadas: /api/v1/sistema');
 console.log('👷 Cargando rutas de instalador...');
 const instaladorRoutes = require('./routes/instalador');
