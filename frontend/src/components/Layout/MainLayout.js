@@ -107,6 +107,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     const performSearch = async () => {
       if (!searchQuery.trim()) {
         setSearchResults([]);
+        setSearchLoading(false);
         return;
       }
 
@@ -114,33 +115,39 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       const query = searchQuery.toLowerCase();
       let results = [];
 
-      // 1. Buscar en páginas del sistema
-      const paginasEncontradas = paginasDelSistema.filter(pagina => {
-        const matchLabel = pagina.label.toLowerCase().includes(query);
-        const matchKeywords = pagina.keywords.some(kw => kw.includes(query));
-        return matchLabel || matchKeywords;
-      }).map(p => ({ ...p, type: 'pagina' }));
+      try {
+        // 1. Buscar en páginas del sistema
+        const paginasEncontradas = paginasDelSistema.filter(pagina => {
+          const matchLabel = pagina.label.toLowerCase().includes(query);
+          const matchKeywords = pagina.keywords.some(kw => kw.includes(query));
+          return matchLabel || matchKeywords;
+        }).map(p => ({ ...p, type: 'pagina' }));
 
-      results = [...paginasEncontradas];
+        results = [...paginasEncontradas];
 
-      // 2. Buscar en comandos rápidos
-      if (query.startsWith('/') || query.startsWith('>')) {
-        const comandosEncontrados = comandosRapidos.filter(cmd =>
-          cmd.label.toLowerCase().includes(query.slice(1)) ||
-          cmd.keywords.some(kw => kw.includes(query.slice(1)))
-        ).map(c => ({ ...c, type: 'comando' }));
-        results = [...comandosEncontrados, ...results];
+        // 2. Buscar en comandos rápidos
+        if (query.startsWith('/') || query.startsWith('>')) {
+          const comandosEncontrados = comandosRapidos.filter(cmd =>
+            cmd.label.toLowerCase().includes(query.slice(1)) ||
+            cmd.keywords.some(kw => kw.includes(query.slice(1)))
+          ).map(c => ({ ...c, type: 'comando' }));
+          results = [...comandosEncontrados, ...results];
+        }
+
+        // 3. Buscar clientes si hay más de 2 caracteres
+        if (query.length > 2 && !query.startsWith('/') && !query.startsWith('>')) {
+          const clientes = await buscarClientes(query);
+          results = [...results, ...clientes];
+        }
+
+        setSearchResults(results.slice(0, 8)); // Limitar a 8 resultados
+      } catch (error) {
+        console.error('Error en búsqueda:', error);
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+        setSelectedIndex(0);
       }
-
-      // 3. Buscar clientes si hay más de 2 caracteres
-      if (query.length > 2 && !query.startsWith('/') && !query.startsWith('>')) {
-        const clientes = await buscarClientes(query);
-        results = [...results, ...clientes];
-      }
-
-      setSearchResults(results.slice(0, 8)); // Limitar a 8 resultados
-      setSearchLoading(false);
-      setSelectedIndex(0);
     };
 
     const debounce = setTimeout(performSearch, 300);
@@ -234,15 +241,20 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   };
 
   const handleSelectResult = (result) => {
-    if (result.type === 'comando') {
-      result.action();
-    } else {
-      navigate(result.path);
-      agregarAlHistorial(result);
-    }
+    // Primero cerrar el modal y limpiar estado
     setSearchOpen(false);
     setSearchQuery('');
     if (isMobile) setSidebarOpen(false);
+    
+    // Usar setTimeout para asegurar que el estado se limpia antes de navegar
+    setTimeout(() => {
+      if (result.type === 'comando') {
+        result.action();
+      } else if (result.path) {
+        agregarAlHistorial(result);
+        navigate(result.path);
+      }
+    }, 50);
   };
 
   // ==========================================
@@ -269,7 +281,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) {
+      if (searchRef.current && !searchRef.current.contains(e.target) && !isMobile) {
         setSearchOpen(false);
       }
       if (profileOpen && !e.target.closest('.profile-menu')) {
@@ -279,7 +291,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [profileOpen]);
+  }, [profileOpen, isMobile]);
 
   // ==========================================
   // ESTILOS Y RESPONSIVE
@@ -587,7 +599,10 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                         {searchHistory.map((item, index) => (
                           <div
                             key={index}
-                            onClick={() => handleSelectResult(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectResult(item);
+                            }}
                             className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
                           >
                             <div className={`p-2 rounded-lg ${getColorClasses(item.color)}`}>
