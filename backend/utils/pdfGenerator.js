@@ -306,11 +306,6 @@ class PDFGenerator {
 
         y += 70;
 
-        // Mensaje de pago en línea
-        doc.fontSize(8).font('Helvetica')
-            .text('Pague la factura en línea www.psi.net.co', xOffset, y, { align: 'center', width: 535 });
-
-        return y + 20;
     }
 
     /**
