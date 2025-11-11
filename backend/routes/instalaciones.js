@@ -574,7 +574,7 @@ router.get('/:id/pdf', async (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PSI - ${instalacion.id}</title>
+    <title>Orden de Servicio PSI - ${instalacion.id}</title>
     <style>
         * {
             box-sizing: border-box; 
@@ -583,9 +583,9 @@ router.get('/:id/pdf', async (req, res) => {
         }
         
         body {
-            font-family: Arial, sans-serif;
-            font-size: 10px;
-            line-height: 1.1;
+            font-family: 'Arial', sans-serif;
+            font-size: 9px;
+            line-height: 1.2;
             color: #000;
             background: white;
             padding: 0;
@@ -593,104 +593,109 @@ router.get('/:id/pdf', async (req, res) => {
         }
         
         .psi-container {
-            width: 210mm;
-            height: 90mm;
-            padding: 4mm;
+            width: 216mm;
+            height: 93mm;
+            padding: 5mm 6mm;
             position: relative;
             background: white;
         }
         
-        /* HEADER */
+        /* HEADER MEJORADO */
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 4mm;
-            height: 15mm;
+            align-items: center;
+            margin-bottom: 3mm;
+            padding-bottom: 2mm;
+            border-bottom: 2px solid #000;
         }
         
         .left-header {
             display: flex;
-            align-items: flex-start;
-            gap: 3mm;
+            align-items: center;
+            gap: 4mm;
         }
         
         .logo-section {
-            width: 18mm;
-            height: 12mm;
+            width: 20mm;
+            height: 14mm;
             display: flex;
             align-items: center;
             justify-content: center;
-            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 1px solid #999; background: #f5f5f5;'}
+            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 2px solid #0056b3; background: #f0f5ff; border-radius: 2mm;'}
         }
         
-        .psi-title {
-            font-size: 28px;
+        .company-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8mm;
+        }
+        
+        .company-name {
+            font-size: 10px;
             font-weight: bold;
-            letter-spacing: 3px;
-            margin-top: 1mm;
+            color: #0056b3;
+            letter-spacing: 0.3px;
+        }
+        
+        .company-details {
+            font-size: 7px;
+            color: #333;
+            line-height: 1.3;
         }
         
         .right-header {
             text-align: right;
-            font-size: 7px;
-            line-height: 1.1;
-            max-width: 70mm;
+            background: #f8f9fa;
+            padding: 2mm 3mm;
+            border-radius: 2mm;
+            border-left: 3px solid #0056b3;
         }
         
-        .company-line {
+        .order-title {
+            font-size: 11px;
             font-weight: bold;
+            color: #0056b3;
             margin-bottom: 1mm;
         }
         
-        .psi-number {
-            font-size: 8px;
+        .order-number {
+            font-size: 14px;
             font-weight: bold;
-            margin-top: 2mm;
+            color: #000;
+            margin-bottom: 1mm;
         }
         
-        /* PRIMERA FILA DE CAMPOS */
-        .first-row {
-            display: flex;
-            gap: 5mm;
+        .order-date {
+            font-size: 7px;
+            color: #666;
+        }
+        
+        /* SECCIÓN CLIENTE */
+        .client-section {
+            background: #f8f9fa;
+            padding: 2.5mm 3mm;
+            border-radius: 2mm;
             margin-bottom: 2.5mm;
+            border-left: 3px solid #0056b3;
         }
         
-        .left-fields {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 2mm;
-        }
-        
-        .right-info {
-            width: 60mm;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5mm;
-            font-size: 8px;
-        }
-        
-        .field-row {
-            display: flex;
-            align-items: center;
-        }
-        
-        .field-label {
+        .section-title {
+            font-size: 9px;
             font-weight: bold;
-            min-width: 20mm;
-            font-size: 9px;
+            color: #0056b3;
+            margin-bottom: 2mm;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
-        .field-value {
-            flex: 1;
-            border-bottom: 1px solid #000;
-            min-height: 3.5mm;
-            padding: 0.5mm 1mm;
-            font-size: 9px;
+        .client-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2mm 4mm;
         }
         
-        .info-line {
+        .info-field {
             display: flex;
             align-items: center;
             gap: 2mm;
@@ -698,71 +703,148 @@ router.get('/:id/pdf', async (req, res) => {
         
         .info-label {
             font-weight: bold;
-            min-width: 25mm;
             font-size: 8px;
+            color: #333;
+            min-width: 22mm;
         }
         
         .info-value {
-            font-size: 8px;
-        }
-        
-        /* SEGUNDA FILA - SERVICIOS */
-        .services-row {
-            display: flex;
-            gap: 5mm;
-            margin-bottom: 2mm;
-        }
-        
-        .service-item {
             flex: 1;
+            font-size: 9px;
+            color: #000;
+            padding: 1mm 2mm;
+            background: white;
+            border-radius: 1mm;
+            border: 1px solid #dee2e6;
+        }
+        
+        /* SECCIÓN PROGRAMACIÓN */
+        .scheduling-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3mm;
+            margin-bottom: 2.5mm;
+        }
+        
+        .schedule-box {
+            background: #fff3cd;
+            padding: 2mm 3mm;
+            border-radius: 2mm;
+            border-left: 3px solid #ffc107;
+        }
+        
+        .schedule-box .section-title {
+            color: #856404;
+            font-size: 8px;
+            margin-bottom: 1.5mm;
+        }
+        
+        /* SECCIÓN SERVICIOS */
+        .services-section {
+            background: #d1ecf1;
+            padding: 2.5mm 3mm;
+            border-radius: 2mm;
+            margin-bottom: 2.5mm;
+            border-left: 3px solid #17a2b8;
+        }
+        
+        .services-section .section-title {
+            color: #0c5460;
+        }
+        
+        .services-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 2mm;
+        }
+        
+        .service-field {
             display: flex;
             align-items: center;
+            gap: 1.5mm;
         }
         
-        /* TERCERA FILA */
-        .internet-row, .description-row {
-            margin-bottom: 2mm;
+        .service-label {
+            font-weight: bold;
+            font-size: 8px;
+            color: #0c5460;
+        }
+        
+        .service-value {
+            flex: 1;
+            font-size: 8px;
+            padding: 1mm 2mm;
+            background: white;
+            border-radius: 1mm;
+            border: 1px solid #bee5eb;
+        }
+        
+        /* SECCIÓN TÉCNICA */
+        .technical-section {
+            background: #d4edda;
+            padding: 2.5mm 3mm;
+            border-radius: 2mm;
+            margin-bottom: 2.5mm;
+            border-left: 3px solid #28a745;
+        }
+        
+        .technical-section .section-title {
+            color: #155724;
+        }
+        
+        .technical-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2mm 3mm;
         }
         
         /* OBSERVACIONES */
         .observations-section {
-            margin-bottom: 4mm;
+            margin-bottom: 3mm;
         }
         
-        .observations-label {
-            font-weight: bold;
-            margin-bottom: 1mm;
-            font-size: 9px;
-        }
-        
-        .observations-line {
-            border-bottom: 1px solid #000;
+        .observations-box {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 2mm;
+            padding: 2mm;
             min-height: 12mm;
-            padding: 1mm;
             font-size: 8px;
+            line-height: 1.4;
         }
         
-        /* FIRMAS */
+        /* FIRMAS MEJORADAS */
         .signatures {
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4mm;
             margin-top: auto;
         }
         
         .signature-block {
             text-align: center;
-            width: 50mm;
+            padding: 2mm;
+            background: #f8f9fa;
+            border-radius: 2mm;
         }
         
         .signature-line {
-            border-top: 1px solid #000;
-            margin-bottom: 1mm;
-            height: 6mm;
+            border-top: 2px solid #000;
+            margin-bottom: 1.5mm;
+            height: 8mm;
         }
         
         .signature-label {
             font-size: 8px;
             font-weight: bold;
+            color: #333;
+            text-transform: uppercase;
+        }
+        
+        .signature-sublabel {
+            font-size: 6px;
+            color: #666;
+            margin-top: 0.5mm;
         }
         
         @page {
@@ -775,6 +857,9 @@ router.get('/:id/pdf', async (req, res) => {
                 margin: 0; 
                 padding: 0;
             }
+            .psi-container {
+                page-break-inside: avoid;
+            }
         }
     </style>
 </head>
@@ -784,96 +869,123 @@ router.get('/:id/pdf', async (req, res) => {
         <div class="header">
             <div class="left-header">
                 <div class="logo-section">
-                    ${!logoBase64 ? '<span style="font-size: 6px; color: #999;">LOGO</span>' : ''}
+                    ${!logoBase64 ? '<span style="font-size: 6px; color: #0056b3; font-weight: bold;">PSI</span>' : ''}
                 </div>
-                <div class="psi-title">PSI</div>
+                <div class="company-info">
+                    <div class="company-name">PROVEEDOR DE TELECOMUNICACIONES S.A.S.</div>
+                    <div class="company-details">
+                        NIT: 901.582.657-3 | Registro TIC No. 96006732<br>
+                        Carrera 9 No. 9-94 | WhatsApp: 318 455 0936
+                    </div>
+                </div>
             </div>
             
             <div class="right-header">
-                <div class="company-line">PROVEEDOR DE TELECOMUNICACIONES S.A.S.</div>
-                <div>NIT: 901.123.456-7</div>
-                <div class="psi-number">
-                    ${String(instalacion.id).padStart(2, '0')} jul 25<br>
-                    02:36 am
+                <div class="order-title">ORDEN DE SERVICIO</div>
+                <div class="order-number">No. ${String(instalacion.id).padStart(6, '0')}</div>
+                <div class="order-date">
+                    ${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: '2-digit' 
+                    }) : ''} - ${instalacion.hora_programada || ''}
                 </div>
             </div>
         </div>
 
-        <!-- PRIMERA FILA -->
-        <div class="first-row">
-            <!-- CAMPOS IZQUIERDA -->
-            <div class="left-fields">
-                <div class="field-row">
-                    <span class="field-label">Nombre:</span>
-                    <span class="field-value">${instalacion.cliente_nombre || ''}</span>
+        <!-- INFORMACIÓN DEL CLIENTE -->
+        <div class="client-section">
+            <div class="section-title">📋 Información del Cliente</div>
+            <div class="client-grid">
+                <div class="info-field">
+                    <span class="info-label">Nombre:</span>
+                    <span class="info-value">${instalacion.cliente_nombre || ''}</span>
                 </div>
-
-                <div class="field-row">
-                    <span class="field-label">Dirección:</span>
-                    <span class="field-value">${instalacion.direccion_instalacion || instalacion.cliente_direccion || ''}</span>
-                </div>
-
-                <div class="field-row">
-                    <span class="field-label">Hora:</span>
-                    <span class="field-value">${instalacion.hora_programada || ''}</span>
-                </div>
-
-                <div class="field-row">
-                    <span class="field-label">Fecha:</span>
-                    <span class="field-value">${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO') : ''}</span>
-                </div>
-            </div>
-
-            <!-- INFO DERECHA -->
-            <div class="right-info">
-                <div class="info-line">
+                <div class="info-field">
                     <span class="info-label">Identificación:</span>
                     <span class="info-value">${instalacion.cliente_identificacion || ''}</span>
                 </div>
-                <div class="info-line">
+                <div class="info-field">
+                    <span class="info-label">Dirección:</span>
+                    <span class="info-value">${instalacion.direccion_instalacion || instalacion.cliente_direccion || ''}</span>
+                </div>
+                <div class="info-field">
                     <span class="info-label">Teléfono:</span>
                     <span class="info-value">${instalacion.telefono_contacto || instalacion.cliente_telefono || ''}</span>
                 </div>
-                <div class="info-line">
-                    <span class="info-label">Poste:</span>
-                    <span class="info-value"></span>
+            </div>
+        </div>
+
+        <!-- PROGRAMACIÓN -->
+        <div class="scheduling-section">
+            <div class="schedule-box">
+                <div class="section-title">📅 Fecha Programada</div>
+                <div class="info-field">
+                    <span class="info-value" style="text-align: center; font-weight: bold; background: white;">
+                        ${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        }) : ''}
+                    </span>
+                </div>
+            </div>
+            <div class="schedule-box">
+                <div class="section-title">⏰ Hora Programada</div>
+                <div class="info-field">
+                    <span class="info-value" style="text-align: center; font-weight: bold; font-size: 11px; background: white;">
+                        ${instalacion.hora_programada || ''}
+                    </span>
                 </div>
             </div>
         </div>
 
-        <!-- FILA DE SERVICIOS -->
-        <div class="services-row">
-            <div class="service-item">
-                <span class="field-label">Amarre:</span>
-                <span class="field-value"></span>
-            </div>
-            <div class="service-item">
-                <span class="field-label">Televisión:</span>
-                <span class="field-value"></span>
+        <!-- SERVICIOS A INSTALAR -->
+        <div class="services-section">
+            <div class="section-title">🌐 Servicios a Instalar</div>
+            <div class="services-grid">
+                <div class="service-field">
+                    <span class="service-label">Internet:</span>
+                    <span class="service-value">${servicioDescripcion}</span>
+                </div>
+                <div class="service-field">
+                    <span class="service-label">Televisión:</span>
+                    <span class="service-value"></span>
+                </div>
+                <div class="service-field">
+                    <span class="service-label">Telefonía:</span>
+                    <span class="service-value"></span>
+                </div>
             </div>
         </div>
 
-        <!-- INTERNET -->
-        <div class="internet-row">
-            <div class="field-row">
-                <span class="field-label">Internet:</span>
-                <span class="field-value">${servicioDescripcion}</span>
-            </div>
-        </div>
-
-        <!-- DESCRIPCIÓN -->
-        <div class="description-row">
-            <div class="field-row">
-                <span class="field-label">Descripción:</span>
-                <span class="field-value">Instalación ${instalacion.observaciones || ''}</span>
+        <!-- INFORMACIÓN TÉCNICA -->
+        <div class="technical-section">
+            <div class="section-title">🔧 Información Técnica</div>
+            <div class="technical-grid">
+                <div class="service-field">
+                    <span class="service-label" style="color: #155724;">Poste:</span>
+                    <span class="service-value" style="border-color: #c3e6cb;"></span>
+                </div>
+                <div class="service-field">
+                    <span class="service-label" style="color: #155724;">Amarre:</span>
+                    <span class="service-value" style="border-color: #c3e6cb;"></span>
+                </div>
+                <div class="service-field" style="grid-column: 1 / -1;">
+                    <span class="service-label" style="color: #155724;">Instalador:</span>
+                    <span class="service-value" style="border-color: #c3e6cb; font-weight: bold;">
+                        ${instalacion.instalador_nombre_completo || 'Por asignar'}
+                    </span>
+                </div>
             </div>
         </div>
 
         <!-- OBSERVACIONES -->
         <div class="observations-section">
-            <div class="observations-label">Observaciones:</div>
-            <div class="observations-line">
-                Instalador: ${instalacion.instalador_nombre_completo || 'Por asignar'}
+            <div class="section-title">📝 Observaciones</div>
+            <div class="observations-box">
+                ${instalacion.observaciones || 'Sin observaciones adicionales'}
             </div>
         </div>
 
@@ -881,21 +993,24 @@ router.get('/:id/pdf', async (req, res) => {
         <div class="signatures">
             <div class="signature-block">
                 <div class="signature-line"></div>
-                <div class="signature-label">Firma Usuario</div>
+                <div class="signature-label">Firma Cliente</div>
+                <div class="signature-sublabel">${instalacion.cliente_nombre || ''}</div>
             </div>
             <div class="signature-block">
                 <div class="signature-line"></div>
-                <div class="signature-label">Fecha</div>
+                <div class="signature-label">Firma Instalador</div>
+                <div class="signature-sublabel">${instalacion.instalador_nombre_completo || 'Por asignar'}</div>
             </div>
             <div class="signature-block">
                 <div class="signature-line"></div>
-                <div class="signature-label">PSI</div>
+                <div class="signature-label">Fecha y Hora</div>
+                <div class="signature-sublabel">Completado</div>
             </div>
         </div>
     </div>
 </body>
 </html>
-        `;
+`;
 
         // Generar PDF con Puppeteer
         console.log('🚀 Iniciando Puppeteer para PDF PSI...');
