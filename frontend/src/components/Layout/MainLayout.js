@@ -166,9 +166,25 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   }, []);
 
   const agregarAlHistorial = (item) => {
-    const newHistory = [item, ...searchHistory.filter(h => h.path !== item.path)].slice(0, 5);
-    setSearchHistory(newHistory);
-    localStorage.setItem('searchHistory', JSON.stringify(newHistory));
+    try {
+      // Crear copia del item sin el ícono de React (no se puede serializar)
+      const itemParaGuardar = {
+        label: item.label,
+        path: item.path,
+        color: item.color,
+        type: item.type,
+        sublabel: item.sublabel
+      };
+      
+      // Filtrar y agregar al historial
+      const historialActual = searchHistory.filter(h => h.path !== item.path);
+      const newHistory = [itemParaGuardar, ...historialActual].slice(0, 5);
+      
+      setSearchHistory(newHistory);
+      localStorage.setItem('searchHistory', JSON.stringify(newHistory));
+    } catch (error) {
+      console.error('Error al guardar en historial:', error);
+    }
   };
 
   // ==========================================
@@ -241,20 +257,41 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   };
 
   const handleSelectResult = (result) => {
-    // Primero cerrar el modal y limpiar estado
+    console.log('Seleccionando resultado:', result); // Para debug
+    
+    // Cerrar modal primero
     setSearchOpen(false);
     setSearchQuery('');
-    if (isMobile) setSidebarOpen(false);
     
-    // Usar setTimeout para asegurar que el estado se limpia antes de navegar
-    setTimeout(() => {
-      if (result.type === 'comando') {
+    // Ejecutar acción después de un breve delay
+    requestAnimationFrame(() => {
+      if (result.type === 'comando' && result.action) {
+        // Ejecutar comando
         result.action();
       } else if (result.path) {
-        agregarAlHistorial(result);
-        navigate(result.path);
+        // Agregar al historial antes de navegar
+        try {
+          const historyItem = {
+            icon: result.icon,
+            label: result.label,
+            path: result.path,
+            color: result.color,
+            type: result.type
+          };
+          agregarAlHistorial(historyItem);
+        } catch (e) {
+          console.error('Error al guardar historial:', e);
+        }
+        
+        // Navegar a la página
+        navigate(result.path, { replace: false });
+        
+        // Cerrar sidebar en móvil
+        if (isMobile) {
+          setTimeout(() => setSidebarOpen(false), 100);
+        }
       }
-    }, 50);
+    });
   };
 
   // ==========================================
@@ -596,26 +633,32 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                           <Clock size={14} />
                           Búsquedas recientes
                         </div>
-                        {searchHistory.map((item, index) => (
-                          <div
-                            key={index}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSelectResult(item);
-                            }}
-                            className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
-                          >
-                            <div className={`p-2 rounded-lg ${getColorClasses(item.color)}`}>
-                              {item.icon}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-gray-900 truncate">
-                                {item.label}
+                        {searchHistory.map((item, index) => {
+                          // Buscar el ícono correspondiente de las páginas del sistema
+                          const paginaOriginal = paginasDelSistema.find(p => p.path === item.path);
+                          const icon = paginaOriginal?.icon || <FileText size={18} />;
+                          
+                          return (
+                            <div
+                              key={index}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectResult({ ...item, icon });
+                              }}
+                              className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
+                            >
+                              <div className={`p-2 rounded-lg ${getColorClasses(item.color)}`}>
+                                {icon}
                               </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-gray-900 truncate">
+                                  {item.label}
+                                </div>
+                              </div>
+                              <ArrowRight size={16} className="text-gray-400" />
                             </div>
-                            <ArrowRight size={16} className="text-gray-400" />
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
 
@@ -625,7 +668,10 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                         {searchResults.map((result, index) => (
                           <div
                             key={index}
-                            onClick={() => handleSelectResult(result)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectResult(result);
+                            }}
                             className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${
                               selectedIndex === index
                                 ? 'bg-[#0e6493]/10 border border-[#0e6493]/20'
@@ -817,7 +863,10 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                   {searchResults.map((result, index) => (
                     <div
                       key={index}
-                      onClick={() => handleSelectResult(result)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectResult(result);
+                      }}
                       className="flex items-center gap-3 px-3 py-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
                     >
                       <div className={`p-2 rounded-lg ${getColorClasses(result.color)}`}>
@@ -844,22 +893,30 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                   <div className="px-3 py-2 text-xs font-semibold text-gray-500">
                     Recientes
                   </div>
-                  {searchHistory.map((item, index) => (
-                    <div
-                      key={index}
-                      onClick={() => handleSelectResult(item)}
-                      className="flex items-center gap-3 px-3 py-3 hover:bg-gray-50 rounded-lg cursor-pointer"
-                    >
-                      <div className={`p-2 rounded-lg ${getColorClasses(item.color)}`}>
-                        {item.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-900 truncate">
-                          {item.label}
+                  {searchHistory.map((item, index) => {
+                    const paginaOriginal = paginasDelSistema.find(p => p.path === item.path);
+                    const icon = paginaOriginal?.icon || <FileText size={18} />;
+                    
+                    return (
+                      <div
+                        key={index}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectResult({ ...item, icon });
+                        }}
+                        className="flex items-center gap-3 px-3 py-3 hover:bg-gray-50 rounded-lg cursor-pointer"
+                      >
+                        <div className={`p-2 rounded-lg ${getColorClasses(item.color)}`}>
+                          {icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">
+                            {item.label}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
