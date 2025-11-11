@@ -111,7 +111,7 @@ class PDFGenerator {
         // === INFORMACIÓN DEL CLIENTE ===
         doc.fontSize(10).font('Helvetica-Bold')
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', xOffset, y)
-            .fontSize(8).font('Helvetica')
+            .fontSize(10).font('Helvetica')
             .text(`ID Cliente ${factura.identificacion_cliente || '1005450340'} / ${factura.codigo_cliente || '200'}`, xOffset, y + 14)
             .text(`Dirección: ${factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN'}`, xOffset, y + 26);
 
@@ -257,7 +257,7 @@ class PDFGenerator {
         this.dibujarLogoPSIReal(doc, xOffset, y);
 
         // Información empresa
-        doc.fontSize(9).font('Helvetica-Bold')
+        doc.fontSize(7).font('Helvetica-Bold')
         .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 140, y + 8, { align: 'center', width: 300 });
 
         // FACTURA DE VENTA
@@ -270,7 +270,7 @@ class PDFGenerator {
         // Información del cliente
         doc.fontSize(11).font('Helvetica-Bold')
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', xOffset, y)
-            .fontSize(9).font('Helvetica')
+            .fontSize(11).font('Helvetica')
             .text(factura.identificacion_cliente || '1005450340', xOffset, y + 15)
             .text(factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN', xOffset, y + 30);
 
@@ -321,7 +321,7 @@ class PDFGenerator {
         this.dibujarLogoPSIReal(doc, xOffset, y);
 
         // Información empresa
-      doc.fontSize(9).font('Helvetica-Bold')
+      doc.fontSize(7).font('Helvetica-Bold')
         .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 140, y + 8, { align: 'center', width: 300 });
 
         // FACTURA DE VENTA y NÚMERO
@@ -334,7 +334,7 @@ class PDFGenerator {
         // Información del cliente
         doc.fontSize(11).font('Helvetica-Bold')
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', xOffset, y)
-            .fontSize(9).font('Helvetica')
+            .fontSize(11).font('Helvetica')
             .text(factura.identificacion_cliente || '1005450340', xOffset, y + 15)
             .text(factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN', xOffset, y + 30);
 
