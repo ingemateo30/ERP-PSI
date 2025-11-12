@@ -54,9 +54,11 @@ const InstalacionesFilters = ({ filtros, onAplicarFiltros, onCerrar }) => {
         try {
             // Cargar instaladores
             const instaladoresRes = await instalacionesService.getInstaladores();
-            if (instaladoresRes.success) {
-                setInstaladores(instaladoresRes.data);
-            }
+if (instaladoresRes?.success && instaladoresRes?.data) {
+  setInstaladores(instaladoresRes.data);
+} else if (Array.isArray(instaladoresRes)) {
+  setInstaladores(instaladoresRes);
+}
 
             // Cargar ciudades (simulado - en producción vendría de la API)
             setCiudades([
@@ -254,7 +256,7 @@ const InstalacionesFilters = ({ filtros, onAplicarFiltros, onCerrar }) => {
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                                     <input
                                         type="text"
-                                        placeholder="Cliente, dirección, persona..."
+                                        placeholder="Cliente, dirección..."
                                         value={filtrosLocales.busqueda}
                                         onChange={(e) => handleFilterChange('busqueda', e.target.value)}
                                         className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -312,10 +314,10 @@ const InstalacionesFilters = ({ filtros, onAplicarFiltros, onCerrar }) => {
                                 >
                                     <option value="">Todos los instaladores</option>
                                     {instaladores.map(instalador => (
-                                        <option key={instalador.id} value={instalador.id}>
-                                            {instalador.nombres} {instalador.apellidos}
-                                        </option>
-                                    ))}
+  <option key={instalador.id} value={instalador.id}>
+    {instalador.nombre || `${instalador.nombres} ${instalador.apellidos}`}
+  </option>
+))}
                                 </select>
                             </div>
 
