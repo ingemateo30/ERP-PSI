@@ -654,72 +654,137 @@ const SupervisorDashboard = () => {
                         />
                     </div>
 
-                    {/* Gráfica de ingresos del mes - DATOS REALES */}
-                    <div className="bg-white rounded-lg shadow-md p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-semibold text-[#0e6493]">Ingresos del Mes</h2>
-                            <span className="text-sm text-gray-500">Últimos 30 días</span>
-                        </div>
+{/* Gráfica de ingresos del mes - MEJORADA Y VISUAL */}
+<div className="bg-white rounded-lg shadow-md p-6">
+    <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-[#0e6493]">Ingresos Últimos 30 Días</h2>
+        <span className="text-sm text-gray-500">
+            {ingresosMensuales.length} {ingresosMensuales.length === 1 ? 'día' : 'días'} con ingresos
+        </span>
+    </div>
+    
+    {ingresosMensuales.length === 0 ? (
+        <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+            <div className="text-center">
+                <TrendingUp size={48} className="mx-auto text-gray-400 mb-2" />
+                <p className="text-gray-500">No hay datos de ingresos</p>
+                <p className="text-sm text-gray-400">Los datos aparecerán cuando haya facturas pagadas</p>
+            </div>
+        </div>
+    ) : (
+        <>
+            {/* Gráfica de Barras Mejorada */}
+            <div className="h-80 relative">
+                {/* Grid de fondo */}
+                <div className="absolute inset-0 flex flex-col justify-between pb-12 pointer-events-none">
+                    {[...Array(5)].map((_, i) => (
+                        <div key={i} className="border-t border-gray-200"></div>
+                    ))}
+                </div>
+
+                {/* Barras */}
+                <div className="relative h-full flex items-end justify-start gap-3 px-4 pb-12 overflow-x-auto">
+                    {ingresosMensuales.map((item, index) => {
+                        const maxMonto = Math.max(...ingresosMensuales.map(i => i.monto));
+                        const altura = maxMonto > 0 ? (item.monto / maxMonto) * 100 : 5;
                         
-                        {ingresosMensuales.length === 0 ? (
-                            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                                <div className="text-center">
-                                    <TrendingUp size={48} className="mx-auto text-gray-400 mb-2" />
-                                    <p className="text-gray-500">No hay datos de ingresos</p>
-                                    <p className="text-sm text-gray-400">Los datos aparecerán cuando haya facturas pagadas</p>
+                        // Calcular color basado en el monto (gradiente)
+                        const intensidad = Math.round((item.monto / maxMonto) * 100);
+                        const color = `hsl(200, 70%, ${Math.max(30, 80 - intensidad/2)}%)`;
+                        
+                        return (
+                            <div key={index} className="flex flex-col items-center min-w-[60px] group">
+                                {/* Valor encima de la barra */}
+                                <div className="mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <span className="text-xs font-semibold text-[#0e6493]">
+                                        ${(item.monto / 1000).toFixed(0)}k
+                                    </span>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="h-64 overflow-x-auto">
-                                <div className="min-w-full h-full flex items-end justify-between px-4 pb-8 space-x-2">
-                                    {ingresosMensuales.map((item, index) => {
-                                        const maxMonto = Math.max(...ingresosMensuales.map(i => i.monto));
-                                        const altura = maxMonto > 0 ? (item.monto / maxMonto) * 100 : 0;
-                                        
-                                        return (
-                                            <div key={index} className="flex flex-col items-center flex-1 min-w-[40px]">
-                                                <div className="relative group w-full">
-                                                    {/* Barra */}
-                                                    <div
-                                                        className="bg-[#0e6493] hover:bg-[#0e6493]/80 rounded-t transition-all duration-300 w-full"
-                                                        style={{ height: `${Math.max(altura, 5)}%`, minHeight: '5px' }}
-                                                    >
-                                                        {/* Tooltip */}
-                                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                                            ${item.monto.toLocaleString('es-CO')}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {/* Etiqueta de fecha */}
-                                                <span className="text-xs text-gray-500 mt-2 transform -rotate-45 origin-top-left">
-                                                    {item.fecha}
-                                                </span>
+                                
+                                {/* Barra con animación */}
+                                <div className="relative flex-1 w-full flex items-end">
+                                    <div
+                                        className="w-full rounded-t-lg transition-all duration-500 ease-out hover:opacity-80 cursor-pointer shadow-lg"
+                                        style={{ 
+                                            height: `${Math.max(altura, 10)}%`,
+                                            backgroundColor: color,
+                                            minHeight: '20px'
+                                        }}
+                                    >
+                                        {/* Tooltip mejorado */}
+                                        <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 
+                                                      bg-gray-900 text-white px-3 py-2 rounded-lg 
+                                                      opacity-0 group-hover:opacity-100 transition-opacity 
+                                                      whitespace-nowrap z-20 shadow-xl">
+                                            <div className="text-xs font-medium">{item.fecha}</div>
+                                            <div className="text-sm font-bold">
+                                                ${item.monto.toLocaleString('es-CO')}
                                             </div>
-                                        );
-                                    })}
+                                            {/* Flechita del tooltip */}
+                                            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 
+                                                          w-2 h-2 bg-gray-900 rotate-45"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Etiqueta de fecha mejorada */}
+                                <div className="mt-2 text-center">
+                                    <span className="text-[10px] text-gray-600 font-medium block">
+                                        {item.fecha}
+                                    </span>
                                 </div>
                             </div>
-                        )}
-                        
-                        {/* Resumen de totales */}
-                        <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                            <div>
-                                <p className="text-sm text-gray-500">Total del período</p>
-                                <p className="text-xl font-bold text-[#0e6493]">
-                                    ${ingresosMensuales.reduce((acc, item) => acc + item.monto, 0).toLocaleString('es-CO')}
-                                </p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-sm text-gray-500">Promedio diario</p>
-                                <p className="text-xl font-bold text-gray-700">
-                                    ${ingresosMensuales.length > 0 
-                                        ? (ingresosMensuales.reduce((acc, item) => acc + item.monto, 0) / ingresosMensuales.length).toLocaleString('es-CO', { maximumFractionDigits: 0 })
-                                        : '0'
-                                    }
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                        );
+                    })}
+                </div>
+
+                {/* Leyenda del eje Y */}
+                <div className="absolute left-0 top-0 bottom-12 flex flex-col justify-between text-xs text-gray-500 pr-2">
+                    {[...Array(5)].map((_, i) => {
+                        const maxMonto = Math.max(...ingresosMensuales.map(item => item.monto));
+                        const valor = Math.round((maxMonto / 4) * (4 - i));
+                        return (
+                            <span key={i} className="text-right">
+                                ${(valor / 1000).toFixed(0)}k
+                            </span>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Resumen de totales mejorado */}
+            <div className="mt-6 pt-4 border-t grid grid-cols-3 gap-4">
+                <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <p className="text-xs text-gray-600 mb-1">Total Período</p>
+                    <p className="text-lg font-bold text-[#0e6493]">
+                        ${ingresosMensuales.reduce((acc, item) => acc + item.monto, 0).toLocaleString('es-CO')}
+                    </p>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <p className="text-xs text-gray-600 mb-1">Promedio Diario</p>
+                    <p className="text-lg font-bold text-green-700">
+                        ${ingresosMensuales.length > 0 
+                            ? (ingresosMensuales.reduce((acc, item) => acc + item.monto, 0) / ingresosMensuales.length).toLocaleString('es-CO', { maximumFractionDigits: 0 })
+                            : '0'
+                        }
+                    </p>
+                </div>
+                <div className="text-center p-3 bg-purple-50 rounded-lg">
+                    <p className="text-xs text-gray-600 mb-1">Día Máximo</p>
+                    <p className="text-lg font-bold text-purple-700">
+                        ${Math.max(...ingresosMensuales.map(i => i.monto)).toLocaleString('es-CO')}
+                    </p>
+                </div>
+            </div>
+
+            {/* Indicador de estado */}
+            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-500">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <span>Datos actualizados en tiempo real</span>
+            </div>
+        </>
+    )}
+</div>
                 </>
             )}
         </>
