@@ -44,6 +44,8 @@ const VisorFirmaPDF = lazy(() => import('./components/Contratos/VisorFirmaPDF'))
 const FirmaContratosWrapper = lazy(() => import('./components/Contratos/FirmaContratosWrapper'));
 const HistorialFacturacionWrapper = lazy(() => import('./components/Facturas/HistorialFacturacionWrapper'));
 const CrucePagosBancarios = lazy(() => import('./components/Facturas/CrucePagosBancarios'));
+const MapaInstalaciones = lazy(() => import('./components/Mapa/MapaInstalaciones'));
+
 <Route path="/calendar" element={<ProtectedRoute><CalendarioManagement /></ProtectedRoute>} />
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -196,6 +198,8 @@ function App() {
                 }
               />
 
+             
+
               {/* ================================ */}
               {/* RUTAS PROTEGIDAS GENERALES */}
               {/* ================================ */}
@@ -209,16 +213,16 @@ function App() {
                 }
               />
               {/* Ruta Mis Trabajos - Para Instaladores */}
-<Route
-  path="/mis-trabajos"
-  element={
-    <ProtectedRoute requiredRole="instalador,supervisor,administrador">
-      <MainLayout title="Mis Trabajos" subtitle="Gestión de instalaciones del día">
-        <MisTrabajos />
-      </MainLayout>
-    </ProtectedRoute>
-  }
-/>
+              <Route
+                path="/mis-trabajos"
+                element={
+                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
+                    <MainLayout title="Mis Trabajos" subtitle="Gestión de instalaciones del día">
+                      <MisTrabajos />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
 
               <Route
                 path="/profile"
@@ -358,7 +362,7 @@ function App() {
                   </ ProtectedRoute>
                 }
               />
-               <Route
+              <Route
                 path="/historial-facturas"
                 element={
                   <ProtectedRoute requiredRole="supervisor,administrador" >
@@ -388,7 +392,7 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-                <Route
+              <Route
                 path="/firma-contratos"
                 element={
                   <ProtectedRoute requiredRole="administrador">
@@ -434,6 +438,17 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+
+               <Route
+                path="/mapa-instalaciones"
+                element={
+                  <ProtectedRoute allowedRoles={['administrador', 'supervisor']}>
+                    <MainLayout title="Gestión de Mapa de Instalaciones" subtitle="">
+                    <MapaInstalaciones />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="pqr"
                 element={
@@ -468,26 +483,26 @@ function App() {
                 }
               />
               // ✅ DESPUÉS (CORRECTO) - Permite administrador y supervisor
-<Route
-  path="/reports"
-  element={
-    <ProtectedRoute requiredRole="administrador">
-      <MainLayout title="Dashboard de Estadísticas" subtitle="Métricas generales del sistema">
-        <EstadisticasGeneral />
-      </MainLayout>
-    </ProtectedRoute>
-  }
-/>
               <Route
-  path="/calendar"
-  element={
-    <ProtectedRoute requiredRole="instalador,supervisor,administrador">
-      <MainLayout title="Calendario" subtitle="Agenda y gestión de eventos">
-        <CalendarioManagement />
-      </MainLayout>
-    </ProtectedRoute>
-  }
-/>
+                path="/reports"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Dashboard de Estadísticas" subtitle="Métricas generales del sistema">
+                      <EstadisticasGeneral />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/calendar"
+                element={
+                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
+                    <MainLayout title="Calendario" subtitle="Agenda y gestión de eventos">
+                      <CalendarioManagement />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
 
 
               {/* ================================ */}
