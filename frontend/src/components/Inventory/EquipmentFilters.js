@@ -78,7 +78,7 @@ const EquipmentFilters = ({ filters, onFilterChange, userRole, onExport }) => {
       // ✅ VERIFICACIÓN ADICIONAL: Asegurar que tienen el campo nombre
       instaladoresList = instaladoresList.map(instalador => ({
         ...instalador,
-        nombre: instalador.nombre || `${instalador.nombres || ''} ${instalador.apellidos || ''}`.trim()
+        display_name: instalador.nombre || instalador.display_name || `${instalador.nombres || ''} ${instalador.apellidos || ''}`.trim()
       }));
 
       console.log(`✅ ${instaladoresList.length} instaladores cargados:`, instaladoresList);
@@ -242,8 +242,8 @@ const EquipmentFilters = ({ filters, onFilterChange, userRole, onExport }) => {
                   <option value="">Todos los instaladores</option>
                   {instaladores.map(instalador => (
                     <option key={instalador.id} value={instalador.id}>
-                      {instalador.nombre} ({instalador.equipos_asignados} equipos)
-                    </option>
+  {instalador.nombre || instalador.display_name || 'Sin nombre'} ({instalador.equipos_asignados || 0} equipos)
+</option>
                   ))}
                 </select>
               </div>
@@ -327,7 +327,7 @@ const EquipmentFilters = ({ filters, onFilterChange, userRole, onExport }) => {
                   )}
                   {filters.instalador_id && (
                     <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mr-1">
-                      Instalador: {instaladores.find(i => i.id == filters.instalador_id)?.nombre}
+                      Instalador: {instaladores.find(i => i.id == filters.instalador_id)?.nombre || instaladores.find(i => i.id == filters.instalador_id)?.display_name || 'Desconocido'}
                       <button
                         onClick={() => handleFilterChange('instalador_id', '')}
                         className="ml-1 text-yellow-600 hover:text-yellow-800"
