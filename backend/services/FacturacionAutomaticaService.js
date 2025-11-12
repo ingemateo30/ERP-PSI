@@ -536,7 +536,7 @@ class FacturacionAutomaticaService {
       const [resultado] = await conexion.execute(`
         SELECT 
           COALESCE(SUM(f.total - COALESCE(
-            (SELECT SUM(p.valor_pagado) 
+            (SELECT SUM(p.monto) 
              FROM pagos p 
              WHERE p.factura_id = f.id 
                AND p.activo = 1), 0
@@ -567,7 +567,7 @@ class FacturacionAutomaticaService {
   static async calcularInteresMora(conexion, clienteId) {
     try {
       // Usar el servicio de intereses moratorios
-      const interes = await InteresesMoratoriosService.calcularInteresesCliente(clienteId);
+      const interes = await InteresesMoratoriosService.calcularInteresesMoratorios(cliente.id);
 
       return {
         tipo: 'interes',
@@ -747,7 +747,7 @@ class FacturacionAutomaticaService {
           Math.round(concepto.valor * (concepto.porcentaje_iva / 100)) : 0;
 
         await conexion.execute(`
-          INSERT INTO detalle_factura (
+          INSERT INTO detalle_facturas (
             factura_id,
             tipo_concepto,
             concepto,
