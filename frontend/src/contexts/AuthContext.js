@@ -203,9 +203,11 @@ export const AuthProvider = ({ children }) => {
     let token, user;
     
     if (response.success && response.data) {
+      // Estructura del backend: { success: true, data: { user: {...}, tokens: {...} } }
       token = response.data.tokens?.accessToken;
       user = response.data.user;
     } else {
+      // Fallback para otras estructuras
       token = response.token || response.accessToken;
       user = response.data?.user || response.user;
     }
@@ -213,6 +215,7 @@ export const AuthProvider = ({ children }) => {
     console.log('🔍 AuthContext - Token extraído:', token ? 'EXISTS' : 'MISSING');
     console.log('🔍 AuthContext - User extraído:', user ? 'EXISTS' : 'MISSING');
 
+    // Si no viene usuario en la respuesta, extraer del token
     if (!user && token) {
       user = authService.getUserFromToken();
       console.log('🔍 AuthContext - User del token:', user);
@@ -224,24 +227,12 @@ export const AuthProvider = ({ children }) => {
         type: AuthActions.SET_AUTHENTICATED,
         payload: { user, token }
       });
-      
-      // 🔥 ESTA ES LA PARTE NUEVA - Retornar la ruta sugerida
-      const userRole = (user.rol || user.role || '').toLowerCase();
-      const dashboardRoutes = {
-        'administrador': '/admin/dashboard',
-        'supervisor': '/supervisor/dashboard',
-        'instalador': '/instalador/dashboard'
-      };
-      
-      return {
-        ...response,
-        success: true,
-        suggestedRoute: dashboardRoutes[userRole] || '/dashboard'
-      };
     } else {
       console.error('❌ AuthContext - Faltan datos: user=', !!user, 'token=', !!token);
       throw new Error('Respuesta de login inválida');
     }
+
+    return response;
   } catch (error) {
     console.error('❌ AuthContext - Error en login:', error);
     const errorMessage = error.message || 'Error al iniciar sesión';
