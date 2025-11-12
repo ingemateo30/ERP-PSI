@@ -372,15 +372,12 @@ const SupervisorDashboard = () => {
             });
             const planesData = await planesResponse.json();
 
-            // 4. Obtener datos para la gráfica de ingresos (últimos 30 días)
-            const fechaFin = new Date().toISOString().split('T')[0];
-            const fechaInicio = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            
-            const ingresosResponse = await fetch(
-                `${process.env.REACT_APP_API_URL}/estadisticas/ingresos-diarios?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`,
+            // 4. Obtener TODAS las facturas para la gráfica
+            const todasFacturasResponse = await fetch(
+                `${process.env.REACT_APP_API_URL}/facturas`,
                 { headers }
             );
-            const ingresosData = await ingresosResponse.json();
+            const todasFacturas = await todasFacturasResponse.json();
 
             // Procesar y establecer estadísticas
             if (clientesData.success) {
@@ -411,13 +408,47 @@ const SupervisorDashboard = () => {
                 });
             }
 
-            // Procesar datos de ingresos para la gráfica
-            if (ingresosData.success && ingresosData.data) {
-                const datosGrafica = ingresosData.data.map(item => ({
-                    fecha: new Date(item.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }),
-                    monto: parseFloat(item.total || 0)
-                }));
+            // Procesar datos de ingresos para la gráfica desde facturas pagadas
+            if (todasFacturas.success && todasFacturas.facturas) {
+                // Filtrar solo facturas pagadas de los últimos 30 días
+                const hace30Dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
                 
+                const facturasPagadas = todasFacturas.facturas
+                    .filter(f => f.estado === 'Pagada')
+                    .filter(f => {
+                        const fechaFactura = new Date(f.fecha_pago || f.fecha_emision);
+                        return fechaFactura >= hace30Dias;
+                    });
+                
+                console.log('📊 Facturas pagadas últimos 30 días:', facturasPagadas.length);
+                
+                // Agrupar por fecha
+                const ingresosPorFecha = {};
+                facturasPagadas.forEach(factura => {
+                    const fecha = new Date(factura.fecha_pago || factura.fecha_emision).toLocaleDateString('es-CO', { 
+                        day: '2-digit', 
+                        month: 'short' 
+                    });
+                    if (!ingresosPorFecha[fecha]) {
+                        ingresosPorFecha[fecha] = 0;
+                    }
+                    ingresosPorFecha[fecha] += parseFloat(factura.monto_total || 0);
+                });
+                
+                // Convertir a array para la gráfica y ordenar por fecha
+                const datosGrafica = Object.entries(ingresosPorFecha)
+                    .map(([fecha, monto]) => ({
+                        fecha,
+                        monto
+                    }))
+                    .sort((a, b) => {
+                        // Ordenar cronológicamente
+                        const fechaA = new Date(a.fecha);
+                        const fechaB = new Date(b.fecha);
+                        return fechaA - fechaB;
+                    });
+                
+                console.log('📈 Datos gráfica:', datosGrafica);
                 setIngresosMensuales(datosGrafica);
             }
 
