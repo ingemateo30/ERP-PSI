@@ -81,6 +81,19 @@ class FacturacionAutomaticaController {
           // Calcular totales
           const totales = FacturacionAutomaticaService.calcularTotalesFactura(conceptos);
 
+          // ✅ CORREGIDO: Contar facturas reales del cliente
+          const conexion = await Database.getConnection();
+          const [conteoFacturas] = await conexion.execute(`
+            SELECT COUNT(*) as total 
+            FROM facturas 
+            WHERE cliente_id = ? AND activo = '1'
+          `, [cliente.id]);
+          conexion.release();
+
+          const numFacturas = conteoFacturas[0]?.total || 0;
+          const tipoFacturaReal = numFacturas === 0 ? 'primera' : 
+                                 numFacturas === 1 ? 'segunda' : 'mensual';
+
           // Construir detalle del cliente
           const detalleCliente = {
             cliente_id: cliente.id,
@@ -88,9 +101,9 @@ class FacturacionAutomaticaController {
             nombre: cliente.nombre,
             estrato: cliente.estrato,
             numero_factura: periodo.numero_factura,
-            tipo_factura: periodo.es_primera_factura ? 'primera' : 
-                         periodo.es_nivelacion ? 'segunda' : 'mensual',
-            tipo_factura_descripcion: periodo.tipo_facturacion,
+            tipo_factura: tipoFacturaReal,
+            tipo_factura_descripcion: `${numFacturas + 1}ra Factura`,
+            tipo_factura_numero: numFacturas + 1,
             periodo_facturacion: {
               fecha_desde: periodo.fecha_desde,
               fecha_hasta: periodo.fecha_hasta,
@@ -127,9 +140,9 @@ class FacturacionAutomaticaController {
           montoTotalEstimado += totales.total;
           serviciosTotales += servicios.length;
 
-          // Estadísticas por tipo
-          if (periodo.es_primera_factura) estadisticas.primera++;
-          else if (periodo.es_nivelacion) estadisticas.segunda++;
+          // ✅ CORREGIDO: Estadísticas por tipo usando el conteo real
+          if (tipoFacturaReal === 'primera') estadisticas.primera++;
+          else if (tipoFacturaReal === 'segunda') estadisticas.segunda++;
           else estadisticas.mensual++;
 
         } catch (error) {
