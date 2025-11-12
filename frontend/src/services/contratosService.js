@@ -270,16 +270,16 @@ class ContratosService {
      * Buscar contratos específicamente para firma
      */
     async buscarContratosParaFirma(termino, estado = 'pendiente') {
-        try {
-            console.log('🔍 Buscando contratos para firma:', { termino, estado });
+    try {
+        console.log('🔍 Buscando contratos para firma:', { termino, estado });
 
-            const params = {
-                buscar: termino,
-                estado: estado,
-                para_firma: true
-            };
+        const params = {
+            search: termino,           // ✅ CAMBIO: 'buscar' → 'search'
+            filtroEstado: estado,      // ✅ CAMBIO: 'estado' → 'filtroEstado'
+            para_firma: true
+        };
 
-            const response = await apiService.get(API_BASE, params);
+        const response = await apiService.get(API_BASE, params);
 
             console.log('✅ Búsqueda de contratos para firma completada');
             return response;
