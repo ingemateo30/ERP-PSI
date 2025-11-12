@@ -71,9 +71,8 @@ const FirmaContratosWrapper = () => {
                 calcularEstadisticas(contratosArray);
                 console.log(`✅ ${contratosArray.length} contratos cargados desde servicio`);
 
-                if (contratosArray.length === 0) {
-                    setError('No se encontraron contratos con los filtros aplicados');
-                }
+                // ✅ REMOVIDO: No mostrar error cuando simplemente no hay datos
+                // Solo mostrar la lista vacía normalmente
             } else {
                 throw new Error('Estructura de respuesta no válida del servicio');
             }
