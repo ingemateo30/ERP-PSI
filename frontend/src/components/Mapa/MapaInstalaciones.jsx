@@ -109,7 +109,7 @@ const MapaInstalaciones = () => {
       if (filtros.fechaHasta) params.append('fecha_hasta', filtros.fechaHasta);
       if (filtros.busqueda) params.append('q', filtros.busqueda);
       
-      const res = await apiService.get(`/api/instalaciones?${params}`);
+      const res = await apiService.get(`/instalaciones?${params}`);
       console.log('📡 Respuesta API:', res);
       
       if (res.success && Array.isArray(res.data)) {
