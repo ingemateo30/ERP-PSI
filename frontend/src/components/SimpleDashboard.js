@@ -390,12 +390,16 @@ const SupervisorDashboard = () => {
             if (clientesData.success) {
                 const clientesActivos = clientesData.data?.activos || 0;
 
-                // Calcular facturación del mes actual
+                // Calcular facturación del mes actual y tasa de cobranza
                 let facturacionMes = 0;
                 let tasaCobranza = 0;
 
                 if (facturasData.success && facturasData.data) {
+                    // Intentar obtener del stats primero
                     facturacionMes = facturasData.data.total_mes_actual || 0;
+                    
+                    // Si viene en 0, lo calcularemos después con las facturas
+                    console.log('💰 SUPERVISOR - Facturación mes desde stats:', facturacionMes);
                     
                     // Calcular tasa de cobranza (pagadas / total * 100)
                     const totalFacturas = facturasData.data.total || 1;
@@ -476,6 +480,31 @@ const SupervisorDashboard = () => {
                     console.warn('⚠️ No hay facturas pagadas en los últimos 30 días');
                     setIngresosMensuales([]);
                 } else {
+                    // 🔧 CALCULAR FACTURACIÓN DEL MES ACTUAL (facturas pagadas del mes en curso)
+                    const inicioMesActual = new Date();
+                    inicioMesActual.setDate(1);
+                    inicioMesActual.setHours(0, 0, 0, 0);
+                    
+                    const facturasMesActual = facturasPagadas.filter(factura => {
+                        const fechaStr = factura.fecha_pago || factura.fecha_emision;
+                        const fecha = new Date(fechaStr);
+                        return fecha >= inicioMesActual;
+                    });
+                    
+                    const totalMesActual = facturasMesActual.reduce((sum, factura) => {
+                        const monto = parseFloat(factura.total || 0);
+                        return sum + monto;
+                    }, 0);
+                    
+                    console.log('📅 SUPERVISOR - Facturas del mes actual:', facturasMesActual.length);
+                    console.log('💵 SUPERVISOR - Total facturado mes actual:', totalMesActual);
+                    
+                    // Actualizar el stat de facturación del mes
+                    setSupervisorStats(prev => ({
+                        ...prev,
+                        facturacionMes: totalMesActual
+                    }));
+                    
                     // Agrupar por fecha y sumar montos
                     const ingresosPorFecha = {};
                     
