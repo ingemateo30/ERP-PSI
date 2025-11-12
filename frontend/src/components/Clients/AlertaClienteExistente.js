@@ -71,26 +71,24 @@ const AlertaClienteExistente = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-2xl">
       {/* Alerta principal */}
-      <div className="border-2 border-orange-200 bg-orange-50 rounded-lg p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-full">
-              <AlertTriangle className="h-6 w-6 text-orange-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-orange-900">
-                ⚠️ Cliente ya registrado
-              </h3>
-              <p className="text-sm text-orange-700">
-                La identificación {cliente.identificacion} ya existe en el sistema
-              </p>
-            </div>
+<div className="border-2 border-orange-200 bg-orange-50 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 p-2 bg-orange-100 rounded-full">
+            <AlertTriangle className="h-5 w-5 text-orange-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-orange-900 text-base mb-1">
+              ⚠️ Cliente ya registrado
+            </h3>
+            <p className="text-sm text-orange-700 break-words">
+              La identificación <span className="font-mono font-medium">{cliente.identificacion}</span> ya existe en el sistema
+            </p>
           </div>
           <button
             onClick={() => setMostrarDetalles(!mostrarDetalles)}
-            className="px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors flex items-center gap-1"
+            className="flex-shrink-0 px-3 py-1.5 text-xs bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors flex items-center gap-1"
           >
             {mostrarDetalles ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             {mostrarDetalles ? 'Ocultar' : 'Ver'} detalles
@@ -101,27 +99,27 @@ const AlertaClienteExistente = ({
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
-              <User className="h-4 w-4 text-gray-600" />
-              <span className="font-medium">{cliente.nombre}</span>
+              <User className="h-4 w-4 text-gray-600 flex-shrink-0" />
+              <span className="font-medium truncate">{cliente.nombre}</span>
             </div>
             {cliente.telefono && (
               <div className="flex items-center gap-2 text-sm">
-                <Phone className="h-4 w-4 text-gray-600" />
-                <span>{cliente.telefono}</span>
+                <Phone className="h-4 w-4 text-gray-600 flex-shrink-0" />
+                <span className="truncate">{cliente.telefono}</span>
               </div>
             )}
             {cliente.correo && (
               <div className="flex items-center gap-2 text-sm">
-                <Mail className="h-4 w-4 text-gray-600" />
-                <span>{cliente.correo}</span>
+                <Mail className="h-4 w-4 text-gray-600 flex-shrink-0" />
+                <span className="truncate">{cliente.correo}</span>
               </div>
             )}
           </div>
           
           <div className="space-y-2">
             <div className="flex items-start gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-gray-600 mt-0.5" />
-              <span>{cliente.direccion}</span>
+              <MapPin className="h-4 w-4 text-gray-600 flex-shrink-0 mt-0.5" />
+              <span className="break-words">{cliente.direccion}</span>
             </div>
             <div className="text-sm">
               Estado: <span className={`font-medium ${cliente.estado === 'activo' ? 'text-green-600' : 'text-red-600'}`}>
@@ -177,10 +175,10 @@ const AlertaClienteExistente = ({
         </div>
 
         {/* Botones de acción */}
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-col sm:flex-row gap-2">
           <button
             onClick={() => onContinuarConCliente && onContinuarConCliente(cliente)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
           >
             <Plus className="h-4 w-4" />
             Agregar servicios a este cliente
@@ -188,35 +186,37 @@ const AlertaClienteExistente = ({
           
           <button
             onClick={() => onVerHistorial && onVerHistorial(cliente)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
           >
             <Eye className="h-4 w-4" />
             Ver historial completo
           </button>
+        </div>
 
-          {onCrearNuevo && (
+        {onCrearNuevo && (
+          <div className="mt-2">
             <button
               onClick={onCrearNuevo}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="w-full px-4 py-2 text-sm text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors border border-orange-200"
             >
               Ignorar y crear nuevo
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Alertas específicas */}
       {alertas && alertas.length > 0 && (
         <div className="space-y-2">
-          {alertas.slice(1).map((alerta, index) => (
+          {alertas.slice(1, 4).map((alerta, index) => (
             <div key={index} className={`p-3 border rounded-lg ${getColorAlerta(alerta.tipo)}`}>
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
+              <div className="flex items-start gap-2">
+                <div className="flex-shrink-0 mt-0.5">
                   {getIconoAlerta(alerta.icono || alerta.tipo)}
                 </div>
-                <div className="flex-grow">
+                <div className="flex-1 min-w-0">
                   <h4 className="font-medium text-sm">{alerta.titulo}</h4>
-                  <p className="text-xs mt-1">{alerta.mensaje}</p>
+                  <p className="text-xs mt-1 break-words">{alerta.mensaje}</p>
                   {alerta.accion && (
                     <p className="text-xs mt-2 font-medium opacity-75">{alerta.accion}</p>
                   )}
