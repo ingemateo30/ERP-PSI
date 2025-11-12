@@ -785,45 +785,39 @@ class FacturacionAutomaticaService {
   }
 
   static async generarNumeroFactura() {
-    try {
-      // Obtener la última factura registrada (sin importar si está activa o no)
-      const ultimaFactura = await Database.query(`
-        SELECT numero_factura 
-        FROM facturas 
-        ORDER BY id DESC 
-        LIMIT 1
-      `);
+  try {
+    // Obtener la última factura registrada
+    const ultimaFactura = await Database.query(`
+      SELECT numero_factura 
+      FROM facturas 
+      ORDER BY id DESC 
+      LIMIT 1
+    `);
 
-      // Si no hay facturas, empezamos desde 1
-      let proximoNumero = 1;
+    // Si no hay facturas, empezamos desde 1
+    let proximoNumero = 1;
 
-      // Si existe al menos una factura previa, extraemos su número final
-      if (ultimaFactura.length > 0 && ultimaFactura[0].numero_factura) {
-        const match = ultimaFactura[0].numero_factura.match(/(\d+)$/);
-        if (match) {
-          proximoNumero = parseInt(match[1], 10) + 1;
-        }
+    // Si existe al menos una factura previa, extraemos su número final
+    if (ultimaFactura.length > 0 && ultimaFactura[0].numero_factura) {
+      const match = ultimaFactura[0].numero_factura.match(/(\d+)$/);
+      if (match) {
+        proximoNumero = parseInt(match[1], 10) + 1;
       }
-
-      // Generar nuevo número con formato FAC000001
-      const nuevoNumero = `FAC${proximoNumero.toString().padStart(6, '0')}`;
-
-      // Responder con el nuevo número generado
-      res.json({
-        success: true,
-        data: { numero_factura: nuevoNumero, consecutivo: proximoNumero },
-        message: 'Número de factura generado correctamente'
-      });
-
-    } catch (error) {
-      console.error('❌ Error generando número de factura:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error generando número de factura',
-        error: error.message
-      });
     }
+
+    // Generar nuevo número con formato FAC000001
+    const nuevoNumero = `FAC${proximoNumero.toString().padStart(6, '0')}`;
+
+    // ✅ Retornar solo el número generado (no JSON)
+    return nuevoNumero;
+
+  } catch (error) {
+    console.error('❌ Error generando número de factura:', error);
+    throw new Error('Error generando número de factura: ' + error.message);
   }
+}
+
+
 
   static async actualizarConsecutivos() {
     try {
