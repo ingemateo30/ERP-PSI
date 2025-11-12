@@ -339,7 +339,7 @@ const SupervisorDashboard = () => {
         serviciosActivos: 0,
         tasaCobranza: 0
     });
-    const [reportesRecientes, setReportesRecientes] = useState([]);
+    const [ingresosMensuales, setIngresosMensuales] = useState([]);
 
     useEffect(() => {
         cargarDatosSupervisor();
@@ -354,30 +354,72 @@ const SupervisorDashboard = () => {
                 'Authorization': `Bearer ${token}`
             };
 
-            // Obtener estadísticas del dashboard (usar el endpoint de estadísticas si existe)
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/config/overview`, {
+            // 1. Obtener estadísticas de clientes
+            const clientesResponse = await fetch(`${process.env.REACT_APP_API_URL}/clients/stats`, {
                 headers
             });
-            const data = await response.json();
+            const clientesData = await clientesResponse.json();
 
-            if (data.success) {
-                const overview = data.data;
-                
+            // 2. Obtener estadísticas de facturas
+            const facturasResponse = await fetch(`${process.env.REACT_APP_API_URL}/facturas/stats`, {
+                headers
+            });
+            const facturasData = await facturasResponse.json();
+
+            // 3. Obtener planes de servicio
+            const planesResponse = await fetch(`${process.env.REACT_APP_API_URL}/config/service-plans`, {
+                headers
+            });
+            const planesData = await planesResponse.json();
+
+            // 4. Obtener datos para la gráfica de ingresos (últimos 30 días)
+            const fechaFin = new Date().toISOString().split('T')[0];
+            const fechaInicio = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            
+            const ingresosResponse = await fetch(
+                `${process.env.REACT_APP_API_URL}/estadisticas/ingresos-diarios?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`,
+                { headers }
+            );
+            const ingresosData = await ingresosResponse.json();
+
+            // Procesar y establecer estadísticas
+            if (clientesData.success) {
+                const totalClientes = clientesData.data?.total || 0;
+                const clientesActivos = clientesData.data?.activos || 0;
+
+                // Calcular facturación del mes actual
+                let facturacionMes = 0;
+                let tasaCobranza = 0;
+
+                if (facturasData.success && facturasData.data) {
+                    facturacionMes = facturasData.data.total_mes_actual || 0;
+                    
+                    // Calcular tasa de cobranza (pagadas / total * 100)
+                    const totalFacturas = facturasData.data.total || 1;
+                    const facturasPagadas = facturasData.data.pagadas || 0;
+                    tasaCobranza = Math.round((facturasPagadas / totalFacturas) * 100);
+                }
+
+                const serviciosActivos = planesData.success ? 
+                    planesData.data?.filter(plan => plan.activo).length || 0 : 0;
+
                 setSupervisorStats({
-                    clientesActivos: overview.contadores?.clientes_activos || 0,
-                    facturacionMes: 0, // Agregar endpoint específico de facturación
-                    serviciosActivos: overview.contadores?.planes_activos || 0,
-                    tasaCobranza: 0 // Agregar endpoint específico de cobranza
+                    clientesActivos: clientesActivos,
+                    facturacionMes: facturacionMes,
+                    serviciosActivos: serviciosActivos,
+                    tasaCobranza: tasaCobranza
                 });
             }
 
-            // Simular reportes recientes (reemplazar con endpoint real cuando esté disponible)
-            setReportesRecientes([
-                { nombre: 'Facturación Mes Actual', fecha: new Date().toISOString().split('T')[0], estado: 'Completado' },
-                { nombre: 'Clientes Activos', fecha: new Date().toISOString().split('T')[0], estado: 'En proceso' },
-                { nombre: 'Servicios por Sector', fecha: new Date().toISOString().split('T')[0], estado: 'Pendiente' },
-                { nombre: 'Ingresos Mensuales', fecha: new Date().toISOString().split('T')[0], estado: 'Completado' }
-            ]);
+            // Procesar datos de ingresos para la gráfica
+            if (ingresosData.success && ingresosData.data) {
+                const datosGrafica = ingresosData.data.map(item => ({
+                    fecha: new Date(item.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }),
+                    monto: parseFloat(item.total || 0)
+                }));
+                
+                setIngresosMensuales(datosGrafica);
+            }
 
         } catch (error) {
             console.error('❌ Error cargando datos del supervisor:', error);
@@ -416,7 +458,7 @@ const SupervisorDashboard = () => {
                         <span className="text-sm md:text-base">Facturación</span>
                     </button>
                     <button
-                        onClick={() => navigate('/reports')}
+                        onClick={() => navigate('/reportes-regulatorios')}
                         className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
                     >
                         <PieChartIcon size={18} className="mr-2" />
@@ -433,7 +475,7 @@ const SupervisorDashboard = () => {
                 </div>
             ) : (
                 <>
-                    {/* Stats Cards para Supervisor */}
+                    {/* Stats Cards para Supervisor - DATOS REALES */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                         <StatCard
                             title="Clientes Activos"
@@ -444,7 +486,7 @@ const SupervisorDashboard = () => {
                         />
                         <StatCard
                             title="Facturación Mes"
-                            value={`$${supervisorStats.facturacionMes.toLocaleString()}`}
+                            value={`$${supervisorStats.facturacionMes.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
                             icon={<DollarSign size={24} className="text-[#10b981]" />}
                             change="Mes actual"
                             color="#10b981"
@@ -465,39 +507,69 @@ const SupervisorDashboard = () => {
                         />
                     </div>
 
-                    {/* Reportes recientes */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                        {/* Gráfico de ingresos */}
-                        <div className="bg-white rounded-lg shadow-md p-4">
-                            <h2 className="text-lg font-semibold mb-4 text-[#0e6493]">Ingresos del Mes</h2>
+                    {/* Gráfica de ingresos del mes - DATOS REALES */}
+                    <div className="bg-white rounded-lg shadow-md p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-lg font-semibold text-[#0e6493]">Ingresos del Mes</h2>
+                            <span className="text-sm text-gray-500">Últimos 30 días</span>
+                        </div>
+                        
+                        {ingresosMensuales.length === 0 ? (
                             <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
                                 <div className="text-center">
                                     <TrendingUp size={48} className="mx-auto text-gray-400 mb-2" />
-                                    <p className="text-gray-500">Gráfico de ingresos</p>
-                                    <p className="text-sm text-gray-400">Datos actualizados</p>
+                                    <p className="text-gray-500">No hay datos de ingresos</p>
+                                    <p className="text-sm text-gray-400">Los datos aparecerán cuando haya facturas pagadas</p>
                                 </div>
                             </div>
-                        </div>
-
-                        {/* Reportes recientes */}
-                        <div className="bg-white rounded-lg shadow-md p-4">
-                            <h2 className="text-lg font-semibold mb-4 text-[#0e6493]">Reportes Recientes</h2>
-                            <div className="space-y-3">
-                                {reportesRecientes.map((reporte, index) => (
-                                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                                        <div>
-                                            <p className="font-medium text-gray-900">{reporte.nombre}</p>
-                                            <p className="text-sm text-gray-500">{reporte.fecha}</p>
-                                        </div>
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                            reporte.estado === 'Completado' ? 'bg-green-100 text-green-800' :
-                                            reporte.estado === 'En proceso' ? 'bg-yellow-100 text-yellow-800' :
-                                            'bg-red-100 text-red-800'
-                                        }`}>
-                                            {reporte.estado}
-                                        </span>
-                                    </div>
-                                ))}
+                        ) : (
+                            <div className="h-64 overflow-x-auto">
+                                <div className="min-w-full h-full flex items-end justify-between px-4 pb-8 space-x-2">
+                                    {ingresosMensuales.map((item, index) => {
+                                        const maxMonto = Math.max(...ingresosMensuales.map(i => i.monto));
+                                        const altura = maxMonto > 0 ? (item.monto / maxMonto) * 100 : 0;
+                                        
+                                        return (
+                                            <div key={index} className="flex flex-col items-center flex-1 min-w-[40px]">
+                                                <div className="relative group w-full">
+                                                    {/* Barra */}
+                                                    <div
+                                                        className="bg-[#0e6493] hover:bg-[#0e6493]/80 rounded-t transition-all duration-300 w-full"
+                                                        style={{ height: `${Math.max(altura, 5)}%`, minHeight: '5px' }}
+                                                    >
+                                                        {/* Tooltip */}
+                                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                                                            ${item.monto.toLocaleString('es-CO')}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {/* Etiqueta de fecha */}
+                                                <span className="text-xs text-gray-500 mt-2 transform -rotate-45 origin-top-left">
+                                                    {item.fecha}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Resumen de totales */}
+                        <div className="mt-4 pt-4 border-t flex justify-between items-center">
+                            <div>
+                                <p className="text-sm text-gray-500">Total del período</p>
+                                <p className="text-xl font-bold text-[#0e6493]">
+                                    ${ingresosMensuales.reduce((acc, item) => acc + item.monto, 0).toLocaleString('es-CO')}
+                                </p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-sm text-gray-500">Promedio diario</p>
+                                <p className="text-xl font-bold text-gray-700">
+                                    ${ingresosMensuales.length > 0 
+                                        ? (ingresosMensuales.reduce((acc, item) => acc + item.monto, 0) / ingresosMensuales.length).toLocaleString('es-CO', { maximumFractionDigits: 0 })
+                                        : '0'
+                                    }
+                                </p>
                             </div>
                         </div>
                     </div>
