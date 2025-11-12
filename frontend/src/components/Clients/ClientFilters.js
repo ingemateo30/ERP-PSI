@@ -177,7 +177,7 @@ const ClientFilters = ({ filters, onApplyFilters, onClearFilters }) => {
             <option value="">Todas las ciudades</option>
             {cities.map((city) => (
               <option key={city.id} value={city.id}>
-                {city.nombre} ({city.departamento_nombre})
+                {city.nombre} ({city.departamento})
               </option>
             ))}
           </select>
