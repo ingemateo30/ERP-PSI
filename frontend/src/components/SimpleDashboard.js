@@ -2,6 +2,7 @@
 import ModalDetalleInstalacion from './Instalaciones/ModalDetalleInstalacion';
 import ModalCompletarInstalacion from './Instalador/ModalCompletarInstalacion';
 import React, { useState, useEffect } from 'react';
+import { facturacionManualService } from '../services/facturacionManualService';
 import {
     DollarSign, TrendingUp, UserCheck, Wifi, Users,
     ChevronUp, PieChart as PieChartIcon, Settings,
@@ -326,7 +327,7 @@ const AdminDashboard = () => {
 };
 
 // ===================================
-// DASHBOARD PARA SUPERVISORES CON DATOS REALES
+// DASHBOARD PARA SUPERVISORES CON DATOS REALES - VERSIÓN CORREGIDA FINAL
 // ===================================
 const SupervisorDashboard = () => {
     const navigate = useNavigate();
@@ -349,6 +350,13 @@ const SupervisorDashboard = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('accessToken');
+            
+            if (!token) {
+                console.error('❌ No hay token disponible');
+                setLoading(false);
+                return;
+            }
+
             const headers = {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
@@ -372,27 +380,26 @@ const SupervisorDashboard = () => {
             });
             const planesData = await planesResponse.json();
 
-            // 4. Obtener datos para la gráfica de ingresos (últimos 30 días)
-            const fechaFin = new Date().toISOString().split('T')[0];
-            const fechaInicio = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            
-            const ingresosResponse = await fetch(
-                `${process.env.REACT_APP_API_URL}/estadisticas/ingresos-diarios?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`,
-                { headers }
-            );
-            const ingresosData = await ingresosResponse.json();
+            console.log('📊 SUPERVISOR - Datos obtenidos:', {
+                clientes: clientesData,
+                facturas: facturasData,
+                planes: planesData
+            });
 
             // Procesar y establecer estadísticas
             if (clientesData.success) {
-                const totalClientes = clientesData.data?.total || 0;
                 const clientesActivos = clientesData.data?.activos || 0;
 
-                // Calcular facturación del mes actual
+                // Calcular facturación del mes actual y tasa de cobranza
                 let facturacionMes = 0;
                 let tasaCobranza = 0;
 
                 if (facturasData.success && facturasData.data) {
+                    // Intentar obtener del stats primero
                     facturacionMes = facturasData.data.total_mes_actual || 0;
+                    
+                    // Si viene en 0, lo calcularemos después con las facturas
+                    console.log('💰 SUPERVISOR - Facturación mes desde stats:', facturacionMes);
                     
                     // Calcular tasa de cobranza (pagadas / total * 100)
                     const totalFacturas = facturasData.data.total || 1;
@@ -411,172 +418,379 @@ const SupervisorDashboard = () => {
                 });
             }
 
-            // Procesar datos de ingresos para la gráfica
-            if (ingresosData.success && ingresosData.data) {
-                const datosGrafica = ingresosData.data.map(item => ({
-                    fecha: new Date(item.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }),
-                    monto: parseFloat(item.total || 0)
-                }));
+            // 4. ✅ OBTENER TODAS LAS FACTURAS USANDO EL SERVICE
+            try {
+                console.log('📡 SUPERVISOR - Obteniendo facturas para gráfica...');
                 
-                setIngresosMensuales(datosGrafica);
+                // Usar el servicio de facturación manual con límite alto
+                const responseFacturas = await facturacionManualService.obtenerFacturas({
+                    limit: 1000,
+                    page: 1
+                });
+
+                console.log('📦 SUPERVISOR - Respuesta del service:', responseFacturas);
+
+                // Extraer las facturas de la respuesta
+                const facturas = responseFacturas?.facturas || [];
+                
+                console.log('✅ SUPERVISOR - Total facturas obtenidas:', facturas.length);
+                console.log('📋 SUPERVISOR - Muestra de facturas completas:', facturas.slice(0, 2));
+
+                if (facturas.length === 0) {
+                    console.warn('⚠️ No hay facturas en el sistema');
+                    setIngresosMensuales([]);
+                    return;
+                }
+
+                // Filtrar solo facturas PAGADAS de los últimos 30 días
+                const hace30Dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                
+                const facturasPagadas = facturas.filter(factura => {
+                    // Verificar estado (puede venir como "Pagada" o "pagada")
+                    const esPagada = factura.estado?.toLowerCase() === 'pagada';
+                    
+                    if (!esPagada) {
+                        return false;
+                    }
+                    
+                    // Obtener fecha (priorizar fecha_pago, luego fecha_emision)
+                    const fechaStr = factura.fecha_pago || factura.fecha_emision;
+                    
+                    if (!fechaStr) {
+                        console.warn('⚠️ Factura sin fecha:', factura);
+                        return false;
+                    }
+                    
+                    try {
+                        const fechaFactura = new Date(fechaStr);
+                        return fechaFactura >= hace30Dias;
+                    } catch (error) {
+                        console.error('❌ Error parseando fecha:', fechaStr, error);
+                        return false;
+                    }
+                });
+                
+                console.log('💰 SUPERVISOR - Facturas pagadas últimos 30 días:', facturasPagadas.length);
+                
+                if (facturasPagadas.length > 0) {
+                    console.log('📋 SUPERVISOR - Primera factura pagada COMPLETA:', facturasPagadas[0]);
+                }
+
+                if (facturasPagadas.length === 0) {
+                    console.warn('⚠️ No hay facturas pagadas en los últimos 30 días');
+                    setIngresosMensuales([]);
+                } else {
+                    // 🔧 CALCULAR FACTURACIÓN DEL MES ACTUAL (facturas pagadas del mes en curso)
+                    const inicioMesActual = new Date();
+                    inicioMesActual.setDate(1);
+                    inicioMesActual.setHours(0, 0, 0, 0);
+                    
+                    const facturasMesActual = facturasPagadas.filter(factura => {
+                        const fechaStr = factura.fecha_pago || factura.fecha_emision;
+                        const fecha = new Date(fechaStr);
+                        return fecha >= inicioMesActual;
+                    });
+                    
+                    const totalMesActual = facturasMesActual.reduce((sum, factura) => {
+                        const monto = parseFloat(factura.total || 0);
+                        return sum + monto;
+                    }, 0);
+                    
+                    console.log('📅 SUPERVISOR - Facturas del mes actual:', facturasMesActual.length);
+                    console.log('💵 SUPERVISOR - Total facturado mes actual:', totalMesActual);
+                    
+                    // Actualizar el stat de facturación del mes
+                    setSupervisorStats(prev => ({
+                        ...prev,
+                        facturacionMes: totalMesActual
+                    }));
+                    
+                    // Agrupar por fecha y sumar montos
+                    const ingresosPorFecha = {};
+                    
+                    facturasPagadas.forEach(factura => {
+                        const fechaStr = factura.fecha_pago || factura.fecha_emision;
+                        const fecha = new Date(fechaStr);
+                        
+                        // Formatear fecha para agrupar
+                        const fechaFormateada = fecha.toLocaleDateString('es-CO', { 
+                            day: '2-digit', 
+                            month: 'short' 
+                        });
+                        
+                        if (!ingresosPorFecha[fechaFormateada]) {
+                            ingresosPorFecha[fechaFormateada] = {
+                                fecha: fechaFormateada,
+                                fechaCompleta: fecha,
+                                monto: 0
+                            };
+                        }
+                        
+                        // 🔧 CORRECCIÓN: Probar múltiples nombres de campo para el monto
+                        const monto = parseFloat(
+                            factura.monto_total || 
+                            factura.total || 
+                            factura.valor_total || 
+                            factura.monto || 
+                            0
+                        );
+                        
+                        console.log(`💰 SUPERVISOR - Procesando factura ${factura.numero_factura || factura.id}:`, {
+                            monto_total: factura.monto_total,
+                            total: factura.total,
+                            valor_total: factura.valor_total,
+                            monto: factura.monto,
+                            montoParseado: monto,
+                            todosLosCampos: Object.keys(factura)
+                        });
+                        
+                        ingresosPorFecha[fechaFormateada].monto += monto;
+                    });
+                    
+                    // Convertir a array y ordenar cronológicamente
+                    const datosGrafica = Object.values(ingresosPorFecha)
+                        .sort((a, b) => a.fechaCompleta - b.fechaCompleta)
+                        .map(({ fecha, monto }) => ({ 
+                            fecha, 
+                            monto: Math.round(monto) // Redondear para mejor visualización
+                        }));
+                    
+                    console.log('📈 SUPERVISOR - Datos procesados para gráfica:', datosGrafica);
+                    console.log('💵 SUPERVISOR - Total ingresos:', datosGrafica.reduce((sum, d) => sum + d.monto, 0));
+                    
+                    setIngresosMensuales(datosGrafica);
+                }
+                
+            } catch (errorFacturas) {
+                console.error('❌ Error obteniendo facturas para gráfica:', errorFacturas);
+                console.error('Stack:', errorFacturas.stack);
+                setIngresosMensuales([]);
             }
 
         } catch (error) {
             console.error('❌ Error cargando datos del supervisor:', error);
+            console.error('Stack:', error.stack);
         } finally {
             setLoading(false);
         }
     };
 
-    return (
-        <>
-            {/* Welcome Message para Supervisor */}
-            <div className="mb-6 bg-gradient-to-r from-[#0e6493] to-[#0e6493]/80 rounded-xl p-5 shadow-lg text-white overflow-hidden relative">
-                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-                <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+return (
+    <>
+        {/* Welcome Message para Supervisor */}
+        <div className="mb-6 bg-gradient-to-r from-[#0e6493] to-[#0e6493]/80 rounded-xl p-5 shadow-lg text-white overflow-hidden relative">
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
 
-                <h1 className="text-2xl md:text-3xl font-bold mb-2">
-                    ¡Hola, {currentUser?.nombre || 'Usuario'}!
-                </h1>
-                <p className="text-lg md:text-xl mb-4 md:mb-6 opacity-90">
-                    ¿Qué quieres hacer hoy?, Controla las operaciones del negocio
-                </p>
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">
+                ¡Hola, {currentUser?.nombre || 'Usuario'}!
+            </h1>
+            <p className="text-lg md:text-xl mb-4 md:mb-6 opacity-90">
+                ¿Qué quieres hacer hoy?, Controla las operaciones del negocio
+            </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
-                    <button
-                        onClick={() => navigate('/clients')}
-                        className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
-                    >
-                        <Users size={18} className="mr-2" />
-                        <span className="text-sm md:text-base">Clientes</span>
-                    </button>
-                    <button
-                        onClick={() => navigate('/invoices')}
-                        className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
-                    >
-                        <CreditCard size={18} className="mr-2" />
-                        <span className="text-sm md:text-base">Facturación</span>
-                    </button>
-                    <button
-                        onClick={() => navigate('/reportes-regulatorios')}
-                        className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
-                    >
-                        <PieChartIcon size={18} className="mr-2" />
-                        <span className="text-sm md:text-base">Reportes</span>
-                    </button>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
+                <button
+                    onClick={() => navigate('/clients')}
+                    className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
+                >
+                    <Users size={18} className="mr-2" />
+                    <span className="text-sm md:text-base">Clientes</span>
+                </button>
+                <button
+                    onClick={() => navigate('/invoices')}
+                    className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
+                >
+                    <CreditCard size={18} className="mr-2" />
+                    <span className="text-sm md:text-base">Facturación</span>
+                </button>
+                <button
+                    onClick={() => navigate('/reportes-regulatorios')}
+                    className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-3 md:px-4 backdrop-blur-sm flex items-center justify-center sm:justify-start"
+                >
+                    <PieChartIcon size={18} className="mr-2" />
+                    <span className="text-sm md:text-base">Reportes</span>
+                </button>
             </div>
+        </div>
 
-            {/* Loading State */}
-            {loading ? (
-                <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#0e6493] mx-auto mb-4"></div>
-                    <p className="text-gray-500">Cargando estadísticas...</p>
+        {/* Loading State */}
+        {loading ? (
+            <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#0e6493] mx-auto mb-4"></div>
+                <p className="text-gray-500">Cargando estadísticas...</p>
+            </div>
+        ) : (
+            <>
+                {/* Stats Cards para Supervisor - DATOS REALES */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <StatCard
+                        title="Clientes Activos"
+                        value={supervisorStats.clientesActivos.toLocaleString()}
+                        icon={<Users size={24} className="text-[#0e6493]" />}
+                        change="Total"
+                        color="#0e6493"
+                    />
+                    <StatCard
+                        title="Facturación Mes"
+                        value={`$${supervisorStats.facturacionMes.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+                        icon={<DollarSign size={24} className="text-[#10b981]" />}
+                        change="Mes actual"
+                        color="#10b981"
+                    />
+                    <StatCard
+                        title="Servicios Activos"
+                        value={supervisorStats.serviciosActivos.toLocaleString()}
+                        icon={<Wifi size={24} className="text-[#6366f1]" />}
+                        change="Planes"
+                        color="#6366f1"
+                    />
+                    <StatCard
+                        title="Tasa Cobranza"
+                        value={`${supervisorStats.tasaCobranza}%`}
+                        icon={<TrendingUp size={24} className="text-[#f59e0b]" />}
+                        change="Promedio"
+                        color="#f59e0b"
+                    />
                 </div>
-            ) : (
-                <>
-                    {/* Stats Cards para Supervisor - DATOS REALES */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        <StatCard
-                            title="Clientes Activos"
-                            value={supervisorStats.clientesActivos.toLocaleString()}
-                            icon={<Users size={24} className="text-[#0e6493]" />}
-                            change="Total"
-                            color="#0e6493"
-                        />
-                        <StatCard
-                            title="Facturación Mes"
-                            value={`$${supervisorStats.facturacionMes.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
-                            icon={<DollarSign size={24} className="text-[#10b981]" />}
-                            change="Mes actual"
-                            color="#10b981"
-                        />
-                        <StatCard
-                            title="Servicios Activos"
-                            value={supervisorStats.serviciosActivos.toLocaleString()}
-                            icon={<Wifi size={24} className="text-[#6366f1]" />}
-                            change="Planes"
-                            color="#6366f1"
-                        />
-                        <StatCard
-                            title="Tasa Cobranza"
-                            value={`${supervisorStats.tasaCobranza}%`}
-                            icon={<TrendingUp size={24} className="text-[#f59e0b]" />}
-                            change="Promedio"
-                            color="#f59e0b"
-                        />
-                    </div>
 
-                    {/* Gráfica de ingresos del mes - DATOS REALES */}
-                    <div className="bg-white rounded-lg shadow-md p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-semibold text-[#0e6493]">Ingresos del Mes</h2>
-                            <span className="text-sm text-gray-500">Últimos 30 días</span>
-                        </div>
-                        
-                        {ingresosMensuales.length === 0 ? (
-                            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                                <div className="text-center">
-                                    <TrendingUp size={48} className="mx-auto text-gray-400 mb-2" />
-                                    <p className="text-gray-500">No hay datos de ingresos</p>
-                                    <p className="text-sm text-gray-400">Los datos aparecerán cuando haya facturas pagadas</p>
-                                </div>
+                {/* Gráfica de ingresos del mes - MEJORADA Y VISUAL */}
+                <div className="bg-white rounded-lg shadow-md p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-lg font-semibold text-[#0e6493]">Ingresos Últimos 30 Días</h2>
+                        <span className="text-sm text-gray-500">
+                            {ingresosMensuales.length} {ingresosMensuales.length === 1 ? 'día' : 'días'} con ingresos
+                        </span>
+                    </div>
+                    
+                    {ingresosMensuales.length === 0 ? (
+                        <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+                            <div className="text-center">
+                                <TrendingUp size={48} className="mx-auto text-gray-400 mb-2" />
+                                <p className="text-gray-500">No hay datos de ingresos</p>
+                                <p className="text-sm text-gray-400">Los datos aparecerán cuando haya facturas pagadas</p>
                             </div>
-                        ) : (
-                            <div className="h-64 overflow-x-auto">
-                                <div className="min-w-full h-full flex items-end justify-between px-4 pb-8 space-x-2">
+                        </div>
+                    ) : (
+                        <>
+                            {/* Gráfica de Barras Mejorada */}
+                            <div className="h-96 relative pl-16 pr-4">
+                                {/* Grid de fondo */}
+                                <div className="absolute inset-0 flex flex-col justify-between pb-16 pl-16 pr-4 pointer-events-none">
+                                    {[...Array(6)].map((_, i) => (
+                                        <div key={i} className="border-t border-gray-200"></div>
+                                    ))}
+                                </div>
+
+                                {/* Leyenda del eje Y - AJUSTADA */}
+                                <div className="absolute left-0 top-0 bottom-16 w-14 flex flex-col justify-between text-xs text-gray-500">
+                                    {[...Array(6)].map((_, i) => {
+                                        const maxMonto = Math.max(...ingresosMensuales.map(item => item.monto));
+                                        const valor = Math.round((maxMonto / 5) * (5 - i));
+                                        return (
+                                            <span key={i} className="text-right pr-2">
+                                                ${valor >= 1000000 
+                                                    ? `${(valor / 1000000).toFixed(1)}M` 
+                                                    : `${(valor / 1000).toFixed(0)}k`}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Barras - CON VALORES DENTRO */}
+                                <div className="relative h-full flex items-end justify-start gap-6 pb-16 overflow-x-auto">
                                     {ingresosMensuales.map((item, index) => {
                                         const maxMonto = Math.max(...ingresosMensuales.map(i => i.monto));
-                                        const altura = maxMonto > 0 ? (item.monto / maxMonto) * 100 : 0;
+                                        const altura = maxMonto > 0 ? (item.monto / maxMonto) * 100 : 5;
+                                        
+                                        // Calcular color basado en el monto (gradiente)
+                                        const intensidad = Math.round((item.monto / maxMonto) * 100);
+                                        const color = `hsl(200, 70%, ${Math.max(30, 80 - intensidad/2)}%)`;
                                         
                                         return (
-                                            <div key={index} className="flex flex-col items-center flex-1 min-w-[40px]">
-                                                <div className="relative group w-full">
-                                                    {/* Barra */}
+                                            <div key={index} className="flex flex-col items-center min-w-[80px] group">
+                                                {/* Barra con animación */}
+                                                <div className="relative flex-1 w-full flex items-end">
                                                     <div
-                                                        className="bg-[#0e6493] hover:bg-[#0e6493]/80 rounded-t transition-all duration-300 w-full"
-                                                        style={{ height: `${Math.max(altura, 5)}%`, minHeight: '5px' }}
+                                                        className="w-full rounded-t-lg transition-all duration-500 ease-out hover:opacity-90 cursor-pointer shadow-lg relative flex flex-col justify-end items-center pb-3"
+                                                        style={{ 
+                                                            height: `${Math.max(altura, 15)}%`,
+                                                            backgroundColor: color,
+                                                            minHeight: '50px'
+                                                        }}
                                                     >
-                                                        {/* Tooltip */}
-                                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                                                            ${item.monto.toLocaleString('es-CO')}
+                                                        {/* VALOR DENTRO DE LA BARRA */}
+                                                        <div className="text-white font-bold text-xs drop-shadow-lg">
+                                                            ${item.monto >= 1000000 
+                                                                ? `${(item.monto / 1000000).toFixed(1)}M`
+                                                                : `${(item.monto / 1000).toFixed(0)}k`}
+                                                        </div>
+                                                        
+                                                        {/* Tooltip mejorado */}
+                                                        <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 
+                                                                      bg-gray-900 text-white px-3 py-2 rounded-lg 
+                                                                      opacity-0 group-hover:opacity-100 transition-opacity 
+                                                                      whitespace-nowrap z-20 shadow-xl">
+                                                            <div className="text-xs font-medium mb-1">{item.fecha}</div>
+                                                            <div className="text-sm font-bold">
+                                                                ${item.monto.toLocaleString('es-CO')}
+                                                            </div>
+                                                            {/* Flechita del tooltip */}
+                                                            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 
+                                                                          w-2 h-2 bg-gray-900 rotate-45"></div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {/* Etiqueta de fecha */}
-                                                <span className="text-xs text-gray-500 mt-2 transform -rotate-45 origin-top-left">
-                                                    {item.fecha}
-                                                </span>
+                                                
+                                                {/* Etiqueta de fecha mejorada */}
+                                                <div className="mt-3 text-center">
+                                                    <span className="text-xs text-gray-600 font-medium block">
+                                                        {item.fecha}
+                                                    </span>
+                                                </div>
                                             </div>
                                         );
                                     })}
                                 </div>
                             </div>
-                        )}
-                        
-                        {/* Resumen de totales */}
-                        <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                            <div>
-                                <p className="text-sm text-gray-500">Total del período</p>
-                                <p className="text-xl font-bold text-[#0e6493]">
-                                    ${ingresosMensuales.reduce((acc, item) => acc + item.monto, 0).toLocaleString('es-CO')}
-                                </p>
+
+                            {/* Resumen de totales mejorado */}
+                            <div className="mt-6 pt-6 border-t grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="text-center p-4 bg-blue-50 rounded-lg hover:shadow-md transition-shadow">
+                                    <p className="text-sm text-gray-600 mb-2">Total Período</p>
+                                    <p className="text-2xl font-bold text-[#0e6493]">
+                                        ${ingresosMensuales.reduce((acc, item) => acc + item.monto, 0).toLocaleString('es-CO')}
+                                    </p>
+                                </div>
+                                <div className="text-center p-4 bg-green-50 rounded-lg hover:shadow-md transition-shadow">
+                                    <p className="text-sm text-gray-600 mb-2">Promedio Diario</p>
+                                    <p className="text-2xl font-bold text-green-700">
+                                        ${ingresosMensuales.length > 0 
+                                            ? (ingresosMensuales.reduce((acc, item) => acc + item.monto, 0) / ingresosMensuales.length).toLocaleString('es-CO', { maximumFractionDigits: 0 })
+                                            : '0'
+                                        }
+                                    </p>
+                                </div>
+                                <div className="text-center p-4 bg-purple-50 rounded-lg hover:shadow-md transition-shadow">
+                                    <p className="text-sm text-gray-600 mb-2">Día Máximo</p>
+                                    <p className="text-2xl font-bold text-purple-700">
+                                        ${Math.max(...ingresosMensuales.map(i => i.monto)).toLocaleString('es-CO')}
+                                    </p>
+                                </div>
                             </div>
-                            <div className="text-right">
-                                <p className="text-sm text-gray-500">Promedio diario</p>
-                                <p className="text-xl font-bold text-gray-700">
-                                    ${ingresosMensuales.length > 0 
-                                        ? (ingresosMensuales.reduce((acc, item) => acc + item.monto, 0) / ingresosMensuales.length).toLocaleString('es-CO', { maximumFractionDigits: 0 })
-                                        : '0'
-                                    }
-                                </p>
+
+                            {/* Indicador de estado */}
+                            <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">
+                                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                                <span>Datos actualizados en tiempo real</span>
                             </div>
-                        </div>
-                    </div>
-                </>
-            )}
-        </>
-    );
+                        </>
+                    )}
+                </div>
+            </>
+        )}
+    </>
+);
 };
 // ===================================
 // DASHBOARD PARA INSTALADORES
