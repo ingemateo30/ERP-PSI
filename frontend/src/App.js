@@ -198,14 +198,7 @@ function App() {
                 }
               />
 
-              <Route
-                path="/mapa-instalaciones"
-                element={
-                  <ProtectedRoute allowedRoles={['administrador', 'supervisor', 'instalador']}>
-                    <MapaInstalaciones />
-                  </ProtectedRoute>
-                }
-              />
+             
 
               {/* ================================ */}
               {/* RUTAS PROTEGIDAS GENERALES */}
@@ -441,6 +434,17 @@ function App() {
                   <ProtectedRoute requiredRole="instalador,supervisor,administrador">
                     <MainLayout title="Gestión de Inventario" subtitle="">
                       <InventoryManagement />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+               <Route
+                path="/mapa-instalaciones"
+                element={
+                  <ProtectedRoute allowedRoles={['administrador', 'supervisor']}>
+                    <MainLayout title="Gestión de Mapa de Instalaciones" subtitle="">
+                    <MapaInstalaciones />
                     </MainLayout>
                   </ProtectedRoute>
                 }
