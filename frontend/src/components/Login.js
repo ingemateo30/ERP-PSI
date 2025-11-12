@@ -106,28 +106,33 @@ const LoginComponent = () => {
   };
 
   // Manejar envío del formulario
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (!validateForm()) {
-      return;
-    }
+  if (!validateForm()) {
+    return;
+  }
 
-    try {
-      await login(formData.email, formData.password);
+  try {
+    // 🔥 CAMBIO CRÍTICO: Capturar la respuesta del login
+    const response = await login(formData.email, formData.password);
+    
+    setSuccessMessage('¡Inicio de sesión exitoso! Redirigiendo...');
+
+    setTimeout(() => {
+      // 🔥 USAR LA RUTA SUGERIDA en lugar de la ruta anterior
+      const targetRoute = response?.suggestedRoute || '/dashboard';
       
-      setSuccessMessage('¡Inicio de sesión exitoso! Redirigiendo...');
+      console.log('🔍 Login - Redirigiendo a:', targetRoute);
+      
+      // IMPORTANTE: replace: true evita guardar en el historial
+      navigate(targetRoute, { replace: true });
+    }, 1000);
 
-      setTimeout(() => {
-        const from = location.state?.from?.pathname || '/dashboard';
-        navigate(from, { replace: true });
-      }, 1000);
-
-    } catch (loginError) {
-      console.error('Error en login:', loginError);
-    }
-  };
-
+  } catch (loginError) {
+    console.error('Error en login:', loginError);
+  }
+};
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4 relative overflow-hidden">
       <style jsx>{`
