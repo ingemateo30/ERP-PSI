@@ -329,8 +329,6 @@ const AdminDashboard = () => {
 // ===================================
 // DASHBOARD PARA SUPERVISORES CON DATOS REALES - VERSIÓN CORREGIDA
 // ===================================
-import { facturacionManualService } from '../services/facturacionManualService'; // AGREGAR ESTE IMPORT
-
 const SupervisorDashboard = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
