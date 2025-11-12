@@ -68,7 +68,7 @@ const FacturacionAutomatica = () => {
     try {
       console.log('⚡ Ejecutando facturación mensual...');
       
-      const response = await facturasService.ejecutarFacturacionMensual({
+      const response = await facturasService.generarFacturacionMensual({
         periodo: new Date().toISOString().slice(0, 7)
       });
       
