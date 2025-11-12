@@ -60,7 +60,7 @@ static async obtenerTodos(req, res) {
             WHERE 1=1
         `;
 
-        const params = [];
+const params = [];
 
         if (cliente_id) {
             query += ' AND c.cliente_id = ?';
@@ -68,19 +68,20 @@ static async obtenerTodos(req, res) {
         }
 
         if (para_firma === 'true' || para_firma === true) {
-    console.log('🖊️ Filtrando contratos para firma');
-    
-    if (req.query.filtroEstado === 'pendiente') {
-        query += ' AND c.firmado_cliente = 0 AND c.documento_pdf_path IS NOT NULL';
-    } else if (req.query.filtroEstado === 'firmado') {
-        query += ' AND c.firmado_cliente = 1';
-    } else if (req.query.filtroEstado === 'anulado') {
-        query += ' AND c.estado = "anulado"';
-    } else if (req.query.filtroEstado === 'todos') {  // ✅ AÑADIR ESTE CASO
-        // No filtrar por estado, mostrar todos
-    }
-} else if (estado) {
-    query += ' AND c.estado = ?';
+            console.log('🖊️ Filtrando contratos para firma');
+            
+            if (req.query.filtroEstado === 'pendiente') {
+                query += ' AND c.firmado_cliente = 0 AND c.documento_pdf_path IS NOT NULL';
+            } else if (req.query.filtroEstado === 'firmado') {
+                query += ' AND c.firmado_cliente = 1';
+            } else if (req.query.filtroEstado === 'anulado') {
+                query += ' AND c.estado = "anulado"';
+            } else if (req.query.filtroEstado === 'todos') {
+                // No filtrar por estado, mostrar todos los contratos
+                console.log('📋 Mostrando todos los contratos para firma');
+            }
+        } else if (estado) {
+            query += ' AND c.estado = ?';
             params.push(estado);
         }
 
