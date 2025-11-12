@@ -2,6 +2,7 @@
 import ModalDetalleInstalacion from './Instalaciones/ModalDetalleInstalacion';
 import ModalCompletarInstalacion from './Instalador/ModalCompletarInstalacion';
 import React, { useState, useEffect } from 'react';
+import { facturacionManualService } from '../services/facturacionManualService';
 import {
     DollarSign, TrendingUp, UserCheck, Wifi, Users,
     ChevronUp, PieChart as PieChartIcon, Settings,
@@ -326,8 +327,10 @@ const AdminDashboard = () => {
 };
 
 // ===================================
-// DASHBOARD PARA SUPERVISORES CON DATOS REALES
+// DASHBOARD PARA SUPERVISORES CON DATOS REALES - VERSIÓN CORREGIDA
 // ===================================
+import { facturacionManualService } from '../services/facturacionManualService'; // AGREGAR ESTE IMPORT
+
 const SupervisorDashboard = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
@@ -349,6 +352,13 @@ const SupervisorDashboard = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('accessToken');
+            
+            if (!token) {
+                console.error('❌ No hay token disponible');
+                setLoading(false);
+                return;
+            }
+
             const headers = {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
@@ -372,16 +382,14 @@ const SupervisorDashboard = () => {
             });
             const planesData = await planesResponse.json();
 
-            // 4. Obtener TODAS las facturas para la gráfica
-            const todasFacturasResponse = await fetch(
-                `${process.env.REACT_APP_API_URL}/facturas`,
-                { headers }
-            );
-            const todasFacturas = await todasFacturasResponse.json();
+            console.log('📊 SUPERVISOR - Datos obtenidos:', {
+                clientes: clientesData,
+                facturas: facturasData,
+                planes: planesData
+            });
 
             // Procesar y establecer estadísticas
             if (clientesData.success) {
-                const totalClientes = clientesData.data?.total || 0;
                 const clientesActivos = clientesData.data?.activos || 0;
 
                 // Calcular facturación del mes actual
@@ -408,52 +416,125 @@ const SupervisorDashboard = () => {
                 });
             }
 
-            // Procesar datos de ingresos para la gráfica desde facturas pagadas
-            if (todasFacturas.success && todasFacturas.facturas) {
-                // Filtrar solo facturas pagadas de los últimos 30 días
+            // 4. ✅ OBTENER TODAS LAS FACTURAS USANDO EL SERVICE
+            try {
+                console.log('📡 SUPERVISOR - Obteniendo facturas para gráfica...');
+                
+                // Usar el servicio de facturación manual con límite alto
+                const responseFacturas = await facturacionManualService.obtenerFacturas({
+                    limit: 1000,
+                    page: 1
+                });
+
+                console.log('📦 SUPERVISOR - Respuesta del service:', responseFacturas);
+
+                // Extraer las facturas de la respuesta
+                const facturas = responseFacturas?.facturas || [];
+                
+                console.log('✅ SUPERVISOR - Total facturas obtenidas:', facturas.length);
+                console.log('📋 SUPERVISOR - Muestra de facturas:', facturas.slice(0, 3));
+
+                if (facturas.length === 0) {
+                    console.warn('⚠️ No hay facturas en el sistema');
+                    setIngresosMensuales([]);
+                    return;
+                }
+
+                // Filtrar solo facturas PAGADAS de los últimos 30 días
                 const hace30Dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
                 
-                const facturasPagadas = todasFacturas.facturas
-                    .filter(f => f.estado === 'Pagada')
-                    .filter(f => {
-                        const fechaFactura = new Date(f.fecha_pago || f.fecha_emision);
-                        return fechaFactura >= hace30Dias;
-                    });
-                
-                console.log('📊 Facturas pagadas últimos 30 días:', facturasPagadas.length);
-                
-                // Agrupar por fecha
-                const ingresosPorFecha = {};
-                facturasPagadas.forEach(factura => {
-                    const fecha = new Date(factura.fecha_pago || factura.fecha_emision).toLocaleDateString('es-CO', { 
-                        day: '2-digit', 
-                        month: 'short' 
-                    });
-                    if (!ingresosPorFecha[fecha]) {
-                        ingresosPorFecha[fecha] = 0;
+                const facturasPagadas = facturas.filter(factura => {
+                    // Verificar estado (puede venir como "Pagada" o "pagada")
+                    const esPagada = factura.estado?.toLowerCase() === 'pagada';
+                    
+                    if (!esPagada) {
+                        return false;
                     }
-                    ingresosPorFecha[fecha] += parseFloat(factura.monto_total || 0);
+                    
+                    // Obtener fecha (priorizar fecha_pago, luego fecha_emision)
+                    const fechaStr = factura.fecha_pago || factura.fecha_emision;
+                    
+                    if (!fechaStr) {
+                        console.warn('⚠️ Factura sin fecha:', factura);
+                        return false;
+                    }
+                    
+                    try {
+                        const fechaFactura = new Date(fechaStr);
+                        return fechaFactura >= hace30Dias;
+                    } catch (error) {
+                        console.error('❌ Error parseando fecha:', fechaStr, error);
+                        return false;
+                    }
                 });
                 
-                // Convertir a array para la gráfica y ordenar por fecha
-                const datosGrafica = Object.entries(ingresosPorFecha)
-                    .map(([fecha, monto]) => ({
-                        fecha,
-                        monto
-                    }))
-                    .sort((a, b) => {
-                        // Ordenar cronológicamente
-                        const fechaA = new Date(a.fecha);
-                        const fechaB = new Date(b.fecha);
-                        return fechaA - fechaB;
-                    });
+                console.log('💰 SUPERVISOR - Facturas pagadas últimos 30 días:', facturasPagadas.length);
                 
-                console.log('📈 Datos gráfica:', datosGrafica);
-                setIngresosMensuales(datosGrafica);
+                if (facturasPagadas.length > 0) {
+                    console.log('📋 SUPERVISOR - Detalle facturas pagadas:', facturasPagadas.map(f => ({
+                        id: f.id,
+                        numero: f.numero_factura,
+                        cliente: f.cliente_nombre,
+                        fecha_pago: f.fecha_pago,
+                        fecha_emision: f.fecha_emision,
+                        monto: f.monto_total,
+                        estado: f.estado
+                    })));
+                }
+
+                if (facturasPagadas.length === 0) {
+                    console.warn('⚠️ No hay facturas pagadas en los últimos 30 días');
+                    setIngresosMensuales([]);
+                } else {
+                    // Agrupar por fecha y sumar montos
+                    const ingresosPorFecha = {};
+                    
+                    facturasPagadas.forEach(factura => {
+                        const fechaStr = factura.fecha_pago || factura.fecha_emision;
+                        const fecha = new Date(fechaStr);
+                        
+                        // Formatear fecha para agrupar
+                        const fechaFormateada = fecha.toLocaleDateString('es-CO', { 
+                            day: '2-digit', 
+                            month: 'short' 
+                        });
+                        
+                        if (!ingresosPorFecha[fechaFormateada]) {
+                            ingresosPorFecha[fechaFormateada] = {
+                                fecha: fechaFormateada,
+                                fechaCompleta: fecha,
+                                monto: 0
+                            };
+                        }
+                        
+                        // Sumar monto (asegurar que sea número)
+                        const monto = parseFloat(factura.monto_total || 0);
+                        ingresosPorFecha[fechaFormateada].monto += monto;
+                    });
+                    
+                    // Convertir a array y ordenar cronológicamente
+                    const datosGrafica = Object.values(ingresosPorFecha)
+                        .sort((a, b) => a.fechaCompleta - b.fechaCompleta)
+                        .map(({ fecha, monto }) => ({ 
+                            fecha, 
+                            monto: Math.round(monto) // Redondear para mejor visualización
+                        }));
+                    
+                    console.log('📈 SUPERVISOR - Datos procesados para gráfica:', datosGrafica);
+                    console.log('💵 SUPERVISOR - Total ingresos:', datosGrafica.reduce((sum, d) => sum + d.monto, 0));
+                    
+                    setIngresosMensuales(datosGrafica);
+                }
+                
+            } catch (errorFacturas) {
+                console.error('❌ Error obteniendo facturas para gráfica:', errorFacturas);
+                console.error('Stack:', errorFacturas.stack);
+                setIngresosMensuales([]);
             }
 
         } catch (error) {
             console.error('❌ Error cargando datos del supervisor:', error);
+            console.error('Stack:', error.stack);
         } finally {
             setLoading(false);
         }
@@ -569,7 +650,7 @@ const SupervisorDashboard = () => {
                                                         style={{ height: `${Math.max(altura, 5)}%`, minHeight: '5px' }}
                                                     >
                                                         {/* Tooltip */}
-                                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
                                                             ${item.monto.toLocaleString('es-CO')}
                                                         </div>
                                                     </div>
