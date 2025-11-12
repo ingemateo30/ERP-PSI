@@ -327,7 +327,7 @@ const AdminDashboard = () => {
 };
 
 // ===================================
-// DASHBOARD PARA SUPERVISORES CON DATOS REALES - VERSIÓN CORREGIDA
+// DASHBOARD PARA SUPERVISORES CON DATOS REALES - VERSIÓN CORREGIDA FINAL
 // ===================================
 const SupervisorDashboard = () => {
     const navigate = useNavigate();
@@ -430,7 +430,7 @@ const SupervisorDashboard = () => {
                 const facturas = responseFacturas?.facturas || [];
                 
                 console.log('✅ SUPERVISOR - Total facturas obtenidas:', facturas.length);
-                console.log('📋 SUPERVISOR - Muestra de facturas:', facturas.slice(0, 3));
+                console.log('📋 SUPERVISOR - Muestra de facturas completas:', facturas.slice(0, 2));
 
                 if (facturas.length === 0) {
                     console.warn('⚠️ No hay facturas en el sistema');
@@ -469,15 +469,7 @@ const SupervisorDashboard = () => {
                 console.log('💰 SUPERVISOR - Facturas pagadas últimos 30 días:', facturasPagadas.length);
                 
                 if (facturasPagadas.length > 0) {
-                    console.log('📋 SUPERVISOR - Detalle facturas pagadas:', facturasPagadas.map(f => ({
-                        id: f.id,
-                        numero: f.numero_factura,
-                        cliente: f.cliente_nombre,
-                        fecha_pago: f.fecha_pago,
-                        fecha_emision: f.fecha_emision,
-                        monto: f.monto_total,
-                        estado: f.estado
-                    })));
+                    console.log('📋 SUPERVISOR - Primera factura pagada COMPLETA:', facturasPagadas[0]);
                 }
 
                 if (facturasPagadas.length === 0) {
@@ -505,8 +497,24 @@ const SupervisorDashboard = () => {
                             };
                         }
                         
-                        // Sumar monto (asegurar que sea número)
-                        const monto = parseFloat(factura.monto_total || 0);
+                        // 🔧 CORRECCIÓN: Probar múltiples nombres de campo para el monto
+                        const monto = parseFloat(
+                            factura.monto_total || 
+                            factura.total || 
+                            factura.valor_total || 
+                            factura.monto || 
+                            0
+                        );
+                        
+                        console.log(`💰 SUPERVISOR - Procesando factura ${factura.numero_factura || factura.id}:`, {
+                            monto_total: factura.monto_total,
+                            total: factura.total,
+                            valor_total: factura.valor_total,
+                            monto: factura.monto,
+                            montoParseado: monto,
+                            todosLosCampos: Object.keys(factura)
+                        });
+                        
                         ingresosPorFecha[fechaFormateada].monto += monto;
                     });
                     
