@@ -785,28 +785,39 @@ class FacturacionAutomaticaService {
   }
 
   static async generarNumeroFactura() {
-    try {
-      const conexion = await Database.getConnection();
+  try {
+    // Obtener la última factura registrada
+    const ultimaFactura = await Database.query(`
+      SELECT numero_factura 
+      FROM facturas 
+      ORDER BY id DESC 
+      LIMIT 1
+    `);
 
-      try {
-        const [config] = await conexion.execute(`
-          SELECT consecutivo_factura, prefijo_factura 
-          FROM configuracion_empresa 
-          WHERE id = 1
-        `);
+    // Si no hay facturas, empezamos desde 1
+    let proximoNumero = 1;
 
-        const consecutivo = config[0]?.consecutivo_factura || 1;
-        const prefijo = config[0]?.prefijo_factura || 'FAC';
-
-        return `${prefijo}${String(consecutivo).padStart(6, '0')}`;
-      } finally {
-        conexion.release();
+    // Si existe al menos una factura previa, extraemos su número final
+    if (ultimaFactura.length > 0 && ultimaFactura[0].numero_factura) {
+      const match = ultimaFactura[0].numero_factura.match(/(\d+)$/);
+      if (match) {
+        proximoNumero = parseInt(match[1], 10) + 1;
       }
-    } catch (error) {
-      console.error('❌ Error generando número de factura:', error);
-      return `FAC${String(Date.now()).slice(-6)}`;
     }
+
+    // Generar nuevo número con formato FAC000001
+    const nuevoNumero = `FAC${proximoNumero.toString().padStart(6, '0')}`;
+
+    // ✅ Retornar solo el número generado (no JSON)
+    return nuevoNumero;
+
+  } catch (error) {
+    console.error('❌ Error generando número de factura:', error);
+    throw new Error('Error generando número de factura: ' + error.message);
   }
+}
+
+
 
   static async actualizarConsecutivos() {
     try {
