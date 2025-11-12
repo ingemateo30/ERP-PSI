@@ -22,7 +22,7 @@ const FacturasFilters = ({
   loading = false 
 }) => {
   // ==========================================
-  // ESTADO DE FILTROS - CORREGIDO
+  // ESTADO DE FILTROS - CORREGIDO COMPLETAMENTE
   // ==========================================
   const [filtros, setFiltros] = useState({
     search: '',
@@ -39,8 +39,7 @@ const FacturasFilters = ({
     vencimiento_hasta: '',
     metodo_pago: '',
     dias_vencimiento: '',
-    incluir_anuladas: false,
-    ...filtrosIniciales
+    incluir_anuladas: false
   });
 
   const [filtrosAvanzados, setFiltrosAvanzados] = useState(false);
@@ -50,50 +49,45 @@ const FacturasFilters = ({
   // EFECTOS - SINCRONIZACIÓN CON PROPS
   // ==========================================
   useEffect(() => {
-    console.log('🔄 [FacturasFilters] Sincronizando filtros iniciales:', filtrosIniciales);
-    setFiltros(prev => ({
-      ...prev,
-      ...filtrosIniciales
-    }));
-  }, [filtrosIniciales]);
+    if (Object.keys(filtrosIniciales).length > 0) {
+      console.log('🔄 [FacturasFilters] Sincronizando filtros iniciales:', filtrosIniciales);
+      setFiltros(prev => ({
+        ...prev,
+        ...filtrosIniciales
+      }));
+    }
+  }, [JSON.stringify(filtrosIniciales)]);
 
   // ==========================================
   // VALIDACIONES DE FORMULARIO
   // ==========================================
-  const validarFiltros = useCallback((filtrosAValidar) => {
+  const validarFiltros = (filtrosAValidar) => {
     const errores = {};
 
-    // Validar fechas
     if (filtrosAValidar.fecha_desde && filtrosAValidar.fecha_hasta) {
       const fechaDesde = new Date(filtrosAValidar.fecha_desde);
       const fechaHasta = new Date(filtrosAValidar.fecha_hasta);
-      
       if (fechaDesde > fechaHasta) {
         errores.fecha_hasta = 'La fecha hasta debe ser posterior a la fecha desde';
       }
     }
 
-    // Validar fechas de vencimiento
     if (filtrosAValidar.vencimiento_desde && filtrosAValidar.vencimiento_hasta) {
       const vencDesde = new Date(filtrosAValidar.vencimiento_desde);
       const vencHasta = new Date(filtrosAValidar.vencimiento_hasta);
-      
       if (vencDesde > vencHasta) {
         errores.vencimiento_hasta = 'La fecha de vencimiento hasta debe ser posterior a la fecha desde';
       }
     }
 
-    // Validar montos
     if (filtrosAValidar.monto_min && filtrosAValidar.monto_max) {
       const montoMin = parseFloat(filtrosAValidar.monto_min);
       const montoMax = parseFloat(filtrosAValidar.monto_max);
-      
       if (montoMin > montoMax) {
         errores.monto_max = 'El monto máximo debe ser mayor al monto mínimo';
       }
     }
 
-    // Validar días de vencimiento
     if (filtrosAValidar.dias_vencimiento) {
       const dias = parseInt(filtrosAValidar.dias_vencimiento);
       if (isNaN(dias) || dias < 0) {
@@ -102,42 +96,16 @@ const FacturasFilters = ({
     }
 
     return errores;
-  }, []);
-
-  // ==========================================
-  // MANEJO DE CAMBIOS EN FILTROS - CORREGIDO
-  // ==========================================
-  const handleFilterChange = useCallback((campo, valor) => {
-    console.log(`🔄 [FacturasFilters] Cambiando filtro ${campo}:`, valor);
-    
-    setFiltros(prev => {
-      const nuevosFiltros = {
-        ...prev,
-        [campo]: valor
-      };
-      
-      // Limpiar errores del campo modificado
-      if (erroresValidacion[campo]) {
-        setErroresValidacion(prevErrores => {
-          const nuevosErrores = { ...prevErrores };
-          delete nuevosErrores[campo];
-          return nuevosErrores;
-        });
-      }
-      
-      return nuevosFiltros;
-    });
-  }, [erroresValidacion]);
+  };
 
   // ==========================================
   // APLICAR FILTROS - CORREGIDO
   // ==========================================
-  const handleSubmit = useCallback((e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     
     console.log('🔍 [FacturasFilters] Aplicando filtros:', filtros);
     
-    // Validar filtros antes de enviar
     const errores = validarFiltros(filtros);
     
     if (Object.keys(errores).length > 0) {
@@ -146,18 +114,14 @@ const FacturasFilters = ({
       return;
     }
     
-    // Filtrar valores vacíos y preparar para envío
     const filtrosLimpios = Object.fromEntries(
       Object.entries(filtros).filter(([key, value]) => {
-        // Mantener booleanos falsos, pero filtrar strings vacíos
         if (typeof value === 'boolean') return true;
         return value !== '' && value !== null && value !== undefined;
       })
     );
     
-    // Verificar que hay al menos un filtro
-    const filtrosNoVacios = Object.keys(filtrosLimpios).length;
-    if (filtrosNoVacios === 0) {
+    if (Object.keys(filtrosLimpios).length === 0) {
       setErroresValidacion({ general: 'Debe especificar al menos un criterio de búsqueda' });
       return;
     }
@@ -167,12 +131,12 @@ const FacturasFilters = ({
     if (onBuscar) {
       onBuscar(filtrosLimpios);
     }
-  }, [filtros, validarFiltros, onBuscar]);
+  };
 
   // ==========================================
   // LIMPIAR FILTROS - CORREGIDO
   // ==========================================
-  const handleLimpiar = useCallback(() => {
+  const handleLimpiar = () => {
     console.log('🗑️ [FacturasFilters] Limpiando todos los filtros');
     
     const filtrosVacios = {
@@ -200,34 +164,28 @@ const FacturasFilters = ({
     if (onLimpiar) {
       onLimpiar();
     }
-  }, [onLimpiar]);
+  };
 
   // ==========================================
-  // BÚSQUEDA RÁPIDA - CORREGIDO
+  // BÚSQUEDA RÁPIDA
   // ==========================================
-  const handleBusquedaRapida = useCallback((termino) => {
+  const handleBusquedaRapida = (termino) => {
     if (!termino || termino.trim().length < 2) return;
     
     console.log('⚡ [FacturasFilters] Búsqueda rápida:', termino);
     
-    const filtrosBusqueda = {
-      search: termino.trim()
-    };
-    
     if (onBuscar) {
-      onBuscar(filtrosBusqueda);
+      onBuscar({ search: termino.trim() });
     }
-  }, [onBuscar]);
+  };
 
   // ==========================================
   // DETECTAR SI HAY FILTROS ACTIVOS
   // ==========================================
-  const hayFiltrosActivos = useMemo(() => {
-    return Object.entries(filtros).some(([key, value]) => {
-      if (typeof value === 'boolean') return value;
-      return value !== '' && value !== null && value !== undefined;
-    });
-  }, [filtros]);
+  const hayFiltrosActivos = Object.entries(filtros).some(([key, value]) => {
+    if (typeof value === 'boolean') return value;
+    return value !== '' && value !== null && value !== undefined;
+  });
 
   // ==========================================
   // OPCIONES DE SELECT
@@ -267,7 +225,7 @@ const FacturasFilters = ({
   // ==========================================
   // RENDER DEL COMPONENTE
   // ==========================================
-  return (
+ return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200">
       {/* Header del filtro */}
       <div className="px-6 py-4 border-b border-gray-200">
@@ -317,15 +275,12 @@ const FacturasFilters = ({
             <div className="relative">
               <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
               <input
-  type="text"
-  value={filtros.search}
-  onChange={(e) => {
-    const valor = e.target.value;
-    setFiltros(prev => ({ ...prev, search: valor }));
-  }}
-  placeholder="Número de factura, cliente, identificación..."
-  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-/>
+                type="text"
+                value={filtros.search}
+                onChange={(e) => setFiltros(prev => ({ ...prev, search: e.target.value }))}
+                placeholder="Número de factura, cliente, identificación..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
           </CampoConError>
 
@@ -336,7 +291,7 @@ const FacturasFilters = ({
             </label>
             <select
               value={filtros.estado}
-              onChange={(e) => handleFilterChange('estado', e.target.value)}
+              onChange={(e) => setFiltros(prev => ({ ...prev, estado: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               {opcionesEstado.map(opcion => (
@@ -357,7 +312,7 @@ const FacturasFilters = ({
               <input
                 type="text"
                 value={filtros.numero_factura}
-                onChange={(e) => handleFilterChange('numero_factura', e.target.value)}
+                onChange={(e) => setFiltros(prev => ({ ...prev, numero_factura: e.target.value }))}
                 placeholder="F000001, F000002..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
@@ -387,7 +342,7 @@ const FacturasFilters = ({
                     <input
                       type="date"
                       value={filtros.fecha_desde}
-                      onChange={(e) => handleFilterChange('fecha_desde', e.target.value)}
+                      onChange={(e) => setFiltros(prev => ({ ...prev, fecha_desde: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </CampoConError>
@@ -399,7 +354,7 @@ const FacturasFilters = ({
                     <input
                       type="date"
                       value={filtros.fecha_hasta}
-                      onChange={(e) => handleFilterChange('fecha_hasta', e.target.value)}
+                      onChange={(e) => setFiltros(prev => ({ ...prev, fecha_hasta: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </CampoConError>
@@ -420,7 +375,7 @@ const FacturasFilters = ({
                     <input
                       type="date"
                       value={filtros.vencimiento_desde}
-                      onChange={(e) => handleFilterChange('vencimiento_desde', e.target.value)}
+                      onChange={(e) => setFiltros(prev => ({ ...prev, vencimiento_desde: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </CampoConError>
@@ -432,7 +387,7 @@ const FacturasFilters = ({
                     <input
                       type="date"
                       value={filtros.vencimiento_hasta}
-                      onChange={(e) => handleFilterChange('vencimiento_hasta', e.target.value)}
+                      onChange={(e) => setFiltros(prev => ({ ...prev, vencimiento_hasta: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </CampoConError>
@@ -445,7 +400,7 @@ const FacturasFilters = ({
                       type="number"
                       min="0"
                       value={filtros.dias_vencimiento}
-                      onChange={(e) => handleFilterChange('dias_vencimiento', e.target.value)}
+                      onChange={(e) => setFiltros(prev => ({ ...prev, dias_vencimiento: e.target.value }))}
                       placeholder="30, 60, 90..."
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
@@ -469,7 +424,7 @@ const FacturasFilters = ({
                       min="0"
                       step="0.01"
                       value={filtros.monto_min}
-                      onChange={(e) => handleFilterChange('monto_min', e.target.value)}
+                      onChange={(e) => setFiltros(prev => ({ ...prev, monto_min: e.target.value }))}
                       placeholder="50000"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
@@ -484,7 +439,7 @@ const FacturasFilters = ({
                       min="0"
                       step="0.01"
                       value={filtros.monto_max}
-                      onChange={(e) => handleFilterChange('monto_max', e.target.value)}
+                      onChange={(e) => setFiltros(prev => ({ ...prev, monto_max: e.target.value }))}
                       placeholder="500000"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
@@ -506,7 +461,7 @@ const FacturasFilters = ({
                     <input
                       type="text"
                       value={filtros.ruta}
-                      onChange={(e) => handleFilterChange('ruta', e.target.value)}
+                      onChange={(e) => setFiltros(prev => ({ ...prev, ruta: e.target.value }))}
                       placeholder="R001, R002..."
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
@@ -518,7 +473,7 @@ const FacturasFilters = ({
                     </label>
                     <select
                       value={filtros.metodo_pago}
-                      onChange={(e) => handleFilterChange('metodo_pago', e.target.value)}
+                      onChange={(e) => setFiltros(prev => ({ ...prev, metodo_pago: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       {opcionesMetodoPago.map(opcion => (
@@ -537,7 +492,7 @@ const FacturasFilters = ({
                       type="number"
                       min="1"
                       value={filtros.cliente_id}
-                      onChange={(e) => handleFilterChange('cliente_id', e.target.value)}
+                      onChange={(e) => setFiltros(prev => ({ ...prev, cliente_id: e.target.value }))}
                       placeholder="12345"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
@@ -555,7 +510,7 @@ const FacturasFilters = ({
                     <input
                       type="checkbox"
                       checked={filtros.incluir_anuladas}
-                      onChange={(e) => handleFilterChange('incluir_anuladas', e.target.checked)}
+                      onChange={(e) => setFiltros(prev => ({ ...prev, incluir_anuladas: e.target.checked }))}
                       className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                     />
                     <span className="ml-2 text-sm text-gray-700">
