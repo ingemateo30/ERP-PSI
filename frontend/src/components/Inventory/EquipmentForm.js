@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import inventoryService from '../../services/inventoryService';
 import { EQUIPMENT_TYPES } from '../../constants/inventoryConstants';
+import { Package } from 'lucide-react';
 
 const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -182,16 +183,21 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+    <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">
-            {equipo ? 'Editar Equipo' : 'Nuevo Equipo'}
-          </h3>
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-[#0e6493] to-[#0a5273]">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+              <Package className="w-6 h-6 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-white">
+              {equipo ? 'Editar Equipo' : 'Nuevo Equipo'}
+            </h3>
+          </div>
           <button
             onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-white hover:bg-white/10 p-2 rounded-lg transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -200,7 +206,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
         </div>
 
         {/* Formulario */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[calc(90vh-180px)] overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Código */}
             <div>
@@ -213,7 +219,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
                   name="codigo"
                   value={formData.codigo}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
                     errors.codigo ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="RTR001"
@@ -242,7 +248,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
                 name="tipo"
                 value={formData.tipo}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
                   errors.tipo ? 'border-red-500' : 'border-gray-300'
                 }`}
               >
@@ -269,7 +275,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
               name="nombre"
               value={formData.nombre}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
                 errors.nombre ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Router WiFi AC1200"
@@ -291,7 +297,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
                 name="marca"
                 value={formData.marca}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
                 placeholder="TP-Link"
                 maxLength="100"
               />
@@ -307,7 +313,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
                 name="modelo"
                 value={formData.modelo}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
                 placeholder="Archer C6"
                 maxLength="100"
               />
@@ -324,7 +330,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
               name="numero_serie"
               value={formData.numero_serie}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
               placeholder="TPL2024001"
               maxLength="100"
             />
@@ -341,7 +347,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
                 name="precio_compra"
                 value={formData.precio_compra}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
                   errors.precio_compra ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="75000"
@@ -363,7 +369,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
                 name="fecha_compra"
                 value={formData.fecha_compra}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
                   errors.fecha_compra ? 'border-red-500' : 'border-gray-300'
                 }`}
                 max={new Date().toISOString().split('T')[0]}
@@ -385,7 +391,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
                 name="proveedor"
                 value={formData.proveedor}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
                 placeholder="Distribuidora Tech"
                 maxLength="255"
               />
@@ -401,7 +407,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
                 name="ubicacion"
                 value={formData.ubicacion}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
                 placeholder="Almacén Principal"
                 maxLength="255"
               />
@@ -418,7 +424,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
               value={formData.observaciones}
               onChange={handleChange}
               rows="3"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
               placeholder="Observaciones adicionales sobre el equipo..."
               maxLength="1000"
             />
@@ -428,18 +434,18 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
           </div>
 
           {/* Botones */}
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+          <div className="flex justify-end gap-4 pt-6 border-t-2 border-gray-200 -mx-6 -mb-6 p-6 bg-gray-50 rounded-b-xl">
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="px-5 py-2.5 text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-all shadow-sm hover:shadow"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading || !codeAvailable}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 bg-gradient-to-r from-[#0e6493] to-[#0a5273] text-white rounded-lg hover:from-[#0a5273] hover:to-[#0e6493] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-lg hover:shadow-xl"
             >
               {loading ? (
                 <>
