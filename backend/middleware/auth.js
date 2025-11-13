@@ -1,4 +1,4 @@
-// backend/middleware/auth.js - Middleware de Autenticación CORREGIDO
+// backend/middleware/auth.js - Middleware de Autenticación FINAL
 const jwt = require('jsonwebtoken');
 const { Database } = require('../models/Database');
 
@@ -83,9 +83,11 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// ✅ CORREGIDO: Middleware para verificar roles específicos
-// Ahora acepta MÚLTIPLES argumentos en lugar de UN array
-const requireRole = (...roles) => {
+// ✅ MEJORADO: Middleware para verificar roles específicos
+// Acepta AMBOS formatos:
+// - requireRole('admin', 'supervisor')  ← Múltiples argumentos
+// - requireRole(['admin', 'supervisor']) ← Array
+const requireRole = (...args) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
@@ -95,8 +97,18 @@ const requireRole = (...roles) => {
       });
     }
 
-    // ✅ roles ya es un array gracias a ...roles (rest parameter)
-    // No necesitamos convertir, simplemente verificamos
+    // ✅ MANEJAR AMBOS FORMATOS
+    let roles;
+    
+    // Si el primer argumento es un array, usar ese array
+    if (Array.isArray(args[0])) {
+      roles = args[0];
+    } else {
+      // Si no, usar todos los argumentos como roles individuales
+      roles = args;
+    }
+
+    // Verificar que el rol del usuario esté en la lista permitida
     if (!roles.includes(req.user.rol)) {
       return res.status(403).json({
         success: false,
