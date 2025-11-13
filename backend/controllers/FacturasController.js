@@ -27,13 +27,10 @@ class FacturasController {
   // MÉTODOS PRINCIPALES REQUERIDOS POR LAS RUTAS
   // ==========================================
 
-  /**
-   * Obtener todas las facturas con filtros y paginación
-   */
-   /**
-   * Obtener todas las facturas con filtros y paginación
-   * CORREGIDO: Usando columnas reales de la tabla facturas
-   */
+ /**
+ * Obtener todas las facturas con filtros y paginación
+ * CORREGIDO: Agregado filtro de búsqueda general
+ */
 static async obtenerTodas(req, res) {
   try {
     const { 
@@ -44,6 +41,10 @@ static async obtenerTodas(req, res) {
       estado,
       cliente_id,
       numero_factura,
+      search,           // ✅ NUEVO: parámetro de búsqueda general
+      ruta,            // ✅ NUEVO: filtro por ruta
+      monto_min,       // ✅ NUEVO: monto mínimo
+      monto_max,       // ✅ NUEVO: monto máximo
       sort_by = 'fecha_emision',
       sort_order = 'DESC'
     } = req.query;
@@ -52,14 +53,18 @@ static async obtenerTodas(req, res) {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    console.log('📋 Obteniendo facturas con parámetros:', {
+    console.log('📋 [FacturasController] Obteniendo facturas con parámetros:', {
       page: pageNum,
       limit: limitNum,
       fecha_desde,
       fecha_hasta,
       estado,
       cliente_id,
-      numero_factura
+      numero_factura,
+      search,
+      ruta,
+      monto_min,
+      monto_max
     });
 
     // Verificar si existe la tabla facturas
@@ -94,7 +99,7 @@ static async obtenerTodas(req, res) {
     const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'fecha_emision';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // Construir query base con WHERE dinámico
+    // ✅ CONSTRUCCIÓN DINÁMICA DE QUERY
     let query = `
       SELECT 
         f.id,
@@ -140,25 +145,60 @@ static async obtenerTodas(req, res) {
 
     const params = [];
 
-    // Aplicar filtros dinámicos
+    // ✅ FILTRO DE BÚSQUEDA GENERAL (NUEVO)
+    if (search && search.trim()) {
+      query += ` AND (
+        f.numero_factura LIKE ? OR 
+        f.nombre_cliente LIKE ? OR 
+        f.identificacion_cliente LIKE ?
+      )`;
+      const searchTerm = `%${search.trim()}%`;
+      params.push(searchTerm, searchTerm, searchTerm);
+      console.log('🔍 Aplicando búsqueda general:', search);
+    }
+
+    // Filtro por rango de fechas
     if (fecha_desde && fecha_hasta) {
       query += ' AND f.fecha_emision BETWEEN ? AND ?';
       params.push(fecha_desde, fecha_hasta);
     }
 
+    // Filtro por estado
     if (estado) {
       query += ' AND f.estado = ?';
       params.push(estado);
     }
 
+    // Filtro por cliente
     if (cliente_id) {
       query += ' AND f.cliente_id = ?';
       params.push(cliente_id);
     }
 
+    // Filtro por número de factura específico
     if (numero_factura) {
       query += ' AND f.numero_factura LIKE ?';
       params.push(`%${numero_factura}%`);
+    }
+
+    // ✅ FILTRO POR RUTA (NUEVO)
+    if (ruta && ruta.trim()) {
+      query += ' AND f.ruta LIKE ?';
+      params.push(`%${ruta.trim()}%`);
+      console.log('📍 Aplicando filtro de ruta:', ruta);
+    }
+
+    // ✅ FILTRO POR RANGO DE MONTOS (NUEVO)
+    if (monto_min) {
+      query += ' AND f.total >= ?';
+      params.push(parseFloat(monto_min));
+      console.log('💰 Aplicando monto mínimo:', monto_min);
+    }
+
+    if (monto_max) {
+      query += ' AND f.total <= ?';
+      params.push(parseFloat(monto_max));
+      console.log('💰 Aplicando monto máximo:', monto_max);
     }
 
     // Contar total
@@ -166,13 +206,14 @@ static async obtenerTodas(req, res) {
     const totalResult = await Database.query(countQuery, params);
     const total = totalResult[0]?.total || 0;
 
-    // ✅ CORRECCIÓN: Interpolar LIMIT y OFFSET directamente
+    console.log(`📊 Total de facturas encontradas: ${total}`);
+
+    // Agregar ordenamiento y paginación
     query += ` ORDER BY f.${sortColumn} ${sortDirection} LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}`;
     
-    console.log('🔍 Query final:', query);
-    console.log('📊 Parámetros:', params);
+    console.log('🔍 Query final construida');
 
-    // Ejecutar query (solo con los params de filtros, sin limit/offset)
+    // Ejecutar query principal
     const facturas = await Database.query(query, params);
 
     // Calcular paginación
