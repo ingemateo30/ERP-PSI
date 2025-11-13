@@ -1,6 +1,6 @@
 // frontend/src/components/Facturas/HistorialFacturacionWrapper.js
 // VERSIÓN CORREGIDA - Soluciona problemas de endpoints y carga de datos
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Search, Users, FileText, AlertCircle, X, Eye, Calendar,
     ChevronDown, ChevronUp, DollarSign, Clock, CheckCircle,
