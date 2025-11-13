@@ -319,122 +319,114 @@ class ClienteController {
   }
 
   // Crear nuevo cliente
-  static async crear(req, res) {
-    try {
-      console.log('🔍 DEBUG - Crear Cliente');
-      console.log('Body recibido:', JSON.stringify(req.body, null, 2));
-
-      // Validaciones básicas mínimas
-      const { identificacion, nombre, direccion } = req.body;
-
-      if (!identificacion || !nombre || !direccion) {
-        console.log('❌ Faltan campos requeridos:', {
-          identificacion: !!identificacion,
-          nombre: !!nombre,
-          direccion: !!direccion
-        });
-
-        return res.status(400).json({
-          success: false,
-          message: 'Identificación, nombre y dirección son campos requeridos'
-        });
-      }
-
-      // CORRECCIÓN: Procesar fechas correctamente antes de guardar
-      const datosCliente = { ...req.body };
-
-      // Convertir fechas al formato correcto
-      if (datosCliente.fecha_registro) {
-        datosCliente.fecha_registro = ClienteController.procesarFecha(datosCliente.fecha_registro);
-      }
-
-      if (datosCliente.fecha_inicio_servicio) {
-        datosCliente.fecha_inicio_servicio = ClienteController.procesarFecha(datosCliente.fecha_inicio_servicio);
-      }
-
-      if (datosCliente.fecha_fin_servicio) {
-        datosCliente.fecha_fin_servicio = ClienteController.procesarFecha(datosCliente.fecha_fin_servicio);
-      }
-
-      // CORRECCIÓN: Validar sincronización ciudad-sector
-      if (datosCliente.sector_id && datosCliente.ciudad_id) {
-        const sectorValido = await Cliente.validarSectorCiudad(datosCliente.sector_id, datosCliente.ciudad_id);
-        if (!sectorValido) {
-          return res.status(400).json({
-            success: false,
-            message: 'El sector seleccionado no pertenece a la ciudad especificada'
-          });
-        }
-      }
-
-      console.log('✅ Datos procesados:', datosCliente);
-
-      const clienteId = await Cliente.crear(datosCliente);
-      const clienteCreado = await Cliente.obtenerPorId(clienteId);
-
-      // Crear notificación de nuevo cliente
-      try {
-        const Notificacion = require('../models/notificacion');
-        await Notificacion.notificarNuevoCliente(clienteId, nombre);
-        console.log('🔔 Notificación de nuevo cliente creada');
-      } catch (notifError) {
-        console.error('⚠️ Error creando notificación:', notifError);
-        // No fallar la creación del cliente si falla la notificación
-      }
-
-      res.status(201).json({
-        success: true,
-        data: clienteCreado,
-        message: 'Cliente creado exitosamente'
-      });
-
-      const serviciosConInstalacion = serviciosCreados.filter(s => s.requiere_instalacion);
-if (serviciosConInstalacion.length > 0) {
+static async crear(req, res) {
   try {
-    await conexion.execute(`
-      INSERT INTO instalaciones (
-        cliente_id, 
-        tipo_instalacion, 
-        estado, 
-        fecha_programada,
-        direccion_instalacion,
-        barrio,
-        telefono_contacto,
-        observaciones, 
-        created_at
-      ) VALUES (?, 'nueva', 'programada', DATE_ADD(CURDATE(), INTERVAL 1 DAY), ?, ?, ?, 
-               'Instalación generada automáticamente', NOW())
-    `, [
-      clienteId,
-      datosCliente.direccion,
-      datosCliente.barrio || '',
-      datosCliente.telefono || ''
-    ]);
+    console.log('🔍 DEBUG - Crear Cliente');
+    console.log('Body recibido:', JSON.stringify(req.body, null, 2));
 
-          console.log(`🔧 Instalación automática creada para cliente ${clienteId}`);
-        } catch (error) {
-          console.warn('⚠️ Error creando instalación automática:', error.message);
-        }
-      }
+    // Validaciones básicas
+    const { identificacion, nombre, direccion } = req.body;
 
-    } catch (error) {
-      console.error('Error al crear cliente:', error);
-
-      if (error.message.includes('Duplicate entry')) {
-        return res.status(409).json({
-          success: false,
-          message: 'Ya existe un cliente con esta identificación'
-        });
-      }
-
-      res.status(500).json({
+    if (!identificacion || !nombre || !direccion) {
+      return res.status(400).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: 'Identificación, nombre y dirección son campos requeridos'
       });
     }
-  }
 
+    // Procesar datos
+    const datosCliente = { ...req.body };
+
+    if (datosCliente.fecha_registro) {
+      datosCliente.fecha_registro = ClienteController.procesarFecha(datosCliente.fecha_registro);
+    }
+    if (datosCliente.fecha_inicio_servicio) {
+      datosCliente.fecha_inicio_servicio = ClienteController.procesarFecha(datosCliente.fecha_inicio_servicio);
+    }
+    if (datosCliente.fecha_fin_servicio) {
+      datosCliente.fecha_fin_servicio = ClienteController.procesarFecha(datosCliente.fecha_fin_servicio);
+    }
+
+    if (datosCliente.sector_id && datosCliente.ciudad_id) {
+      const sectorValido = await Cliente.validarSectorCiudad(datosCliente.sector_id, datosCliente.ciudad_id);
+      if (!sectorValido) {
+        return res.status(400).json({
+          success: false,
+          message: 'El sector seleccionado no pertenece a la ciudad especificada'
+        });
+      }
+    }
+
+    // ✅ CREAR CLIENTE
+    const clienteId = await Cliente.crear(datosCliente);
+    
+    // ✅ CREAR INSTALACIÓN AUTOMÁTICA CON DIRECCIÓN
+    try {
+      const db = require('../config/database');
+      const conexion = await db.getConnection();
+      
+      await conexion.execute(`
+        INSERT INTO instalaciones (
+          cliente_id, 
+          tipo_instalacion, 
+          estado, 
+          fecha_programada,
+          direccion_instalacion,
+          barrio,
+          telefono_contacto,
+          observaciones, 
+          created_at
+        ) VALUES (?, 'nueva', 'programada', DATE_ADD(CURDATE(), INTERVAL 1 DAY), ?, ?, ?, 
+                 'Instalación generada automáticamente', NOW())
+      `, [
+        clienteId,
+        datosCliente.direccion,
+        datosCliente.barrio || '',
+        datosCliente.telefono || ''
+      ]);
+      
+      conexion.release();
+      console.log(`🔧 Instalación automática creada para cliente ${clienteId}`);
+    } catch (error) {
+      console.warn('⚠️ Error creando instalación automática:', error.message);
+      // No fallar la creación del cliente si falla la instalación
+    }
+
+    // ✅ CREAR NOTIFICACIÓN
+    try {
+      const Notificacion = require('../models/notificacion');
+      await Notificacion.notificarNuevoCliente(clienteId, nombre);
+      console.log('🔔 Notificación de nuevo cliente creada');
+    } catch (notifError) {
+      console.error('⚠️ Error creando notificación:', notifError);
+    }
+
+    // ✅ OBTENER CLIENTE CREADO Y RESPONDER
+    const clienteCreado = await Cliente.obtenerPorId(clienteId);
+
+    res.status(201).json({
+      success: true,
+      data: clienteCreado,
+      message: 'Cliente creado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('Error al crear cliente:', error);
+
+    if (error.message.includes('Duplicate entry')) {
+      return res.status(409).json({
+        success: false,
+        message: 'Ya existe un cliente con esta identificación'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+}
   // CORRECCIÓN: Función auxiliar para procesar fechas
   static procesarFecha(fecha) {
     if (!fecha) return null;
