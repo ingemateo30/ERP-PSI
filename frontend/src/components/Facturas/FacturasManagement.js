@@ -8,6 +8,8 @@ import FacturasList from './FacturasList';
 import FacturaModal from './FacturaModal';
 import PagoModal from './PagoModal';
 import AnularModal from './AnularModal';
+import { useAuth } from '../../contexts/AuthContext';
+
 
 const FacturasManagement = () => {
   const {
@@ -42,7 +44,7 @@ const FacturasManagement = () => {
     anular: false,
     facturaSeleccionada: null
   });
-
+const { hasPermission } = useAuth();
   // Estados de UI
   const [filtrosAvanzados, setFiltrosAvanzados] = useState(false);
   const [notificacion, setNotificacion] = useState(null);
