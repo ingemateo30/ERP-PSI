@@ -20,8 +20,9 @@ class GeminiService {
       this.genAI = null;
     } else {
       this.genAI = new GoogleGenerativeAI(apiKey);
-      // Usar gemini-1.5-flash (más rápido y económico) o gemini-1.5-pro (más capaz)
-      this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      // Usar gemini-2.0-flash-lite (gratuito: 30 RPM, 1M TPM, 200 RPD)
+      this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+      console.log('✅ Gemini API inicializado con modelo: gemini-2.0-flash-lite');
     }
 
     // Contexto del sistema para el chatbot
@@ -61,11 +62,6 @@ Problemas que DEBES DERIVAR a ticket:
    * Genera una respuesta usando Gemini AI
    */
   async generateResponse(userMessage, conversationHistory = []) {
-    // Siempre usar respuestas predefinidas (más confiables y rápidas)
-    // Si quieres habilitar Gemini AI en el futuro, descomenta el código siguiente
-    return this.getFallbackResponse(userMessage);
-
-    /* CÓDIGO GEMINI AI - DESACTIVADO POR AHORA
     try {
       // Si no hay API key, usar respuestas predefinidas
       if (!this.genAI) {
@@ -95,12 +91,11 @@ Problemas que DEBES DERIVAR a ticket:
         needsTicket: this.shouldCreateTicket(text, userMessage),
       };
     } catch (error) {
-      console.error('Error en Gemini Service:', error);
+      console.error('⚠️  Error en Gemini API, usando respuestas predefinidas:', error.message);
 
       // Fallback a respuestas predefinidas si falla la API
       return this.getFallbackResponse(userMessage);
     }
-    */
   }
 
   /**
