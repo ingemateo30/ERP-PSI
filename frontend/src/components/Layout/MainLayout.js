@@ -14,6 +14,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import LogoutButton from '../LogoutButton';
 import { ConfigSidebarNotification } from '../Config/ConfigNotifications';
+import NotificationBell from '../Notificaciones/NotificationBell';
 
 const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -764,7 +765,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                 )}
               </div>
 
-              <button 
+              <button
                 onClick={() => {
                   setSearchOpen(true);
                   setTimeout(() => searchInputRef.current?.focus(), 100);
@@ -774,10 +775,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
                 <Search size={20} />
               </button>
 
-              <button className="p-2 rounded-full hover:bg-gray-100 relative">
-                <Bell size={20} />
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#e21f25]"></span>
-              </button>
+              {/* Campanita de notificaciones */}
+              <NotificationBell />
 
               <div className="w-px h-6 bg-gray-300 hidden sm:block"></div>
 

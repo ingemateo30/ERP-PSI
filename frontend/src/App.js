@@ -33,6 +33,9 @@ const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagem
 const FacturasManagement = lazy(() => import('./components/Facturas/FacturasManagement'));// CORREGIDO: Importación correcta del componente FacturasManagement'./components/Facturas/FacturasManagement';from './components/Facturas/FacturasManagement';
 
 const ReportesRegulatorios = lazy(() => import('./components/Reports/ReportesRegulatorios'));// CORREGIDO: Importación correcta del componente ReportesRegulatorios'from './components/Reports/ReportesRegulatorios';
+
+// Soporte - Página pública
+const SoportePage = lazy(() => import('./components/Soporte/SoportePage'));
 const PQRManagement = lazy(() => import('./components/PQR/PQRManagement'));// CORREGIDO: Importación correcta del componente PQRManagement' from './components/PQR/PQRManagement';
 const IncidenciasManagement = lazy(() => import('./components/Incidencias/IncidenciasManagement'));
 const ConceptosConfig = lazy(() => import('./components/Config/ConceptosConfig'));
@@ -196,6 +199,12 @@ function App() {
                     <ComingSoon pageName="Registro de Usuario" />
                   </MainLayout>
                 }
+              />
+
+              {/* Ruta pública de soporte con chatbot IA */}
+              <Route
+                path="/soporte"
+                element={<SoportePage />}
               />
 
              

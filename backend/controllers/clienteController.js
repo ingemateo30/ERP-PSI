@@ -372,6 +372,16 @@ class ClienteController {
       const clienteId = await Cliente.crear(datosCliente);
       const clienteCreado = await Cliente.obtenerPorId(clienteId);
 
+      // Crear notificación de nuevo cliente
+      try {
+        const Notificacion = require('../models/notificacion');
+        await Notificacion.notificarNuevoCliente(clienteId, nombre);
+        console.log('🔔 Notificación de nuevo cliente creada');
+      } catch (notifError) {
+        console.error('⚠️ Error creando notificación:', notifError);
+        // No fallar la creación del cliente si falla la notificación
+      }
+
       res.status(201).json({
         success: true,
         data: clienteCreado,

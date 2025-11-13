@@ -269,6 +269,18 @@ try {
   app.use('/api/v1/incidencias', incidenciasRoutes);
   console.log('✅ Rutas de incidencias cargadas: /api/v1/incidencias');
 
+  // Rutas de notificaciones
+  console.log('🔔 Cargando rutas de notificaciones...');
+  const notificacionesRoutes = require('./routes/notificaciones');
+  app.use('/api/v1/notificaciones', notificacionesRoutes);
+  console.log('✅ Rutas de notificaciones cargadas: /api/v1/notificaciones');
+
+  // Rutas de soporte (chatbot IA - públicas)
+  console.log('🤖 Cargando rutas de soporte con IA...');
+  const soporteRoutes = require('./routes/soporte');
+  app.use('/api/v1/soporte', soporteRoutes);
+  console.log('✅ Rutas de soporte cargadas: /api/v1/soporte');
+
   //rutas de instalaciones
   console.log('🔧 Cargando rutas de instalaciones...');
   const instalacionesRoutes = require('./routes/instalaciones');
