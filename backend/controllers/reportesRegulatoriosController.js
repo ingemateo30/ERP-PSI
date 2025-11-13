@@ -14,45 +14,77 @@ class ReportesRegulatoriosController {
     async generarReporteSuscriptoresTv(req, res) {
         try {
             const { anno, trimestre } = req.query;
-            
+
             if (!anno || !trimestre) {
                 return res.status(400).json({ error: 'Año y trimestre son requeridos' });
             }
-            
+
+            // Calcular meses del trimestre
+            const mesesTrimestre = {
+                '1': [1, 2, 3],
+                '2': [4, 5, 6],
+                '3': [7, 8, 9],
+                '4': [10, 11, 12]
+            };
+
+            const meses = mesesTrimestre[trimestre];
+            if (!meses) {
+                return res.status(400).json({ error: 'Trimestre inválido' });
+            }
+
             const query = `
-                SELECT 
+                SELECT
                     ? as ANNO,
                     ? as TRIMESTRE,
-                    MONTH(f.fecha_emision) as MES_DEL_TRIMESTRE,
-                    c.ciudad_id as CODIGO_DANE_MUNICIPIO,
+                    m.mes as MES_DEL_TRIMESTRE,
+                    ci.codigo as CODIGO_DANE_MUNICIPIO,
                     '0001' as CODIGO_DANE_CENTRO_POBLADO,
                     ci.nombre as NOMBRE_CENTRO_POBLADO,
-                    'IPTV' as MODALIDAD_SERVICIO_TELEVISION,
-                    CASE 
+                    CASE
+                        WHEN ps.tecnologia LIKE '%IPTV%' OR ps.tecnologia LIKE '%IP TV%' THEN 'IPTV'
+                        WHEN ps.tecnologia LIKE '%Cable%' OR ps.tecnologia LIKE '%HFC%' THEN 'CABLE'
+                        WHEN ps.tecnologia LIKE '%Satelit%' THEN 'SATELITE'
+                        WHEN ps.tecnologia LIKE '%DTH%' THEN 'DTH'
+                        ELSE 'IPTV'
+                    END as MODALIDAD_SERVICIO_TELEVISION,
+                    CASE
                         WHEN c.estrato IN ('1','2','3') THEN 'RESIDENCIAL'
                         ELSE 'EMPRESARIAL'
                     END as SEGMENTO,
-                    'FIBRA_OPTICA' as TIPO_TECNOLOGIA,
+                    UPPER(REPLACE(REPLACE(ps.tecnologia, 'á', 'a'), ' ', '_')) as TIPO_TECNOLOGIA,
                     COUNT(DISTINCT sc.cliente_id) as NUMERO_TOTAL_CONEXIONES
-                FROM servicios_cliente sc
-                JOIN clientes c ON sc.cliente_id = c.id
-                JOIN ciudades ci ON c.ciudad_id = ci.id
-                JOIN planes_servicio ps ON sc.plan_id = ps.id
-                LEFT JOIN facturas f ON c.id = f.cliente_id 
-                    AND YEAR(f.fecha_emision) = ? 
-                    AND QUARTER(f.fecha_emision) = ?
-                WHERE ps.tipo IN ('television', 'combo')
-                    AND sc.estado = 'activo'
+                FROM (
+                    SELECT ? as mes UNION ALL SELECT ? UNION ALL SELECT ?
+                ) m
+                CROSS JOIN ciudades ci
+                LEFT JOIN clientes c ON c.ciudad_id = ci.id
                     AND c.estado = 'activo'
-                GROUP BY 
-                    c.ciudad_id, 
+                LEFT JOIN servicios_cliente sc ON sc.cliente_id = c.id
+                    AND sc.estado = 'activo'
+                    AND DATE_FORMAT(sc.fecha_activacion, '%Y-%m') <= CONCAT(?, '-', LPAD(m.mes, 2, '0'))
+                LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+                    AND ps.tipo IN ('television', 'combo')
+                    AND ps.activo = 1
+                WHERE ci.id IN (SELECT DISTINCT ciudad_id FROM clientes WHERE ciudad_id IS NOT NULL)
+                GROUP BY
+                    m.mes,
+                    ci.codigo,
                     ci.nombre,
+                    CASE WHEN ps.tecnologia LIKE '%IPTV%' OR ps.tecnologia LIKE '%IP TV%' THEN 'IPTV'
+                         WHEN ps.tecnologia LIKE '%Cable%' OR ps.tecnologia LIKE '%HFC%' THEN 'CABLE'
+                         WHEN ps.tecnologia LIKE '%Satelit%' THEN 'SATELITE'
+                         WHEN ps.tecnologia LIKE '%DTH%' THEN 'DTH'
+                         ELSE 'IPTV' END,
                     CASE WHEN c.estrato IN ('1','2','3') THEN 'RESIDENCIAL' ELSE 'EMPRESARIAL' END,
-                    MONTH(f.fecha_emision)
-                ORDER BY c.ciudad_id, MES_DEL_TRIMESTRE
+                    ps.tecnologia
+                HAVING NUMERO_TOTAL_CONEXIONES > 0
+                ORDER BY ci.codigo, m.mes
             `;
-            
-            const datos = await this.db.query(query, [anno, trimestre, anno, trimestre]);
+
+            const datos = await this.db.query(query, [
+                meses[0], meses[1], meses[2],
+                anno
+            ]);
             
             // Si no hay datos, crear una fila vacía con la estructura
             if (datos.length === 0) {
@@ -127,50 +159,69 @@ class ReportesRegulatoriosController {
     }
 
     // Reporte de Planes Tarifarios (Res. 6333 - T.1.2)
-async generarReportePlanesTarifarios(req, res) {
-    try {
-        const { anno, semestre } = req.query;
-        
-        const query = `
-            SELECT 
-                ? as ANNO,
-                ? as SEMESTRE,
-                ps.codigo as CODIGO_PLAN,
-                ps.nombre as NOMBRE_PLAN,
-                c.ciudad_id as ID_MUNICIPIO,
-                CASE 
-                    WHEN c.estrato IN ('1','2','3') THEN 1
-                    ELSE 2
-                END as ID_SEGMENTO_PLANES,
-                ROUND(ps.precio * (1 + cfg.porcentaje_iva/100), 2) as VALOR_PLAN_IMPUESTOS,
-                ps.precio as VALOR_PLAN,
-                CASE ps.tipo
-                    WHEN 'internet' THEN 1
-                    WHEN 'television' THEN 2
-                    WHEN 'combo' THEN 3
-                END as ID_MODALIDAD_PLAN,
-                DATE_FORMAT(ps.created_at, '%Y-%m-%d') as FECHA_INICIO,
-                NULL as FECHA_FIN,
-                CASE WHEN ps.tipo IN ('combo') THEN 'SI' ELSE 'NO' END as TIENE_TELEFONIA_FIJA,
-                CASE WHEN ps.tipo IN ('combo') THEN ps.codigo ELSE NULL END as CODIGO_PLAN_TEL_FIJA,
-                CASE WHEN ps.tipo IN ('combo') THEN 0 ELSE NULL END as TARIFA_TELEFONIA_FIJA,
-                CASE WHEN ps.tipo IN ('combo') THEN 0 ELSE NULL END as CANTIDAD_MINUTOS,
-                CASE WHEN ps.tipo IN ('internet', 'combo') THEN 'SI' ELSE 'NO' END as TIENE_INTERNET_FIJO,
-                CASE WHEN ps.tipo IN ('internet', 'combo') THEN ps.codigo ELSE NULL END as CODIGO_PLAN_INT_FI,
-                CASE WHEN ps.tipo IN ('internet', 'combo') THEN ps.precio ELSE NULL END as TARIFA_MENSUAL_INTERNET,
-                ps.velocidad_bajada as VELOCIDAD_OFRECIDA_BAJADA,
-                ps.velocidad_subida as VELOCIDAD_OFRECIDA_SUBIDA,
-                1 as ID_TECNOLOGIA
-            FROM planes_servicio ps
-            CROSS JOIN configuracion_empresa cfg
-            LEFT JOIN servicios_cliente sc ON ps.id = sc.plan_id
-            LEFT JOIN clientes c ON sc.cliente_id = c.id
-            WHERE ps.activo = 1
-            GROUP BY ps.id, ps.codigo, ps.nombre, ps.precio, ps.tipo, ps.created_at, 
-                     ps.velocidad_bajada, ps.velocidad_subida, c.ciudad_id, c.estrato, cfg.porcentaje_iva
-            ORDER BY ps.codigo, c.ciudad_id
-        `;
-            
+    async generarReportePlanesTarifarios(req, res) {
+        try {
+            const { anno, semestre } = req.query;
+
+            if (!anno || !semestre) {
+                return res.status(400).json({ error: 'Año y semestre son requeridos' });
+            }
+
+            const query = `
+                SELECT
+                    ? as ANNO,
+                    ? as SEMESTRE,
+                    ps.codigo as CODIGO_PLAN,
+                    ps.nombre as NOMBRE_PLAN,
+                    ci.codigo as ID_MUNICIPIO,
+                    CASE
+                        WHEN seg.segmento = 'RESIDENCIAL' THEN 1
+                        ELSE 2
+                    END as ID_SEGMENTO_PLANES,
+                    CASE
+                        WHEN seg.segmento = 'RESIDENCIAL' AND ps.aplica_iva_estrato_123 = 1 THEN
+                            ROUND(ps.precio * (1 + (SELECT porcentaje_iva FROM configuracion_empresa LIMIT 1)/100), 2)
+                        WHEN seg.segmento != 'RESIDENCIAL' AND ps.aplica_iva_estrato_456 = 1 THEN
+                            ROUND(ps.precio * (1 + (SELECT porcentaje_iva FROM configuracion_empresa LIMIT 1)/100), 2)
+                        ELSE ps.precio
+                    END as VALOR_PLAN_IMPUESTOS,
+                    ps.precio as VALOR_PLAN,
+                    CASE ps.tipo
+                        WHEN 'internet' THEN 1
+                        WHEN 'television' THEN 2
+                        WHEN 'combo' THEN 3
+                    END as ID_MODALIDAD_PLAN,
+                    DATE_FORMAT(COALESCE(ps.fecha_inicio_promocion, ps.created_at), '%Y-%m-%d') as FECHA_INICIO,
+                    DATE_FORMAT(ps.fecha_fin_promocion, '%Y-%m-%d') as FECHA_FIN,
+                    'NO' as TIENE_TELEFONIA_FIJA,
+                    NULL as CODIGO_PLAN_TEL_FIJA,
+                    NULL as TARIFA_TELEFONIA_FIJA,
+                    NULL as CANTIDAD_MINUTOS,
+                    CASE WHEN ps.tipo IN ('internet', 'combo') THEN 'SI' ELSE 'NO' END as TIENE_INTERNET_FIJO,
+                    CASE WHEN ps.tipo IN ('internet', 'combo') THEN ps.codigo ELSE NULL END as CODIGO_PLAN_INT_FI,
+                    CASE
+                        WHEN ps.tipo = 'internet' THEN ps.precio
+                        WHEN ps.tipo = 'combo' THEN COALESCE(ps.precio_internet, ps.precio * 0.6)
+                        ELSE NULL
+                    END as TARIFA_MENSUAL_INTERNET,
+                    COALESCE(ps.velocidad_bajada, 0) as VELOCIDAD_OFRECIDA_BAJADA,
+                    COALESCE(ps.velocidad_subida, 0) as VELOCIDAD_OFRECIDA_SUBIDA,
+                    CASE
+                        WHEN ps.tecnologia LIKE '%Fibra%' OR ps.tecnologia LIKE '%FTTH%' THEN 1
+                        WHEN ps.tecnologia LIKE '%Cable%' OR ps.tecnologia LIKE '%HFC%' THEN 2
+                        WHEN ps.tecnologia LIKE '%Inalamb%' OR ps.tecnologia LIKE '%Wireless%' THEN 3
+                        WHEN ps.tecnologia LIKE '%Satelit%' THEN 4
+                        WHEN ps.tecnologia LIKE '%ADSL%' OR ps.tecnologia LIKE '%Cobre%' THEN 5
+                        ELSE 1
+                    END as ID_TECNOLOGIA
+                FROM planes_servicio ps
+                CROSS JOIN (SELECT 'RESIDENCIAL' as segmento UNION ALL SELECT 'EMPRESARIAL') seg
+                CROSS JOIN ciudades ci
+                WHERE ps.activo = 1
+                    AND ci.id IN (SELECT DISTINCT ciudad_id FROM clientes WHERE ciudad_id IS NOT NULL)
+                ORDER BY ps.codigo, ci.codigo, ID_SEGMENTO_PLANES
+            `;
+
             const datos = await this.db.query(query, [anno, semestre]);
             
             const wb = XLSX.utils.book_new();
@@ -203,13 +254,30 @@ async generarReportePlanesTarifarios(req, res) {
     async generarReporteLineasValores(req, res) {
         try {
             const { anno, trimestre } = req.query;
-            
+
+            if (!anno || !trimestre) {
+                return res.status(400).json({ error: 'Año y trimestre son requeridos' });
+            }
+
+            // Calcular fechas del trimestre
+            const mesesTrimestre = {
+                '1': { inicio: `${anno}-01-01`, fin: `${anno}-03-31` },
+                '2': { inicio: `${anno}-04-01`, fin: `${anno}-06-30` },
+                '3': { inicio: `${anno}-07-01`, fin: `${anno}-09-30` },
+                '4': { inicio: `${anno}-10-01`, fin: `${anno}-12-31` }
+            };
+
+            const periodo = mesesTrimestre[trimestre];
+            if (!periodo) {
+                return res.status(400).json({ error: 'Trimestre inválido' });
+            }
+
             const query = `
-                SELECT 
+                SELECT
                     ? as ANNO,
                     ? as TRIMESTRE,
-                    c.ciudad_id as ID_MUNICIPIO,
-                    CASE 
+                    ci.codigo as ID_MUNICIPIO,
+                    CASE
                         WHEN c.estrato IN ('1','2','3') THEN 1
                         ELSE 2
                     END as ID_SEGMENTO,
@@ -218,37 +286,65 @@ async generarReportePlanesTarifarios(req, res) {
                         WHEN 'television' THEN 2
                         WHEN 'combo' THEN 3
                     END as ID_SERVICIO_PAQUETE,
-                    ps.velocidad_bajada as VELOCIDAD_EFECTIVA_DOWNSTREAM,
-                    ps.velocidad_subida as VELOCIDAD_EFECTIVA_UPSTREAM,
-                    1 as ID_TECNOLOGIA_ACCESO,
+                    COALESCE(ps.velocidad_bajada, 0) as VELOCIDAD_EFECTIVA_DOWNSTREAM,
+                    COALESCE(ps.velocidad_subida, 0) as VELOCIDAD_EFECTIVA_UPSTREAM,
+                    CASE
+                        WHEN ps.tecnologia LIKE '%Fibra%' OR ps.tecnologia LIKE '%FTTH%' THEN 1
+                        WHEN ps.tecnologia LIKE '%Cable%' OR ps.tecnologia LIKE '%HFC%' THEN 2
+                        WHEN ps.tecnologia LIKE '%Inalamb%' OR ps.tecnologia LIKE '%Wireless%' THEN 3
+                        WHEN ps.tecnologia LIKE '%Satelit%' THEN 4
+                        WHEN ps.tecnologia LIKE '%ADSL%' OR ps.tecnologia LIKE '%Cobre%' THEN 5
+                        ELSE 1
+                    END as ID_TECNOLOGIA_ACCESO,
                     CASE sc.estado
                         WHEN 'activo' THEN 1
                         WHEN 'suspendido' THEN 2
                         WHEN 'cortado' THEN 3
+                        WHEN 'cancelado' THEN 4
                         ELSE 4
                     END as ID_ESTADO,
-                    COUNT(DISTINCT sc.cliente_id) as CANTIDAD_LINEAS_ACCESOS,
-                    COALESCE(SUM(f.total), 0) as VALOR_FACTURADO_O_COBRADO,
+                    COUNT(DISTINCT sc.id) as CANTIDAD_LINEAS_ACCESOS,
+                    COALESCE(SUM(CASE
+                        WHEN f.estado IN ('pagada', 'pendiente') THEN f.total
+                        ELSE 0
+                    END), 0) as VALOR_FACTURADO_O_COBRADO,
                     0 as OTROS_VALORES_FACTURADOS
                 FROM servicios_cliente sc
                 JOIN clientes c ON sc.cliente_id = c.id
+                JOIN ciudades ci ON c.ciudad_id = ci.id
                 JOIN planes_servicio ps ON sc.plan_id = ps.id
-                LEFT JOIN facturas f ON c.id = f.cliente_id 
-                    AND YEAR(f.fecha_emision) = ? 
-                    AND QUARTER(f.fecha_emision) = ?
-                    AND f.estado = 'pagada'
-                WHERE YEAR(sc.created_at) <= ?
-                GROUP BY 
-                    c.ciudad_id,
+                LEFT JOIN facturas f ON c.id = f.cliente_id
+                    AND f.fecha_emision BETWEEN ? AND ?
+                WHERE sc.fecha_activacion <= ?
+                    AND (sc.estado IN ('activo', 'suspendido', 'cortado')
+                         OR (sc.estado = 'cancelado' AND sc.updated_at >= ?))
+                GROUP BY
+                    ci.codigo,
                     CASE WHEN c.estrato IN ('1','2','3') THEN 1 ELSE 2 END,
                     CASE ps.tipo WHEN 'internet' THEN 1 WHEN 'television' THEN 2 WHEN 'combo' THEN 3 END,
                     ps.velocidad_bajada,
                     ps.velocidad_subida,
-                    CASE sc.estado WHEN 'activo' THEN 1 WHEN 'suspendido' THEN 2 WHEN 'cortado' THEN 3 ELSE 4 END
-                ORDER BY c.ciudad_id, ID_SEGMENTO, ID_SERVICIO_PAQUETE
+                    CASE
+                        WHEN ps.tecnologia LIKE '%Fibra%' OR ps.tecnologia LIKE '%FTTH%' THEN 1
+                        WHEN ps.tecnologia LIKE '%Cable%' OR ps.tecnologia LIKE '%HFC%' THEN 2
+                        WHEN ps.tecnologia LIKE '%Inalamb%' OR ps.tecnologia LIKE '%Wireless%' THEN 3
+                        WHEN ps.tecnologia LIKE '%Satelit%' THEN 4
+                        WHEN ps.tecnologia LIKE '%ADSL%' OR ps.tecnologia LIKE '%Cobre%' THEN 5
+                        ELSE 1
+                    END,
+                    CASE sc.estado WHEN 'activo' THEN 1 WHEN 'suspendido' THEN 2 WHEN 'cortado' THEN 3 WHEN 'cancelado' THEN 4 ELSE 4 END
+                HAVING CANTIDAD_LINEAS_ACCESOS > 0
+                ORDER BY ci.codigo, ID_SEGMENTO, ID_SERVICIO_PAQUETE
             `;
-            
-            const datos = await this.db.query(query, [anno, trimestre, anno, trimestre, anno]);
+
+            const datos = await this.db.query(query, [
+                anno,
+                trimestre,
+                periodo.inicio,
+                periodo.fin,
+                periodo.fin,
+                periodo.inicio
+            ]);
             
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.json_to_sheet(datos);
@@ -280,25 +376,85 @@ async generarReportePlanesTarifarios(req, res) {
     async generarReporteDisponibilidad(req, res) {
         try {
             const { anno, semestre } = req.query;
-            
-            // Para este reporte necesitarías una tabla de incidencias/mantenimiento
-            // Por ahora simulo con un 99.5% de disponibilidad
-            const datosDisponibilidad = [];
-            const mesesSemestre = semestre === '1' ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
-            
-            for (const mes of mesesSemestre) {
-                datosDisponibilidad.push({
-                    ANNO: parseInt(anno),
-                    SEMESTRE: parseInt(semestre),
-                    MES_TOTAL: mes,
-                    DISPONIBLIDAD_SERVICIO: 99.5
-                });
+
+            if (!anno || !semestre) {
+                return res.status(400).json({ error: 'Año y semestre son requeridos' });
             }
-            
-            const datosIncidencias = [
-                // Aquí irían las incidencias reales desde una tabla de incidencias
-                // Por ahora está vacío como ejemplo
-            ];
+
+            const mesesSemestre = semestre === '1' ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
+
+            // Query para disponibilidad mensual
+            const queryDisponibilidad = `
+                SELECT
+                    ? as ANNO,
+                    ? as SEMESTRE,
+                    m.mes as MES_TOTAL,
+                    COALESCE(
+                        (SELECT disponibilidad_porcentaje
+                         FROM metricas_qos
+                         WHERE anno = ? AND mes = m.mes
+                         ORDER BY fecha_medicion DESC
+                         LIMIT 1),
+                        99.50
+                    ) as DISPONIBLIDAD_SERVICIO
+                FROM (
+                    SELECT ? as mes UNION ALL SELECT ? UNION ALL SELECT ?
+                    UNION ALL SELECT ? UNION ALL SELECT ? UNION ALL SELECT ?
+                ) m
+                ORDER BY m.mes
+            `;
+
+            const datosDisponibilidad = await this.db.query(queryDisponibilidad, [
+                anno,
+                semestre,
+                anno,
+                mesesSemestre[0], mesesSemestre[1], mesesSemestre[2],
+                mesesSemestre[3], mesesSemestre[4], mesesSemestre[5]
+            ]);
+
+            // Query para incidencias
+            const queryIncidencias = `
+                SELECT
+                    i.numero_incidencia as NUMERO_INCIDENCIA,
+                    CASE i.tipo_incidencia
+                        WHEN 'programado' THEN 'Programado'
+                        WHEN 'no_programado' THEN 'No Programado'
+                        WHEN 'emergencia' THEN 'Emergencia'
+                    END as TIPO_INCIDENCIA,
+                    CASE i.categoria
+                        WHEN 'fibra_cortada' THEN 'Fibra Cortada'
+                        WHEN 'falla_energia' THEN 'Falla de Energía'
+                        WHEN 'mantenimiento' THEN 'Mantenimiento'
+                        WHEN 'actualizacion' THEN 'Actualización'
+                        ELSE 'Otros'
+                    END as CATEGORIA,
+                    DATE_FORMAT(i.fecha_inicio, '%Y-%m-%d %H:%i:%s') as FECHA_INICIO,
+                    DATE_FORMAT(i.fecha_fin, '%Y-%m-%d %H:%i:%s') as FECHA_FIN,
+                    COALESCE(i.tiempo_duracion_minutos, 0) as DURACION_MINUTOS,
+                    COALESCE(i.usuarios_afectados, 0) as USUARIOS_AFECTADOS,
+                    ci.codigo as CODIGO_MUNICIPIO,
+                    ci.nombre as MUNICIPIO,
+                    i.descripcion as DESCRIPCION,
+                    i.causa_raiz as CAUSA_RAIZ,
+                    i.solucion_aplicada as SOLUCION_APLICADA,
+                    CASE i.estado
+                        WHEN 'reportado' THEN 'Reportado'
+                        WHEN 'en_atencion' THEN 'En Atención'
+                        WHEN 'resuelto' THEN 'Resuelto'
+                        WHEN 'cerrado' THEN 'Cerrado'
+                    END as ESTADO
+                FROM incidencias_servicio i
+                LEFT JOIN ciudades ci ON i.municipio_id = ci.id
+                WHERE YEAR(i.fecha_inicio) = ?
+                    AND MONTH(i.fecha_inicio) IN (?, ?, ?, ?, ?, ?)
+                ORDER BY i.fecha_inicio DESC
+            `;
+
+            const datosIncidencias = await this.db.query(queryIncidencias, [
+                anno,
+                mesesSemestre[0], mesesSemestre[1], mesesSemestre[2],
+                mesesSemestre[3], mesesSemestre[4], mesesSemestre[5]
+            ]);
             
             const wb = XLSX.utils.book_new();
             
@@ -336,21 +492,84 @@ async generarReportePlanesTarifarios(req, res) {
     async generarReporteQuejas(req, res) {
         try {
             const { anno, trimestre } = req.query;
-            
-            // Este reporte requeriría una tabla de quejas/PQR
-            // Por ahora simulo datos básicos
-            const datosQuejas = [
-                {
-                    ANNO: parseInt(anno),
-                    TRIMESTRE: parseInt(trimestre),
-                    MES_DEL_TRIMESTRE: 1,
-                    ID_SERVICIO: 1, // Internet
-                    EMPAQUETADO: 'NO',
-                    ID_TIPOLOGIA: 1, // Facturación
-                    ID_MEDIO_ATENCION: 1, // Telefónico
-                    NUMERO_QUEJAS: 0
+
+            if (!anno || !trimestre) {
+                return res.status(400).json({ error: 'Año y trimestre son requeridos' });
+            }
+
+            // Calcular meses del trimestre
+            const mesesTrimestre = {
+                '1': [1, 2, 3],
+                '2': [4, 5, 6],
+                '3': [7, 8, 9],
+                '4': [10, 11, 12]
+            };
+
+            const meses = mesesTrimestre[trimestre];
+            if (!meses) {
+                return res.status(400).json({ error: 'Trimestre inválido' });
+            }
+
+            const query = `
+                SELECT
+                    ? as ANNO,
+                    ? as TRIMESTRE,
+                    MONTH(p.fecha_recepcion) as MES_DEL_TRIMESTRE,
+                    CASE
+                        WHEN p.servicio_afectado = 'internet' THEN 1
+                        WHEN p.servicio_afectado = 'television' THEN 2
+                        WHEN p.servicio_afectado = 'combo' THEN 3
+                        ELSE 1
+                    END as ID_SERVICIO,
+                    CASE
+                        WHEN p.servicio_afectado = 'combo' THEN 'SI'
+                        ELSE 'NO'
+                    END as EMPAQUETADO,
+                    CASE p.categoria
+                        WHEN 'facturacion' THEN 1
+                        WHEN 'tecnico' THEN 2
+                        WHEN 'comercial' THEN 3
+                        WHEN 'atencion_cliente' THEN 4
+                        ELSE 5
+                    END as ID_TIPOLOGIA,
+                    CASE p.medio_recepcion
+                        WHEN 'telefono' THEN 1
+                        WHEN 'presencial' THEN 2
+                        WHEN 'email' THEN 3
+                        WHEN 'web' THEN 4
+                        WHEN 'chat' THEN 5
+                        ELSE 1
+                    END as ID_MEDIO_ATENCION,
+                    COUNT(*) as NUMERO_QUEJAS
+                FROM pqr p
+                WHERE YEAR(p.fecha_recepcion) = ?
+                    AND QUARTER(p.fecha_recepcion) = ?
+                    AND p.tipo IN ('queja', 'reclamo')
+                GROUP BY
+                    MONTH(p.fecha_recepcion),
+                    p.servicio_afectado,
+                    p.categoria,
+                    p.medio_recepcion
+                ORDER BY MES_DEL_TRIMESTRE, ID_SERVICIO, ID_TIPOLOGIA
+            `;
+
+            const datosQuejas = await this.db.query(query, [anno, trimestre, anno, trimestre]);
+
+            // Si no hay datos, generar estructura vacía
+            if (datosQuejas.length === 0) {
+                for (const mes of meses) {
+                    datosQuejas.push({
+                        ANNO: parseInt(anno),
+                        TRIMESTRE: parseInt(trimestre),
+                        MES_DEL_TRIMESTRE: mes,
+                        ID_SERVICIO: 1,
+                        EMPAQUETADO: 'NO',
+                        ID_TIPOLOGIA: 1,
+                        ID_MEDIO_ATENCION: 1,
+                        NUMERO_QUEJAS: 0
+                    });
                 }
-            ];
+            }
             
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.json_to_sheet(datosQuejas);
@@ -382,44 +601,112 @@ async generarReportePlanesTarifarios(req, res) {
     async generarReporteIndicadoresQuejas(req, res) {
         try {
             const { anno, trimestre } = req.query;
-            
-            const datosIndicadores = [
-                {
+
+            if (!anno || !trimestre) {
+                return res.status(400).json({ error: 'Año y trimestre son requeridos' });
+            }
+
+            // Calcular meses del trimestre
+            const mesesTrimestre = {
+                '1': [1, 2, 3],
+                '2': [4, 5, 6],
+                '3': [7, 8, 9],
+                '4': [10, 11, 12]
+            };
+
+            const meses = mesesTrimestre[trimestre];
+            if (!meses) {
+                return res.status(400).json({ error: 'Trimestre inválido' });
+            }
+
+            // Query para quejas y peticiones
+            const queryIndicadores = `
+                SELECT
+                    ? as ANNO,
+                    ? as TRIMESTRE,
+                    MONTH(fecha_recepcion) as MES_DEL_TRIMESTRE,
+                    SUM(CASE WHEN tipo IN ('queja', 'reclamo') AND estado IN ('resuelto', 'cerrado')
+                             AND respuesta LIKE '%favor del usuario%' THEN 1 ELSE 0 END) as NUMERO_QUEJAS_A_FAVOR,
+                    SUM(CASE WHEN tipo IN ('queja', 'reclamo') AND estado IN ('resuelto', 'cerrado')
+                             AND respuesta NOT LIKE '%favor del usuario%' THEN 1 ELSE 0 END) as NUMERO_QUEJAS_EN_CONTRA,
+                    SUM(CASE WHEN tipo IN ('queja', 'reclamo') THEN 1 ELSE 0 END) as NUMERO_QUEJAS_PRESENTADAS,
+                    SUM(CASE WHEN tipo = 'peticion' THEN 1 ELSE 0 END) as NUMERO_PETICIONES
+                FROM pqr
+                WHERE YEAR(fecha_recepcion) = ?
+                    AND QUARTER(fecha_recepcion) = ?
+                GROUP BY MONTH(fecha_recepcion)
+                ORDER BY MES_DEL_TRIMESTRE
+            `;
+
+            let datosIndicadores = await this.db.query(queryIndicadores, [anno, trimestre, anno, trimestre]);
+
+            // Rellenar meses faltantes
+            if (datosIndicadores.length === 0) {
+                datosIndicadores = meses.map(mes => ({
                     ANNO: parseInt(anno),
                     TRIMESTRE: parseInt(trimestre),
-                    MES_DEL_TRIMESTRE: 1,
+                    MES_DEL_TRIMESTRE: mes,
                     NUMERO_QUEJAS_A_FAVOR: 0,
                     NUMERO_QUEJAS_EN_CONTRA: 0,
                     NUMERO_QUEJAS_PRESENTADAS: 0,
                     NUMERO_PETICIONES: 0
-                }
-            ];
-            
-            const datosSegundaInstancia = [
-                {
+                }));
+            }
+
+            // Query para segunda instancia (por ahora vacío ya que no tenemos recursos)
+            const datosSegundaInstancia = meses.map(mes => ({
+                ANNO: parseInt(anno),
+                TRIMESTRE: parseInt(trimestre),
+                MES_DEL_TRIMESTRE: mes,
+                NUMERO_REPOSICION_A_FAVOR: 0,
+                NUMERO_REPOSICION_EN_CONTRA: 0,
+                NUMERO_REPOSICION_PRESENTADOS: 0,
+                NUMERO_RECURSOS_APELACION: 0
+            }));
+
+            // Query para satisfacción
+            const querySatisfaccion = `
+                SELECT
+                    ? as ANNO,
+                    ? as TRIMESTRE,
+                    MONTH(fecha_recepcion) as MES_DEL_TRIMESTRE,
+                    CASE medio_recepcion
+                        WHEN 'telefono' THEN 1
+                        WHEN 'presencial' THEN 2
+                        WHEN 'email' THEN 3
+                        WHEN 'web' THEN 4
+                        WHEN 'chat' THEN 5
+                        ELSE 1
+                    END as ID_MEDIO_ATENCION,
+                    SUM(CASE WHEN satisfaccion_cliente = 'muy_insatisfecho' THEN 1 ELSE 0 END) as USUARIOS_NS_MUY_INSATISFECHO,
+                    SUM(CASE WHEN satisfaccion_cliente = 'insatisfecho' THEN 1 ELSE 0 END) as USUARIOS_NS_INSATISFECHO,
+                    SUM(CASE WHEN satisfaccion_cliente = 'neutral' THEN 1 ELSE 0 END) as USUAR_NS_NI_INSATISF_NI_SATISF,
+                    SUM(CASE WHEN satisfaccion_cliente = 'satisfecho' THEN 1 ELSE 0 END) as USUARIOS_NS_SATISFECHO,
+                    SUM(CASE WHEN satisfaccion_cliente = 'muy_satisfecho' THEN 1 ELSE 0 END) as USUARIOS_NS_MUY_SATISFECHO
+                FROM pqr
+                WHERE YEAR(fecha_recepcion) = ?
+                    AND QUARTER(fecha_recepcion) = ?
+                    AND satisfaccion_cliente IS NOT NULL
+                GROUP BY MONTH(fecha_recepcion), medio_recepcion
+                ORDER BY MES_DEL_TRIMESTRE, ID_MEDIO_ATENCION
+            `;
+
+            let datosSatisfaccion = await this.db.query(querySatisfaccion, [anno, trimestre, anno, trimestre]);
+
+            // Si no hay datos de satisfacción, crear estructura vacía
+            if (datosSatisfaccion.length === 0) {
+                datosSatisfaccion = meses.map(mes => ({
                     ANNO: parseInt(anno),
                     TRIMESTRE: parseInt(trimestre),
-                    MES_DEL_TRIMESTRE: 1,
-                    NUMERO_REPOSICION_A_FAVOR: 0,
-                    NUMERO_REPOSICION_EN_CONTRA: 0,
-                    NUMERO_REPOSICION_PRESENTADOS: 0,
-                    NUMERO_RECURSOS_APELACION: 0
-                }
-            ];
-            
-            const datosSatisfaccion = [
-                {
-                    ANNO: parseInt(anno),
-                    TRIMESTRE: parseInt(trimestre),
-                    MES_DEL_TRIMESTRE: 1,
+                    MES_DEL_TRIMESTRE: mes,
                     ID_MEDIO_ATENCION: 1,
                     USUARIOS_NS_MUY_INSATISFECHO: 0,
                     USUARIOS_NS_INSATISFECHO: 0,
                     USUAR_NS_NI_INSATISF_NI_SATISF: 0,
                     USUARIOS_NS_SATISFECHO: 0,
                     USUARIOS_NS_MUY_SATISFECHO: 0
-                }
-            ];
+                }));
+            }
             
             const wb = XLSX.utils.book_new();
             
