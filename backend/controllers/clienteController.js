@@ -389,15 +389,27 @@ class ClienteController {
       });
 
       const serviciosConInstalacion = serviciosCreados.filter(s => s.requiere_instalacion);
-      if (serviciosConInstalacion.length > 0) {
-        try {
-          await conexion.execute(`
+if (serviciosConInstalacion.length > 0) {
+  try {
+    await conexion.execute(`
       INSERT INTO instalaciones (
-        cliente_id, tipo_instalacion, estado, fecha_programada,
-        observaciones, created_at
-      ) VALUES (?, 'nueva', 'programada', DATE_ADD(CURDATE(), INTERVAL 1 DAY),
+        cliente_id, 
+        tipo_instalacion, 
+        estado, 
+        fecha_programada,
+        direccion_instalacion,
+        barrio,
+        telefono_contacto,
+        observaciones, 
+        created_at
+      ) VALUES (?, 'nueva', 'programada', DATE_ADD(CURDATE(), INTERVAL 1 DAY), ?, ?, ?, 
                'Instalación generada automáticamente', NOW())
-    `, [clienteId]);
+    `, [
+      clienteId,
+      datosCliente.direccion,
+      datosCliente.barrio || '',
+      datosCliente.telefono || ''
+    ]);
 
           console.log(`🔧 Instalación automática creada para cliente ${clienteId}`);
         } catch (error) {
