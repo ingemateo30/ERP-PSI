@@ -895,7 +895,6 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                     </button>
                   </div>
                 )}
-              </div>
 
               {/* Nombre completo */}
               <div>
