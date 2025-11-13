@@ -33,19 +33,33 @@ router.post(
       .withMessage('El mensaje es requerido')
       .isLength({ max: 1000 })
       .withMessage('El mensaje no puede exceder 1000 caracteres'),
-    body('sessionId').optional().isString(),
-    body('nombre').optional({ values: 'falsy' }).trim().isLength({ max: 255 }),
+    body('sessionId')
+      .optional()
+      .isString()
+      .withMessage('Session ID debe ser texto'),
+    body('nombre')
+      .optional()
+      .trim()
+      .isLength({ min: 0, max: 255 })
+      .withMessage('Nombre no puede exceder 255 caracteres'),
     body('email')
-      .optional({ values: 'falsy' })
+      .optional()
       .trim()
       .custom((value) => {
-        // Permitir cadena vacía o email válido
+        // Permitir ausencia, cadena vacía o email válido
         if (!value || value === '') return true;
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
       })
       .withMessage('Email inválido'),
-    body('telefono').optional({ values: 'falsy' }).trim().isLength({ max: 20 }),
-    body('conversationHistory').optional().isArray(),
+    body('telefono')
+      .optional()
+      .trim()
+      .isLength({ min: 0, max: 20 })
+      .withMessage('Teléfono no puede exceder 20 caracteres'),
+    body('conversationHistory')
+      .optional()
+      .isArray()
+      .withMessage('Historial debe ser un array'),
     validate,
   ],
   soporteController.chatMessage

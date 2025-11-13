@@ -91,15 +91,20 @@ Estoy aquí para ayudarte con:
         content: msg.content,
       }));
 
-      // Enviar mensaje a la API
-      const response = await soporteService.sendMessage({
+      // Preparar payload (solo enviar campos con valores)
+      const payload = {
         message: userMessage,
-        sessionId: sessionId,
-        nombre: userInfo.nombre,
-        email: userInfo.email,
-        telefono: userInfo.telefono,
         conversationHistory: conversationHistory,
-      });
+      };
+
+      // Agregar campos opcionales solo si tienen valor
+      if (sessionId) payload.sessionId = sessionId;
+      if (userInfo.nombre && userInfo.nombre.trim()) payload.nombre = userInfo.nombre;
+      if (userInfo.email && userInfo.email.trim()) payload.email = userInfo.email;
+      if (userInfo.telefono && userInfo.telefono.trim()) payload.telefono = userInfo.telefono;
+
+      // Enviar mensaje a la API
+      const response = await soporteService.sendMessage(payload);
 
       // Guardar session ID
       if (!sessionId) {
