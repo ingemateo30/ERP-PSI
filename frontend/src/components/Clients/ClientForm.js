@@ -862,22 +862,22 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       {errors.identificacion}
     </p>
   )}
-
-  {/* 🔔 Ahora la alerta desplaza el contenido en lugar de flotar */}
-  {verificacionCliente && !client && (
-    <div className="mt-3 w-full max-w-[600px]">
-      <AlertaClienteExistente
-        verificacion={verificacionCliente}
-        onContinuarConCliente={manejarContinuarConClienteExistente}
-        onCrearNuevo={manejarCrearNuevo}
-        onVerHistorial={manejarVerHistorial}
-      />
-    </div>
-  )}
 </div>
+              </div>
 
+              {/* Alerta de cliente existente - Ahora abarca todo el ancho */}
+              {verificacionCliente && !client && (
+                <div className="w-full">
+                  <AlertaClienteExistente
+                    verificacion={verificacionCliente}
+                    onContinuarConCliente={manejarContinuarConClienteExistente}
+                    onCrearNuevo={manejarCrearNuevo}
+                    onVerHistorial={manejarVerHistorial}
+                  />
+                </div>
+              )}
 
-                {modoAgregarServicio && clienteSeleccionado && (
+              {modoAgregarServicio && clienteSeleccionado && (
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <User className="h-5 w-5 text-blue-600" />
