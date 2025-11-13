@@ -1411,7 +1411,9 @@ router.patch('/:id/asignar-instalador',
 /**
  * ARREGLADO: Cambiar estado de instalación
  */
-router.patch('/:id/cambiar-estado', async (req, res) => {
+router.patch('/:id/cambiar-estado',
+    requireRole('administrador', 'supervisor', 'instalador'),  
+    async (req, res) => {
     try {
         const { id } = req.params;
         const { estado, observaciones, motivo_cancelacion } = req.body;
@@ -1587,7 +1589,10 @@ router.post('/', InstalacionesController.crear);
 /**
  * ARREGLADO: Actualizar instalación
  */
-router.put('/:id', InstalacionesController.actualizar);
+router.put('/:id',
+    requireRole('administrador', 'supervisor'),  // ✅ AGREGAR ESTO
+    InstalacionesController.actualizar
+);
 
 /**
  * ARREGLADO: Eliminar instalación (solo administradores)
