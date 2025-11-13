@@ -259,15 +259,20 @@ const InstalacionForm = ({
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                        {instalacion ? 'Editar Instalación' : 'Nueva Instalación'}
-                    </h2>
+                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-[#0e6493] to-[#0a5273]">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                            <Wrench className="w-6 h-6 text-white" />
+                        </div>
+                        <h2 className="text-xl font-bold text-white">
+                            {instalacion ? 'Editar Instalación' : 'Nueva Instalación'}
+                        </h2>
+                    </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        className="text-white hover:bg-white/10 transition-colors p-2 rounded-lg"
                     >
                         <X className="w-6 h-6" />
                     </button>
@@ -278,8 +283,11 @@ const InstalacionForm = ({
                     <div className="p-6 space-y-6">
 
                         {/* Información del Cliente */}
-                        <div className="bg-blue-50 p-4 rounded-lg">
-                            <h3 className="text-lg font-medium text-blue-900 mb-4">Información del Cliente</h3>
+                        <div className="bg-gray-50 p-5 rounded-lg border-2 border-gray-200">
+                            <h3 className="text-lg font-semibold text-[#0e6493] mb-4 flex items-center gap-2">
+                                <User className="w-5 h-5" />
+                                Información del Cliente
+                            </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Selector de Cliente */}
@@ -298,7 +306,7 @@ const InstalacionForm = ({
                                                 setShowClienteSearch(true);
                                             }}
                                             onFocus={() => setShowClienteSearch(true)}
-                                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.cliente_id ? 'border-red-500' : 'border-gray-300'
+                                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent ${errors.cliente_id ? 'border-red-500' : 'border-gray-300'
                                                 }`}
                                         />
                                         <Search className="absolute right-3 top-2.5 w-5 h-5 text-gray-400" />
@@ -344,7 +352,7 @@ const InstalacionForm = ({
                                     <select
                                         value={formData.plan_id}
                                         onChange={(e) => handleInputChange('plan_id', e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.plan_id ? 'border-red-500' : 'border-gray-300'
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent ${errors.plan_id ? 'border-red-500' : 'border-gray-300'
                                             }`}
                                     >
                                         <option value="">Seleccionar plan</option>
@@ -367,7 +375,7 @@ const InstalacionForm = ({
                                     <select
                                         value={formData.tipo_instalacion}
                                         onChange={(e) => handleInputChange('tipo_instalacion', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                                     >
                                         <option value="nueva">Nueva Instalación</option>
                                         <option value="migracion">Migración</option>
@@ -379,8 +387,11 @@ const InstalacionForm = ({
                         </div>
 
                         {/* Información de la Instalación */}
-                        <div className="bg-green-50 p-4 rounded-lg">
-                            <h3 className="text-lg font-medium text-green-900 mb-4">Detalles de Instalación</h3>
+                        <div className="bg-gray-50 p-5 rounded-lg border-2 border-gray-200">
+                            <h3 className="text-lg font-semibold text-[#0e6493] mb-4 flex items-center gap-2">
+                                <Calendar className="w-5 h-5" />
+                                Detalles de Instalación
+                            </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Fecha Programada */}
@@ -393,7 +404,7 @@ const InstalacionForm = ({
                                         type="datetime-local"
                                         value={formData.fecha_programada}
                                         onChange={(e) => handleInputChange('fecha_programada', e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.fecha_programada ? 'border-red-500' : 'border-gray-300'
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent ${errors.fecha_programada ? 'border-red-500' : 'border-gray-300'
                                             }`}
                                     />
                                     {errors.fecha_programada && (
@@ -410,7 +421,7 @@ const InstalacionForm = ({
                                     <select
                                         value={formData.instalador_id}
                                         onChange={(e) => handleInputChange('instalador_id', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                                     >
                                         <option value="">Sin asignar</option>
                                         {instaladores.filter(inst => inst.activo).map(instalador => (
@@ -432,7 +443,7 @@ const InstalacionForm = ({
                                         placeholder="Ej: Calle 123 #45-67"
                                         value={formData.direccion_instalacion}
                                         onChange={(e) => handleInputChange('direccion_instalacion', e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.direccion_instalacion ? 'border-red-500' : 'border-gray-300'
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent ${errors.direccion_instalacion ? 'border-red-500' : 'border-gray-300'
                                             }`}
                                     />
                                     {errors.direccion_instalacion && (
@@ -450,7 +461,7 @@ const InstalacionForm = ({
                                         placeholder="Nombre del barrio"
                                         value={formData.barrio}
                                         onChange={(e) => handleInputChange('barrio', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                                     />
                                 </div>
 
@@ -462,7 +473,7 @@ const InstalacionForm = ({
                                     <select
                                         value={formData.ciudad_id}
                                         onChange={(e) => handleInputChange('ciudad_id', e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.ciudad_id ? 'border-red-500' : 'border-gray-300'
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent ${errors.ciudad_id ? 'border-red-500' : 'border-gray-300'
                                             }`}
                                     >
                                         <option value="">Seleccionar ciudad</option>
@@ -488,7 +499,7 @@ const InstalacionForm = ({
                                         placeholder="Ej: 3001234567"
                                         value={formData.telefono_contacto}
                                         onChange={(e) => handleInputChange('telefono_contacto', e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.telefono_contacto ? 'border-red-500' : 'border-gray-300'
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent ${errors.telefono_contacto ? 'border-red-500' : 'border-gray-300'
                                             }`}
                                     />
                                     {errors.telefono_contacto && (
@@ -506,15 +517,18 @@ const InstalacionForm = ({
                                         placeholder="Nombre de quien recibe"
                                         value={formData.persona_recibe}
                                         onChange={(e) => handleInputChange('persona_recibe', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                                     />
                                 </div>
                             </div>
                         </div>
 
                         {/* Coordenadas GPS */}
-                        <div className="bg-yellow-50 p-4 rounded-lg">
-                            <h3 className="text-lg font-medium text-yellow-900 mb-4">Coordenadas GPS (Opcional)</h3>
+                        <div className="bg-gray-50 p-5 rounded-lg border-2 border-gray-200">
+                            <h3 className="text-lg font-semibold text-[#0e6493] mb-4 flex items-center gap-2">
+                                <MapPin className="w-5 h-5" />
+                                Coordenadas GPS (Opcional)
+                            </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -527,7 +541,7 @@ const InstalacionForm = ({
                                         placeholder="Ej: 4.6097102"
                                         value={formData.coordenadas_lat}
                                         onChange={(e) => handleInputChange('coordenadas_lat', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                                     />
                                 </div>
 
@@ -541,20 +555,23 @@ const InstalacionForm = ({
                                         placeholder="Ej: -74.0817413"
                                         value={formData.coordenadas_lng}
                                         onChange={(e) => handleInputChange('coordenadas_lng', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                                     />
                                 </div>
                             </div>
                         </div>
 
                         {/* Equipos Instalados */}
-                        <div className="bg-purple-50 p-4 rounded-lg">
+                        <div className="bg-gray-50 p-5 rounded-lg border-2 border-gray-200">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-medium text-purple-900">Equipos a Instalar</h3>
+                                <h3 className="text-lg font-semibold text-[#0e6493] flex items-center gap-2">
+                                    <Package className="w-5 h-5" />
+                                    Equipos a Instalar
+                                </h3>
                                 <button
                                     type="button"
                                     onClick={agregarEquipo}
-                                    className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#0e6493] to-[#0a5273] text-white rounded-lg hover:from-[#0a5273] hover:to-[#0e6493] transition-all shadow-md font-medium"
                                 >
                                     <Plus className="w-4 h-4" />
                                     Agregar Equipo
@@ -564,7 +581,7 @@ const InstalacionForm = ({
                             {formData.equipos_instalados.length > 0 ? (
                                 <div className="space-y-3">
                                     {formData.equipos_instalados.map((equipo, index) => (
-                                        <div key={index} className="bg-white p-4 rounded-lg border border-purple-200">
+                                        <div key={index} className="bg-white p-4 rounded-lg border-2 border-gray-200">
                                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -573,7 +590,7 @@ const InstalacionForm = ({
                                                     <select
                                                         value={equipo.equipo_id}
                                                         onChange={(e) => actualizarEquipo(index, 'equipo_id', e.target.value)}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                                                     >
                                                         <option value="">Seleccionar equipo</option>
                                                         {equipos.map(eq => (
@@ -593,7 +610,7 @@ const InstalacionForm = ({
                                                         min="1"
                                                         value={equipo.cantidad}
                                                         onChange={(e) => actualizarEquipo(index, 'cantidad', parseInt(e.target.value) || 1)}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                                                     />
                                                 </div>
 
@@ -606,7 +623,7 @@ const InstalacionForm = ({
                                                         placeholder="Serie del equipo"
                                                         value={equipo.numero_serie}
                                                         onChange={(e) => actualizarEquipo(index, 'numero_serie', e.target.value)}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                                                     />
                                                 </div>
 
@@ -631,7 +648,7 @@ const InstalacionForm = ({
                                                     placeholder="Observaciones específicas..."
                                                     value={equipo.observaciones}
                                                     onChange={(e) => actualizarEquipo(index, 'observaciones', e.target.value)}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                                                 />
                                             </div>
                                         </div>
@@ -646,8 +663,11 @@ const InstalacionForm = ({
                         </div>
 
                         {/* Información Adicional */}
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">Información Adicional</h3>
+                        <div className="bg-gray-50 p-5 rounded-lg border-2 border-gray-200">
+                            <h3 className="text-lg font-semibold text-[#0e6493] mb-4 flex items-center gap-2">
+                                <FileText className="w-5 h-5" />
+                                Información Adicional
+                            </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Costo de Instalación */}
@@ -662,7 +682,7 @@ const InstalacionForm = ({
                                         placeholder="Ej: 50000"
                                         value={formData.costo_instalacion}
                                         onChange={(e) => handleInputChange('costo_instalacion', e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.costo_instalacion ? 'border-red-500' : 'border-gray-300'
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent ${errors.costo_instalacion ? 'border-red-500' : 'border-gray-300'
                                             }`}
                                     />
                                     {errors.costo_instalacion && (
@@ -680,7 +700,7 @@ const InstalacionForm = ({
                                         placeholder="Observaciones generales de la instalación..."
                                         value={formData.observaciones}
                                         onChange={(e) => handleInputChange('observaciones', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent resize-none"
                                     />
                                 </div>
                             </div>
@@ -688,18 +708,18 @@ const InstalacionForm = ({
                     </div>
 
                     {/* Footer con botones */}
-                    <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+                    <div className="flex items-center justify-end gap-4 p-6 border-t-2 border-gray-200 bg-gray-50">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            className="px-5 py-2.5 text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-all shadow-sm hover:shadow"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="flex items-center gap-2 px-6 py-2.5 font-medium text-white bg-gradient-to-r from-[#0e6493] to-[#0a5273] rounded-lg hover:from-[#0a5273] hover:to-[#0e6493] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
                         >
                             {loading ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
