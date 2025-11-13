@@ -181,19 +181,12 @@ const cargarFacturasCliente = async () => {
     
     let facturasCargadas = response.facturas || [];
     
-    if (facturasCargadas.length === 0) {
-  console.log('📝 No hay facturas para este cliente');
-  setFacturas([]);
-  setEstadisticas({
-    total_facturas: 0,
-    total_pagadas: 0,
-    total_pendientes: 0,
-    monto_total: 0,
-    monto_pagado: 0,
-    monto_pendiente: 0
-  });
+if (facturasCargadas.length === 0) {
+  console.log('📝 No hay facturas para este filtro específico');
+  setFacturas([]); // Solo limpia la tabla
+  // ✅ NO resetear estadísticas - mantener las del cliente
   setLoadingFacturas(false);
-  setError(''); // Sin error, simplemente no hay facturas
+  setError(''); 
   return;
 }
     
