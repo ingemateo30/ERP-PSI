@@ -456,14 +456,14 @@ const FacturasManagement = () => {
             🔧 {filtrosAvanzados ? 'Ocultar' : 'Mostrar'} Filtros
           </button>
           
-          <button
-            onClick={handleCrearFactura}
-            disabled={loading}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            ➕ Nueva Factura
-          </button>
-          
+          {hasPermission('administrador') && (
+  <button
+    onClick={() => setMostrarModal(true)}
+    className="btn-primary"
+  >
+    ➕ Nueva Factura
+  </button>
+)}
           <button
             onClick={handleProbarPDF}
             disabled={loading || !facturas.length}
