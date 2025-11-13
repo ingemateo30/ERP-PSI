@@ -408,43 +408,71 @@ if (facturasCargadas.length === 0) {
         });
     };
 
-    const verDetalleFactura = async (factura) => {
-        try {
-            setLoading(true);
+   // ==========================================
+// FUNCIÓN DE NOTIFICACIONES - AGREGAR ARRIBA DE verDetalleFactura
+// ==========================================
+const mostrarNotificacion = useCallback((mensaje, tipo = 'info') => {
+    console.log(`${tipo === 'error' ? '❌' : tipo === 'success' ? '✅' : tipo === 'warning' ? '⚠️' : 'ℹ️'} ${mensaje}`);
+    
+    // Mostrar notificación visual en la UI
+    setError(tipo === 'error' ? mensaje : '');
+    
+    // Opcional: Usar alert para notificaciones críticas
+    if (tipo === 'error') {
+        alert(mensaje);
+    }
+    
+    // Auto-limpiar después de 5 segundos
+    if (tipo !== 'error') {
+        setTimeout(() => {
+            setError('');
+        }, 5000);
+    }
+}, []);
 
-            // Intentar obtener detalle completo de la factura
-            const endpoints = [
-                `/api/v1/facturas/${factura.id}`,
-                `/api/v1/facturacion/facturas/${factura.id}`
-            ];
-
-            let facturaCompleta = null;
-
-            for (const endpoint of endpoints) {
-                try {
-                    const response = await fetch(endpoint);
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.success && data.data) {
-                            facturaCompleta = data.data;
-                            break;
-                        }
-                    }
-                } catch (error) {
-                    console.log(`Error en endpoint ${endpoint}:`, error.message);
-                }
-            }
-
-            // Si no se puede obtener el detalle, usar los datos básicos
-            setFacturaDetalle(facturaCompleta || factura);
-
-        } catch (error) {
-            console.error('Error cargando detalle:', error);
-            setFacturaDetalle(factura);
-        } finally {
-            setLoading(false);
+// ==========================================
+// FUNCIÓN CORREGIDA - verDetalleFactura
+// ==========================================
+const verDetalleFactura = useCallback((factura) => {
+    try {
+        console.log('👁️ Ver detalle de factura:', factura);
+        
+        // Validación de factura
+        if (!factura || !factura.id) {
+            console.error('❌ Factura no válida para mostrar detalle');
+            mostrarNotificacion('Factura no válida', 'error');
+            return;
         }
-    };
+
+        // ✅ CORRECCIÓN PRINCIPAL: Usar los datos que ya tenemos cargados
+        // No necesitamos hacer peticiones adicionales porque el historial
+        // ya trae toda la información necesaria (pagos, detalles, etc.)
+        
+        // Buscar la factura completa en el estado actual
+        const facturaCompleta = facturas.find(f => f.id === factura.id) || factura;
+        
+        // Logging detallado para debugging
+        console.log('✅ Mostrando detalle de factura:', {
+            id: facturaCompleta.id,
+            numero: facturaCompleta.numero_factura,
+            cliente: facturaCompleta.cliente_nombre || clienteSeleccionado?.nombre,
+            total: facturaCompleta.total,
+            estado: facturaCompleta.estado,
+            pagos: facturaCompleta.pagos?.length || 0,
+            items: facturaCompleta.items?.length || 0
+        });
+        
+        // Mostrar el modal con los datos completos
+        setFacturaDetalle(facturaCompleta);
+        
+    } catch (error) {
+        console.error('❌ Error al mostrar detalle de factura:', error);
+        mostrarNotificacion(
+            `Error al cargar el detalle de la factura: ${error.message}`, 
+            'error'
+        );
+    }
+}, [facturas, clienteSeleccionado, mostrarNotificacion]);
 
     const handleBusquedaChange = (e) => {
         const valor = e.target.value;
