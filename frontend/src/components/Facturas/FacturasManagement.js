@@ -460,8 +460,8 @@ const { hasPermission } = useAuth();
           
           {hasPermission('administrador') && (
   <button
-    onClick={() => setMostrarModal(true)}
-    className="btn-primary"
+    onClick={handleCrearFactura}
+    className="px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90 focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:ring-offset-2 transition-all duration-200 font-medium"
   >
     ➕ Nueva Factura
   </button>
