@@ -232,12 +232,20 @@ const { hasPermission } = useAuth();
 
       const resultado = await marcarComoPagada(modalState.facturaSeleccionada.id, datosPago);
       
-      handleCerrarModal();
       refrescar();
-      mostrarNotificacion(
-        `Factura ${modalState.facturaSeleccionada.numero_factura} marcada como pagada exitosamente`, 
-        'success'
-      );
+
+// ✅ NUEVO: Disparar evento para que el dashboard se actualice
+window.dispatchEvent(new CustomEvent('factura-pagada', { 
+  detail: { 
+    facturaId: modalState.facturaSeleccionada.id,
+    monto: datosPago.valor_pagado 
+  }
+}));
+
+mostrarNotificacion(
+  `Factura ${modalState.facturaSeleccionada.numero_factura} marcada como pagada exitosamente`, 
+  'success'
+);
       
     } catch (error) {
       console.error('❌ [FacturasManagement] Error al marcar como pagada:', error);

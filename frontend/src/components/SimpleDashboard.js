@@ -345,6 +345,25 @@ const SupervisorDashboard = () => {
     useEffect(() => {
         cargarDatosSupervisor();
     }, []);
+    useEffect(() => {
+    cargarDatosSupervisor();
+}, []);
+
+// ✅ NUEVO: Escuchar eventos de pagos
+useEffect(() => {
+    const handleFacturaPagada = (event) => {
+        console.log('🔔 Dashboard - Factura pagada detectada:', event.detail);
+        console.log('🔄 Dashboard - Recargando datos...');
+        cargarDatosSupervisor();
+    };
+
+    window.addEventListener('factura-pagada', handleFacturaPagada);
+
+    return () => {
+        window.removeEventListener('factura-pagada', handleFacturaPagada);
+    };
+}, []);
+
 
     const cargarDatosSupervisor = async () => {
         try {
