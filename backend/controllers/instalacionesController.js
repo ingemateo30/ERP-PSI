@@ -552,225 +552,156 @@ static async obtenerInstalacionCompleta(connection, instalacionId) {
     return instalacion;
 }
     // Actualizar instalación
- static async actualizar(req, res) {
-        const connection = await Database.getConnection(); // CORRECCIÓN: usar pool en lugar de Database
+ // Actualizar instalación
+static async actualizar(req, res) {
+    const connection = await Database.getConnection();
 
-        try {
-            await connection.beginTransaction();
+    try {
+        await connection.beginTransaction();
 
-            const { id } = req.params;
-            console.log('📝 Actualizando instalación ID:', id, 'Datos:', req.body);
+        const { id } = req.params;
+        const datosActualizacion = req.body;
 
-            // Obtener instalación actual
-            const [instalacionActual] = await connection.query(
-                'SELECT * FROM instalaciones WHERE id = ?',
-                [id]
+        console.log(`✏️ Actualizando instalación ID: ${id}`, datosActualizacion);
+
+        // Obtener instalación actual
+        const [instalacionActual] = await connection.query(
+            'SELECT * FROM instalaciones WHERE id = ?',
+            [id]
+        );
+
+        if (instalacionActual.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Instalación no encontrada'
+            });
+        }
+
+        // 🔴 CORRECCIÓN 1: Convertir instalador_id vacío a null
+        if (datosActualizacion.instalador_id === '' || datosActualizacion.instalador_id === 'null') {
+            datosActualizacion.instalador_id = null;
+        }
+
+        // 🔴 CORRECCIÓN 2: Convertir fecha ISO a formato MySQL
+        if (datosActualizacion.fecha_programada) {
+            if (datosActualizacion.fecha_programada.includes('T')) {
+                datosActualizacion.fecha_programada = datosActualizacion.fecha_programada.split('T')[0];
+            }
+        }
+
+        // 🔴 CORRECCIÓN 3: Validar tipo_instalacion permitido
+        const tiposPermitidos = ['nueva', 'migracion', 'upgrade', 'reparacion'];
+        if (datosActualizacion.tipo_instalacion && !tiposPermitidos.includes(datosActualizacion.tipo_instalacion)) {
+            console.log(`⚠️ tipo_instalacion inválido: ${datosActualizacion.tipo_instalacion}, usando 'nueva'`);
+            datosActualizacion.tipo_instalacion = 'nueva';
+        }
+
+        // Construir query dinámicamente
+        const camposActualizar = [];
+        const parametros = [];
+
+        // Validar instalador si se proporciona
+        if (datosActualizacion.instalador_id !== undefined && datosActualizacion.instalador_id !== null) {
+            const [instalador] = await connection.query(
+                'SELECT id FROM sistema_usuarios WHERE id = ? AND rol IN ("instalador", "supervisor") AND activo = 1',
+                [datosActualizacion.instalador_id]
             );
 
-            if (instalacionActual.length === 0) { // CORRECCIÓN: verificar length
-                await connection.rollback();
-                return res.status(404).json({
-                    success: false,
-                    message: 'Instalación no encontrada'
-                });
-            }
-
-            const {
-                instalador_id,
-                fecha_programada,
-                hora_programada,
-                direccion_instalacion,
-                barrio,
-                telefono_contacto,
-                persona_recibe,
-                tipo_instalacion,
-                observaciones,
-                equipos_instalados,
-                costo_instalacion,
-                coordenadas_lat,
-                coordenadas_lng,
-                estado
-            } = req.body;
-
-            // Construir consulta de actualización dinámicamente
-            const camposActualizar = [];
-            const parametros = [];
-
-            if (instalador_id !== undefined) {
-                // Validar que el instalador existe
-                if (instalador_id) {
-                    const [instalador] = await connection.query(
-                        'SELECT id FROM sistema_usuarios WHERE id = ? AND rol IN ("instalador", "supervisor") AND activo = 1',
-                        [instalador_id]
-                    );
-
-                    if (instalador.length === 0) {
-                        await connection.rollback();
-                        return res.status(400).json({
-                            success: false,
-                            message: 'El instalador especificado no existe o no está activo'
-                        });
-                    }
-                }
-                camposActualizar.push('instalador_id = ?');
-                parametros.push(instalador_id);
-            }
-
-            if (fecha_programada !== undefined) {
-                // Validar formato de fecha
-                const fechaValida = new Date(fecha_programada);
-                if (isNaN(fechaValida.getTime())) {
-                    await connection.rollback();
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Formato de fecha inválido'
-                    });
-                }
-                camposActualizar.push('fecha_programada = ?');
-                parametros.push(fecha_programada);
-            }
-
-            if (hora_programada !== undefined) {
-                camposActualizar.push('hora_programada = ?');
-                parametros.push(hora_programada);
-            }
-
-            if (direccion_instalacion !== undefined) {
-                camposActualizar.push('direccion_instalacion = ?');
-                parametros.push(direccion_instalacion);
-            }
-
-            if (barrio !== undefined) {
-                camposActualizar.push('barrio = ?');
-                parametros.push(barrio);
-            }
-
-            if (telefono_contacto !== undefined) {
-                camposActualizar.push('telefono_contacto = ?');
-                parametros.push(telefono_contacto);
-            }
-
-            if (persona_recibe !== undefined) {
-                camposActualizar.push('persona_recibe = ?');
-                parametros.push(persona_recibe);
-            }
-
-            if (tipo_instalacion !== undefined) {
-                camposActualizar.push('tipo_instalacion = ?');
-                parametros.push(tipo_instalacion);
-            }
-
-            if (observaciones !== undefined) {
-                camposActualizar.push('observaciones = ?');
-                parametros.push(observaciones);
-            }
-
-            if (equipos_instalados !== undefined) {
-                camposActualizar.push('equipos_instalados = ?');
-                parametros.push(JSON.stringify(equipos_instalados));
-            }
-
-            if (costo_instalacion !== undefined) {
-                camposActualizar.push('costo_instalacion = ?');
-                parametros.push(parseFloat(costo_instalacion) || 0);
-            }
-
-            if (coordenadas_lat !== undefined) {
-                camposActualizar.push('coordenadas_lat = ?');
-                parametros.push(coordenadas_lat ? parseFloat(coordenadas_lat) : null);
-            }
-
-            if (coordenadas_lng !== undefined) {
-                camposActualizar.push('coordenadas_lng = ?');
-                parametros.push(coordenadas_lng ? parseFloat(coordenadas_lng) : null);
-            }
-
-            if (estado !== undefined) {
-                // Validar estado
-                const estadosValidos = ['programada', 'en_proceso', 'completada', 'cancelada', 'reagendada'];
-                if (!estadosValidos.includes(estado)) {
-                    await connection.rollback();
-                    return res.status(400).json({
-                        success: false,
-                        message: `Estado inválido. Estados válidos: ${estadosValidos.join(', ')}`
-                    });
-                }
-                camposActualizar.push('estado = ?');
-                parametros.push(estado);
-            }
-
-            if (camposActualizar.length === 0) {
+            if (instalador.length === 0) {
                 await connection.rollback();
                 return res.status(400).json({
                     success: false,
-                    message: 'No se proporcionaron campos para actualizar'
+                    message: 'El instalador especificado no existe o no está activo'
                 });
             }
-
-            // Agregar updated_at y id
-            camposActualizar.push('updated_at = NOW()');
-            parametros.push(id);
-
-            const query = `UPDATE instalaciones SET ${camposActualizar.join(', ')} WHERE id = ?`;
-
-            console.log('📝 Ejecutando query:', query);
-            console.log('📝 Parámetros:', parametros);
-
-            const [result] = await connection.query(query, parametros);
-
-            if (result.affectedRows === 0) {
-                await connection.rollback();
-                return res.status(404).json({
-                    success: false,
-                    message: 'No se pudo actualizar la instalación'
-                });
-            }
-
-            // Registrar en logs si existe el sistema de logs
-            try {
-                if (req.user && req.user.id) {
-                    await connection.query(
-                        `INSERT INTO logs_sistema (usuario_id, accion, tabla_afectada, registro_id, datos_anteriores, datos_nuevos, ip_address, user_agent)
-                         VALUES (?, 'UPDATE', 'instalaciones', ?, ?, ?, ?, ?)`,
-                        [
-                            req.user.id,
-                            id,
-                            JSON.stringify(instalacionActual[0]),
-                            JSON.stringify(req.body),
-                            req.ip || 'unknown',
-                            req.get('User-Agent') || 'unknown'
-                        ]
-                    );
-                }
-            } catch (logError) {
-                console.warn('⚠️ Error registrando en logs:', logError.message);
-                // No fallar la transacción por errores de logs
-            }
-
-            await connection.commit();
-
-            // Obtener instalación actualizada con datos completos
-            const instalacionActualizada = await InstalacionesController.obtenerInstalacionCompleta(id);
-
-            res.json({
-                success: true,
-                message: 'Instalación actualizada exitosamente',
-                data: instalacionActualizada
-            });
-
-        } catch (error) {
-            await connection.rollback();
-            console.error('❌ Error actualizando instalación:', error);
-
-            res.status(500).json({
-                success: false,
-                message: error.message || 'Error al actualizar la instalación',
-                error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno del servidor'
-            });
-        } finally {
-            connection.release();
         }
+
+        // Mapeo de campos actualizables
+        const camposPermitidos = {
+            instalador_id: datosActualizacion.instalador_id,
+            fecha_programada: datosActualizacion.fecha_programada,
+            hora_programada: datosActualizacion.hora_programada,
+            direccion_instalacion: datosActualizacion.direccion_instalacion,
+            barrio: datosActualizacion.barrio,
+            telefono_contacto: datosActualizacion.telefono_contacto,
+            persona_recibe: datosActualizacion.persona_recibe,
+            tipo_instalacion: datosActualizacion.tipo_instalacion,
+            observaciones: datosActualizacion.observaciones,
+            equipos_instalados: datosActualizacion.equipos_instalados ? JSON.stringify(datosActualizacion.equipos_instalados) : undefined,
+            costo_instalacion: datosActualizacion.costo_instalacion ? parseFloat(datosActualizacion.costo_instalacion) : undefined,
+            coordenadas_lat: datosActualizacion.coordenadas_lat ? parseFloat(datosActualizacion.coordenadas_lat) : null,
+            coordenadas_lng: datosActualizacion.coordenadas_lng ? parseFloat(datosActualizacion.coordenadas_lng) : null,
+            estado: datosActualizacion.estado
+        };
+
+        // Construir arrays de actualización
+        Object.keys(camposPermitidos).forEach(campo => {
+            if (camposPermitidos[campo] !== undefined) {
+                camposActualizar.push(`${campo} = ?`);
+                parametros.push(camposPermitidos[campo]);
+            }
+        });
+
+        if (camposActualizar.length === 0) {
+            await connection.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'No se proporcionaron campos para actualizar'
+            });
+        }
+
+        // Agregar updated_at y id
+        camposActualizar.push('updated_at = NOW()');
+        parametros.push(id);
+
+        const query = `UPDATE instalaciones SET ${camposActualizar.join(', ')} WHERE id = ?`;
+
+        console.log('📝 Query:', query);
+        console.log('📝 Parámetros:', parametros);
+
+        const [result] = await connection.query(query, parametros);
+
+        if (result.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'No se pudo actualizar la instalación'
+            });
+        }
+
+        await connection.commit();
+
+        // Obtener instalación actualizada
+        const [instalacionActualizada] = await connection.query(`
+            SELECT 
+                i.*,
+                c.nombre as cliente_nombre,
+                u.nombre as instalador_nombre_completo
+            FROM instalaciones i
+            LEFT JOIN clientes c ON i.cliente_id = c.id
+            LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
+            WHERE i.id = ?
+        `, [id]);
+
+        res.json({
+            success: true,
+            message: 'Instalación actualizada exitosamente',
+            data: instalacionActualizada[0]
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('❌ Error actualizando instalación:', error);
+
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error al actualizar la instalación'
+        });
+    } finally {
+        connection.release();
     }
+}
 
     // Cambiar estado de instalación
     static async cambiarEstado(req, res) {

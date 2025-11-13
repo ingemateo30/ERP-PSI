@@ -1334,6 +1334,183 @@ router.put('/:id/completar', upload.single('foto_despues'), async (req, res) => 
     });
   }
 });
+/**
+ * 🆕 CORREGIDO: Asignar instalador (DEBE IR ANTES DE /:id)
+ */
+router.patch('/:id/asignar-instalador',
+    requireRole('administrador', 'supervisor'),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { instalador_id } = req.body;
+
+            if (!instalador_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El ID del instalador es requerido'
+                });
+            }
+
+            // Verificar instalación
+            const [instalacion] = await Database.query(
+                'SELECT * FROM instalaciones WHERE id = ?',
+                [id]
+            );
+
+            if (!instalacion) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Instalación no encontrada'
+                });
+            }
+
+            // Verificar instalador
+            const [instalador] = await Database.query(
+                'SELECT * FROM sistema_usuarios WHERE id = ? AND rol IN ("instalador", "supervisor") AND activo = 1',
+                [instalador_id]
+            );
+
+            if (!instalador) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Instalador no encontrado o no tiene permisos'
+                });
+            }
+
+            // Actualizar
+            await Database.query(
+                'UPDATE instalaciones SET instalador_id = ?, updated_at = NOW() WHERE id = ?',
+                [instalador_id, id]
+            );
+
+            // Obtener actualizada
+            const [instalacionActualizada] = await Database.query(`
+                SELECT i.*, c.nombre as cliente_nombre, u.nombre as instalador_nombre_completo
+                FROM instalaciones i
+                LEFT JOIN clientes c ON i.cliente_id = c.id
+                LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
+                WHERE i.id = ?
+            `, [id]);
+
+            res.json({
+                success: true,
+                message: 'Instalador asignado exitosamente',
+                data: instalacionActualizada
+            });
+
+        } catch (error) {
+            console.error('❌ Error asignando instalador:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    }
+);
+
+/**
+ * ARREGLADO: Cambiar estado de instalación
+ */
+router.patch('/:id/cambiar-estado', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { estado, observaciones, motivo_cancelacion } = req.body;
+
+        console.log(`🔄 Cambiando estado de instalación ${id} a: ${estado}`);
+
+        if (!estado) {
+            return res.status(400).json({
+                success: false,
+                message: 'El estado es requerido'
+            });
+        }
+
+        // Verificar que la instalación existe
+        const [instalacion] = await Database.query(
+            'SELECT * FROM instalaciones WHERE id = ?',
+            [id]
+        );
+
+        if (!instalacion) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instalación no encontrada'
+            });
+        }
+
+        // Verificar permisos según el estado
+        const permisosEstado = {
+            'en_proceso': ['instalador'],
+            'completada': ['instalador'],
+            'cancelada': ['administrador', 'supervisor'],
+            'reagendada': ['administrador', 'supervisor'],
+            'programada': ['administrador', 'supervisor']
+        };
+
+        if (!permisosEstado[estado]?.includes(req.user.rol)) {
+            return res.status(403).json({
+                success: false,
+                message: 'No tienes permisos para cambiar a este estado'
+            });
+        }
+
+        // Para instaladores, verificar que sea su instalación
+        if (req.user.rol === 'instalador' && instalacion.instalador_id !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: 'Solo puedes cambiar el estado de tus propias instalaciones'
+            });
+        }
+
+        // Construir query de actualización
+        const updates = ['estado = ?', 'updated_at = NOW()'];
+        const params = [estado];
+
+        if (estado === 'cancelada' && motivo_cancelacion) {
+            updates.push('motivo_cancelacion = ?');
+            params.push(motivo_cancelacion);
+        }
+
+        if (estado === 'completada') {
+            updates.push('fecha_completada = ?');
+            params.push(new Date().toISOString().split('T')[0]);
+        }
+
+        if (observaciones) {
+            updates.push('observaciones = ?');
+            params.push(observaciones);
+        }
+
+        // Ejecutar actualización
+        const query = `UPDATE instalaciones SET ${updates.join(', ')} WHERE id = ?`;
+        params.push(id);
+
+        await Database.query(query, params);
+
+        // Obtener instalación actualizada
+        const [instalacionActualizada] = await Database.query(`
+            SELECT 
+                i.*,
+                c.nombre as cliente_nombre
+            FROM instalaciones i
+            LEFT JOIN clientes c ON i.cliente_id = c.id
+            WHERE i.id = ?
+        `, [id]);
+
+        res.json({
+            success: true,
+            message: `Estado cambiado a: ${estado}`,
+            data: instalacionActualizada
+        });
+
+    } catch (error) {
+        console.error('❌ Error cambiando estado:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error cambiando estado'
+        });
+    }
+});
 
 /**
  * ⚠️ ESTA DEBE IR DESPUÉS DE TODAS LAS RUTAS ESPECÍFICAS
@@ -1460,192 +1637,5 @@ router.delete('/:id',
         }
     }
 );
-
-// ==========================================
-// RUTAS DE ACCIONES ESPECÍFICAS
-// ==========================================
-
-/**
- * ARREGLADO: Asignar instalador
- */
-router.patch('/:id/cambiar-estado',
-    requireRole('administrador', 'supervisor', 'instalador'),
-    async (req, res) => {
-        try {
-            const { id } = req.params;
-            const { instalador_id } = req.body;
-
-            console.log(`👷‍♂️ Asignando instalador ${instalador_id} a instalación ${id}`);
-
-            if (!instalador_id) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El ID del instalador es requerido'
-                });
-            }
-
-            // Verificar que la instalación existe
-            const [instalacion] = await Database.query(
-                'SELECT * FROM instalaciones WHERE id = ?',
-                [id]
-            );
-
-            if (!instalacion) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Instalación no encontrada'
-                });
-            }
-
-            // Verificar que el instalador existe
-            const [instalador] = await Database.query(
-                'SELECT * FROM sistema_usuarios WHERE id = ? AND rol IN ("instalador", "supervisor")',
-                [instalador_id]
-            );
-
-            if (!instalador) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Instalador no encontrado o no tiene permisos'
-                });
-            }
-
-            // Actualizar instalador
-            await Database.query(
-                'UPDATE instalaciones SET instalador_id = ?, updated_at = NOW() WHERE id = ?',
-                [instalador_id, id]
-            );
-
-            // Obtener instalación actualizada
-            const [instalacionActualizada] = await Database.query(`
-                SELECT 
-                    i.*,
-                    c.nombre as cliente_nombre,
-                    u.nombre as instalador_nombre_completo
-                FROM instalaciones i
-                LEFT JOIN clientes c ON i.cliente_id = c.id
-                LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
-                WHERE i.id = ?
-            `, [id]);
-
-            res.json({
-                success: true,
-                message: 'Instalador asignado exitosamente',
-                data: instalacionActualizada
-            });
-
-        } catch (error) {
-            console.error('❌ Error asignando instalador:', error);
-            res.status(500).json({
-                success: false,
-                message: error.message || 'Error asignando instalador'
-            });
-        }
-    }
-);
-
-/**
- * ARREGLADO: Cambiar estado de instalación
- */
-router.patch('/:id/cambiar-estado', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { estado, observaciones, motivo_cancelacion } = req.body;
-
-        console.log(`🔄 Cambiando estado de instalación ${id} a: ${estado}`);
-
-        if (!estado) {
-            return res.status(400).json({
-                success: false,
-                message: 'El estado es requerido'
-            });
-        }
-
-        // Verificar que la instalación existe
-        const [instalacion] = await Database.query(
-            'SELECT * FROM instalaciones WHERE id = ?',
-            [id]
-        );
-
-        if (!instalacion) {
-            return res.status(404).json({
-                success: false,
-                message: 'Instalación no encontrada'
-            });
-        }
-
-        // Verificar permisos según el estado
-        const permisosEstado = {
-            'en_proceso': ['instalador'],
-            'completada': ['instalador'],
-            'cancelada': ['administrador', 'supervisor'],
-            'reagendada': ['administrador', 'supervisor'],
-            'programada': ['administrador', 'supervisor']
-        };
-
-        if (!permisosEstado[estado]?.includes(req.user.rol)) {
-            return res.status(403).json({
-                success: false,
-                message: 'No tienes permisos para cambiar a este estado'
-            });
-        }
-
-        // Para instaladores, verificar que sea su instalación
-        if (req.user.rol === 'instalador' && instalacion.instalador_id !== req.user.id) {
-            return res.status(403).json({
-                success: false,
-                message: 'Solo puedes cambiar el estado de tus propias instalaciones'
-            });
-        }
-
-        // Construir query de actualización
-        const updates = ['estado = ?', 'updated_at = NOW()'];
-        const params = [estado];
-
-        if (estado === 'cancelada' && motivo_cancelacion) {
-            updates.push('motivo_cancelacion = ?');
-            params.push(motivo_cancelacion);
-        }
-
-        if (estado === 'completada') {
-            updates.push('fecha_completada = ?');
-            params.push(new Date().toISOString().split('T')[0]);
-        }
-
-        if (observaciones) {
-            updates.push('observaciones = ?');
-            params.push(observaciones);
-        }
-
-        // Ejecutar actualización
-        const query = `UPDATE instalaciones SET ${updates.join(', ')} WHERE id = ?`;
-        params.push(id);
-
-        await Database.query(query, params);
-
-        // Obtener instalación actualizada
-        const [instalacionActualizada] = await Database.query(`
-            SELECT 
-                i.*,
-                c.nombre as cliente_nombre
-            FROM instalaciones i
-            LEFT JOIN clientes c ON i.cliente_id = c.id
-            WHERE i.id = ?
-        `, [id]);
-
-        res.json({
-            success: true,
-            message: `Estado cambiado a: ${estado}`,
-            data: instalacionActualizada
-        });
-
-    } catch (error) {
-        console.error('❌ Error cambiando estado:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || 'Error cambiando estado'
-        });
-    }
-});
 
 module.exports = router;
