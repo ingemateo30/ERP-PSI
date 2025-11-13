@@ -492,11 +492,10 @@ const FacturasManagement = () => {
           : 'opacity-0 max-h-0 overflow-hidden'
       }`}>
         <FacturasFilters
-          onBuscar={handleBuscar}
-          onLimpiar={handleLimpiarFiltros}
-          filtrosIniciales={filtros}
-          loading={loading}
-        />
+  onBuscar={handleBuscar}
+  onLimpiar={handleLimpiarFiltros}
+  loading={loading}
+/>
       </div>
 
       {/* Lista de facturas mejorada */}
