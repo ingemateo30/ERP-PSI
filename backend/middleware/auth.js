@@ -1,4 +1,4 @@
-// backend/middleware/auth.js - Middleware de Autenticación CORREGIDO
+// backend/middleware/auth.js - Middleware de Autenticación CORREGIDO FINAL
 const jwt = require('jsonwebtoken');
 const { Database } = require('../models/Database');
 
@@ -95,8 +95,9 @@ const authenticateToken = async (req, res, next) => {
 };
 
 /**
- * ✅ CORREGIDO: Middleware para verificar roles específicos
- * Ahora acepta múltiples roles como argumentos
+ * ✅ CORREGIDO FINAL: Middleware para verificar roles específicos
+ * Acepta múltiples roles como argumentos separados
+ * Validación robusta de tipos antes de normalizar
  * 
  * Uso: requireRole('administrador', 'supervisor')
  */
@@ -104,8 +105,8 @@ const requireRole = (...allowedRoles) => {
   return (req, res, next) => {
     console.log('🔐 requireRole - Verificando acceso');
     console.log('🔐 Usuario:', req.user?.nombre, '(ID:', req.user?.id, ')');
-    console.log('🔐 Rol del usuario:', req.user?.rol);
-    console.log('🔐 Roles permitidos:', allowedRoles);
+    console.log('🔐 Rol del usuario (raw):', req.user?.rol, '(tipo:', typeof req.user?.rol, ')');
+    console.log('🔐 Roles permitidos (raw):', allowedRoles);
 
     // Verificar que el usuario esté autenticado
     if (!req.user) {
@@ -117,17 +118,56 @@ const requireRole = (...allowedRoles) => {
       });
     }
 
-    // Normalizar roles para comparación (minúsculas y sin espacios)
-    const userRole = (req.user.rol || '').toLowerCase().trim();
-    const normalizedRoles = allowedRoles.map(role => 
-      (role || '').toLowerCase().trim()
-    );
+    // ✅ VALIDACIÓN ROBUSTA: Verificar que el rol sea un string válido
+    const userRole = req.user.rol;
+    
+    if (!userRole) {
+      console.log('❌ requireRole - Rol vacío');
+      return res.status(403).json({
+        success: false,
+        message: 'Usuario sin rol asignado',
+        timestamp: new Date().toISOString()
+      });
+    }
 
-    console.log('🔐 Rol normalizado usuario:', userRole);
+    if (typeof userRole !== 'string') {
+      console.log('❌ requireRole - Rol no es string:', userRole, typeof userRole);
+      return res.status(403).json({
+        success: false,
+        message: 'Rol de usuario inválido',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Normalizar rol del usuario
+    const normalizedUserRole = userRole.toLowerCase().trim();
+    
+    // ✅ VALIDACIÓN ROBUSTA: Filtrar y normalizar roles permitidos
+    const normalizedRoles = allowedRoles
+      .filter(role => {
+        if (!role || typeof role !== 'string') {
+          console.log('⚠️ Rol permitido inválido ignorado:', role);
+          return false;
+        }
+        return true;
+      })
+      .map(role => role.toLowerCase().trim());
+
+    console.log('🔐 Rol normalizado usuario:', normalizedUserRole);
     console.log('🔐 Roles permitidos normalizados:', normalizedRoles);
 
+    // Verificar si hay roles permitidos válidos
+    if (normalizedRoles.length === 0) {
+      console.log('❌ requireRole - No hay roles permitidos válidos');
+      return res.status(500).json({
+        success: false,
+        message: 'Error en configuración de permisos',
+        timestamp: new Date().toISOString()
+      });
+    }
+
     // Verificar si el rol del usuario está en los roles permitidos
-    if (!normalizedRoles.includes(userRole)) {
+    if (!normalizedRoles.includes(normalizedUserRole)) {
       console.log('❌ requireRole - Acceso DENEGADO');
       return res.status(403).json({
         success: false,
