@@ -82,6 +82,8 @@ class ReportesRegulatoriosController {
             `;
 
             const datos = await this.db.query(query, [
+                anno,
+                trimestre,
                 meses[0], meses[1], meses[2],
                 anno
             ]);
