@@ -208,54 +208,61 @@ const { hasPermission } = useAuth();
   // ==========================================
 
   const handleMarcarPagada = useCallback(async (datosPago) => {
-    if (!modalState.facturaSeleccionada) {
-      mostrarNotificacion('No hay factura seleccionada', 'error');
+  if (!modalState.facturaSeleccionada) {
+    mostrarNotificacion('No hay factura seleccionada', 'error');
+    return;
+  }
+
+  try {
+    console.log('💰 [FacturasManagement] Marcando factura como pagada:', {
+      factura: modalState.facturaSeleccionada.id,
+      ...datosPago
+    });
+    
+    // VALIDACIONES DE PAGO
+    if (!datosPago.valor_pagado || datosPago.valor_pagado <= 0) {
+      mostrarNotificacion('El valor del pago debe ser mayor a 0', 'error');
       return;
     }
 
-    try {
-      console.log('💰 [FacturasManagement] Marcando factura como pagada:', {
-        factura: modalState.facturaSeleccionada.id,
-        ...datosPago
-      });
-      
-      // VALIDACIONES DE PAGO
-      if (!datosPago.valor_pagado || datosPago.valor_pagado <= 0) {
-        mostrarNotificacion('El valor del pago debe ser mayor a 0', 'error');
-        return;
-      }
-
-      if (!datosPago.metodo_pago) {
-        mostrarNotificacion('Debe seleccionar un método de pago', 'error');
-        return;
-      }
-
-      const resultado = await marcarComoPagada(modalState.facturaSeleccionada.id, datosPago);
-      
-      refrescar();
-
-// ✅ NUEVO: Disparar evento para que el dashboard se actualice
-window.dispatchEvent(new CustomEvent('factura-pagada', { 
-  detail: { 
-    facturaId: modalState.facturaSeleccionada.id,
-    monto: datosPago.valor_pagado 
-  }
-}));
-
-mostrarNotificacion(
-  `Factura ${modalState.facturaSeleccionada.numero_factura} marcada como pagada exitosamente`, 
-  'success'
-);
-      
-    } catch (error) {
-      console.error('❌ [FacturasManagement] Error al marcar como pagada:', error);
-      mostrarNotificacion(
-        error.message || 'Error al marcar la factura como pagada', 
-        'error'
-      );
+    if (!datosPago.metodo_pago) {
+      mostrarNotificacion('Debe seleccionar un método de pago', 'error');
+      return;
     }
-  }, [modalState.facturaSeleccionada, marcarComoPagada, handleCerrarModal, refrescar, mostrarNotificacion]);
 
+    await marcarComoPagada(modalState.facturaSeleccionada.id, datosPago);
+    
+    // ✅ 1. CERRAR EL MODAL INMEDIATAMENTE
+    handleCerrarModal();
+    
+    // ✅ 2. RECARGAR FACTURAS
+    await refrescar();
+
+    // ✅ 3. DISPARAR EVENTO PARA ACTUALIZAR ESTADÍSTICAS
+    window.dispatchEvent(new CustomEvent('actualizar-estadisticas-facturas'));
+
+    // ✅ 4. DISPARAR EVENTO PARA DASHBOARD
+    window.dispatchEvent(new CustomEvent('factura-pagada', { 
+      detail: { 
+        facturaId: modalState.facturaSeleccionada.id,
+        monto: datosPago.valor_pagado 
+      }
+    }));
+
+    // ✅ 5. MOSTRAR NOTIFICACIÓN
+    mostrarNotificacion(
+      `Factura ${modalState.facturaSeleccionada.numero_factura} marcada como pagada exitosamente`, 
+      'success'
+    );
+      
+  } catch (error) {
+    console.error('❌ [FacturasManagement] Error al marcar como pagada:', error);
+    mostrarNotificacion(
+      error.message || 'Error al marcar la factura como pagada', 
+      'error'
+    );
+  }
+}, [modalState.facturaSeleccionada, marcarComoPagada, handleCerrarModal, refrescar, mostrarNotificacion]);
   const handleAnularFactura = useCallback(async (motivo) => {
     if (!modalState.facturaSeleccionada) {
       mostrarNotificacion('No hay factura seleccionada para anular', 'error');

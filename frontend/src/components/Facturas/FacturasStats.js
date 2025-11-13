@@ -24,7 +24,21 @@ const FacturasStats = ({ facturas = [], loading = false }) => {
     console.log('📊 [FacturasStats] Cargando estadísticas desde backend...');
     cargarEstadisticasAPI();
   }, []); // Sin dependencias para que cargue solo una vez al montar
+// ==========================================
+// ESCUCHAR EVENTO DE ACTUALIZACIÓN
+// ==========================================
+useEffect(() => {
+  const handleActualizarStats = () => {
+    console.log('📊 [FacturasStats] Evento recibido - Actualizando estadísticas...');
+    cargarEstadisticasAPI();
+  };
 
+  window.addEventListener('actualizar-estadisticas-facturas', handleActualizarStats);
+
+  return () => {
+    window.removeEventListener('actualizar-estadisticas-facturas', handleActualizarStats);
+  };
+}, []);
   // ==========================================
   // FUNCIÓN PARA CALCULAR ESTADÍSTICAS LOCALMENTE
   // ==========================================
