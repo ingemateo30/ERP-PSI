@@ -537,44 +537,58 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
     throw error;
   }
 }
-  /**
-   * Generar orden de instalación interna COMPLETA
+ /**
+   * Generar orden de instalación interna COMPLETA con DIRECCIÓN
    */
-  static async generarOrdenInstalacionInterno(conexion, clienteId, servicioId, createdBy = null) {
-    console.log('🔧 Generando orden de instalación...');
+  static async generarOrdenInstalacionInterno(conexion, clienteId, serviciosDeLaSede, createdBy = null) {
+    console.log('🔧 Generando orden de instalación CON DIRECCIÓN...');
+
+    // Obtener datos del cliente
+    const [clientes] = await conexion.execute(
+      'SELECT nombre, direccion, barrio, telefono FROM clientes WHERE id = ?',
+      [clienteId]
+    );
+
+    if (clientes.length === 0) {
+      throw new Error('Cliente no encontrado');
+    }
+
+    const cliente = clientes[0];
 
     // Generar número de orden único
     const numeroOrden = `INS-${Date.now()}`;
 
     const query = `
       INSERT INTO instalaciones (
-        cliente_id, servicio_cliente_id, fecha_programada,
-        hora_programada, estado, observaciones
-      ) VALUES ( ?, ?, DATE_ADD(NOW(), INTERVAL 2 DAY), '09:00:00', 'programada', 'Instalación generada automáticamente')
+        cliente_id, fecha_programada, hora_programada, 
+        direccion_instalacion, barrio, telefono_contacto,
+        estado, observaciones, created_at
+      ) VALUES (?, DATE_ADD(NOW(), INTERVAL 1 DAY), '09:00:00', ?, ?, ?, 'programada', 'Instalación generada automáticamente', NOW())
     `;
 
     const valores = [
       clienteId,
-      servicioId,
+      cliente.direccion,
+      cliente.barrio || '',
+      cliente.telefono || ''
     ];
 
-    console.log('🔍 Query instalación:', query);
-    console.log('🔍 Valores instalación:', valores);
+    console.log('🔍 Query instalación CON DIRECCIÓN:', query);
+    console.log('🔍 Valores:', valores);
 
     const [resultado] = await conexion.execute(query, valores);
-
     const instalacionId = resultado.insertId;
 
-    console.log(`✅ Orden de instalación ${numeroOrden} creada con ID: ${instalacionId}`);
+    console.log(`✅ Instalación ${numeroOrden} creada - ID: ${instalacionId} - Dirección: ${cliente.direccion}`);
 
     return {
       id: instalacionId,
       numero: numeroOrden,
-      fecha_programada: new Date(Date.now() + (2 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+      fecha_programada: new Date(Date.now() + (24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+      direccion: cliente.direccion,
       estado: 'programada'
     };
   }
-
   /**
    * Generar contrato interno
    */
