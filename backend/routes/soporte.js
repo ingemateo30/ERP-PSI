@@ -34,9 +34,17 @@ router.post(
       .isLength({ max: 1000 })
       .withMessage('El mensaje no puede exceder 1000 caracteres'),
     body('sessionId').optional().isString(),
-    body('nombre').optional().trim().isLength({ max: 255 }),
-    body('email').optional().trim().isEmail().withMessage('Email inválido'),
-    body('telefono').optional().trim().isLength({ max: 20 }),
+    body('nombre').optional({ values: 'falsy' }).trim().isLength({ max: 255 }),
+    body('email')
+      .optional({ values: 'falsy' })
+      .trim()
+      .custom((value) => {
+        // Permitir cadena vacía o email válido
+        if (!value || value === '') return true;
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+      })
+      .withMessage('Email inválido'),
+    body('telefono').optional({ values: 'falsy' }).trim().isLength({ max: 20 }),
     body('conversationHistory').optional().isArray(),
     validate,
   ],
@@ -51,13 +59,16 @@ router.post(
   '/ticket',
   [
     body('sessionId').notEmpty().withMessage('Session ID es requerido'),
-    body('nombre').optional().trim().isLength({ max: 255 }),
+    body('nombre').optional({ values: 'falsy' }).trim().isLength({ max: 255 }),
     body('email')
-      .optional()
+      .optional({ values: 'falsy' })
       .trim()
-      .isEmail()
+      .custom((value) => {
+        if (!value || value === '') return true;
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+      })
       .withMessage('Email inválido'),
-    body('telefono').optional().trim().isLength({ max: 20 }),
+    body('telefono').optional({ values: 'falsy' }).trim().isLength({ max: 20 }),
     body('clienteId').optional().isInt(),
     body('categoria')
       .optional()
@@ -67,7 +78,7 @@ router.post(
       .optional()
       .isIn(['baja', 'media', 'alta', 'critica'])
       .withMessage('Prioridad inválida'),
-    body('asuntoAdicional').optional().trim().isLength({ max: 500 }),
+    body('asuntoAdicional').optional({ values: 'falsy' }).trim().isLength({ max: 500 }),
     validate,
   ],
   soporteController.createTicketFromChat
