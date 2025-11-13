@@ -20,7 +20,8 @@ class GeminiService {
       this.genAI = null;
     } else {
       this.genAI = new GoogleGenerativeAI(apiKey);
-      this.model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
+      // Usar gemini-1.5-flash (más rápido y económico) o gemini-1.5-pro (más capaz)
+      this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     }
 
     // Contexto del sistema para el chatbot
