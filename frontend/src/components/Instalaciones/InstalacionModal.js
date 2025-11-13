@@ -192,41 +192,50 @@ const InstalacionModal = ({
       }));
     }
   };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  console.log('🔵 handleSubmit ejecutado');
+  console.log('🔵 Modo:', modo);
+  console.log('🔵 User:', user);
+  console.log('🔵 FormData:', formData);
+  
+  if (modo === 'ver') {
+    onCerrar();
+    return;
+  }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const erroresValidacion = validarFormulario();
+  console.log('🔵 Errores de validación:', erroresValidacion);
+  
+  if (Object.keys(erroresValidacion).length > 0) {
+    setErrores(erroresValidacion);
+    console.log('❌ Validación falló');
+    return;
+  }
+
+  console.log('🔵 Iniciando guardado...');
+  setProcesando(true);
+  
+  try {
+    console.log('🔵 Llamando onGuardar...');
+    await onGuardar(formData);
+    console.log('✅ Guardado exitoso');
+  } catch (error) {
+    console.error('❌ Error en submit:', error);
     
-    if (modo === 'ver') {
-      onCerrar();
-      return;
+    // Mostrar mensaje amigable según el tipo de error
+    if (error.message && error.message.includes('Ya existe una instalación pendiente')) {
+      alert('⚠️ Este servicio ya tiene una instalación pendiente.\n\nPor favor, completa o cancela la instalación existante antes de crear una nueva.');
+    } else if (error.message) {
+      alert(`❌ Error al guardar la instalación:\n\n${error.message}`);
+    } else {
+      alert('❌ Ocurrió un error desconocido al guardar la instalación.');
     }
-
-    const erroresValidacion = validarFormulario();
-    if (Object.keys(erroresValidacion).length > 0) {
-      setErrores(erroresValidacion);
-      return;
-    }
-
-    setProcesando(true);
-    
-    try {
-      await onGuardar(formData);
-    } catch (error) {
-      console.error('❌ Error en submit:', error);
-      
-      // Mostrar mensaje amigable según el tipo de error
-      if (error.message && error.message.includes('Ya existe una instalación pendiente')) {
-        alert('⚠️ Este servicio ya tiene una instalación pendiente.\n\nPor favor, completa o cancela la instalación existente antes de crear una nueva.');
-      } else if (error.message) {
-        alert(`❌ Error al guardar la instalación:\n\n${error.message}`);
-      } else {
-        alert('❌ Ocurrió un error desconocido al guardar la instalación.');
-      }
-    } finally {
-      setProcesando(false);
-    }
-  };
-
+  } finally {
+    setProcesando(false);
+  }
+};
   const validarFormulario = () => {
     const errores = {};
 
