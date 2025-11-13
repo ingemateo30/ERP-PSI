@@ -61,6 +61,11 @@ Problemas que DEBES DERIVAR a ticket:
    * Genera una respuesta usando Gemini AI
    */
   async generateResponse(userMessage, conversationHistory = []) {
+    // Siempre usar respuestas predefinidas (más confiables y rápidas)
+    // Si quieres habilitar Gemini AI en el futuro, descomenta el código siguiente
+    return this.getFallbackResponse(userMessage);
+
+    /* CÓDIGO GEMINI AI - DESACTIVADO POR AHORA
     try {
       // Si no hay API key, usar respuestas predefinidas
       if (!this.genAI) {
@@ -95,6 +100,7 @@ Problemas que DEBES DERIVAR a ticket:
       // Fallback a respuestas predefinidas si falla la API
       return this.getFallbackResponse(userMessage);
     }
+    */
   }
 
   /**
