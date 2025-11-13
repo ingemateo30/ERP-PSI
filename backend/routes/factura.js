@@ -91,7 +91,20 @@ router.get('/historial-cliente', async (req, res) => {
       limit = 50
     } = req.query;
 
+    // ✅ LOG DE DEBUG
+    console.log('📋 [BACKEND historial-cliente] Parámetros recibidos:', {
+      cliente_id,
+      estado,
+      fecha_desde,
+      fecha_hasta,
+      numero_factura,
+      page,
+      limit
+    });
+
+    // ✅ VALIDACIÓN CRÍTICA
     if (!cliente_id) {
+      console.log('❌ [BACKEND] Cliente ID no proporcionado');
       return res.status(400).json({
         success: false,
         message: 'ID de cliente es requerido'
@@ -100,29 +113,41 @@ router.get('/historial-cliente', async (req, res) => {
 
     const { Database } = require('../models/Database');
     const offset = (page - 1) * limit;
-    let whereClause = 'WHERE f.cliente_id = ?';
+    
+    // ✅ CORRECCIÓN: Agregar f.activo = 1 desde el inicio
+    let whereClause = 'WHERE f.cliente_id = ? AND f.activo = 1';
     let params = [cliente_id];
 
-    // Aplicar filtros
+    console.log('🔍 [BACKEND] WHERE inicial:', whereClause);
+    console.log('🔍 [BACKEND] Params inicial:', params);
+
+    // Aplicar filtros adicionales
     if (estado) {
       whereClause += ' AND f.estado = ?';
       params.push(estado);
+      console.log('🎯 [BACKEND] Filtro estado agregado:', estado);
     }
 
     if (fecha_desde) {
       whereClause += ' AND f.fecha_emision >= ?';
       params.push(fecha_desde);
+      console.log('📅 [BACKEND] Filtro fecha_desde agregado:', fecha_desde);
     }
 
     if (fecha_hasta) {
       whereClause += ' AND f.fecha_emision <= ?';
       params.push(fecha_hasta);
+      console.log('📅 [BACKEND] Filtro fecha_hasta agregado:', fecha_hasta);
     }
 
     if (numero_factura) {
       whereClause += ' AND f.numero_factura LIKE ?';
       params.push(`%${numero_factura}%`);
+      console.log('🔢 [BACKEND] Filtro numero_factura agregado:', numero_factura);
     }
+
+    console.log('🔍 [BACKEND] WHERE final:', whereClause);
+    console.log('🔍 [BACKEND] Params finales:', params);
 
     // Obtener facturas
     const facturas = await Database.query(`
@@ -135,7 +160,9 @@ router.get('/historial-cliente', async (req, res) => {
       ${whereClause}
       ORDER BY f.fecha_emision DESC, f.id DESC
       LIMIT ${parseInt(limit)} OFFSET ${offset}
-      `, params);
+    `, params);
+
+    console.log(`✅ [BACKEND] Facturas encontradas: ${facturas.length}`);
 
     // Obtener detalles de cada factura (pagos, etc.)
     for (let factura of facturas) {
@@ -159,13 +186,13 @@ router.get('/historial-cliente', async (req, res) => {
         
         factura.detalles = detalles;
       } catch (detailError) {
-        console.log('⚠️ Error obteniendo detalles para factura', factura.id, detailError.message);
+        console.log('⚠️ [BACKEND] Error obteniendo detalles para factura', factura.id, detailError.message);
         factura.pagos = [];
         factura.detalles = [];
       }
     }
 
-    // Obtener estadísticas del cliente
+    // Obtener estadísticas del cliente (SOLO del cliente específico)
     const estadisticas = await Database.query(`
       SELECT 
         COUNT(*) as total_facturas,
@@ -177,8 +204,10 @@ router.get('/historial-cliente', async (req, res) => {
         SUM(CASE WHEN estado = 'pagada' THEN total ELSE 0 END) as valor_pagado,
         AVG(total) as promedio_factura
       FROM facturas 
-      WHERE cliente_id = ? AND estado != 'anulada'
+      WHERE cliente_id = ? AND estado != 'anulada' AND activo = 1
     `, [cliente_id]);
+
+    console.log('📊 [BACKEND] Estadísticas calculadas:', estadisticas[0]);
 
     res.json({
       success: true,
@@ -195,7 +224,7 @@ router.get('/historial-cliente', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error obteniendo historial de facturación:', error);
+    console.error('❌ [BACKEND] Error obteniendo historial de facturación:', error);
     res.status(500).json({
       success: false,
       message: 'Error obteniendo historial de facturación',
