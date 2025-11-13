@@ -1,5 +1,6 @@
 // frontend/src/components/Contratos/ContratosList.js
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { 
   FileText, 
   Download, 
@@ -44,7 +45,7 @@ const ContratosList = () => {
   useEffect(() => {
     cargarEstadisticas();
   }, []);
-
+const { hasPermission } = useAuth();
   const cargarContratos = async () => {
     try {
       setLoading(true);
@@ -396,26 +397,25 @@ const ContratosList = () => {
                       >
                         <Download className="w-4 h-4" />
                       </button>
+{hasPermission('administrador') && contrato.estado === 'activo' && (
+  <button
+    onClick={() => handleCambiarEstado(contrato.id, 'terminado')}
+    className="text-gray-600 hover:text-gray-900 p-1 rounded transition-colors"
+    title="Terminar contrato"
+  >
+    <XCircle className="w-4 h-4" />
+  </button>
+)}
 
-                      {contrato.estado === 'activo' && (
-                        <button
-                          onClick={() => handleCambiarEstado(contrato.id, 'terminado')}
-                          className="text-gray-600 hover:text-gray-900 p-1 rounded transition-colors"
-                          title="Terminar contrato"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {contrato.estado !== 'anulado' && (
-                        <button
-                          onClick={() => handleCambiarEstado(contrato.id, 'anulado')}
-                          className="text-red-600 hover:text-red-900 p-1 rounded transition-colors"
-                          title="Anular contrato"
-                        >
-                          <AlertTriangle className="w-4 h-4" />
-                        </button>
-                      )}
+{hasPermission('administrador') && contrato.estado !== 'anulado' && (
+  <button
+    onClick={() => handleCambiarEstado(contrato.id, 'anulado')}
+    className="text-red-600 hover:text-red-900 p-1 rounded transition-colors"
+    title="Anular contrato"
+  >
+    <AlertTriangle className="w-4 h-4" />
+  </button>
+)}
                     </div>
                   </td>
                 </tr>
