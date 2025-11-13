@@ -79,6 +79,7 @@ const MapaInstalaciones = () => {
     fechaHasta: '',
     busqueda: ''
   });
+  const [busquedaTemp, setBusquedaTemp] = useState('');
   const [vistaActual, setVistaActual] = useState('lista');
   const [instalacionSeleccionada, setInstalacionSeleccionada] = useState(null);
   const [mostrarFiltros, setMostrarFiltros] = useState(true);
@@ -95,6 +96,15 @@ const MapaInstalaciones = () => {
   const CENTRO_MAPA = [6.4667, -73.2667]; // Socorro
   const ZOOM = 13;
 
+  // Debounce para el campo de búsqueda
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setFiltros(prev => ({ ...prev, busqueda: busquedaTemp }));
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [busquedaTemp]);
+
   useEffect(() => {
     cargarInstalaciones();
   }, [filtros]);
@@ -107,11 +117,12 @@ const MapaInstalaciones = () => {
       if (filtros.instalador) params.append('instalador_id', filtros.instalador);
       if (filtros.fechaDesde) params.append('fecha_desde', filtros.fechaDesde);
       if (filtros.fechaHasta) params.append('fecha_hasta', filtros.fechaHasta);
-      if (filtros.busqueda) params.append('q', filtros.busqueda);
-      
+      if (filtros.busqueda) params.append('busqueda', filtros.busqueda);
+
       const res = await apiService.get(`/instalaciones?${params}`);
       console.log('📡 Respuesta API:', res);
-      
+      console.log('📡 Parámetros enviados:', params.toString());
+
       if (res.success && Array.isArray(res.data)) {
         console.log(`✅ Instalaciones cargadas: ${res.data.length}`);
         setInstalaciones(res.data);
@@ -405,17 +416,17 @@ const MapaInstalaciones = () => {
       {mostrarFiltros && (
         <div className="bg-white p-4 rounded-lg shadow mb-6">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <input 
-              type="text" 
-              value={filtros.busqueda} 
-              onChange={e => setFiltros({...filtros, busqueda: e.target.value})} 
-              placeholder="Buscar cliente, dirección..." 
+            <input
+              type="text"
+              value={busquedaTemp}
+              onChange={e => setBusquedaTemp(e.target.value)}
+              placeholder="Buscar cliente, dirección..."
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
-            
-            <select 
-              value={filtros.estado} 
-              onChange={e => setFiltros({...filtros, estado: e.target.value})} 
+
+            <select
+              value={filtros.estado}
+              onChange={e => setFiltros({...filtros, estado: e.target.value})}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todos los estados</option>
@@ -425,23 +436,28 @@ const MapaInstalaciones = () => {
               <option value="cancelada">Cancelada</option>
               <option value="reagendada">Reagendada</option>
             </select>
-            
-            <input 
-              type="date" 
-              value={filtros.fechaDesde} 
-              onChange={e => setFiltros({...filtros, fechaDesde: e.target.value})} 
+
+            <input
+              type="date"
+              value={filtros.fechaDesde}
+              onChange={e => setFiltros({...filtros, fechaDesde: e.target.value})}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder="Fecha desde"
             />
-            
-            <input 
-              type="date" 
-              value={filtros.fechaHasta} 
-              onChange={e => setFiltros({...filtros, fechaHasta: e.target.value})} 
+
+            <input
+              type="date"
+              value={filtros.fechaHasta}
+              onChange={e => setFiltros({...filtros, fechaHasta: e.target.value})}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder="Fecha hasta"
             />
-            
-            <button 
-              onClick={() => setFiltros({estado:'',instalador:'',fechaDesde:'',fechaHasta:'',busqueda:''})} 
+
+            <button
+              onClick={() => {
+                setFiltros({estado:'',instalador:'',fechaDesde:'',fechaHasta:'',busqueda:''});
+                setBusquedaTemp('');
+              }}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
             >
               Limpiar Filtros
