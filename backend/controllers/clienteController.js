@@ -318,8 +318,11 @@ class ClienteController {
     }
   }
 
-  // Crear nuevo cliente
+// Crear nuevo cliente
 static async crear(req, res) {
+  const db = require('../config/database');
+  let conexion;
+
   try {
     console.log('🔍 DEBUG - Crear Cliente');
     console.log('Body recibido:', JSON.stringify(req.body, null, 2));
@@ -357,49 +360,48 @@ static async crear(req, res) {
       }
     }
 
+    // Obtener conexión para la transacción
+    conexion = await db.getConnection();
+    await conexion.beginTransaction();
+
     // ✅ CREAR CLIENTE
     const clienteId = await Cliente.crear(datosCliente);
     
     // ✅ CREAR INSTALACIÓN AUTOMÁTICA CON DIRECCIÓN
-    try {
-      const db = require('../config/database');
-      const conexion = await db.getConnection();
-      
-      await conexion.execute(`
-        INSERT INTO instalaciones (
-          cliente_id, 
-          tipo_instalacion, 
-          estado, 
-          fecha_programada,
-          direccion_instalacion,
-          barrio,
-          telefono_contacto,
-          observaciones, 
-          created_at
-        ) VALUES (?, 'nueva', 'programada', DATE_ADD(CURDATE(), INTERVAL 1 DAY), ?, ?, ?, 
-                 'Instalación generada automáticamente', NOW())
-      `, [
-        clienteId,
-        datosCliente.direccion,
-        datosCliente.barrio || '',
-        datosCliente.telefono || ''
-      ]);
-      
-      conexion.release();
-      console.log(`🔧 Instalación automática creada para cliente ${clienteId}`);
-    } catch (error) {
-      console.warn('⚠️ Error creando instalación automática:', error.message);
-      // No fallar la creación del cliente si falla la instalación
-    }
+    await conexion.execute(`
+      INSERT INTO instalaciones (
+        cliente_id, 
+        tipo_instalacion, 
+        estado, 
+        fecha_programada,
+        direccion_instalacion,
+        barrio,
+        telefono_contacto,
+        observaciones, 
+        created_at
+      ) VALUES (?, 'nueva', 'programada', DATE_ADD(CURDATE(), INTERVAL 1 DAY), ?, ?, ?, 
+               'Instalación generada automáticamente', NOW())
+    `, [
+      clienteId,
+      datosCliente.direccion,
+      datosCliente.barrio || '',
+      datosCliente.telefono || ''
+    ]);
+    
+    console.log(`🔧 Instalación automática creada para cliente ${clienteId}`);
 
-    // ✅ CREAR NOTIFICACIÓN
+    // ✅ CREAR NOTIFICACIÓN (dentro de la transacción)
     try {
       const Notificacion = require('../models/notificacion');
       await Notificacion.notificarNuevoCliente(clienteId, nombre);
       console.log('🔔 Notificación de nuevo cliente creada');
     } catch (notifError) {
       console.error('⚠️ Error creando notificación:', notifError);
+      // No fallar la transacción por error en notificación
     }
+
+    // Confirmar transacción
+    await conexion.commit();
 
     // ✅ OBTENER CLIENTE CREADO Y RESPONDER
     const clienteCreado = await Cliente.obtenerPorId(clienteId);
@@ -411,7 +413,12 @@ static async crear(req, res) {
     });
 
   } catch (error) {
-    console.error('Error al crear cliente:', error);
+    // Rollback en caso de error
+    if (conexion) {
+      await conexion.rollback();
+    }
+
+    console.error('❌ Error al crear cliente:', error);
 
     if (error.message.includes('Duplicate entry')) {
       return res.status(409).json({
@@ -425,6 +432,11 @@ static async crear(req, res) {
       message: 'Error interno del servidor',
       error: error.message
     });
+  } finally {
+    // Liberar conexión siempre
+    if (conexion) {
+      conexion.release();
+    }
   }
 }
   // CORRECCIÓN: Función auxiliar para procesar fechas
