@@ -754,27 +754,45 @@ return (
                                 </div>
                             </div>
 
-                            {/* Resumen de totales mejorado */}
+                            {/* ✅ RESUMEN DE TOTALES MEJORADO Y CORREGIDO */}
                             <div className="mt-6 pt-6 border-t grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Total Período con Desglose */}
                                 <div className="text-center p-4 bg-blue-50 rounded-lg hover:shadow-md transition-shadow">
-                                    <p className="text-sm text-gray-600 mb-2">Total Período</p>
-                                    <p className="text-2xl font-bold text-[#0e6493]">
-                                        ${ingresosMensuales.reduce((acc, item) => acc + item.monto, 0).toLocaleString('es-CO')}
+                                    <p className="text-sm text-gray-600 mb-2">
+                                        Total Período ({ingresosMensuales.length} {ingresosMensuales.length === 1 ? 'día' : 'días'})
                                     </p>
+                                    <p className="text-2xl font-bold text-[#0e6493]">
+                                        ${ingresosMensuales.reduce((acc, item) => acc + item.monto, 0).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                    </p>
+                                    {ingresosMensuales.length > 0 && ingresosMensuales.length <= 5 && (
+                                        <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                                            {ingresosMensuales.map(i => `$${i.monto.toLocaleString('es-CO', { minimumFractionDigits: 0 })}`).join(' + ')}
+                                        </p>
+                                    )}
                                 </div>
+
+                                {/* Promedio por Día con Explicación */}
                                 <div className="text-center p-4 bg-green-50 rounded-lg hover:shadow-md transition-shadow">
-                                    <p className="text-sm text-gray-600 mb-2">Promedio Diario</p>
+                                    <p className="text-sm text-gray-600 mb-2">Promedio por Día</p>
                                     <p className="text-2xl font-bold text-green-700">
                                         ${ingresosMensuales.length > 0 
-                                            ? (ingresosMensuales.reduce((acc, item) => acc + item.monto, 0) / ingresosMensuales.length).toLocaleString('es-CO', { maximumFractionDigits: 0 })
+                                            ? Math.round(ingresosMensuales.reduce((acc, item) => acc + item.monto, 0) / ingresosMensuales.length).toLocaleString('es-CO')
                                             : '0'
                                         }
                                     </p>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Calculado sobre {ingresosMensuales.length} {ingresosMensuales.length === 1 ? 'día' : 'días'} con facturación
+                                    </p>
                                 </div>
+
+                                {/* Día Máximo con Fecha */}
                                 <div className="text-center p-4 bg-purple-50 rounded-lg hover:shadow-md transition-shadow">
-                                    <p className="text-sm text-gray-600 mb-2">Día Máximo</p>
+                                    <p className="text-sm text-gray-600 mb-2">Día con Mayor Ingreso</p>
                                     <p className="text-2xl font-bold text-purple-700">
-                                        ${Math.max(...ingresosMensuales.map(i => i.monto)).toLocaleString('es-CO')}
+                                        ${Math.max(...ingresosMensuales.map(i => i.monto)).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        📅 {ingresosMensuales.find(i => i.monto === Math.max(...ingresosMensuales.map(m => m.monto)))?.fecha || 'N/A'}
                                     </p>
                                 </div>
                             </div>
