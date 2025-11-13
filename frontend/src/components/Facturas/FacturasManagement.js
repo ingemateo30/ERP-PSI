@@ -485,18 +485,15 @@ const FacturasManagement = () => {
       {/* Estadísticas */}
       <FacturasStats loading={loading} />
 
-      {/* Filtros con transición */}
-      <div className={`transition-all duration-300 ease-in-out ${
-        filtrosAvanzados 
-          ? 'opacity-100 max-h-96 mb-6' 
-          : 'opacity-0 max-h-0 overflow-hidden'
-      }`}>
-        <FacturasFilters
-  onBuscar={handleBuscar}
-  onLimpiar={handleLimpiarFiltros}
-  loading={loading}
-/>
-      </div>
+      {filtrosAvanzados && (
+  <div className="mb-6">
+    <FacturasFilters
+      onBuscar={handleBuscar}
+      onLimpiar={handleLimpiarFiltros}
+      loading={loading}
+    />
+  </div>
+)}
 
       {/* Lista de facturas mejorada */}
       <FacturasList
