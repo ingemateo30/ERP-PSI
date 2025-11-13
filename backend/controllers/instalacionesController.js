@@ -95,6 +95,8 @@ class InstalacionesController {
       LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
       LEFT JOIN servicios_cliente sc ON i.servicio_cliente_id = sc.id
       LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+      LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+      LEFT JOIN departamentos d ON ci.departamento_id = d.id
       ${whereClause}
     `;
 
@@ -107,12 +109,15 @@ class InstalacionesController {
             // Si es para exportar, devolver todos los datos
             if (req.query.export || (res && typeof res.json !== 'function')) {
                 const exportQuery = `
-        SELECT 
+        SELECT
           i.*,
           c.nombre as cliente_nombre,
-c.identificacion as cliente_identificacion,
-c.telefono as cliente_telefono,
-u.nombre as instalador_nombre
+          c.identificacion as cliente_identificacion,
+          c.telefono as cliente_telefono,
+          c.direccion as cliente_direccion,
+          u.nombre as instalador_nombre,
+          ci.nombre as ciudad_nombre,
+          d.nombre as departamento_nombre
         ${baseQuery}
         ORDER BY i.created_at DESC
       `;
@@ -139,10 +144,13 @@ const selectQuery = `
         c.nombre as cliente_nombre,
         c.identificacion as cliente_identificacion,
         c.telefono as cliente_telefono,
+        c.direccion as cliente_direccion,
         c.correo as cliente_email,
         u.nombre as instalador_nombre,
         ps.nombre as plan_nombre,
-        ps.precio as plan_precio
+        ps.precio as plan_precio,
+        ci.nombre as ciudad_nombre,
+        d.nombre as departamento_nombre
       ${baseQuery}
       ORDER BY i.created_at DESC
       LIMIT ${limitNum} OFFSET ${offset}

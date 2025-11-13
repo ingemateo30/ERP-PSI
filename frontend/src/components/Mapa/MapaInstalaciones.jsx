@@ -144,12 +144,12 @@ const MapaInstalaciones = () => {
   const construirDireccion = (i) => {
     const dir = i.direccion_instalacion || i.cliente_direccion || i.direccion || '';
     const barrio = i.barrio || '';
-    const ciudad = i.ciudad_nombre || 'Socorro';
-    const depto = i.departamento_nombre || 'Santander';
-    
+    const ciudad = i.ciudad_nombre || '';
+    const depto = i.departamento_nombre || '';
+
     const partes = [dir, barrio, ciudad, depto, 'Colombia'].filter(p => p);
     const direccionCompleta = partes.join(', ');
-    
+
     console.log(`📍 Dirección construida para instalación ${i.id}:`, direccionCompleta);
     return direccionCompleta;
   };
