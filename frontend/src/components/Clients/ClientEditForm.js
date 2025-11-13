@@ -210,29 +210,30 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-[#0e6493] to-[#0a5273]">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <User className="w-6 h-6" />
               Editar Cliente
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-white/90 mt-1">
               {client.identificacion} - {client.nombre}
             </p>
             <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+              <span className="text-xs bg-white/20 text-white px-3 py-1 rounded-full backdrop-blur-sm font-medium">
                 Solo campos editables
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-white/75">
                 La identificación no se puede cambiar
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
           >
             <X className="w-5 h-5" />
           </button>
@@ -255,7 +256,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
             
             {/* Información Personal */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-[#0e6493] mb-4 flex items-center gap-2 border-b-2 border-[#0e6493]/20 pb-3">
                 <User className="w-5 h-5" />
                 Información Personal
               </h3>
@@ -269,7 +270,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     type="text"
                     value={formData.nombre}
                     onChange={(e) => handleInputChange('nombre', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
                       errors.nombre ? 'border-red-300' : 'border-gray-300'
                     }`}
                     placeholder="Nombre completo del cliente"
@@ -287,7 +288,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     type="email"
                     value={formData.correo}
                     onChange={(e) => handleInputChange('correo', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
                       errors.correo ? 'border-red-300' : 'border-gray-300'
                     }`}
                     placeholder="correo@example.com"
@@ -305,7 +306,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     type="tel"
                     value={formData.telefono}
                     onChange={(e) => handleInputChange('telefono', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
                       errors.telefono ? 'border-red-300' : 'border-gray-300'
                     }`}
                     placeholder="3001234567"
@@ -323,7 +324,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     type="tel"
                     value={formData.telefono_fijo}
                     onChange={(e) => handleInputChange('telefono_fijo', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
                       errors.telefono_fijo ? 'border-red-300' : 'border-gray-300'
                     }`}
                     placeholder="6012345678"
@@ -337,7 +338,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
 
             {/* Información de Ubicación */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-[#0e6493] mb-4 flex items-center gap-2 border-b-2 border-[#0e6493]/20 pb-3">
                 <MapPin className="w-5 h-5" />
                 Ubicación
               </h3>
@@ -351,7 +352,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     type="text"
                     value={formData.direccion}
                     onChange={(e) => handleInputChange('direccion', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
                       errors.direccion ? 'border-red-300' : 'border-gray-300'
                     }`}
                     placeholder="Dirección completa del cliente"
@@ -369,7 +370,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     type="text"
                     value={formData.barrio}
                     onChange={(e) => handleInputChange('barrio', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
                     placeholder="Nombre del barrio"
                   />
                 </div>
@@ -381,7 +382,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                   <select
                     value={formData.estrato}
                     onChange={(e) => handleInputChange('estrato', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
                   >
                     <option value="1">Estrato 1</option>
                     <option value="2">Estrato 2</option>
@@ -399,7 +400,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                   <select
                     value={formData.ciudad_id}
                     onChange={(e) => handleInputChange('ciudad_id', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
                   >
                     <option value="">Seleccionar ciudad</option>
                     {ciudades.map(ciudad => (
@@ -417,7 +418,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                   <select
                     value={formData.sector_id}
                     onChange={(e) => handleInputChange('sector_id', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
                     disabled={!formData.ciudad_id}
                   >
                     <option value="">Seleccionar sector</option>
@@ -440,18 +441,18 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                 value={formData.observaciones}
                 onChange={(e) => handleInputChange('observaciones', e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
                 placeholder="Observaciones adicionales sobre el cliente..."
               />
             </div>
           </div>
 
           {/* Botones de acción */}
-          <div className="flex items-center justify-end gap-4 pt-6 border-t border-gray-200 mt-8">
+          <div className="flex items-center justify-end gap-4 pt-6 border-t-2 border-gray-200 mt-8 bg-gray-50 p-6 -mx-6 -mb-6 rounded-b-xl">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-5 py-2.5 text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-all shadow-sm hover:shadow"
             >
               Cancelar
             </button>
@@ -459,7 +460,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              className="px-6 py-2.5 bg-gradient-to-r from-[#0e6493] to-[#0a5273] text-white rounded-lg hover:from-[#0a5273] hover:to-[#0e6493] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium shadow-lg hover:shadow-xl"
             >
               {saving ? (
                 <>
