@@ -182,13 +182,21 @@ const cargarFacturasCliente = async () => {
     let facturasCargadas = response.facturas || [];
     
     if (facturasCargadas.length === 0) {
-      console.log('📝 No hay facturas reales, usando datos de prueba...');
-      facturasCargadas = generarFacturasPrueba(clienteSeleccionado.id);
-      setError('📝 No hay facturas reales para este cliente - Mostrando datos de ejemplo');
-    } else {
-      console.log(`✅ ${facturasCargadas.length} facturas reales encontradas`);
-      setError(''); // Limpiar error si hay datos reales
-    }
+  console.log('📝 No hay facturas para este cliente');
+  setFacturas([]);
+  setEstadisticas({
+    total_facturas: 0,
+    total_pagadas: 0,
+    total_pendientes: 0,
+    monto_total: 0,
+    monto_pagado: 0,
+    monto_pendiente: 0
+  });
+  setLoadingFacturas(false);
+  setError(''); // Sin error, simplemente no hay facturas
+  return;
+}
+    
     
     // Normalizar facturas (tanto reales como de prueba)
     const facturasNormalizadas = facturasCargadas.map(factura => ({
@@ -245,69 +253,25 @@ const cargarFacturasCliente = async () => {
     console.log(`✅ ${facturasNormalizadas.length} facturas procesadas y cargadas`);
     
   } catch (error) {
-    console.error('❌ Error cargando historial desde servicio:', error);
-    setError(`Error del servicio: ${error.message}. Usando datos de prueba.`);
-    
-    // Fallback a datos de prueba
-    const facturasPrueba = generarFacturasPrueba(clienteSeleccionado.id);
-    setFacturas(facturasPrueba);
-    calcularEstadisticasLocal(facturasPrueba);
-  } finally {
-    setLoadingFacturas(false);
-  }
+  console.error('❌ Error cargando historial desde servicio:', error);
+  setError(`Error del servicio: ${error.message}`);
+  
+  // ✅ NO usar datos de prueba
+  setFacturas([]);
+  setEstadisticas({
+    total_facturas: 0,
+    total_pagadas: 0,
+    total_pendientes: 0,
+    monto_total: 0,
+    monto_pagado: 0,
+    monto_pendiente: 0
+  });
+} finally {
+  setLoadingFacturas(false);
+}
 };
     // CORREGIDO: Función para generar facturas de prueba más realistas
-    const generarFacturasPrueba = (clienteId) => {
-        const estados = ['pagada', 'pendiente', 'vencida'];
-        const facturasPrueba = [];
-
-        for (let i = 1; i <= 6; i++) {
-            const fechaBase = new Date();
-            fechaBase.setMonth(fechaBase.getMonth() - i);
-
-            const estado = estados[Math.floor(Math.random() * estados.length)];
-            const total = 45000 + (Math.random() * 25000);
-
-            facturasPrueba.push({
-                id: 1000 + i,
-                numero_factura: `FAC-2024-${String(1000 + i).padStart(6, '0')}`,
-                cliente_id: clienteId,
-                fecha_factura: fechaBase.toISOString().split('T')[0],
-                fecha_emision: fechaBase.toISOString().split('T')[0],
-                fecha_vencimiento: new Date(fechaBase.getTime() + (30 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
-                periodo: `${fechaBase.getFullYear()}-${String(fechaBase.getMonth() + 1).padStart(2, '0')}`,
-                total: total.toFixed(2),
-                estado: estado,
-                subtotal: (total * 0.84).toFixed(2),
-                iva: (total * 0.16).toFixed(2),
-                observaciones: `Factura ${estado} - Período ${fechaBase.getFullYear()}-${String(fechaBase.getMonth() + 1).padStart(2, '0')}`,
-                items: [
-                    {
-                        concepto: 'Servicio Internet',
-                        cantidad: 1,
-                        valor_unitario: total * 0.7,
-                        total: total * 0.7
-                    },
-                    {
-                        concepto: 'Servicio TV',
-                        cantidad: 1,
-                        valor_unitario: total * 0.3,
-                        total: total * 0.3
-                    }
-                ],
-                pagos: estado === 'pagada' ? [
-                    {
-                        fecha_pago: new Date(fechaBase.getTime() + (10 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
-                        monto: total,
-                        metodo_pago: 'Transferencia'
-                    }
-                ] : []
-            });
-        }
-
-        return facturasPrueba.reverse();
-    };
-
+   
     // CORREGIDO: Cargar facturas cuando se selecciona un cliente o cambian los filtros
     useEffect(() => {
         if (clienteSeleccionado) {
