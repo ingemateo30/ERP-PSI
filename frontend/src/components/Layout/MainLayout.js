@@ -420,7 +420,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   ];
 
   const facturacionFinanzas = [
-    { icon: <Activity size={22} />, label: 'Facturación Automática', path: '/facturacion-automatica', permission: 'supervisor,administrador' },
+    { icon: <Activity size={22} />, label: 'Facturación Automática', path: '/facturacion-automatica', permission: 'administrador' },
     { icon: <TrendingUp size={22} />, label: 'Facturas', path: '/facturas', permission: 'supervisor,administrador' },
     { icon: <FileText size={22} />, label: 'Contratos', path: '/contratos', permission: 'supervisor,administrador' },
     { icon: <CreditCard size={22} />, label: 'Pagos', path: '/cruce-pagos', permission: 'supervisor,administrador' },
