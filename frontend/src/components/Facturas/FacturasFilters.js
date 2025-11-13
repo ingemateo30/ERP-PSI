@@ -1,12 +1,11 @@
-// frontend/src/components/Facturas/FacturasFilters.js - COMPONENTE COMPLETAMENTE CORREGIDO
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+// frontend/src/components/Facturas/FacturasFilters.js - REHECHO COMPLETAMENTE
+import React, { useState, useEffect } from 'react';
 import { ESTADOS_FACTURA, METODOS_PAGO } from '../../hooks/useFacturacionManual';
 import { 
   Search, 
   Filter, 
   X, 
   Calendar,
-  User,
   DollarSign,
   FileText,
   MapPin,
@@ -22,7 +21,7 @@ const FacturasFilters = ({
   loading = false 
 }) => {
   // ==========================================
-  // ESTADO DE FILTROS - CORREGIDO COMPLETAMENTE
+  // ESTADO DE FILTROS
   // ==========================================
   const [filtros, setFiltros] = useState({
     search: '',
@@ -42,91 +41,118 @@ const FacturasFilters = ({
     incluir_anuladas: false
   });
 
-  const [filtrosAvanzados, setFiltrosAvanzados] = useState(false);
-  const [erroresValidacion, setErroresValidacion] = useState({});
+  const [mostrarAvanzados, setMostrarAvanzados] = useState(false);
+  const [errores, setErrores] = useState({});
 
   // ==========================================
-  // EFECTOS - SINCRONIZACIÓN CON PROPS
+  // SINCRONIZAR FILTROS INICIALES
   // ==========================================
   useEffect(() => {
-    if (Object.keys(filtrosIniciales).length > 0) {
-      console.log('🔄 [FacturasFilters] Sincronizando filtros iniciales:', filtrosIniciales);
+    if (filtrosIniciales && Object.keys(filtrosIniciales).length > 0) {
       setFiltros(prev => ({
         ...prev,
         ...filtrosIniciales
       }));
     }
-  }, [JSON.stringify(filtrosIniciales)]);
+  }, [filtrosIniciales]);
 
   // ==========================================
-  // VALIDACIONES DE FORMULARIO
+  // MANEJADOR DE CAMBIOS - CORREGIDO
   // ==========================================
-  const validarFiltros = (filtrosAValidar) => {
-    const errores = {};
-
-    if (filtrosAValidar.fecha_desde && filtrosAValidar.fecha_hasta) {
-      const fechaDesde = new Date(filtrosAValidar.fecha_desde);
-      const fechaHasta = new Date(filtrosAValidar.fecha_hasta);
-      if (fechaDesde > fechaHasta) {
-        errores.fecha_hasta = 'La fecha hasta debe ser posterior a la fecha desde';
-      }
+  const handleCambio = (campo, valor) => {
+    setFiltros(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+    
+    // Limpiar error del campo cuando se modifica
+    if (errores[campo]) {
+      setErrores(prev => {
+        const nuevosErrores = { ...prev };
+        delete nuevosErrores[campo];
+        return nuevosErrores;
+      });
     }
-
-    if (filtrosAValidar.vencimiento_desde && filtrosAValidar.vencimiento_hasta) {
-      const vencDesde = new Date(filtrosAValidar.vencimiento_desde);
-      const vencHasta = new Date(filtrosAValidar.vencimiento_hasta);
-      if (vencDesde > vencHasta) {
-        errores.vencimiento_hasta = 'La fecha de vencimiento hasta debe ser posterior a la fecha desde';
-      }
-    }
-
-    if (filtrosAValidar.monto_min && filtrosAValidar.monto_max) {
-      const montoMin = parseFloat(filtrosAValidar.monto_min);
-      const montoMax = parseFloat(filtrosAValidar.monto_max);
-      if (montoMin > montoMax) {
-        errores.monto_max = 'El monto máximo debe ser mayor al monto mínimo';
-      }
-    }
-
-    if (filtrosAValidar.dias_vencimiento) {
-      const dias = parseInt(filtrosAValidar.dias_vencimiento);
-      if (isNaN(dias) || dias < 0) {
-        errores.dias_vencimiento = 'Los días de vencimiento deben ser un número positivo';
-      }
-    }
-
-    return errores;
   };
 
   // ==========================================
-  // APLICAR FILTROS - CORREGIDO
+  // VALIDACIONES
   // ==========================================
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const validarFiltros = () => {
+    const nuevosErrores = {};
+
+    // Validar rango de fechas de emisión
+    if (filtros.fecha_desde && filtros.fecha_hasta) {
+      const desde = new Date(filtros.fecha_desde);
+      const hasta = new Date(filtros.fecha_hasta);
+      if (desde > hasta) {
+        nuevosErrores.fecha_hasta = 'La fecha hasta debe ser posterior a la fecha desde';
+      }
+    }
+
+    // Validar rango de fechas de vencimiento
+    if (filtros.vencimiento_desde && filtros.vencimiento_hasta) {
+      const desde = new Date(filtros.vencimiento_desde);
+      const hasta = new Date(filtros.vencimiento_hasta);
+      if (desde > hasta) {
+        nuevosErrores.vencimiento_hasta = 'La fecha de vencimiento hasta debe ser posterior';
+      }
+    }
+
+    // Validar rango de montos
+    if (filtros.monto_min && filtros.monto_max) {
+      const min = parseFloat(filtros.monto_min);
+      const max = parseFloat(filtros.monto_max);
+      if (!isNaN(min) && !isNaN(max) && min > max) {
+        nuevosErrores.monto_max = 'El monto máximo debe ser mayor al mínimo';
+      }
+    }
+
+    // Validar días de vencimiento
+    if (filtros.dias_vencimiento) {
+      const dias = parseInt(filtros.dias_vencimiento);
+      if (isNaN(dias) || dias < 0) {
+        nuevosErrores.dias_vencimiento = 'Debe ser un número positivo';
+      }
+    }
+
+    return nuevosErrores;
+  };
+
+  // ==========================================
+  // APLICAR BÚSQUEDA
+  // ==========================================
+  const handleBuscar = (e) => {
+    if (e) e.preventDefault();
     
-    console.log('🔍 [FacturasFilters] Aplicando filtros:', filtros);
+    console.log('🔍 Aplicando filtros:', filtros);
     
-    const errores = validarFiltros(filtros);
-    
-    if (Object.keys(errores).length > 0) {
-      setErroresValidacion(errores);
-      console.warn('⚠️ [FacturasFilters] Errores de validación:', errores);
+    // Validar
+    const nuevosErrores = validarFiltros();
+    if (Object.keys(nuevosErrores).length > 0) {
+      setErrores(nuevosErrores);
+      console.warn('⚠️ Errores de validación:', nuevosErrores);
       return;
     }
-    
-    const filtrosLimpios = Object.fromEntries(
-      Object.entries(filtros).filter(([key, value]) => {
-        if (typeof value === 'boolean') return true;
-        return value !== '' && value !== null && value !== undefined;
-      })
-    );
-    
+
+    // Limpiar filtros vacíos
+    const filtrosLimpios = {};
+    Object.keys(filtros).forEach(key => {
+      const valor = filtros[key];
+      if (typeof valor === 'boolean') {
+        filtrosLimpios[key] = valor;
+      } else if (valor !== '' && valor !== null && valor !== undefined) {
+        filtrosLimpios[key] = valor;
+      }
+    });
+
+    // Verificar que haya al menos un filtro
     if (Object.keys(filtrosLimpios).length === 0) {
-      setErroresValidacion({ general: 'Debe especificar al menos un criterio de búsqueda' });
+      setErrores({ general: 'Debe especificar al menos un criterio de búsqueda' });
       return;
     }
-    
-    setErroresValidacion({});
+
+    setErrores({});
     
     if (onBuscar) {
       onBuscar(filtrosLimpios);
@@ -134,10 +160,10 @@ const FacturasFilters = ({
   };
 
   // ==========================================
-  // LIMPIAR FILTROS - CORREGIDO
+  // LIMPIAR FILTROS
   // ==========================================
-  const handleLimpiar = () => {
-    console.log('🗑️ [FacturasFilters] Limpiando todos los filtros');
+  const handleLimpiarTodo = () => {
+    console.log('🗑️ Limpiando filtros');
     
     const filtrosVacios = {
       search: '',
@@ -158,8 +184,8 @@ const FacturasFilters = ({
     };
     
     setFiltros(filtrosVacios);
-    setErroresValidacion({});
-    setFiltrosAvanzados(false);
+    setErrores({});
+    setMostrarAvanzados(false);
     
     if (onLimpiar) {
       onLimpiar();
@@ -167,88 +193,42 @@ const FacturasFilters = ({
   };
 
   // ==========================================
-  // BÚSQUEDA RÁPIDA
+  // DETECTAR FILTROS ACTIVOS
   // ==========================================
-  const handleBusquedaRapida = (termino) => {
-    if (!termino || termino.trim().length < 2) return;
-    
-    console.log('⚡ [FacturasFilters] Búsqueda rápida:', termino);
-    
-    if (onBuscar) {
-      onBuscar({ search: termino.trim() });
-    }
+  const tienesFiltrosActivos = () => {
+    return Object.entries(filtros).some(([key, value]) => {
+      if (typeof value === 'boolean') return value === true;
+      return value !== '' && value !== null && value !== undefined;
+    });
   };
 
   // ==========================================
-  // DETECTAR SI HAY FILTROS ACTIVOS
+  // RENDER
   // ==========================================
-  const hayFiltrosActivos = Object.entries(filtros).some(([key, value]) => {
-    if (typeof value === 'boolean') return value;
-    return value !== '' && value !== null && value !== undefined;
-  });
-
-  // ==========================================
-  // OPCIONES DE SELECT
-  // ==========================================
-  const opcionesEstado = [
-    { value: '', label: 'Todos los estados' },
-    { value: ESTADOS_FACTURA.PENDIENTE, label: 'Pendientes' },
-    { value: ESTADOS_FACTURA.PAGADA, label: 'Pagadas' },
-    { value: ESTADOS_FACTURA.VENCIDA, label: 'Vencidas' },
-    { value: ESTADOS_FACTURA.ANULADA, label: 'Anuladas' }
-  ];
-
-  const opcionesMetodoPago = [
-    { value: '', label: 'Todos los métodos' },
-    { value: METODOS_PAGO.EFECTIVO, label: 'Efectivo' },
-    { value: METODOS_PAGO.TRANSFERENCIA, label: 'Transferencia' },
-    { value: METODOS_PAGO.TARJETA_CREDITO, label: 'Tarjeta de Crédito' },
-    { value: METODOS_PAGO.TARJETA_DEBITO, label: 'Tarjeta de Débito' },
-    { value: METODOS_PAGO.CHEQUE, label: 'Cheque' },
-    { value: METODOS_PAGO.PSE, label: 'PSE' }
-  ];
-
-  // ==========================================
-  // COMPONENTE DE CAMPO CON ERROR
-  // ==========================================
-  const CampoConError = ({ campo, children, className = '' }) => (
-    <div className={`${className}`}>
-      {children}
-      {erroresValidacion[campo] && (
-        <p className="mt-1 text-xs text-red-600">
-          {erroresValidacion[campo]}
-        </p>
-      )}
-    </div>
-  );
-
-  // ==========================================
-  // RENDER DEL COMPONENTE
-  // ==========================================
- return (
-    <div className="bg-white rounded-lg shadow-md border border-gray-200">
-      {/* Header del filtro */}
+  return (
+    <div className="bg-white rounded-lg shadow-md border border-gray-200 mb-6">
+      {/* HEADER */}
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
             <Filter className="w-5 h-5 text-blue-600" />
             <h3 className="text-lg font-semibold text-gray-900">
               Filtros de Búsqueda
             </h3>
-            {hayFiltrosActivos && (
-              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                Filtros activos
+            {tienesFiltrosActivos() && (
+              <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                Activos
               </span>
             )}
           </div>
           
           <button
             type="button"
-            onClick={() => setFiltrosAvanzados(!filtrosAvanzados)}
-            className="flex items-center space-x-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            onClick={() => setMostrarAvanzados(!mostrarAvanzados)}
+            className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
           >
-            <span>{filtrosAvanzados ? 'Ocultar' : 'Mostrar'} filtros avanzados</span>
-            {filtrosAvanzados ? (
+            <span>{mostrarAvanzados ? 'Ocultar' : 'Mostrar'} filtros avanzados</span>
+            {mostrarAvanzados ? (
               <ChevronUp className="w-4 h-4" />
             ) : (
               <ChevronDown className="w-4 h-4" />
@@ -257,343 +237,332 @@ const FacturasFilters = ({
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6">
-        {/* Error general */}
-        {erroresValidacion.general && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600">{erroresValidacion.general}</p>
+      {/* FORMULARIO */}
+      <form onSubmit={handleBuscar} className="p-6">
+        {/* ERROR GENERAL */}
+        {errores.general && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start">
+            <X className="w-5 h-5 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+            <p className="text-sm text-red-700">{errores.general}</p>
           </div>
         )}
 
-        {/* Búsqueda básica */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+        {/* FILTROS BÁSICOS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Búsqueda general */}
-          <CampoConError campo="search" className="lg:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="lg:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Búsqueda General
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 value={filtros.search}
-                onChange={(e) => setFiltros(prev => ({ ...prev, search: e.target.value }))}
+                onChange={(e) => handleCambio('search', e.target.value)}
                 placeholder="Número de factura, cliente, identificación..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                disabled={loading}
               />
             </div>
-          </CampoConError>
+          </div>
 
           {/* Estado */}
-          <CampoConError campo="estado">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Estado
             </label>
             <select
               value={filtros.estado}
-              onChange={(e) => setFiltros(prev => ({ ...prev, estado: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              onChange={(e) => handleCambio('estado', e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              disabled={loading}
             >
-              {opcionesEstado.map(opcion => (
-                <option key={opcion.value} value={opcion.value}>
-                  {opcion.label}
-                </option>
-              ))}
+              <option value="">Todos los estados</option>
+              <option value={ESTADOS_FACTURA.PENDIENTE}>Pendientes</option>
+              <option value={ESTADOS_FACTURA.PAGADA}>Pagadas</option>
+              <option value={ESTADOS_FACTURA.VENCIDA}>Vencidas</option>
+              <option value={ESTADOS_FACTURA.ANULADA}>Anuladas</option>
             </select>
-          </CampoConError>
+          </div>
 
           {/* Número de factura */}
-          <CampoConError campo="numero_factura">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Número de Factura
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              N° Factura
             </label>
             <div className="relative">
-              <FileText className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+              <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 value={filtros.numero_factura}
-                onChange={(e) => setFiltros(prev => ({ ...prev, numero_factura: e.target.value }))}
-                placeholder="F000001, F000002..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onChange={(e) => handleCambio('numero_factura', e.target.value)}
+                placeholder="F000001"
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                disabled={loading}
               />
             </div>
-          </CampoConError>
+          </div>
         </div>
 
-        {/* Filtros avanzados */}
-        <div className={`transition-all duration-300 ease-in-out ${
-          filtrosAvanzados 
-            ? 'opacity-100 max-h-none' 
-            : 'opacity-0 max-h-0 overflow-hidden'
-        }`}>
-          {filtrosAvanzados && (
-            <div className="space-y-6 pt-6 border-t border-gray-200">
-              {/* Fechas de emisión */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Fechas de Emisión
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <CampoConError campo="fecha_desde">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Desde
-                    </label>
-                    <input
-                      type="date"
-                      value={filtros.fecha_desde}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, fecha_desde: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </CampoConError>
-                  
-                  <CampoConError campo="fecha_hasta">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Hasta
-                    </label>
-                    <input
-                      type="date"
-                      value={filtros.fecha_hasta}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, fecha_hasta: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </CampoConError>
-                </div>
-              </div>
-
-              {/* Fechas de vencimiento */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Fechas de Vencimiento
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <CampoConError campo="vencimiento_desde">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Vencimiento Desde
-                    </label>
-                    <input
-                      type="date"
-                      value={filtros.vencimiento_desde}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, vencimiento_desde: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </CampoConError>
-                  
-                  <CampoConError campo="vencimiento_hasta">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Vencimiento Hasta
-                    </label>
-                    <input
-                      type="date"
-                      value={filtros.vencimiento_hasta}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, vencimiento_hasta: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </CampoConError>
-
-                  <CampoConError campo="dias_vencimiento">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Días Vencidos (mínimo)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={filtros.dias_vencimiento}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, dias_vencimiento: e.target.value }))}
-                      placeholder="30, 60, 90..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </CampoConError>
-                </div>
-              </div>
-
-              {/* Montos */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                  <DollarSign className="w-4 h-4 mr-2" />
-                  Rangos de Monto
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <CampoConError campo="monto_min">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Monto Mínimo
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={filtros.monto_min}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, monto_min: e.target.value }))}
-                      placeholder="50000"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </CampoConError>
-                  
-                  <CampoConError campo="monto_max">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Monto Máximo
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={filtros.monto_max}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, monto_max: e.target.value }))}
-                      placeholder="500000"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </CampoConError>
-                </div>
-              </div>
-
-              {/* Ubicación y pago */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                  <MapPin className="w-4 h-4 mr-2" />
-                  Ubicación y Métodos de Pago
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <CampoConError campo="ruta">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Ruta
-                    </label>
-                    <input
-                      type="text"
-                      value={filtros.ruta}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, ruta: e.target.value }))}
-                      placeholder="R001, R002..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </CampoConError>
-
-                  <CampoConError campo="metodo_pago">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Método de Pago
-                    </label>
-                    <select
-                      value={filtros.metodo_pago}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, metodo_pago: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      {opcionesMetodoPago.map(opcion => (
-                        <option key={opcion.value} value={opcion.value}>
-                          {opcion.label}
-                        </option>
-                      ))}
-                    </select>
-                  </CampoConError>
-
-                  <CampoConError campo="cliente_id">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      ID Cliente
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={filtros.cliente_id}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, cliente_id: e.target.value }))}
-                      placeholder="12345"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </CampoConError>
-                </div>
-              </div>
-
-              {/* Opciones adicionales */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  Opciones Adicionales
-                </h4>
-                <div className="flex items-center space-x-6">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={filtros.incluir_anuladas}
-                      onChange={(e) => setFiltros(prev => ({ ...prev, incluir_anuladas: e.target.checked }))}
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">
-                      Incluir facturas anuladas
-                    </span>
+        {/* FILTROS AVANZADOS */}
+        {mostrarAvanzados && (
+          <div className="mt-6 pt-6 border-t border-gray-200 space-y-6">
+            {/* Fechas de emisión */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                <Calendar className="w-4 h-4 mr-2 text-blue-600" />
+                Fechas de Emisión
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Desde
                   </label>
+                  <input
+                    type="date"
+                    value={filtros.fecha_desde}
+                    onChange={(e) => handleCambio('fecha_desde', e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Hasta
+                  </label>
+                  <input
+                    type="date"
+                    value={filtros.fecha_hasta}
+                    onChange={(e) => handleCambio('fecha_hasta', e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                  {errores.fecha_hasta && (
+                    <p className="mt-1 text-xs text-red-600">{errores.fecha_hasta}</p>
+                  )}
                 </div>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Botones de acción */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+            {/* Fechas de vencimiento */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                <Calendar className="w-4 h-4 mr-2 text-red-600" />
+                Fechas de Vencimiento
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Vence Desde
+                  </label>
+                  <input
+                    type="date"
+                    value={filtros.vencimiento_desde}
+                    onChange={(e) => handleCambio('vencimiento_desde', e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Vence Hasta
+                  </label>
+                  <input
+                    type="date"
+                    value={filtros.vencimiento_hasta}
+                    onChange={(e) => handleCambio('vencimiento_hasta', e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                  {errores.vencimiento_hasta && (
+                    <p className="mt-1 text-xs text-red-600">{errores.vencimiento_hasta}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Días Vencidos (mín)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={filtros.dias_vencimiento}
+                    onChange={(e) => handleCambio('dias_vencimiento', e.target.value)}
+                    placeholder="30"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                  {errores.dias_vencimiento && (
+                    <p className="mt-1 text-xs text-red-600">{errores.dias_vencimiento}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Montos */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                <DollarSign className="w-4 h-4 mr-2 text-green-600" />
+                Rangos de Monto
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Monto Mínimo
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={filtros.monto_min}
+                    onChange={(e) => handleCambio('monto_min', e.target.value)}
+                    placeholder="50000"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Monto Máximo
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={filtros.monto_max}
+                    onChange={(e) => handleCambio('monto_max', e.target.value)}
+                    placeholder="500000"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                  {errores.monto_max && (
+                    <p className="mt-1 text-xs text-red-600">{errores.monto_max}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Ubicación y métodos de pago */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                <MapPin className="w-4 h-4 mr-2 text-purple-600" />
+                Ubicación y Métodos de Pago
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Ruta
+                  </label>
+                  <input
+                    type="text"
+                    value={filtros.ruta}
+                    onChange={(e) => handleCambio('ruta', e.target.value)}
+                    placeholder="R001"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Método de Pago
+                  </label>
+                  <select
+                    value={filtros.metodo_pago}
+                    onChange={(e) => handleCambio('metodo_pago', e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  >
+                    <option value="">Todos</option>
+                    <option value={METODOS_PAGO.EFECTIVO}>Efectivo</option>
+                    <option value={METODOS_PAGO.TRANSFERENCIA}>Transferencia</option>
+                    <option value={METODOS_PAGO.TARJETA_CREDITO}>Tarjeta Crédito</option>
+                    <option value={METODOS_PAGO.TARJETA_DEBITO}>Tarjeta Débito</option>
+                    <option value={METODOS_PAGO.CHEQUE}>Cheque</option>
+                    <option value={METODOS_PAGO.PSE}>PSE</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    ID Cliente
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={filtros.cliente_id}
+                    onChange={(e) => handleCambio('cliente_id', e.target.value)}
+                    placeholder="12345"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Opciones adicionales */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                Opciones Adicionales
+              </h4>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filtros.incluir_anuladas}
+                  onChange={(e) => handleCambio('incluir_anuladas', e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  disabled={loading}
+                />
+                <span className="text-sm text-gray-700">
+                  Incluir facturas anuladas
+                </span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* BOTONES */}
+        <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-6 border-t border-gray-200">
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 sm:flex-none px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            className="flex-1 sm:flex-none px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center"
           >
             {loading ? (
-              <div className="flex items-center justify-center">
+              <>
                 <RefreshCw className="w-4 h-4 animate-spin mr-2" />
                 Buscando...
-              </div>
+              </>
             ) : (
-              <div className="flex items-center justify-center">
+              <>
                 <Search className="w-4 h-4 mr-2" />
                 Buscar Facturas
-              </div>
+              </>
             )}
           </button>
 
           <button
             type="button"
-            onClick={handleLimpiar}
+            onClick={handleLimpiarTodo}
             disabled={loading}
-            className="flex-1 sm:flex-none px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            className="flex-1 sm:flex-none px-6 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center"
           >
-            <div className="flex items-center justify-center">
-              <X className="w-4 h-4 mr-2" />
-              Limpiar Filtros
-            </div>
+            <X className="w-4 h-4 mr-2" />
+            Limpiar Filtros
           </button>
-
-          {/* Búsqueda rápida */}
-          <div className="flex-1 sm:flex-none">
-            <input
-              type="text"
-              placeholder="Búsqueda rápida..."
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleBusquedaRapida(e.target.value);
-                  e.target.value = '';
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
-              disabled={loading}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Presiona Enter para búsqueda rápida
-            </p>
-          </div>
         </div>
 
-        {/* Información de ayuda */}
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        {/* INFORMACIÓN DE AYUDA */}
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <Search className="w-5 h-5 text-blue-600 mt-0.5" />
-            </div>
-            <div className="ml-3">
-              <h4 className="text-sm font-medium text-blue-900">
+            <Search className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+            <div>
+              <h4 className="text-sm font-medium text-blue-900 mb-1">
                 Consejos de Búsqueda
               </h4>
-              <div className="mt-1 text-sm text-blue-800">
-                <ul className="list-disc list-inside space-y-1">
-                  <li>La búsqueda general incluye número de factura, nombre del cliente e identificación</li>
-                  <li>Usa los filtros avanzados para búsquedas más específicas</li>
-                  <li>Las facturas en mora se calculan automáticamente excluyendo las pagadas</li>
-                  <li>Combina múltiples filtros para resultados más precisos</li>
-                </ul>
-              </div>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• La búsqueda general busca en número de factura, cliente e identificación</li>
+                <li>• Usa los filtros avanzados para búsquedas más específicas</li>
+                <li>• Combina múltiples filtros para resultados más precisos</li>
+              </ul>
             </div>
           </div>
         </div>
