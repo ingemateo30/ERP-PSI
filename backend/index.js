@@ -269,6 +269,12 @@ try {
   app.use('/api/v1/incidencias', incidenciasRoutes);
   console.log('✅ Rutas de incidencias cargadas: /api/v1/incidencias');
 
+  // Rutas de notificaciones
+  console.log('🔔 Cargando rutas de notificaciones...');
+  const notificacionesRoutes = require('./routes/notificaciones');
+  app.use('/api/v1/notificaciones', notificacionesRoutes);
+  console.log('✅ Rutas de notificaciones cargadas: /api/v1/notificaciones');
+
   //rutas de instalaciones
   console.log('🔧 Cargando rutas de instalaciones...');
   const instalacionesRoutes = require('./routes/instalaciones');
