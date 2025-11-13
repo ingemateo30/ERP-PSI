@@ -478,6 +478,17 @@ static async crear(req, res) {
         // Obtener la instalación creada con datos completos
         const instalacionCreada = await this.obtenerInstalacionCompleta(connection, instalacionId);
 
+        // Crear notificación de nueva instalación
+        try {
+            const Notificacion = require('../models/notificacion');
+            const clienteNombre = clientes[0].nombre;
+            await Notificacion.notificarNuevaInstalacion(instalacionId, clienteNombre, instalador_id);
+            console.log('🔔 Notificación de nueva instalación creada');
+        } catch (notifError) {
+            console.error('⚠️ Error creando notificación:', notifError);
+            // No fallar la creación de la instalación si falla la notificación
+        }
+
         res.status(201).json({
             success: true,
             message: 'Instalación creada exitosamente',
