@@ -1468,8 +1468,8 @@ router.delete('/:id',
 /**
  * ARREGLADO: Asignar instalador
  */
-router.patch('/:id/asignar-instalador',
-    requireRole('administrador', 'supervisor'),
+router.patch('/:id/cambiar-estado',
+    requireRole('administrador', 'supervisor', 'instalador'),
     async (req, res) => {
         try {
             const { id } = req.params;

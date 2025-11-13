@@ -428,7 +428,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   ];
 
   const serviciosOperaciones = [
-    { icon: <Wifi size={22} />, label: 'Planes de Servicio', path: '/config/service-plans', permission: 'supervisor,administrador' },
+    { icon: <Wifi size={22} />, label: 'Planes de Servicio', path: '/config/service-plans', permission: 'administrador' },
     { icon: <Wrench size={22} />, label: 'Instalaciones', path: '/instalaciones', permission: 'instalador,supervisor,administrador' },
     { icon: <Package size={22} />, label: 'Inventario', path: '/inventory', permission: 'instalador,supervisor,administrador' },
     { icon: <Calendar size={22} />, label: 'Calendario', path: '/calendar', permission: 'instalador,supervisor,administrador' }
