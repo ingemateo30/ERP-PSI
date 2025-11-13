@@ -236,17 +236,20 @@ const handleSubmit = async (e) => {
     setProcesando(false);
   }
 };
-  const validarFormulario = () => {
-    const errores = {};
+const validarFormulario = () => {
+  const errores = {};
 
-    if (!formData.cliente_id) {
-      errores.cliente_id = 'Debe seleccionar un cliente';
-    }
+  if (!formData.cliente_id) {
+    errores.cliente_id = 'Debe seleccionar un cliente';
+  }
 
-    if (!formData.fecha_programada) {
-      errores.fecha_programada = 'La fecha es obligatoria';
-    }
+  if (!formData.fecha_programada) {
+    errores.fecha_programada = 'La fecha es obligatoria';
+  }
 
+  // ✅ CORREGIDO: Solo validar si estamos creando (modo crear)
+  // En modo editar, permitir que estos campos estén vacíos temporalmente
+  if (modo === 'crear') {
     if (!formData.direccion_instalacion?.trim()) {
       errores.direccion_instalacion = 'La dirección es obligatoria';
     }
@@ -254,9 +257,10 @@ const handleSubmit = async (e) => {
     if (!formData.telefono_contacto?.trim()) {
       errores.telefono_contacto = 'El teléfono de contacto es obligatorio';
     }
+  }
 
-    return errores;
-  };
+  return errores;
+};
   // ==========================================
   // FUNCIONES DE UTILIDAD
   // ==========================================
