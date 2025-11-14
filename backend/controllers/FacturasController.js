@@ -148,7 +148,6 @@ static async obtenerTodas(req, res) {
     END as estado_descripcion
   FROM facturas f
   LEFT JOIN clientes c ON f.cliente_id = c.id
-      FROM facturas f
       WHERE f.activo = 1
     `;
 
