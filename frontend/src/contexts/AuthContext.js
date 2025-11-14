@@ -308,11 +308,15 @@ const register = async (userData) => {
 };
 
  // Función para cerrar sesión
+// Función para cerrar sesión
 const logout = async () => {
   try {
     console.log('🚪 Cerrando sesión...');
     
-    // Limpiar tokens
+    // Limpiar tokens del servicio
+    authService.removeToken();
+    
+    // Limpiar localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     
@@ -320,9 +324,8 @@ const logout = async () => {
     localStorage.removeItem('searchHistory');
     localStorage.removeItem('recentSearches');
     
-    // Resetear estado
-    setCurrentUser(null);
-    setIsAuthenticated(false);
+    // Resetear estado usando dispatch (NO useState)
+    dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
     
     console.log('✅ Sesión cerrada exitosamente');
     
@@ -330,6 +333,9 @@ const logout = async () => {
     window.location.href = '/login';
   } catch (error) {
     console.error('❌ Error al cerrar sesión:', error);
+    // Incluso si hay error, limpiar estado
+    dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
+    window.location.href = '/login';
   }
 };
 
