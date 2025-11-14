@@ -760,7 +760,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     }
   };
 
-  const planSeleccionado = planesDisponibles.find(p => p.id == formData.plan_id);
+ const planSeleccionado = planesDisponibles.find(p => p.id == formData.plan_id);
 
   if (loading) {
     return (
@@ -842,27 +842,27 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   </select>
                 </div>
                 <div className="md:col-span-2">
-  <label className="block text-sm font-medium text-gray-700 mb-2">
-    Número de Identificación <span className="text-red-500">*</span>
-  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Número de Identificación <span className="text-red-500">*</span>
+                  </label>
 
-  <input
-    type="text"
-    value={formData.identificacion}
-    onChange={(e) => handleInputChange('identificacion', e.target.value)}
-    disabled={modoAgregarServicio}
-    className={`w-full max-w-[400px] px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100 transition-all ${
-      errors.identificacion ? 'border-red-500' : 'border-gray-300'
-    }`}
-    placeholder="1234567890"
-  />
+                  <input
+                    type="text"
+                    value={formData.identificacion}
+                    onChange={(e) => handleInputChange('identificacion', e.target.value)}
+                    disabled={modoAgregarServicio}
+                    className={`w-full max-w-[400px] px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100 transition-all ${
+                      errors.identificacion ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="1234567890"
+                  />
 
-  {errors.identificacion && (
-    <p className="mt-1 text-sm text-red-600 break-words max-w-[400px]">
-      {errors.identificacion}
-    </p>
-  )}
-</div>
+                  {errors.identificacion && (
+                    <p className="mt-1 text-sm text-red-600 break-words max-w-[400px]">
+                      {errors.identificacion}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Alerta de cliente existente - Ahora abarca todo el ancho */}
@@ -878,24 +878,23 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
               )}
 
               {modoAgregarServicio && clienteSeleccionado && (
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <User className="h-5 w-5 text-blue-600" />
-                      <h4 className="font-medium text-blue-900">Cliente seleccionado</h4>
-                    </div>
-                    <p className="text-sm text-blue-800">
-                      Se agregará el nuevo servicio a: <span className="font-medium">{clienteSeleccionado.nombre}</span>
-                    </p>
-                    <button
-                      type="button"
-                      onClick={manejarCrearNuevo}
-                      className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
-                    >
-                      Cambiar a crear cliente nuevo
-                    </button>
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <User className="h-5 w-5 text-blue-600" />
+                    <h4 className="font-medium text-blue-900">Cliente seleccionado</h4>
                   </div>
-                )}
-              </div>
+                  <p className="text-sm text-blue-800">
+                    Se agregará el nuevo servicio a: <span className="font-medium">{clienteSeleccionado.nombre}</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={manejarCrearNuevo}
+                    className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Cambiar a crear cliente nuevo
+                  </button>
+                </div>
+              )}
 
               {/* Nombre completo */}
               <div>
@@ -1072,7 +1071,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   </div>
                 </div>
               </div>
-            </div>
+            </div>  {/* ✅ CIERRE DE COLUMNA 1 (space-y-6) */}
 
             {/* COLUMNA 2: DATOS DEL SERVICIO */}
             <div className="space-y-6">
@@ -1303,8 +1302,8 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   placeholder="Observaciones adicionales sobre el cliente..."
                 />
               </div>
-            </div>
-          </div>
+            </div>  {/* ✅ CIERRE DE COLUMNA 2 (space-y-6) */}
+          </div>  {/* ✅ CIERRE DEL GRID DE 2 COLUMNAS */}
 
           {/* Botones de acción */}
           <div className="flex items-center justify-end gap-4 pt-6 border-t-2 border-gray-200 mt-8 bg-gray-50 p-6 -mx-6 -mb-6 rounded-b-xl">
@@ -1336,9 +1335,9 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
               )}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </form>  
+      </div>  
+    </div>  
   );
 };
 
