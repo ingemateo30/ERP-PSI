@@ -156,6 +156,8 @@ const selectQuery = `
         c.telefono as cliente_telefono,
         c.direccion as cliente_direccion,
         c.correo as cliente_email,
+        c.ip_asignada,
+        c.tap,
         u.nombre as instalador_nombre,
         ps.nombre as plan_nombre,
         ps.precio as plan_precio,
@@ -255,6 +257,7 @@ const instalaciones = await Database.query(selectQuery, params);
             const consulta = `
         SELECT 
           i.*,
+          i.equipos_instalados as equipos_json,
           
           -- Datos del cliente
           c.identificacion as cliente_identificacion,
@@ -262,7 +265,8 @@ const instalaciones = await Database.query(selectQuery, params);
           c.telefono as cliente_telefono,
           c.direccion as cliente_direccion,
           c.correo as cliente_email,
-          
+          c.ip_asignada,
+          c.tap,
           -- Datos del instalador
           u.nombre as instalador_nombres,
           u.telefono as instalador_telefono,

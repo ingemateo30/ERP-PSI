@@ -476,22 +476,18 @@ const validarFormulario = () => {
           </div>
 
           {/* Información de Contacto */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-              <Phone className="w-4 h-4 mr-2" />
-              Contacto en Instalación
-            </h4>
-            <div className="space-y-2">
-              <div>
-                <span className="text-sm text-gray-600">Persona que recibe:</span>
-                <p className="font-medium">{instalacion?.persona_recibe || 'No especificado'}</p>
-              </div>
-              <div>
-                <span className="text-sm text-gray-600">Teléfono:</span>
-                <p className="font-medium">{instalacion?.telefono_contacto || 'No especificado'}</p>
-              </div>
-            </div>
-          </div>
+<div className="bg-gray-50 p-4 rounded-lg">
+  <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+    <Phone className="w-4 h-4 mr-2" />
+    Contacto en Instalación
+  </h4>
+  <div className="space-y-2">
+    <div>
+      <span className="text-sm text-gray-600">Teléfono:</span>
+      <p className="font-medium">{instalacion?.telefono_contacto || 'No especificado'}</p>
+    </div>
+  </div>
+</div>
         </div>
       ) : (
         // Formulario de edición/creación
@@ -592,26 +588,22 @@ const validarFormulario = () => {
       {modo === 'ver' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Detalles Técnicos */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-              <Settings className="w-4 h-4 mr-2" />
-              Detalles Técnicos
-            </h4>
-            <div className="space-y-2">
-              <div>
-                <span className="text-sm text-gray-600">Servicio:</span>
-                <p className="font-medium">{instalacion?.servicio_nombre || 'No especificado'}</p>
-              </div>
-              <div>
-                <span className="text-sm text-gray-600">Plan:</span>
-                <p className="font-medium">{instalacion?.plan_nombre || 'No especificado'}</p>
-              </div>
-              <div>
-                <span className="text-sm text-gray-600">Velocidad:</span>
-                <p className="font-medium">{instalacion?.velocidad || 'No especificado'}</p>
-              </div>
-            </div>
-          </div>
+<div className="bg-gray-50 p-4 rounded-lg">
+  <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+    <Settings className="w-4 h-4 mr-2" />
+    Detalles Técnicos
+  </h4>
+  <div className="space-y-2">
+    <div>
+      <span className="text-sm text-gray-600">IP Asignada:</span>
+      <p className="font-medium">{instalacion?.ip_asignada || 'No asignada'}</p>
+    </div>
+    <div>
+      <span className="text-sm text-gray-600">TAP (Contraseña):</span>
+      <p className="font-medium">{instalacion?.tap || 'No especificado'}</p>
+    </div>
+  </div>
+</div>
 
           {/* Costo */}
           <div className="bg-gray-50 p-4 rounded-lg">
