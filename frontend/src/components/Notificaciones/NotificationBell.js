@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Bell, X, Check, Trash2, Users, Wrench, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import notificacionesService from '../../services/notificacionesService';
 
 const NotificationBell = () => {
   const [notificaciones, setNotificaciones] = useState([]);
@@ -38,19 +39,12 @@ const NotificationBell = () => {
       const token = getToken();
       if (!token) return;
 
-      const response = await fetch('/api/v1/notificaciones?leida=false&limite=10', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setNotificaciones(data.data || []);
-      }
+      const response = await notificacionesService.getUnread(10);
+      setNotificaciones(response.data || []);
     } catch (error) {
       console.error('Error al obtener notificaciones:', error);
+      // No mostrar error al usuario, solo loggear
+      setNotificaciones([]);
     }
   };
 
@@ -60,19 +54,12 @@ const NotificationBell = () => {
       const token = getToken();
       if (!token) return;
 
-      const response = await fetch('/api/v1/notificaciones/count', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setNotificacionesNoLeidas(data.data.total || 0);
-      }
+      const response = await notificacionesService.getUnreadCount();
+      setNotificacionesNoLeidas(response.data?.total || 0);
     } catch (error) {
       console.error('Error al contar notificaciones:', error);
+      // En caso de error, establecer en 0 para no molestar al usuario
+      setNotificacionesNoLeidas(0);
     }
   };
 
@@ -93,19 +80,9 @@ const NotificationBell = () => {
   // Marcar como leída
   const marcarComoLeida = async (id) => {
     try {
-      const token = getToken();
-      const response = await fetch(`/api/v1/notificaciones/${id}/read`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        setNotificaciones(prev => prev.filter(n => n.id !== id));
-        setNotificacionesNoLeidas(prev => Math.max(0, prev - 1));
-      }
+      await notificacionesService.markAsRead(id);
+      setNotificaciones(prev => prev.filter(n => n.id !== id));
+      setNotificacionesNoLeidas(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Error al marcar como leída:', error);
     }
@@ -115,19 +92,9 @@ const NotificationBell = () => {
   const marcarTodasComoLeidas = async () => {
     try {
       setLoading(true);
-      const token = getToken();
-      const response = await fetch('/api/v1/notificaciones/mark-all-read', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        setNotificaciones([]);
-        setNotificacionesNoLeidas(0);
-      }
+      await notificacionesService.markAllAsRead();
+      setNotificaciones([]);
+      setNotificacionesNoLeidas(0);
     } catch (error) {
       console.error('Error al marcar todas como leídas:', error);
     } finally {
@@ -138,19 +105,9 @@ const NotificationBell = () => {
   // Eliminar notificación
   const eliminarNotificacion = async (id) => {
     try {
-      const token = getToken();
-      const response = await fetch(`/api/v1/notificaciones/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        setNotificaciones(prev => prev.filter(n => n.id !== id));
-        setNotificacionesNoLeidas(prev => Math.max(0, prev - 1));
-      }
+      await notificacionesService.delete(id);
+      setNotificaciones(prev => prev.filter(n => n.id !== id));
+      setNotificacionesNoLeidas(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Error al eliminar notificación:', error);
     }

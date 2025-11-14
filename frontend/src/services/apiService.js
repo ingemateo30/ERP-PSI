@@ -10,7 +10,7 @@ class ApiService {
   }
 
   // Método genérico para hacer peticiones HTTP
-  async request(endpoint, options = {}) {
+ async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const token = authService.getToken();
     
@@ -22,12 +22,10 @@ class ApiService {
         ...options,
     };
 
-    // CORRECCIÓN: Solo agregar Content-Type para JSON, no para blobs/PDFs
-    if (!config.headers['Accept'] || config.headers['Accept'] !== 'application/pdf') {
+    if (!options.responseType || options.responseType !== 'blob') {
         config.headers['Content-Type'] = 'application/json';
     }
 
-    // Agregar token de autorización si existe
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
@@ -43,7 +41,6 @@ class ApiService {
         console.log('📡 ApiService - Response status:', response.status);
         console.log('📡 ApiService - Response headers:', Object.fromEntries(response.headers.entries()));
 
-        // Si es 401, intentar refrescar token una vez
         if (response.status === 401 && token && !options._isRetry) {
             console.log('🔄 ApiService - Token expirado, intentando refrescar...');
             try {
@@ -57,37 +54,33 @@ class ApiService {
             }
         }
 
-        // CORRECCIÓN CRÍTICA: Verificar si es respuesta binaria ANTES de verificar response.ok
         const contentType = response.headers.get('content-type') || '';
         const isBinaryResponse = contentType.includes('application/pdf') || 
-                              contentType.includes('image/') || 
+                              contentType.includes('application/vnd.openxmlformats') ||
                               contentType.includes('application/octet-stream') ||
+                              contentType.includes('text/csv') ||
                               options.responseType === 'blob';
 
         if (isBinaryResponse) {
             console.log('📄 ApiService - Respuesta binaria detectada:', contentType);
             
             if (!response.ok) {
-                // Para respuestas binarias con error, intentar leer como texto
                 const errorText = await response.text();
                 console.error('❌ ApiService - Error en respuesta binaria:', errorText);
                 throw new Error(errorText || `Error ${response.status}: ${response.statusText}`);
             }
             
-            // CORRECCIÓN: Retornar blob para respuestas binarias
             const blob = await response.blob();
             console.log('✅ ApiService - Blob recibido, tamaño:', blob.size, 'tipo:', blob.type);
             
-            // VALIDACIÓN: Verificar que el blob no esté vacío
-            if (blob.size < 100) { // Un PDF válido debe tener al menos 100 bytes
+            if (blob.size < 50) {
                 console.error('❌ ApiService - Blob demasiado pequeño:', blob.size);
                 throw new Error('El archivo descargado está vacío o es inválido');
             }
             
-            return blob;
+            return { data: blob, success: true };
         }
 
-        // Para respuestas JSON normales
         if (!response.ok) {
             let errorMessage;
             try {
@@ -100,7 +93,6 @@ class ApiService {
             throw new Error(errorMessage);
         }
 
-        // Intentar parsear como JSON
         try {
             const data = await response.json();
             console.log('✅ ApiService - Respuesta JSON exitosa');
@@ -113,7 +105,6 @@ class ApiService {
     } catch (error) {
         console.error('❌ ApiService - Error en petición:', error);
         
-        // Si es error de red, dar mensaje más específico
         if (error.name === 'TypeError' && error.message.includes('fetch')) {
             throw new Error('Error de conexión. Verifique su conexión a internet.');
         }

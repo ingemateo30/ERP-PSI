@@ -101,45 +101,53 @@ static async obtenerTodas(req, res) {
 
     // ✅ CONSTRUCCIÓN DINÁMICA DE QUERY
     let query = `
-      SELECT 
-        f.id,
-        f.numero_factura,
-        f.cliente_id,
-        f.identificacion_cliente,
-        f.nombre_cliente,
-        f.periodo_facturacion,
-        f.fecha_emision,
-        f.fecha_vencimiento,
-        f.fecha_desde,
-        f.fecha_hasta,
-        f.fecha_pago,
-        f.internet,
-        f.television,
-        f.saldo_anterior,
-        f.interes,
-        f.reconexion,
-        f.descuento,
-        f.varios,
-        f.publicidad,
-        f.subtotal,
-        f.iva,
-        f.total,
-        f.estado,
-        f.metodo_pago,
-        f.referencia_pago,
-        f.banco_id,
-        f.ruta,
-        f.observaciones,
-        f.created_at,
-        f.updated_at,
-        DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencido,
-        CASE 
-          WHEN f.estado = 'pagada' THEN 'Pagada'
-          WHEN f.estado = 'anulada' THEN 'Anulada'
-          WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' THEN 'Vencida'
-          ELSE 'Pendiente'
-        END as estado_descripcion
-      FROM facturas f
+  SELECT 
+    f.id,
+    f.numero_factura,
+    f.cliente_id,
+    f.identificacion_cliente,
+    f.nombre_cliente,
+    f.periodo_facturacion,
+    f.fecha_emision,
+    f.fecha_vencimiento,
+    f.fecha_desde,
+    f.fecha_hasta,
+    f.fecha_pago,
+    f.internet,
+    f.television,
+    f.saldo_anterior,
+    f.interes,
+    f.reconexion,
+    f.descuento,
+    f.varios,
+    f.publicidad,
+    f.subtotal,
+    f.iva,
+    f.total,
+    f.estado,
+    f.metodo_pago,
+    f.referencia_pago,
+    f.banco_id,
+    f.ruta,
+    f.observaciones,
+    f.created_at,
+    f.updated_at,
+    
+    -- Información adicional del cliente desde tabla clientes
+    c.telefono as cliente_telefono,
+    c.direccion as cliente_direccion,
+    c.correo as cliente_email,
+    c.estrato as cliente_estrato,
+    
+    DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencido,
+    CASE 
+      WHEN f.estado = 'pagada' THEN 'Pagada'
+      WHEN f.estado = 'anulada' THEN 'Anulada'
+      WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' THEN 'Vencida'
+      ELSE 'Pendiente'
+    END as estado_descripcion
+  FROM facturas f
+  LEFT JOIN clientes c ON f.cliente_id = c.id
       WHERE f.activo = 1
     `;
 

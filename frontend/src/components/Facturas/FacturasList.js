@@ -548,59 +548,59 @@ const FacturasList = ({
                   </tr>
                   
                   {/* Fila expandida con detalles */}
-                  {facturaExpandida === factura.id && (
-                    <tr>
-                      <td colSpan="7" className="px-6 py-4 bg-gray-50">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Información del Cliente</h4>
-                            <div className="space-y-1 text-gray-600">
-                              <div>📍 {factura.direccion_cliente || 'No especificada'}</div>
-                              <div>📞 {factura.telefono_cliente || 'No especificado'}</div>
-                              <div>✉️ {factura.email_cliente || 'No especificado'}</div>
-                              {factura.ruta && <div>🛣️ Ruta: {factura.ruta}</div>}
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Detalles Financieros</h4>
-                            <div className="space-y-1 text-gray-600">
-                              <div>Subtotal: {formatearMoneda(factura.subtotal)}</div>
-                              <div>Impuestos: {formatearMoneda(factura.impuestos)}</div>
-                              <div>Descuentos: {formatearMoneda(factura.descuentos)}</div>
-                              <div className="font-bold text-gray-900">
-                                Total: {formatearMoneda(factura.total)}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Estado y Pagos</h4>
-                            <div className="space-y-1 text-gray-600">
-                              <div>Estado: {getBadgeEstado(factura)}</div>
-                              {factura.fecha_pago && (
-                                <div>Fecha de pago: {formatearFecha(factura.fecha_pago)}</div>
-                              )}
-                              {factura.metodo_pago && (
-                                <div>Método: {factura.metodo_pago}</div>
-                              )}
-                              {factura.referencia_pago && (
-                                <div>Ref: {factura.referencia_pago}</div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Observaciones */}
-                        {factura.observaciones && (
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <h4 className="font-medium text-gray-900 mb-2">Observaciones</h4>
-                            <p className="text-gray-600 text-sm">{factura.observaciones}</p>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
+{facturaExpandida === factura.id && (
+  <tr>
+    <td colSpan="7" className="px-6 py-4 bg-gray-50">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div>
+          <h4 className="font-medium text-gray-900 mb-2">Información del Cliente</h4>
+          <div className="space-y-1 text-gray-600">
+            <div>📍 {factura.cliente_direccion || 'No especificada'}</div>
+            <div>📞 {factura.cliente_telefono || 'No especificado'}</div>
+            <div>✉️ {factura.cliente_email || 'No especificado'}</div>
+            {factura.ruta && <div>🛣️ Ruta: {factura.ruta}</div>}
+          </div>
+        </div>
+        
+        <div>
+          <h4 className="font-medium text-gray-900 mb-2">Detalles Financieros</h4>
+          <div className="space-y-1 text-gray-600">
+            <div>Subtotal: {formatearMoneda(factura.subtotal || 0)}</div>
+            <div>Impuestos: {formatearMoneda(factura.iva || 0)}</div>
+            <div>Descuentos: {formatearMoneda(factura.descuento || 0)}</div>
+            <div className="font-bold text-gray-900">
+              Total: {formatearMoneda(factura.total || 0)}
+            </div>
+          </div>
+        </div>
+        
+        <div>
+          <h4 className="font-medium text-gray-900 mb-2">Estado y Pagos</h4>
+          <div className="space-y-1 text-gray-600">
+            <div>Estado: {getBadgeEstado(factura)}</div>
+            {factura.fecha_pago && (
+              <div>Fecha de pago: {formatearFecha(factura.fecha_pago)}</div>
+            )}
+            {factura.metodo_pago && (
+              <div>Método: {factura.metodo_pago}</div>
+            )}
+            {factura.referencia_pago && (
+              <div>Ref: {factura.referencia_pago}</div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Observaciones */}
+      {factura.observaciones && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <h4 className="font-medium text-gray-900 mb-2">Observaciones</h4>
+          <p className="text-gray-600 text-sm">{factura.observaciones}</p>
+        </div>
+      )}
+    </td>
+  </tr>
+)}
                 </React.Fragment>
               );
             })}
