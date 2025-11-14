@@ -14,14 +14,23 @@ exports.obtenerNotificaciones = async (req, res) => {
       limite: req.query.limite || 50
     };
 
+    console.log('📋 Obteniendo notificaciones:', {
+      usuarioId,
+      rol,
+      query: req.query,
+      filtros
+    });
+
     const notificaciones = await Notificacion.obtenerPorUsuario(usuarioId, rol, filtros);
+
+    console.log('✅ Notificaciones obtenidas:', notificaciones.length);
 
     res.json({
       success: true,
       data: notificaciones
     });
   } catch (error) {
-    console.error('Error al obtener notificaciones:', error);
+    console.error('❌ Error al obtener notificaciones:', error);
     res.status(500).json({
       success: false,
       message: 'Error al obtener notificaciones',
