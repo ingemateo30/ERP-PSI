@@ -82,13 +82,24 @@ class Notificacion {
 
       console.log('📬 Filas obtenidas de BD:', filas.length);
 
-      // Parsear datos adicionales
-      return filas.map(fila => ({
-        ...fila,
-        datos_adicionales: fila.datos_adicionales ? JSON.parse(fila.datos_adicionales) : null
-      }));
+      // Parsear datos adicionales con manejo de errores
+      return filas.map(fila => {
+        let datosAdicionales = null;
+        if (fila.datos_adicionales) {
+          try {
+            datosAdicionales = JSON.parse(fila.datos_adicionales);
+          } catch (parseError) {
+            console.error('⚠️ Error parseando datos_adicionales para notificación', fila.id, ':', parseError.message);
+            datosAdicionales = null;
+          }
+        }
+        return {
+          ...fila,
+          datos_adicionales: datosAdicionales
+        };
+      });
     } catch (error) {
-      console.error('Error al obtener notificaciones:', error);
+      console.error('❌ Error al obtener notificaciones:', error);
       throw new Error(`Error al obtener notificaciones: ${error.message}`);
     }
   }
