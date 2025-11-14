@@ -14,17 +14,18 @@ class AlertasClienteService {
 
       return response;
     } catch (error) {
-      console.error('Error verificando cliente existente:', error);
+      // Capturar cualquier error y permitir que la app continúe
+      // La verificación de cliente es una funcionalidad opcional
+      console.warn('⚠️ Endpoint de verificación no disponible, continuando sin verificación:', error.message);
 
-      // Si el error es 404 o 500, retornar null en lugar de lanzar error
-      // Esto permite que la app continúe funcionando incluso si el endpoint no existe
-      if (error.message?.includes('404') || error.message?.includes('500')) {
-        console.warn('Endpoint de verificación no disponible, continuando sin verificación');
-        return { data: null, success: false, exists: false };
-      }
-
-      // Para otros errores, retornar respuesta segura
-      return { data: null, success: false, exists: false };
+      // Retornar respuesta segura que indica que no existe cliente duplicado
+      return {
+        data: null,
+        success: false,
+        exists: false,
+        error: true,
+        message: 'Servicio de verificación temporalmente no disponible'
+      };
     }
   }
 
