@@ -1003,10 +1003,18 @@ static async marcarComoPagada(req, res) {
       referencia_pago,
       fecha_pago,
       monto_pagado,
-      banco_id
+      banco_id,
+      observaciones
     } = req.body;
 
-    console.log('💰 Marcando factura como pagada:', id);
+    console.log('💰 Marcando factura como pagada:', {
+      id,
+      metodo_pago,
+      referencia_pago,
+      fecha_pago,
+      monto_pagado,
+      banco_id
+    });
 
     // Verificar que existe
     const [factura] = await Database.query(
@@ -1028,26 +1036,36 @@ static async marcarComoPagada(req, res) {
       });
     }
 
-    // Actualizar factura
-   await Database.query(`
-  UPDATE facturas SET
-    estado = 'pagada',
-    fecha_pago = ?,
-    metodo_pago = ?,
-    referencia_pago = ?,
-    banco_id = ?,
-    updated_at = NOW()
-  WHERE id = ?
-`, [
-  id,
-  fecha_pago || new Date().toISOString().split('T')[0],
-  monto_pagado || factura.total,
-  metodo_pago || 'efectivo',
-  referencia_pago || null,
-  banco_id || null,
-  req.user?.id || null
-]);
-    // Registrar pago si existe tabla pagos
+    if (factura.estado === 'anulada') {
+      return res.status(400).json({
+        success: false,
+        message: 'No se puede marcar como pagada una factura anulada'
+      });
+    }
+
+    // ✅ CORRECCIÓN: Orden correcto de parámetros en el UPDATE
+    await Database.query(`
+      UPDATE facturas SET
+        estado = 'pagada',
+        fecha_pago = ?,
+        metodo_pago = ?,
+        referencia_pago = ?,
+        banco_id = ?,
+        observaciones = COALESCE(?, observaciones),
+        updated_at = NOW()
+      WHERE id = ?
+    `, [
+      fecha_pago || new Date().toISOString().split('T')[0],  // Parámetro 1: fecha_pago
+      metodo_pago || 'efectivo',                              // Parámetro 2: metodo_pago
+      referencia_pago || null,                                // Parámetro 3: referencia_pago
+      banco_id || null,                                       // Parámetro 4: banco_id
+      observaciones || null,                                  // Parámetro 5: observaciones
+      id                                                      // Parámetro 6: id (WHERE)
+    ]);
+
+    console.log('✅ Factura actualizada a estado pagada');
+
+    // Registrar pago en tabla pagos si existe
     try {
       await Database.query(`
         INSERT INTO pagos (
@@ -1059,20 +1077,26 @@ static async marcarComoPagada(req, res) {
         fecha_pago || new Date().toISOString().split('T')[0],
         monto_pagado || factura.total,
         metodo_pago || 'efectivo',
-        referencia_pago,
-        banco_id,
-        req.user?.id
+        referencia_pago || null,
+        banco_id || null,
+        req.user?.id || null
       ]);
+      console.log('✅ Pago registrado en tabla pagos');
     } catch (error) {
       console.log('⚠️ No se pudo registrar en tabla pagos:', error.message);
     }
 
-    console.log('✅ Factura marcada como pagada:', id);
+    console.log('✅ Factura marcada como pagada exitosamente:', id);
 
     res.json({
       success: true,
       message: 'Factura marcada como pagada exitosamente',
-      data: { id, estado: 'pagada' }
+      data: { 
+        id, 
+        estado: 'pagada',
+        fecha_pago: fecha_pago || new Date().toISOString().split('T')[0],
+        monto_pagado: monto_pagado || factura.total
+      }
     });
 
   } catch (error) {
