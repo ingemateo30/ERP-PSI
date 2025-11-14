@@ -74,7 +74,7 @@ const ServicePlansConfig = () => {
     try {
       setLoading(true);
       const [planesResponse, statsResponse] = await Promise.all([
-        configService.getServicePlans(),
+        configService.getServicePlans({ activo: null }), // ✅ Mostrar TODOS los planes (activos e inactivos)
         configService.getServicePlansStats()
       ]);
 
@@ -91,7 +91,6 @@ const ServicePlansConfig = () => {
       setLoading(false);
     }
   };
-
   const cargarEstadisticas = async () => {
     try {
       const response = await configService.getServicePlansStats();
