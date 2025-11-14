@@ -164,35 +164,70 @@ const AdminDashboard = () => {
         }
     };
     
-    // Función para generar backup
-    const generarBackup = async () => {
-        try {
-            const token = localStorage.getItem('accessToken');
-            
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/sistema/backup/generar`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                alert(`✅ Backup generado exitosamente!\n\n📁 Archivo: ${data.archivo}\n💾 Tamaño: ${data.tamano}\n📅 Fecha: ${data.fecha}`);
-                // Recargar datos después de generar backup
-                cargarDatosAdmin();
-            } else {
-                alert('❌ Error al generar backup: ' + data.message);
+   // Función para generar backup
+const generarBackup = async () => {
+    try {
+        const token = localStorage.getItem('accessToken');
+        
+        console.log('🔄 Generando backup...');
+        
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/sistema/backup/generar`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
             }
-            
-        } catch (error) {
-            console.error('Error:', error);
-            alert('❌ Error de conexión al generar backup');
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al generar backup');
         }
-    };
-
+        
+        // ✅ NUEVO: Obtener el archivo como blob
+        const blob = await response.blob();
+        
+        // ✅ NUEVO: Extraer el nombre del archivo del header
+        const contentDisposition = response.headers.get('content-disposition');
+        let nombreArchivo = 'backup.sql';
+        
+        if (contentDisposition) {
+            const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+            if (matches && matches[1]) {
+                nombreArchivo = matches[1];
+            }
+        } else {
+            // Si no viene en el header, generarlo con fecha actual
+            const fecha = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+            const hora = new Date().toTimeString().split(' ')[0].replace(/:/g, '-');
+            nombreArchivo = `backup_${fecha}_${hora}.sql`;
+        }
+        
+        // ✅ NUEVO: Crear enlace de descarga y hacer clic automático
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = nombreArchivo;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Limpiar
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        const tamanoMB = (blob.size / (1024 * 1024)).toFixed(2);
+        
+        alert(`✅ Backup generado y descargado exitosamente!\n\n📁 Archivo: ${nombreArchivo}\n💾 Tamaño: ${tamanoMB} MB\n📂 Guardado en servidor y descargado en tu equipo`);
+        
+        console.log('✅ Backup descargado:', nombreArchivo);
+        
+        // Recargar datos después de generar backup
+        cargarDatosAdmin();
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error de conexión al generar backup');
+    }
+};
     return (
         <>
             {/* Welcome Message específico para Admin */}
