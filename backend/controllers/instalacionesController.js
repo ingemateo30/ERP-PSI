@@ -1809,7 +1809,7 @@ static async actualizar(req, res) {
     }
 }
 /**
- * Generar orden de servicio en PDF
+ * Generar orden de servicio en PDF (optimizado para 1 página)
  */
 static async generarOrdenServicioPDF(req, res) {
     try {
@@ -1817,7 +1817,7 @@ static async generarOrdenServicioPDF(req, res) {
         console.log(`📄 Generando orden de servicio PDF para instalación ${id}`);
 
         const instalacion = await this.obtenerInstalacionCompleta(id);
-        
+
         if (!instalacion) {
             return res.status(404).json({
                 success: false,
@@ -1826,8 +1826,8 @@ static async generarOrdenServicioPDF(req, res) {
         }
 
         const PDFDocument = require('pdfkit');
-        const doc = new PDFDocument({ 
-            margin: 50,
+        const doc = new PDFDocument({
+            margin: 40,
             size: 'LETTER',
             bufferPages: true
         });
@@ -1837,117 +1837,161 @@ static async generarOrdenServicioPDF(req, res) {
 
         doc.pipe(res);
 
-        // ENCABEZADO
+        // ============ ENCABEZADO COMPACTO ============
         doc.font('Helvetica-Bold')
-            .fontSize(20)
-            .text('ORDEN DE SERVICIO PSI', 50, 50, { align: 'center' });
+            .fontSize(18)
+            .text('ORDEN DE SERVICIO PSI', 40, 40, { align: 'center' });
 
-        doc.fontSize(11)
-            .text('PSI - Proveedor de Servicios de Internet', 50, 80, { align: 'center' })
-            .text('NIT: 900.123.456-7', 50, 95, { align: 'center' })
-            .text('Tel: (607) 123-4567', 50, 110, { align: 'center' });
+        doc.fontSize(9)
+            .font('Helvetica')
+            .text('PSI - Proveedor de Servicios de Internet | NIT: 900.123.456-7 | Tel: (607) 123-4567', 40, 65, { align: 'center' });
 
-        doc.moveTo(50, 130).lineTo(562, 130).stroke();
+        doc.moveTo(40, 80).lineTo(572, 80).stroke();
 
-        let y = 150;
+        let y = 95;
 
-        // INFORMACIÓN DE LA ORDEN
-        doc.font('Helvetica-Bold').fontSize(12).text('INFORMACIÓN DE LA ORDEN', 50, y);
-        y += 20;
+        // ============ INFORMACIÓN DE LA ORDEN ============
+        doc.font('Helvetica-Bold').fontSize(11).text('INFORMACIÓN DE LA ORDEN', 40, y);
+        y += 16;
 
-        doc.font('Helvetica').fontSize(10)
-            .text(`Orden No: #${String(instalacion.id).padStart(6, '0')}`, 50, y)
-            .text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 350, y);
-        y += 15;
+        doc.font('Helvetica').fontSize(9)
+            .text(`Orden No: #${String(instalacion.id).padStart(6, '0')}`, 40, y)
+            .text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 320, y)
+            .text(`Estado: ${(instalacion.estado || 'PROGRAMADA').toUpperCase()}`, 450, y);
+        y += 12;
 
-        doc.text(`Estado: ${(instalacion.estado || 'PROGRAMADA').toUpperCase()}`, 50, y)
-            .text(`Tipo: ${instalacion.tipo_instalacion || 'Nueva'}`, 350, y);
-        y += 25;
+        doc.text(`Tipo: ${instalacion.tipo_instalacion || 'Nueva'}`, 40, y);
+        y += 18;
 
-        // INFORMACIÓN DEL CLIENTE
-        doc.font('Helvetica-Bold').fontSize(12).text('INFORMACIÓN DEL CLIENTE', 50, y);
-        y += 20;
+        // ============ INFORMACIÓN DEL CLIENTE ============
+        doc.font('Helvetica-Bold').fontSize(11).text('INFORMACIÓN DEL CLIENTE', 40, y);
+        y += 16;
 
-        doc.font('Helvetica').fontSize(10)
-            .text(`Cliente: ${instalacion.cliente_nombre || 'N/A'}`, 50, y);
-        y += 15;
+        doc.font('Helvetica').fontSize(9)
+            .text(`Cliente: ${instalacion.cliente_nombre || 'N/A'}`, 40, y)
+            .text(`CC/NIT: ${instalacion.cliente_identificacion || 'N/A'}`, 320, y);
+        y += 12;
 
-        doc.text(`CC/NIT: ${instalacion.cliente_identificacion || 'N/A'}`, 50, y)
-            .text(`Tel: ${instalacion.telefono_contacto || instalacion.cliente_telefono || 'N/A'}`, 350, y);
-        y += 15;
-
-        doc.text(`Email: ${instalacion.cliente_email || 'N/A'}`, 50, y);
-        y += 15;
+        doc.text(`Teléfono: ${instalacion.telefono_contacto || instalacion.cliente_telefono || 'N/A'}`, 40, y)
+            .text(`Email: ${instalacion.cliente_email || 'N/A'}`, 320, y);
+        y += 12;
 
         const direccionTexto = instalacion.direccion_instalacion || 'No especificada';
-        doc.text(`Dirección: ${direccionTexto}`, 50, y, { width: 500 });
-        y += Math.max(15, doc.heightOfString(direccionTexto, { width: 500 }));
-        y += 10;
+        doc.text(`Dirección: ${direccionTexto}`, 40, y, { width: 532 });
+        y += Math.ceil(doc.heightOfString(direccionTexto, { width: 532 }) / 12) * 12;
+        y += 6;
 
-        // INFORMACIÓN DEL SERVICIO
-        doc.font('Helvetica-Bold').fontSize(12).text('INFORMACIÓN DEL SERVICIO', 50, y);
-        y += 20;
+        // ============ INFORMACIÓN DEL SERVICIO ============
+        doc.font('Helvetica-Bold').fontSize(11).text('INFORMACIÓN DEL SERVICIO', 40, y);
+        y += 16;
 
-        doc.font('Helvetica').fontSize(10)
-            .text(`Plan: ${instalacion.plan_nombre || 'N/A'}`, 50, y);
-        y += 15;
+        doc.font('Helvetica').fontSize(9)
+            .text(`Plan Contratado: ${instalacion.plan_nombre || 'N/A'}`, 40, y);
+        y += 12;
 
-        doc.text(`Precio Mensual: $${(instalacion.plan_precio || 0).toLocaleString('es-CO')}`, 50, y)
-            .text(`Costo Instalación: $${(instalacion.costo_instalacion || 0).toLocaleString('es-CO')}`, 350, y);
-        y += 25;
+        const velocidades = [];
+        if (instalacion.velocidad_bajada) velocidades.push(`${instalacion.velocidad_bajada} Mbps bajada`);
+        if (instalacion.velocidad_subida) velocidades.push(`${instalacion.velocidad_subida} Mbps subida`);
+        if (velocidades.length > 0) {
+            doc.text(`Velocidad: ${velocidades.join(' / ')}`, 40, y);
+            y += 12;
+        }
 
-        // PROGRAMACIÓN
-        doc.font('Helvetica-Bold').fontSize(12).text('PROGRAMACIÓN DE INSTALACIÓN', 50, y);
-        y += 20;
+        doc.text(`Precio Mensual: $${(instalacion.plan_precio || 0).toLocaleString('es-CO')}`, 40, y)
+            .text(`Costo Instalación: $${(instalacion.costo_instalacion || 0).toLocaleString('es-CO')}`, 320, y);
+        y += 18;
 
-        const fechaProg = instalacion.fecha_programada ? 
+        // ============ PROGRAMACIÓN DE INSTALACIÓN ============
+        doc.font('Helvetica-Bold').fontSize(11).text('PROGRAMACIÓN DE INSTALACIÓN', 40, y);
+        y += 16;
+
+        const fechaProg = instalacion.fecha_programada ?
             new Date(instalacion.fecha_programada).toLocaleDateString('es-CO') : 'Por definir';
 
-        doc.font('Helvetica').fontSize(10)
-            .text(`Fecha: ${fechaProg}`, 50, y)
-            .text(`Hora: ${instalacion.hora_programada || 'Por definir'}`, 350, y);
+        doc.font('Helvetica').fontSize(9)
+            .text(`Fecha Programada: ${fechaProg}`, 40, y)
+            .text(`Hora: ${instalacion.hora_programada || 'Por definir'}`, 320, y);
+        y += 12;
+
+        doc.text(`Instalador Asignado: ${instalacion.instalador_nombres || 'Sin asignar'}`, 40, y);
+        y += 18;
+
+        // ============ EQUIPOS A INSTALAR ============
+        if (instalacion.equipos_instalados && Array.isArray(instalacion.equipos_instalados) && instalacion.equipos_instalados.length > 0) {
+            doc.font('Helvetica-Bold').fontSize(11).text('EQUIPOS A INSTALAR', 40, y);
+            y += 16;
+
+            instalacion.equipos_instalados.forEach((equipo, index) => {
+                const equipoTexto = `${index + 1}. ${equipo.nombre || equipo.tipo_equipo || 'Equipo'} - ${equipo.modelo || ''} (S/N: ${equipo.numero_serie || 'N/A'})`;
+                doc.font('Helvetica').fontSize(8).text(equipoTexto, 40, y, { width: 532 });
+                y += 10;
+            });
+            y += 8;
+        }
+
+        // ============ OBSERVACIONES (limitadas y compactas) ============
+        if (instalacion.observaciones && instalacion.observaciones.trim()) {
+            doc.font('Helvetica-Bold').fontSize(11).text('OBSERVACIONES', 40, y);
+            y += 16;
+
+            const obs = instalacion.observaciones.substring(0, 180).trim();
+            doc.font('Helvetica').fontSize(8).text(obs, 40, y, { width: 532 });
+            y += Math.ceil(doc.heightOfString(obs, { width: 532 }) / 10) * 10;
+            y += 8;
+        }
+
+        // ============ TÉRMINOS Y CONDICIONES (compacto) ============
+        doc.font('Helvetica-Bold').fontSize(9).text('TÉRMINOS Y CONDICIONES', 40, y);
+        y += 12;
+
+        const terminos = [
+            '• El cliente autoriza la instalación del servicio en la dirección indicada.',
+            '• Los equipos instalados son propiedad de PSI y deben ser devueltos al finalizar el contrato.',
+            '• El servicio será activado una vez completada la instalación y verificada la conectividad.'
+        ];
+
+        doc.font('Helvetica').fontSize(7);
+        terminos.forEach(termino => {
+            doc.text(termino, 40, y, { width: 532 });
+            y += 10;
+        });
         y += 15;
 
-        doc.text(`Instalador: ${instalacion.instalador_nombre || 'Sin asignar'}`, 50, y);
-        y += 25;
+        // ============ FIRMAS (posicionadas estratégicamente) ============
+        // Calcular espacio restante
+        const espacioRestante = 720 - y; // 720 es aproximadamente el límite inferior útil
 
-        // OBSERVACIONES (limitadas)
-        if (instalacion.observaciones && instalacion.observaciones.trim()) {
-            doc.font('Helvetica-Bold').fontSize(12).text('OBSERVACIONES', 50, y);
-            y += 20;
-
-            const obs = instalacion.observaciones.substring(0, 200);
-            doc.font('Helvetica').fontSize(9).text(obs, 50, y, { width: 500 });
-            y += doc.heightOfString(obs, { width: 500 }) + 15;
-        }
-
-        // ✅ SOLUCIÓN FIRMAS: Verificar espacio antes de dibujar
-        const espacioNecesario = 120;
-        const limiteInferior = 700; // Límite antes del final de la página
-
-        if (y > limiteInferior) {
-            console.log('📄 Agregando nueva página para firmas');
+        if (espacioRestante < 90) {
+            // Si no hay suficiente espacio, agregar nueva página
             doc.addPage();
-            y = 100; // Reset en nueva página
+            y = 100;
+            doc.font('Helvetica-Bold').fontSize(11).text('FIRMAS Y AUTORIZACIONES', 40, y);
+            y += 30;
         } else {
-            // Posicionar firmas al final si hay espacio
-            y = Math.max(y + 30, 640);
+            // Posicionar las firmas en el espacio disponible
+            y = Math.max(y, 610); // Mínimo en posición 610
         }
 
-        // FIRMAS
-        doc.fontSize(9)
-            .text('_____________________________', 70, y, { width: 200 })
-            .text('Firma del Cliente', 70, y + 20, { width: 200, align: 'center' })
-            .text('Fecha: _______________', 70, y + 35, { width: 200, align: 'center' });
+        // Dibujar líneas y textos de firma
+        doc.font('Helvetica').fontSize(8);
 
-        doc.text('_____________________________', 342, y, { width: 200 })
-            .text('Firma del Instalador', 342, y + 20, { width: 200, align: 'center' })
-            .text('Fecha: _______________', 342, y + 35, { width: 200, align: 'center' });
+        // Firma del Cliente
+        doc.moveTo(60, y).lineTo(260, y).stroke();
+        doc.text('Firma del Cliente', 60, y + 5, { width: 200, align: 'center' });
+        doc.text(`CC: ${instalacion.cliente_identificacion || '_________________'}`, 60, y + 18, { width: 200, align: 'center' });
+        doc.text('Fecha: _______________', 60, y + 30, { width: 200, align: 'center' });
 
-        // PIE DE PÁGINA
+        // Firma del Instalador
+        doc.moveTo(352, y).lineTo(552, y).stroke();
+        doc.text('Firma del Instalador', 352, y + 5, { width: 200, align: 'center' });
+        doc.text(`Nombre: ${instalacion.instalador_nombres || '_________________'}`, 352, y + 18, { width: 200, align: 'center' });
+        doc.text('Fecha: _______________', 352, y + 30, { width: 200, align: 'center' });
+
+        // ============ PIE DE PÁGINA ============
         doc.fontSize(7)
             .fillColor('#666666')
-            .text('Documento oficial - PSI Telecomunicaciones', 50, y + 65, { align: 'center', width: 512 });
+            .text('Documento oficial - PSI Telecomunicaciones | Generado el ' + new Date().toLocaleString('es-CO'),
+                40, y + 55, { align: 'center', width: 532 });
 
         doc.end();
 
