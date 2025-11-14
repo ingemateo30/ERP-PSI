@@ -507,30 +507,49 @@ router.get('/:id/pdf', async (req, res) => {
         const instalacion = instalacionData[0];
         console.log('✅ Instalación encontrada:', instalacion.id, instalacion.cliente_nombre);
 
-        // Obtener servicios - CORREGIDO
+        // Obtener servicios - MEJORADO
         let servicios = [];
         try {
             if (instalacion.servicio_cliente_id) {
-                let serviciosIds;
+                // Parsear servicio_cliente_id (puede ser un número o un JSON array)
+                let serviciosClienteIds;
                 if (typeof instalacion.servicio_cliente_id === 'string') {
                     try {
-                        serviciosIds = JSON.parse(instalacion.servicio_cliente_id);
+                        serviciosClienteIds = JSON.parse(instalacion.servicio_cliente_id);
+                        if (!Array.isArray(serviciosClienteIds)) {
+                            serviciosClienteIds = [serviciosClienteIds];
+                        }
                     } catch {
-                        serviciosIds = [instalacion.servicio_cliente_id];
+                        // Es un string simple, convertir a array
+                        serviciosClienteIds = [instalacion.servicio_cliente_id];
                     }
                 } else {
-                    serviciosIds = [instalacion.servicio_cliente_id];
+                    serviciosClienteIds = [instalacion.servicio_cliente_id];
                 }
 
-                if (Array.isArray(serviciosIds) && serviciosIds.length > 0) {
-                    const placeholders = serviciosIds.map(() => '?').join(',');
-                    const serviciosResult = await Database.query(`
-                        SELECT nombre, velocidad_subida, velocidad_bajada
-                        FROM planes_servicio
-                        WHERE id IN (${placeholders})
-                    `, serviciosIds);
+                console.log('🔍 IDs de servicios_cliente a buscar:', serviciosClienteIds);
 
-                    // CORRECCIÓN: Extraer servicios según estructura
+                if (Array.isArray(serviciosClienteIds) && serviciosClienteIds.length > 0) {
+                    const placeholders = serviciosClienteIds.map(() => '?').join(',');
+
+                    // JOIN correcto: servicios_cliente -> planes_servicio
+                    const serviciosResult = await Database.query(`
+                        SELECT
+                            ps.nombre,
+                            ps.tipo,
+                            ps.velocidad_subida,
+                            ps.velocidad_bajada,
+                            ps.canales_tv,
+                            ps.tecnologia,
+                            sc.precio_personalizado,
+                            ps.precio
+                        FROM servicios_cliente sc
+                        INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
+                        WHERE sc.id IN (${placeholders})
+                        AND sc.estado = 'activo'
+                    `, serviciosClienteIds);
+
+                    // Extraer servicios según estructura de respuesta
                     if (Array.isArray(serviciosResult)) {
                         if (serviciosResult.length > 0 && Array.isArray(serviciosResult[0])) {
                             servicios = serviciosResult[0] || [];
@@ -538,6 +557,8 @@ router.get('/:id/pdf', async (req, res) => {
                             servicios = serviciosResult || [];
                         }
                     }
+
+                    console.log('✅ Servicios encontrados:', servicios.length);
                 }
             }
         } catch (error) {
@@ -545,14 +566,11 @@ router.get('/:id/pdf', async (req, res) => {
             servicios = [];
         }
 
-        // Construir descripción de servicios
-        let servicioDescripcion = 'Internet';
-        if (servicios.length > 0) {
-            const primerServicio = servicios[0];
-            servicioDescripcion = `${primerServicio.nombre || 'Internet'} ${primerServicio.velocidad_bajada || ''}${primerServicio.velocidad_bajada ? ' Mbps' : ''}`.trim();
-        }
+        // Organizar servicios por tipo
+        const serviciosInternet = servicios.filter(s => s.tipo === 'internet' || s.tipo === 'combo');
+        const serviciosTV = servicios.filter(s => s.tipo === 'television' || s.tipo === 'combo');
 
-        console.log('📋 Servicio descripción:', servicioDescripcion);
+        console.log('📋 Servicios Internet:', serviciosInternet.length, 'TV:', serviciosTV.length);
 
         const logoPath = path.join(__dirname, '../public/logo2.png');
         let logoBase64 = '';
@@ -573,6 +591,55 @@ router.get('/:id/pdf', async (req, res) => {
 // Fragmento mejorado para la ruta GET /:id/pdf
 // Reemplazar solo la sección del htmlContent
 
+        // Construir HTML de servicios de forma dinámica
+        let serviciosHTML = '';
+
+        // Mostrar servicios de Internet
+        if (serviciosInternet.length > 0) {
+            serviciosInternet.forEach(serv => {
+                const velocidad = serv.velocidad_bajada ? `${serv.velocidad_bajada} Mbps` : '';
+                const tecnologia = serv.tecnologia || 'Fibra Óptica';
+                serviciosHTML += `
+                    <div class="service-item">
+                        <span class="service-icon">🌐</span>
+                        <div class="service-details">
+                            <strong>${serv.nombre}</strong>
+                            <span class="service-specs">${velocidad}${velocidad ? ' - ' : ''}${tecnologia}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Mostrar servicios de TV
+        if (serviciosTV.length > 0) {
+            serviciosTV.forEach(serv => {
+                const canales = serv.canales_tv ? `${serv.canales_tv} canales` : '';
+                serviciosHTML += `
+                    <div class="service-item">
+                        <span class="service-icon">📺</span>
+                        <div class="service-details">
+                            <strong>${serv.nombre}</strong>
+                            ${canales ? `<span class="service-specs">${canales}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Si no hay servicios, mostrar mensaje genérico
+        if (servicios.length === 0) {
+            serviciosHTML = `
+                <div class="service-item">
+                    <span class="service-icon">📦</span>
+                    <div class="service-details">
+                        <strong>Instalación de Servicio</strong>
+                        <span class="service-specs">Servicios a definir</span>
+                    </div>
+                </div>
+            `;
+        }
+
 const htmlContent = `
 <!DOCTYPE html>
 <html lang="es">
@@ -588,9 +655,9 @@ const htmlContent = `
         }
 
         body {
-            font-family: 'Arial', sans-serif;
-            font-size: 7px;
-            line-height: 1.1;
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            font-size: 9px;
+            line-height: 1.3;
             color: #000;
             background: white;
             padding: 0;
@@ -600,232 +667,281 @@ const htmlContent = `
         .psi-container {
             width: 216mm;
             height: 93mm;
-            padding: 2mm 3mm;
+            padding: 3mm 4mm;
             position: relative;
             background: white;
         }
 
-        /* HEADER ULTRA COMPACTO */
+        /* HEADER PROFESIONAL */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1mm;
-            padding-bottom: 0.5mm;
-            border-bottom: 1px solid #000;
+            margin-bottom: 2mm;
+            padding-bottom: 1.5mm;
+            border-bottom: 2px solid #0056b3;
         }
 
         .left-header {
             display: flex;
             align-items: center;
-            gap: 1.5mm;
+            gap: 2mm;
         }
 
         .logo-section {
-            width: 12mm;
-            height: 8mm;
+            width: 15mm;
+            height: 12mm;
             display: flex;
             align-items: center;
             justify-content: center;
-            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 1px solid #000; background: white;'}
+            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 2px solid #0056b3; background: white;'}
         }
 
         .company-info {
             display: flex;
             flex-direction: column;
-            gap: 0.2mm;
+            gap: 0.5mm;
         }
 
         .company-name {
-            font-size: 7px;
+            font-size: 9px;
             font-weight: bold;
-            color: #000;
+            color: #0056b3;
+            line-height: 1.2;
         }
 
         .company-details {
-            font-size: 5px;
+            font-size: 7px;
             color: #333;
-            line-height: 1.1;
+            line-height: 1.3;
         }
 
         .right-header {
             text-align: right;
-            background: #f0f0f0;
-            padding: 0.5mm 1.5mm;
-            border: 1px solid #000;
+            background: #0056b3;
+            color: white;
+            padding: 1.5mm 3mm;
+            border-radius: 2mm;
         }
 
         .order-title {
-            font-size: 7px;
+            font-size: 8px;
             font-weight: bold;
-            color: #000;
+            letter-spacing: 0.3px;
         }
 
         .order-number {
-            font-size: 9px;
+            font-size: 12px;
             font-weight: bold;
-            color: #000;
+            margin: 0.5mm 0;
         }
 
         .order-date {
-            font-size: 5px;
-            color: #333;
+            font-size: 7px;
+            opacity: 0.9;
         }
 
-        /* SECCIÓN CLIENTE COMPACTA */
+        /* SECCIÓN CLIENTE */
         .client-section {
-            background: white;
-            padding: 0.8mm 1.5mm;
-            margin-bottom: 0.8mm;
-            border: 1px solid #000;
+            background: #f8f9fa;
+            padding: 1.5mm 2mm;
+            margin-bottom: 1.5mm;
+            border: 1px solid #dee2e6;
+            border-radius: 1mm;
         }
 
         .section-title {
-            font-size: 6px;
+            font-size: 8px;
             font-weight: bold;
-            color: #000;
-            margin-bottom: 0.5mm;
+            color: #0056b3;
+            margin-bottom: 1mm;
             text-transform: uppercase;
-            border-bottom: 1px solid #000;
-            padding-bottom: 0.3mm;
+            letter-spacing: 0.5px;
         }
 
         .client-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 0.5mm 2mm;
+            gap: 1mm 3mm;
         }
 
         .info-field {
             display: flex;
-            align-items: center;
-            gap: 0.5mm;
+            align-items: baseline;
+            gap: 1mm;
         }
 
         .info-label {
             font-weight: bold;
-            font-size: 6px;
-            color: #000;
-            min-width: 16mm;
+            font-size: 8px;
+            color: #495057;
+            min-width: 20mm;
         }
 
         .info-value {
             flex: 1;
-            font-size: 6px;
+            font-size: 9px;
             color: #000;
-            padding: 0.3mm 0.8mm;
+            padding: 0.5mm 1mm;
             background: white;
-            border-bottom: 1px solid #000;
+            border-bottom: 1px solid #0056b3;
         }
 
-        /* GRID ÚNICO PARA PROGRAMACIÓN Y SERVICIOS */
-        .combined-section {
+        /* GRID PARA PROGRAMACIÓN E INSTALADOR */
+        .schedule-installer-section {
             display: grid;
             grid-template-columns: 1fr 2fr;
-            gap: 1.5mm;
-            margin-bottom: 0.8mm;
+            gap: 2mm;
+            margin-bottom: 1.5mm;
         }
 
         .schedule-box {
-            background: #f5f5f5;
-            padding: 0.8mm 1.5mm;
-            border: 1px solid #000;
+            background: #fff3cd;
+            padding: 1.5mm 2mm;
+            border: 1px solid #ffc107;
+            border-radius: 1mm;
         }
 
-        .schedule-box .section-title {
-            font-size: 6px;
-            margin-bottom: 0.3mm;
+        .schedule-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1mm;
+            margin-top: 1mm;
         }
 
-        .schedule-value {
+        .schedule-item {
+            background: white;
+            padding: 1mm 1.5mm;
+            border-radius: 1mm;
             text-align: center;
             font-weight: bold;
-            font-size: 7px;
-            background: white;
-            padding: 0.5mm;
-            border: 1px solid #000;
-            margin-top: 0.5mm;
+            font-size: 9px;
+            border: 1px solid #ffc107;
         }
 
-        /* SERVICIOS INLINE */
-        .services-box {
-            background: white;
-            padding: 0.8mm 1.5mm;
-            border: 1px solid #000;
+        .installer-box {
+            background: #e7f3ff;
+            padding: 1.5mm 2mm;
+            border: 1px solid #0056b3;
+            border-radius: 1mm;
         }
 
-        .services-inline {
+        .installer-name {
+            background: white;
+            padding: 1.5mm 2mm;
+            margin-top: 1mm;
+            border-radius: 1mm;
+            font-weight: bold;
+            font-size: 10px;
+            color: #0056b3;
+            text-align: center;
+            border: 1px solid #0056b3;
+        }
+
+        /* SERVICIOS A INSTALAR */
+        .services-section {
+            background: white;
+            padding: 1.5mm 2mm;
+            margin-bottom: 1.5mm;
+            border: 1px solid #28a745;
+            border-radius: 1mm;
+        }
+
+        .services-section .section-title {
+            color: #28a745;
+        }
+
+        .services-grid {
             display: flex;
-            flex-wrap: wrap;
-            gap: 1mm 2mm;
-            margin-top: 0.5mm;
+            flex-direction: column;
+            gap: 1.5mm;
+            margin-top: 1mm;
         }
 
         .service-item {
             display: flex;
             align-items: center;
+            gap: 2mm;
+            background: #f8f9fa;
+            padding: 1.5mm 2mm;
+            border-radius: 1mm;
+            border-left: 3px solid #28a745;
+        }
+
+        .service-icon {
+            font-size: 12px;
+            min-width: 5mm;
+        }
+
+        .service-details {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
             gap: 0.5mm;
-            font-size: 6px;
         }
 
-        .service-label {
-            font-weight: bold;
+        .service-details strong {
+            font-size: 9px;
+            color: #000;
         }
 
-        .service-value {
-            padding: 0.3mm 1mm;
-            border-bottom: 1px solid #000;
-            min-width: 15mm;
+        .service-specs {
+            font-size: 8px;
+            color: #6c757d;
         }
 
-        /* OBSERVACIONES MÁS PEQUEÑAS */
+        /* OBSERVACIONES */
         .observations-section {
-            margin-bottom: 0.8mm;
+            margin-bottom: 1.5mm;
         }
 
         .observations-box {
-            background: white;
-            border: 1px solid #000;
-            padding: 0.8mm 1mm;
-            min-height: 6mm;
-            max-height: 8mm;
-            font-size: 5.5px;
-            line-height: 1.2;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 1mm;
+            padding: 1.5mm 2mm;
+            min-height: 8mm;
+            max-height: 12mm;
+            font-size: 8px;
+            line-height: 1.3;
             overflow: hidden;
+            color: #495057;
         }
 
-        /* FIRMAS COMPACTAS */
+        /* FIRMAS PROFESIONALES */
         .signatures {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 2mm;
-            margin-top: 1mm;
+            gap: 3mm;
+            margin-top: auto;
         }
 
         .signature-block {
             text-align: center;
-            padding: 0.5mm;
-            background: white;
-            border: 1px solid #000;
+            padding: 1mm;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 1mm;
         }
 
         .signature-line {
-            border-top: 1.5px solid #000;
-            margin-bottom: 0.5mm;
-            height: 7mm;
+            border-top: 2px solid #000;
+            margin-bottom: 1mm;
+            height: 10mm;
         }
 
         .signature-label {
-            font-size: 6px;
+            font-size: 8px;
             font-weight: bold;
             color: #000;
             text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         .signature-sublabel {
-            font-size: 5px;
-            color: #333;
-            margin-top: 0.3mm;
+            font-size: 7px;
+            color: #6c757d;
+            margin-top: 0.5mm;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -853,12 +969,13 @@ const htmlContent = `
         <div class="header">
             <div class="left-header">
                 <div class="logo-section">
-                    ${!logoBase64 ? '<span style="font-size: 5px; color: #0056b3; font-weight: bold;">PSI</span>' : ''}
+                    ${!logoBase64 ? '<span style="font-size: 8px; color: #0056b3; font-weight: bold;">PSI</span>' : ''}
                 </div>
                 <div class="company-info">
                     <div class="company-name">PROVEEDOR DE TELECOMUNICACIONES S.A.S.</div>
                     <div class="company-details">
-                        NIT: 901.582.657-3 | Registro TIC No. 96006732 | WhatsApp: 318 455 0936
+                        NIT: 901.582.657-3 | Registro TIC No. 96006732<br>
+                        WhatsApp: 318 455 0936
                     </div>
                 </div>
             </div>
@@ -871,14 +988,14 @@ const htmlContent = `
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric'
-                    }) : ''} ${instalacion.hora_programada || ''}
+                    }) : ''}
                 </div>
             </div>
         </div>
 
         <!-- INFORMACIÓN DEL CLIENTE -->
         <div class="client-section">
-            <div class="section-title">Cliente</div>
+            <div class="section-title">Información del Cliente</div>
             <div class="client-grid">
                 <div class="info-field">
                     <span class="info-label">Nombre:</span>
@@ -899,51 +1016,37 @@ const htmlContent = `
             </div>
         </div>
 
-        <!-- PROGRAMACIÓN Y SERVICIOS COMBINADOS -->
-        <div class="combined-section">
-            <div>
-                <div class="schedule-box">
-                    <div class="section-title">Programación</div>
-                    <div class="schedule-value">
-                        ${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO', {
+        <!-- PROGRAMACIÓN E INSTALADOR -->
+        <div class="schedule-installer-section">
+            <div class="schedule-box">
+                <div class="section-title">Programación</div>
+                <div class="schedule-content">
+                    <div class="schedule-item">
+                        📅 ${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO', {
+                            weekday: 'short',
                             day: '2-digit',
                             month: 'short'
-                        }) : ''}
+                        }) : 'Por definir'}
                     </div>
-                    <div class="schedule-value" style="margin-top: 0.5mm; font-size: 8px;">
-                        ${instalacion.hora_programada || ''}
+                    <div class="schedule-item">
+                        🕐 ${instalacion.hora_programada || 'Por definir'}
                     </div>
                 </div>
             </div>
 
-            <div class="services-box">
-                <div class="section-title">Servicios a Instalar</div>
-                <div class="services-inline">
-                    <div class="service-item">
-                        <span class="service-label">Internet:</span>
-                        <span class="service-value">${servicioDescripcion}</span>
-                    </div>
-                    <div class="service-item">
-                        <span class="service-label">TV:</span>
-                        <span class="service-value"></span>
-                    </div>
-                    <div class="service-item">
-                        <span class="service-label">Tel:</span>
-                        <span class="service-value"></span>
-                    </div>
-                    <div class="service-item">
-                        <span class="service-label">Poste:</span>
-                        <span class="service-value"></span>
-                    </div>
-                    <div class="service-item">
-                        <span class="service-label">Amarre:</span>
-                        <span class="service-value"></span>
-                    </div>
-                    <div class="service-item">
-                        <span class="service-label">Instalador:</span>
-                        <span class="service-value" style="font-weight: bold;">${instalacion.instalador_nombre_completo || 'Sin asignar'}</span>
-                    </div>
+            <div class="installer-box">
+                <div class="section-title">Instalador Asignado</div>
+                <div class="installer-name">
+                    👷 ${instalacion.instalador_nombre_completo || 'Sin asignar'}
                 </div>
+            </div>
+        </div>
+
+        <!-- SERVICIOS A INSTALAR -->
+        <div class="services-section">
+            <div class="section-title">📦 Servicios a Instalar</div>
+            <div class="services-grid">
+                ${serviciosHTML}
             </div>
         </div>
 
@@ -955,7 +1058,7 @@ const htmlContent = `
             </div>
         </div>
 
-        <!-- FIRMAS COMPACTAS -->
+        <!-- FIRMAS -->
         <div class="signatures">
             <div class="signature-block">
                 <div class="signature-line"></div>
@@ -969,8 +1072,8 @@ const htmlContent = `
             </div>
             <div class="signature-block">
                 <div class="signature-line"></div>
-                <div class="signature-label">Completado</div>
-                <div class="signature-sublabel">Fecha y Hora</div>
+                <div class="signature-label">Fecha Completado</div>
+                <div class="signature-sublabel">____/____/________</div>
             </div>
         </div>
     </div>
