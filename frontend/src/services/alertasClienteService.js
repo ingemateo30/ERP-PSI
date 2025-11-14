@@ -7,16 +7,20 @@ class AlertasClienteService {
 
   static async verificarClienteExistente(identificacion, tipoDocumento = 'cedula') {
     try {
-      const response = await apiService.get('/clients/verificar-existente', {
-        identificacion,
-        tipo_documento: tipoDocumento
-      });
+      const response = await apiService.get(
+        '/clients/verificar-existente',
+        {
+          identificacion,
+          tipo_documento: tipoDocumento
+        },
+        { silent: true } // Modo silencioso para no mostrar errores en consola
+      );
 
       return response;
     } catch (error) {
       // Capturar cualquier error y permitir que la app continúe
       // La verificación de cliente es una funcionalidad opcional
-      console.warn('⚠️ Endpoint de verificación no disponible, continuando sin verificación:', error.message);
+      // No loggear nada ya que el endpoint está en modo silent
 
       // Retornar respuesta segura que indica que no existe cliente duplicado
       return {

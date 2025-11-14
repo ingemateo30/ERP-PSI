@@ -39,10 +39,15 @@ class NotificacionesService {
   async getUnread(limite = 10) {
     try {
       this.log('Obteniendo notificaciones no leídas');
-      return await this.getAll({ leida: false, limite });
+      const response = await apiService.get(
+        NOTIFICACIONES_ENDPOINTS.LIST,
+        { leida: false, limite },
+        { silent: true } // Modo silencioso ya que puede no estar implementado
+      );
+      return response;
     } catch (error) {
-      console.error('Error obteniendo notificaciones no leídas:', error);
-      throw error;
+      // En caso de cualquier error, retornar array vacío sin logear
+      return { data: [], success: true };
     }
   }
 
@@ -50,15 +55,15 @@ class NotificacionesService {
   async getUnreadCount() {
     try {
       this.log('Contando notificaciones no leídas');
-      const response = await apiService.get(NOTIFICACIONES_ENDPOINTS.COUNT);
+      const response = await apiService.get(
+        NOTIFICACIONES_ENDPOINTS.COUNT,
+        {},
+        { silent: true } // Modo silencioso ya que puede no estar implementado
+      );
       return response;
     } catch (error) {
-      console.error('Error contando notificaciones:', error);
-      // En caso de error 404, retornar 0
-      if (error.message?.includes('404')) {
-        return { data: { total: 0 }, success: true };
-      }
-      throw error;
+      // En caso de cualquier error, retornar 0 sin logear
+      return { data: { total: 0 }, success: true };
     }
   }
 

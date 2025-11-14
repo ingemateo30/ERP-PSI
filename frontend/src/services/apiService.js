@@ -13,7 +13,8 @@ class ApiService {
  async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const token = authService.getToken();
-    
+    const silent = options.silent || false; // Modo silencioso para endpoints opcionales
+
     const config = {
         headers: {
             ...options.headers,
@@ -31,15 +32,19 @@ class ApiService {
     }
 
     try {
-        console.log('🔗 ApiService - Haciendo petición a:', url);
-        console.log('🔑 ApiService - Token presente:', !!token);
-        console.log('📋 ApiService - Headers:', config.headers);
-        console.log('🎯 ApiService - ResponseType:', options.responseType);
+        if (!silent) {
+            console.log('🔗 ApiService - Haciendo petición a:', url);
+            console.log('🔑 ApiService - Token presente:', !!token);
+            console.log('📋 ApiService - Headers:', config.headers);
+            console.log('🎯 ApiService - ResponseType:', options.responseType);
+        }
 
         const response = await fetch(url, config);
-        
-        console.log('📡 ApiService - Response status:', response.status);
-        console.log('📡 ApiService - Response headers:', Object.fromEntries(response.headers.entries()));
+
+        if (!silent) {
+            console.log('📡 ApiService - Response status:', response.status);
+            console.log('📡 ApiService - Response headers:', Object.fromEntries(response.headers.entries()));
+        }
 
         if (response.status === 401 && token && !options._isRetry) {
             console.log('🔄 ApiService - Token expirado, intentando refrescar...');
@@ -62,22 +67,30 @@ class ApiService {
                               options.responseType === 'blob';
 
         if (isBinaryResponse) {
-            console.log('📄 ApiService - Respuesta binaria detectada:', contentType);
-            
+            if (!silent) {
+                console.log('📄 ApiService - Respuesta binaria detectada:', contentType);
+            }
+
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('❌ ApiService - Error en respuesta binaria:', errorText);
+                if (!silent) {
+                    console.error('❌ ApiService - Error en respuesta binaria:', errorText);
+                }
                 throw new Error(errorText || `Error ${response.status}: ${response.statusText}`);
             }
-            
+
             const blob = await response.blob();
-            console.log('✅ ApiService - Blob recibido, tamaño:', blob.size, 'tipo:', blob.type);
-            
+            if (!silent) {
+                console.log('✅ ApiService - Blob recibido, tamaño:', blob.size, 'tipo:', blob.type);
+            }
+
             if (blob.size < 50) {
-                console.error('❌ ApiService - Blob demasiado pequeño:', blob.size);
+                if (!silent) {
+                    console.error('❌ ApiService - Blob demasiado pequeño:', blob.size);
+                }
                 throw new Error('El archivo descargado está vacío o es inválido');
             }
-            
+
             return { data: blob, success: true };
         }
 
@@ -95,31 +108,38 @@ class ApiService {
 
         try {
             const data = await response.json();
-            console.log('✅ ApiService - Respuesta JSON exitosa');
+            if (!silent) {
+                console.log('✅ ApiService - Respuesta JSON exitosa');
+            }
             return data;
         } catch (parseError) {
-            console.warn('⚠️ ApiService - No se pudo parsear JSON, retornando texto');
+            if (!silent) {
+                console.warn('⚠️ ApiService - No se pudo parsear JSON, retornando texto');
+            }
             return await response.text();
         }
 
     } catch (error) {
-        console.error('❌ ApiService - Error en petición:', error);
-        
+        if (!silent) {
+            console.error('❌ ApiService - Error en petición:', error);
+        }
+
         if (error.name === 'TypeError' && error.message.includes('fetch')) {
             throw new Error('Error de conexión. Verifique su conexión a internet.');
         }
-        
+
         throw error;
     }
 }
 
   // Métodos HTTP específicos
-  async get(endpoint, params = {}) {
+  async get(endpoint, params = {}, options = {}) {
     const queryString = new URLSearchParams(params).toString();
     const url = queryString ? `${endpoint}?${queryString}` : endpoint;
-    
+
     return this.request(url, {
       method: 'GET',
+      ...options
     });
   }
 
