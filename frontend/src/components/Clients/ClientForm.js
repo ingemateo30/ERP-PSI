@@ -228,21 +228,21 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   useEffect(() => {
     const verificarClienteExistente = async () => {
       if (formData.identificacion.length >= 6 && !client) { // Solo para clientes nuevos
-        try {
-          setVerificandoCliente(true);
+        setVerificandoCliente(true);
 
-          const response = await AlertasClienteService.verificarClienteExistente(
-            formData.identificacion,
-            formData.tipo_documento
-          );
+        const response = await AlertasClienteService.verificarClienteExistente(
+          formData.identificacion,
+          formData.tipo_documento
+        );
 
+        // Verificar si existe un cliente y establecerlo
+        if (response.success && response.data) {
           setVerificacionCliente(response.data);
-        } catch (error) {
-          console.error('Error verificando cliente:', error);
+        } else {
           setVerificacionCliente(null);
-        } finally {
-          setVerificandoCliente(false);
         }
+
+        setVerificandoCliente(false);
       } else {
         setVerificacionCliente(null);
       }
