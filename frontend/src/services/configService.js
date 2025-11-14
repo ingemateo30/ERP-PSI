@@ -302,12 +302,15 @@
 
 async getServicePlans(params = {}) {
   try {
+    // ✅ ASEGURAR que params sea un objeto
+    const filtros = params || {};
+    
     // ✅ Si no se especifica 'activo', filtrar solo activos por defecto
-    if (params.activo === undefined) {
-      params.activo = 'true';
+    if (filtros.activo === undefined) {
+      filtros.activo = 'true';
     }
     
-    const queryParams = new URLSearchParams(params).toString();
+    const queryParams = new URLSearchParams(filtros).toString();
     const url = queryParams ? 
       `${this.baseURL}/service-plans?${queryParams}` : 
       `${this.baseURL}/service-plans`;
@@ -318,12 +321,11 @@ async getServicePlans(params = {}) {
     console.log('📡 ConfigService: Respuesta recibida:', response);
     
     return response;
-      } catch (error) {
-        console.error('❌ ConfigService: Error obteniendo planes:', error);
-        throw error;
-      }
-    }
-
+  } catch (error) {
+    console.error('❌ ConfigService: Error obteniendo planes:', error);
+    throw error;
+  }
+}
     async getServicePlanStats() {
       try {
         return await this.makeRequest(`${this.baseURL}/service-plans/stats`);
