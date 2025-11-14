@@ -41,39 +41,40 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const rol = (userRole || '').toLowerCase().trim();
   const esAdministrador = rol === 'administrador';
 
-  // ==========================================
-  // DEFINICIÓN DE PÁGINAS Y COMANDOS
+// ==========================================
+  // DEFINICIÓN DE PÁGINAS Y COMANDOS CON PERMISOS
   // ==========================================
 
   const paginasDelSistema = [
-    { icon: <Home size={18} />, label: 'Dashboard', path: '/dashboard', keywords: ['inicio', 'home', 'principal'], color: 'blue' },
-    { icon: <Users size={18} />, label: 'Clientes', path: '/clients', keywords: ['clientes', 'usuarios', 'customers'], color: 'green' },
-    { icon: <Activity size={18} />, label: 'Facturación Automática', path: '/facturacion-automatica', keywords: ['facturas', 'billing', 'automatico'], color: 'purple' },
-    { icon: <TrendingUp size={18} />, label: 'Facturas', path: '/facturas', keywords: ['facturas', 'invoices', 'cobros'], color: 'yellow' },
-    { icon: <FileText size={18} />, label: 'Contratos', path: '/contratos', keywords: ['contratos', 'contracts', 'acuerdos'], color: 'orange' },
-    { icon: <CreditCard size={18} />, label: 'Pagos', path: '/cruce-pagos', keywords: ['pagos', 'payments', 'cruce'], color: 'green' },
-    { icon: <FileText size={18} />, label: 'Historial Facturas', path: '/historial-facturas', keywords: ['historial', 'history'], color: 'gray' },
-    { icon: <Wifi size={18} />, label: 'Planes de Servicio', path: '/config/service-plans', keywords: ['planes', 'servicios', 'plans'], color: 'blue' },
-    { icon: <Wrench size={18} />, label: 'Instalaciones', path: '/instalaciones', keywords: ['instalaciones', 'installation', 'instalar'], color: 'red' },
-    { icon: <Package size={18} />, label: 'Inventario', path: '/inventory', keywords: ['inventario', 'stock', 'productos'], color: 'indigo' },
-    { icon: <Calendar size={18} />, label: 'Calendario', path: '/calendar', keywords: ['calendario', 'calendar', 'agenda'], color: 'pink' },
-    { icon: <FileText size={18} />, label: 'PQR', path: '/pqr', keywords: ['pqr', 'quejas', 'reclamos', 'peticiones'], color: 'red' },
-    { icon: <Loader2 size={18} />, label: 'Incidencias', path: '/incidencias', keywords: ['incidencias', 'issues', 'problemas'], color: 'orange' },
-    { icon: <Mail size={18} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', keywords: ['correo', 'email', 'plantillas'], color: 'blue' },
-    { icon: <PieChartIcon size={18} />, label: 'Reportes', path: '/reportes-regulatorios', keywords: ['reportes', 'reports', 'regulatorios'], color: 'purple' },
-    { icon: <BarChart3 size={18} />, label: 'Estadísticas', path: '/reports', keywords: ['estadisticas', 'stats', 'analytics'], color: 'green' },
-    { icon: <UserCheck size={18} />, label: 'Usuarios Sistema', path: '/admin/users', keywords: ['usuarios', 'admin', 'sistema'], color: 'blue' },
-    { icon: <FileText size={18} />, label: 'Firma de Contratos', path: '/firma-contratos', keywords: ['firma', 'signature', 'contratos'], color: 'indigo' },
-    { icon: <Settings size={18} />, label: 'Configuración', path: '/config', keywords: ['configuracion', 'settings', 'config'], color: 'gray' },
-    { icon: <User size={18} />, label: 'Mi Perfil', path: '/profile', keywords: ['perfil', 'profile', 'cuenta'], color: 'blue' },
+    { icon: <Home size={18} />, label: 'Dashboard', path: '/dashboard', keywords: ['inicio', 'home', 'principal'], color: 'blue', permission: null },
+    { icon: <Users size={18} />, label: 'Clientes', path: '/clients', keywords: ['clientes', 'usuarios', 'customers'], color: 'green', permission: 'supervisor,administrador' },
+    { icon: <Activity size={18} />, label: 'Facturación Automática', path: '/facturacion-automatica', keywords: ['facturas', 'billing', 'automatico'], color: 'purple', permission: 'administrador' },
+    { icon: <TrendingUp size={18} />, label: 'Facturas', path: '/facturas', keywords: ['facturas', 'invoices', 'cobros'], color: 'yellow', permission: 'supervisor,administrador' },
+    { icon: <FileText size={18} />, label: 'Contratos', path: '/contratos', keywords: ['contratos', 'contracts', 'acuerdos'], color: 'orange', permission: 'supervisor,administrador' },
+    { icon: <CreditCard size={18} />, label: 'Pagos', path: '/cruce-pagos', keywords: ['pagos', 'payments', 'cruce'], color: 'green', permission: 'supervisor,administrador' },
+    { icon: <FileText size={18} />, label: 'Historial Facturas', path: '/historial-facturas', keywords: ['historial', 'history'], color: 'gray', permission: 'supervisor,administrador' },
+    { icon: <Wifi size={18} />, label: 'Planes de Servicio', path: '/config/service-plans', keywords: ['planes', 'servicios', 'plans'], color: 'blue', permission: 'administrador' },
+    { icon: <Wrench size={18} />, label: 'Instalaciones', path: '/instalaciones', keywords: ['instalaciones', 'installation', 'instalar'], color: 'red', permission: 'instalador,supervisor,administrador' },
+    { icon: <Package size={18} />, label: 'Inventario', path: '/inventory', keywords: ['inventario', 'stock', 'productos'], color: 'indigo', permission: 'instalador,supervisor,administrador' },
+    { icon: <Calendar size={18} />, label: 'Calendario', path: '/calendar', keywords: ['calendario', 'calendar', 'agenda'], color: 'pink', permission: 'instalador,supervisor,administrador' },
+    { icon: <FileText size={18} />, label: 'PQR', path: '/pqr', keywords: ['pqr', 'quejas', 'reclamos', 'peticiones'], color: 'red', permission: 'supervisor,administrador' },
+    { icon: <Loader2 size={18} />, label: 'Incidencias', path: '/incidencias', keywords: ['incidencias', 'issues', 'problemas'], color: 'orange', permission: 'supervisor,administrador' },
+    { icon: <Mail size={18} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', keywords: ['correo', 'email', 'plantillas'], color: 'blue', permission: 'supervisor,administrador' },
+    { icon: <PieChartIcon size={18} />, label: 'Reportes', path: '/reportes-regulatorios', keywords: ['reportes', 'reports', 'regulatorios'], color: 'purple', permission: 'administrador' },
+    { icon: <BarChart3 size={18} />, label: 'Estadísticas', path: '/reports', keywords: ['estadisticas', 'stats', 'analytics'], color: 'green', permission: 'administrador' },
+    { icon: <BarChart3 size={18} />, label: 'Mapa', path: '/mapa-instalaciones', keywords: ['mapa', 'map', 'ubicacion'], color: 'green', permission: 'instalador,administrador,supervisor' },
+    { icon: <UserCheck size={18} />, label: 'Usuarios Sistema', path: '/admin/users', keywords: ['usuarios', 'admin', 'sistema'], color: 'blue', permission: 'administrador' },
+    { icon: <FileText size={18} />, label: 'Firma de Contratos', path: '/firma-contratos', keywords: ['firma', 'signature', 'contratos'], color: 'indigo', permission: 'administrador' },
+    { icon: <Settings size={18} />, label: 'Configuración', path: '/config', keywords: ['configuracion', 'settings', 'config'], color: 'gray', permission: 'administrador' },
+    { icon: <User size={18} />, label: 'Mi Perfil', path: '/profile', keywords: ['perfil', 'profile', 'cuenta'], color: 'blue', permission: null },
   ];
 
   const comandosRapidos = [
-    { icon: <Zap size={18} />, label: 'Nuevo Cliente', action: () => navigate('/clients?action=new'), keywords: ['nuevo', 'cliente', 'crear'], color: 'green' },
-    { icon: <FileText size={18} />, label: 'Nueva Factura', action: () => navigate('/facturas?action=new'), keywords: ['nueva', 'factura', 'crear'], color: 'blue' },
-    { icon: <Wrench size={18} />, label: 'Nueva Instalación', action: () => navigate('/instalaciones?action=new'), keywords: ['nueva', 'instalacion', 'crear'], color: 'red' },
-    { icon: <Calendar size={18} />, label: 'Ver Calendario Hoy', action: () => navigate('/calendar'), keywords: ['calendario', 'hoy', 'agenda'], color: 'pink' },
-    { icon: <LogOut size={18} />, label: 'Cerrar Sesión', action: logout, keywords: ['salir', 'logout', 'cerrar'], color: 'red' },
+    { icon: <Zap size={18} />, label: 'Nuevo Cliente', action: () => navigate('/clients?action=new'), keywords: ['nuevo', 'cliente', 'crear'], color: 'green', permission: 'supervisor,administrador' },
+    { icon: <FileText size={18} />, label: 'Nueva Factura', action: () => navigate('/facturas?action=new'), keywords: ['nueva', 'factura', 'crear'], color: 'blue', permission: 'supervisor,administrador' },
+    { icon: <Wrench size={18} />, label: 'Nueva Instalación', action: () => navigate('/instalaciones?action=new'), keywords: ['nueva', 'instalacion', 'crear'], color: 'red', permission: 'instalador,supervisor,administrador' },
+    { icon: <Calendar size={18} />, label: 'Ver Calendario Hoy', action: () => navigate('/calendar'), keywords: ['calendario', 'hoy', 'agenda'], color: 'pink', permission: 'instalador,supervisor,administrador' },
+    { icon: <LogOut size={18} />, label: 'Cerrar Sesión', action: logout, keywords: ['salir', 'logout', 'cerrar'], color: 'red', permission: null },
   ];
 
   // ==========================================
@@ -81,6 +82,11 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   // ==========================================
 
   const buscarClientes = async (query) => {
+    // ✅ Solo buscar clientes si tiene permisos
+    if (!hasPermission('supervisor,administrador')) {
+      return [];
+    }
+
     try {
       const response = await fetch(`/api/clients/search?q=${encodeURIComponent(query)}`);
       if (response.ok) {
@@ -101,10 +107,10 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   };
 
   // ==========================================
-  // LÓGICA DE BÚSQUEDA
+  // LÓGICA DE BÚSQUEDA CON FILTRO DE PERMISOS
   // ==========================================
 
-  useEffect(() => {
+ useEffect(() => {
     const performSearch = async () => {
       if (!searchQuery.trim()) {
         setSearchResults([]);
@@ -117,31 +123,55 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
       let results = [];
 
       try {
-        // 1. Buscar en páginas del sistema
-        const paginasEncontradas = paginasDelSistema.filter(pagina => {
-          const matchLabel = pagina.label.toLowerCase().includes(query);
-          const matchKeywords = pagina.keywords.some(kw => kw.includes(query));
-          return matchLabel || matchKeywords;
-        }).map(p => ({ ...p, type: 'pagina' }));
+        // 1. ✅ Buscar en páginas del sistema CON FILTRO DE PERMISOS
+        const paginasEncontradas = paginasDelSistema
+          .filter(pagina => {
+            // Primero verificar la búsqueda
+            const matchLabel = pagina.label.toLowerCase().includes(query);
+            const matchKeywords = pagina.keywords?.some(kw => kw.includes(query)) || false;
+            const matchesSearch = matchLabel || matchKeywords;
+            
+            // Si no coincide la búsqueda, descartar inmediatamente
+            if (!matchesSearch) return false;
+            
+            // ✅ LUEGO VERIFICAR PERMISOS
+            // Si no tiene permission definido (null), permitir acceso
+            if (!pagina.permission) return true;
+            
+            // Si tiene permission, verificar que el usuario tenga acceso
+            return hasPermission(pagina.permission);
+          })
+          .map(p => ({ ...p, type: 'pagina' }));
 
         results = [...paginasEncontradas];
 
-        // 2. Buscar en comandos rápidos
+        // 2. ✅ Buscar en comandos rápidos CON FILTRO DE PERMISOS
         if (query.startsWith('/') || query.startsWith('>')) {
-          const comandosEncontrados = comandosRapidos.filter(cmd =>
-            cmd.label.toLowerCase().includes(query.slice(1)) ||
-            cmd.keywords.some(kw => kw.includes(query.slice(1)))
-          ).map(c => ({ ...c, type: 'comando' }));
+          const comandosEncontrados = comandosRapidos
+            .filter(cmd => {
+              const matchesSearch = cmd.label.toLowerCase().includes(query.slice(1)) ||
+                cmd.keywords?.some(kw => kw.includes(query.slice(1))) || false;
+              
+              if (!matchesSearch) return false;
+              
+              // ✅ VERIFICAR PERMISOS EN COMANDOS
+              if (!cmd.permission) return true;
+              return hasPermission(cmd.permission);
+            })
+            .map(c => ({ ...c, type: 'comando' }));
+          
           results = [...comandosEncontrados, ...results];
         }
 
-        // 3. Buscar clientes si hay más de 2 caracteres
+        // 3. ✅ Buscar clientes solo si tiene permisos
         if (query.length > 2 && !query.startsWith('/') && !query.startsWith('>')) {
-          const clientes = await buscarClientes(query);
-          results = [...results, ...clientes];
+          if (hasPermission('supervisor,administrador')) {
+            const clientes = await buscarClientes(query);
+            results = [...results, ...clientes];
+          }
         }
 
-        setSearchResults(results.slice(0, 8)); // Limitar a 8 resultados
+        setSearchResults(results.slice(0, 8));
       } catch (error) {
         console.error('Error en búsqueda:', error);
         setSearchResults([]);
@@ -153,8 +183,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
     const debounce = setTimeout(performSearch, 300);
     return () => clearTimeout(debounce);
-  }, [searchQuery]);
-
+  }, [searchQuery, hasPermission]);
   // ==========================================
   // HISTORIAL DE BÚSQUEDA
   // ==========================================
