@@ -2018,6 +2018,7 @@ static async generarOrdenServicioPDF(req, res) {
     }
 
 }
+}
 
 
 console.log('✅ Controlador de instalaciones inicializado');
