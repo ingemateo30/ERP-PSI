@@ -258,8 +258,6 @@ const selectQuery = `
             const consulta = `
         SELECT 
           i.*,
-          i.equipos_instalados as equipos_json,
-          
           -- Datos del cliente
           c.identificacion as cliente_identificacion,
           c.nombre as cliente_nombre,
@@ -1173,14 +1171,33 @@ const selectQuery = `
             const [instalacion] = await Database.query(consulta, [id]);
 
             if (instalacion) {
-                // Procesar JSON fields
-                if (instalacion.equipos_instalados) {
-                    try {
-                        instalacion.equipos_instalados = JSON.parse(instalacion.equipos_instalados);
-                    } catch (e) {
-                        instalacion.equipos_instalados = [];
-                    }
-                }
+               // Procesar JSON fields con logs detallados
+console.log('🔧 RAW equipos_instalados:', instalacion.equipos_instalados);
+console.log('🔧 Tipo:', typeof instalacion.equipos_instalados);
+
+if (instalacion.equipos_instalados) {
+    try {
+        // Si ya es un objeto/array, no parsear
+        if (typeof instalacion.equipos_instalados === 'string') {
+            const parsed = JSON.parse(instalacion.equipos_instalados);
+            instalacion.equipos_instalados = parsed;
+            console.log('✅ Equipos parseados:', parsed);
+        } else if (Array.isArray(instalacion.equipos_instalados)) {
+            console.log('✅ Equipos ya son array:', instalacion.equipos_instalados);
+        } else {
+            console.log('⚠️ Equipos en formato inesperado:', instalacion.equipos_instalados);
+            instalacion.equipos_instalados = [];
+        }
+    } catch (e) {
+        console.error('❌ Error parseando equipos:', e.message);
+        instalacion.equipos_instalados = [];
+    }
+} else {
+    console.log('⚠️ No hay equipos_instalados en BD');
+    instalacion.equipos_instalados = [];
+}
+
+console.log('📦 Equipos finales a enviar:', instalacion.equipos_instalados);
 
                 if (instalacion.fotos_instalacion) {
                     try {

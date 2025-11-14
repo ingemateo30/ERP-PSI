@@ -813,182 +813,117 @@ const validarFormulario = () => {
     </div>
   );
 
-  const renderPestañaEquipos = () => (
-    <div className="space-y-6">
-      {modo === 'ver' ? (
-        <div>
-          {formData.equipos_instalados && formData.equipos_instalados.length > 0 ? (
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                <Package className="w-4 h-4 mr-2" />
-                Equipos Instalados
-              </h4>
-              <div className="space-y-3">
-                {formData.equipos_instalados.map((equipo, index) => (
-                  <div key={index} className="bg-white p-3 rounded border">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                      <div>
-                        <span className="text-sm text-gray-600">Equipo:</span>
-                        <p className="font-medium">{equipo.nombre || 'No especificado'}</p>
-                      </div>
-                      <div>
-                        <span className="text-sm text-gray-600">Serie:</span>
-                        <p className="font-medium">{equipo.serie || 'No especificado'}</p>
-                      </div>
-                      <div>
-                        <span className="text-sm text-gray-600">MAC:</span>
-                        <p className="font-medium">{equipo.mac || 'No especificado'}</p>
-                      </div>
-                    </div>
-                    {equipo.observaciones && (
-                      <div className="mt-2">
-                        <span className="text-sm text-gray-600">Observaciones:</span>
-                        <p className="text-sm">{equipo.observaciones}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Sin equipos registrados
-              </h3>
-              <p className="text-gray-600">
-                No se han registrado equipos para esta instalación
-              </p>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-lg font-medium text-gray-900">Equipos a instalar</h4>
-            <button
-              type="button"
-              onClick={() => {
-                setFormData(prev => ({
-                  ...prev,
-                  equipos_instalados: [
-                    ...prev.equipos_instalados,
-                    { equipo_id: '', serie: '', mac: '', observaciones: '' }
-                  ]
-                }));
-              }}
-              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Agregar equipo
-            </button>
+{/* Pestaña Equipos */}
+{pestañaActiva === 'equipos' && (
+  <div className="space-y-4">
+    <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+      <Package className="w-4 h-4 mr-2" />
+      Equipos Instalados
+    </h4>
+
+    {(() => {
+      // 🔍 DEBUG
+      console.log('🔍 RAW equipos_instalados:', instalacion?.equipos_instalados);
+      console.log('🔍 Tipo:', typeof instalacion?.equipos_instalados);
+
+      // Parsear si es string
+      let equipos = instalacion?.equipos_instalados;
+      
+      if (typeof equipos === 'string') {
+        try {
+          equipos = JSON.parse(equipos);
+          console.log('✅ Equipos parseados:', equipos);
+        } catch (e) {
+          console.error('❌ Error parseando:', e);
+          equipos = [];
+        }
+      }
+
+      // Validar array
+      if (!Array.isArray(equipos) || equipos.length === 0) {
+        return (
+          <div className="text-center py-8 text-gray-500">
+            <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+            <p>No hay equipos instalados registrados</p>
           </div>
+        );
+      }
 
-          {formData.equipos_instalados.map((equipo, index) => (
-            <div key={index} className="bg-gray-50 p-4 rounded-lg mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <h5 className="font-medium text-gray-900">Equipo {index + 1}</h5>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormData(prev => ({
-                      ...prev,
-                      equipos_instalados: prev.equipos_instalados.filter((_, i) => i !== index)
-                    }));
-                  }}
-                  className="text-red-600 hover:text-red-800"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+      // Renderizar equipos
+      return (
+        <div className="space-y-3">
+          {equipos.map((equipo, index) => {
+            console.log(`🔧 Equipo ${index}:`, equipo);
+            
+            return (
+              <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  
+                  {/* ID del Equipo */}
+                  {equipo.equipo_id && (
+                    <div>
+                      <span className="text-gray-600">ID Equipo:</span>
+                      <p className="font-medium">#{equipo.equipo_id}</p>
+                    </div>
+                  )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tipo de equipo
-                  </label>
-                  <select
-                    value={equipo.equipo_id}
-                    onChange={(e) => {
-                      const nuevosEquipos = [...formData.equipos_instalados];
-                      nuevosEquipos[index].equipo_id = e.target.value;
-                      setFormData(prev => ({ ...prev, equipos_instalados: nuevosEquipos }));
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Seleccionar equipo...</option>
-                    {equiposDisponibles.map(equipoDisp => (
-                      <option key={equipoDisp.id} value={equipoDisp.id}>
-                        {equipoDisp.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  {/* Nombre/Tipo */}
+                  <div>
+                    <span className="text-gray-600">Equipo:</span>
+                    <p className="font-medium">
+                      {equipo.nombre || equipo.tipo || equipo.tipo_equipo || 'No especificado'}
+                    </p>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Número de serie
-                  </label>
-                  <input
-                    type="text"
-                    value={equipo.serie}
-                    onChange={(e) => {
-                      const nuevosEquipos = [...formData.equipos_instalados];
-                      nuevosEquipos[index].serie = e.target.value;
-                      setFormData(prev => ({ ...prev, equipos_instalados: nuevosEquipos }));
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Serie del equipo..."
-                  />
-                </div>
+                  {/* Serie */}
+                  <div>
+                    <span className="text-gray-600">Serie:</span>
+                    <p className="font-medium font-mono">
+                      {equipo.serie || equipo.numero_serie || equipo.serial || 'No especificado'}
+                    </p>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Dirección MAC
-                  </label>
-                  <input
-                    type="text"
-                    value={equipo.mac}
-                    onChange={(e) => {
-                      const nuevosEquipos = [...formData.equipos_instalados];
-                      nuevosEquipos[index].mac = e.target.value.toUpperCase();
-                      setFormData(prev => ({ ...prev, equipos_instalados: nuevosEquipos }));
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="XX:XX:XX:XX:XX:XX"
-                  />
-                </div>
+                  {/* MAC */}
+                  <div>
+                    <span className="text-gray-600">MAC:</span>
+                    <p className="font-medium font-mono">
+                      {equipo.mac || equipo.mac_address || 'No especificado'}
+                    </p>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Observaciones
-                  </label>
-                  <input
-                    type="text"
-                    value={equipo.observaciones}
-                    onChange={(e) => {
-                      const nuevosEquipos = [...formData.equipos_instalados];
-                      nuevosEquipos[index].observaciones = e.target.value;
-                      setFormData(prev => ({ ...prev, equipos_instalados: nuevosEquipos }));
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Observaciones del equipo..."
-                  />
+                  {/* Marca */}
+                  {equipo.marca && (
+                    <div>
+                      <span className="text-gray-600">Marca:</span>
+                      <p className="font-medium">{equipo.marca}</p>
+                    </div>
+                  )}
+
+                  {/* Modelo */}
+                  {equipo.modelo && (
+                    <div>
+                      <span className="text-gray-600">Modelo:</span>
+                      <p className="font-medium">{equipo.modelo}</p>
+                    </div>
+                  )}
+
+                  {/* Observaciones */}
+                  {equipo.observaciones && (
+                    <div className="col-span-2">
+                      <span className="text-gray-600">Observaciones:</span>
+                      <p className="font-medium">{equipo.observaciones}</p>
+                    </div>
+                  )}
+                  
                 </div>
               </div>
-            </div>
-          ))}
-
-          {formData.equipos_instalados.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p>No hay equipos agregados. Haz clic en "Agregar equipo" para comenzar.</p>
-            </div>
-          )}
+            );
+          })}
         </div>
-      )}
-    </div>
-  );
+      );
+    })()}
+  </div>
+)}
 
   const renderPestañaHistorial = () => (
     <div className="space-y-6">
