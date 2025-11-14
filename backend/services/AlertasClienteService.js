@@ -132,13 +132,22 @@ class AlertasClienteService {
 
       conexion.release();
 
+ 
+
       return {
+
         existe: true,
+
         total_ubicaciones: clientes.length,
+
         cliente: {
-          identificacion: cliente.identificacion,
-          tipo_documento: cliente.tipo_documento,
-          nombre: cliente.nombre
+
+          identificacion: clientes[0].identificacion,
+
+          tipo_documento: clientes[0].tipo_documento,
+
+          nombre: clientes[0].nombre
+
         },
         ubicaciones: ubicaciones,
         servicios_totales: serviciosTotales,

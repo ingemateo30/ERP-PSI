@@ -43,9 +43,21 @@ const AlertaClienteExistente = ({
     );
   }
 
-  const { cliente, servicios, facturas_pendientes, alertas } = verificacion;
-  const serviciosActivos = servicios.filter(s => s.estado === 'activo');
+  const { cliente, servicios, servicios_totales, facturas_pendientes, facturas_pendientes_totales, alertas } = verificacion;
 
+ 
+
+  // Usar servicios_totales si existe (nueva estructura), sino usar servicios (retrocompatibilidad)
+
+  const listaServicios = servicios_totales || servicios || [];
+
+  const serviciosActivos = listaServicios.filter(s => s.estado === 'activo');
+
+ 
+
+  // Usar facturas_pendientes_totales si existe (nueva estructura), sino usar facturas_pendientes
+
+  const datosPendientes = facturas_pendientes_totales || facturas_pendientes;
   const getIconoAlerta = (tipo) => {
     const iconos = {
       info: Info,
@@ -147,32 +159,58 @@ const AlertaClienteExistente = ({
             </div>
           </div>
 
-          {facturas_pendientes && (
+         {datosPendientes && (
+
             <>
+
               <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+
                 <div className="flex items-center gap-2">
+
                   <div className="p-2 bg-yellow-100 rounded-lg">
+
                     <CreditCard className="h-4 w-4 text-yellow-600" />
+
                   </div>
+
                   <div className="flex-1 min-w-0">
+
                     <div className="text-xs text-gray-600">Facturas pendientes</div>
+
                     <div className="text-lg font-bold text-yellow-600">
-                      {facturas_pendientes.total_pendientes || 0}
+
+                      {datosPendientes.total_pendientes || 0}
+
                     </div>
+
                   </div>
+
                 </div>
+
               </div>
 
-              {facturas_pendientes.valor_pendiente > 0 && (
+ 
+
+              {datosPendientes.valor_pendiente > 0 && (
+
                 <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+
                   <div className="flex items-center gap-2">
+
                     <div className="p-2 bg-red-100 rounded-lg">
+
                       <AlertTriangle className="h-4 w-4 text-red-600" />
+
                     </div>
+
                     <div className="flex-1 min-w-0">
+
                       <div className="text-xs text-gray-600 truncate">Valor pendiente</div>
+
                       <div className="text-lg font-bold text-red-600 truncate">
-                        ${facturas_pendientes.valor_pendiente.toLocaleString()}
+
+                        ${datosPendientes.valor_pendiente.toLocaleString()}
+
                       </div>
                     </div>
                   </div>
@@ -244,11 +282,15 @@ const AlertaClienteExistente = ({
           </h4>
 
           {/* Servicios */}
-          {servicios && servicios.length > 0 && (
+          {listaServicios && listaServicios.length > 0 && (
+
             <div className="mb-5">
-              <h5 className="font-semibold text-gray-900 mb-3">Servicios ({servicios.length})</h5>
+
+              <h5 className="font-semibold text-gray-900 mb-3">Servicios ({listaServicios.length})</h5>
+
               <div className="space-y-2">
-                {servicios.map((servicio, index) => (
+
+                {listaServicios.map((servicio, index) => (
                   <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm gap-2">
                     <div className="flex-1 min-w-0">
                       <span className="font-semibold block truncate">{servicio.plan_nombre}</span>
