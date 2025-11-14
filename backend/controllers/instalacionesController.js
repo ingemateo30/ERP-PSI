@@ -1817,7 +1817,10 @@ static async generarOrdenServicioPDF(req, res) {
         }
 
         const PDFDocument = require('pdfkit');
-        const doc = new PDFDocument({ margin: 50 });
+        const doc = new PDFDocument({ 
+            margin: 50,
+            size: 'LETTER' // Asegurar tamaño carta
+        });
 
         // Headers para descarga
         res.setHeader('Content-Type', 'application/pdf');
@@ -1928,33 +1931,57 @@ static async generarOrdenServicioPDF(req, res) {
 
             yPosition += 20;
 
-            // Calcular cuánto espacio ocuparán las observaciones
-            const observacionesHeight = doc.heightOfString(instalacion.observaciones, { width: 500 });
-
             doc.font('Helvetica')
                 .fontSize(10)
                 .text(instalacion.observaciones, 50, yPosition, { width: 500 });
 
-            yPosition += observacionesHeight + 40;
+            // Calcular altura real de las observaciones
+            const observacionesHeight = doc.heightOfString(instalacion.observaciones, { width: 500 });
+            yPosition += observacionesHeight + 30;
         }
 
-        // ✅ CONTROL DE SALTO DE PÁGINA PARA FIRMAS
-        // Si no hay espacio suficiente para las firmas (necesitamos al menos 120px)
-        const espacioNecesarioParaFirmas = 120;
-        const alturaMaximaPagina = doc.page.height - doc.page.margins.bottom;
-
-        if (yPosition + espacioNecesarioParaFirmas > alturaMaximaPagina) {
-            // Forzar salto de página
+        // ✅✅✅ SOLUCIÓN DEFINITIVA: POSICIONAMIENTO ABSOLUTO DE FIRMAS ✅✅✅
+        
+        // Calcular altura de la página
+        const pageHeight = doc.page.height;
+        const bottomMargin = doc.page.margins.bottom;
+        const espacioParaFirmas = 150; // Espacio que necesitan las firmas
+        
+        // Límite seguro: si estamos a menos de 200px del final, nueva página
+        const limiteSeguro = pageHeight - bottomMargin - 200;
+        
+        console.log(`📏 Control de página - yPosition: ${yPosition}, límite: ${limiteSeguro}`);
+        
+        if (yPosition > limiteSeguro) {
+            console.log('📄 Agregando nueva página para firmas');
             doc.addPage();
-            yPosition = 50; // Reiniciar posición en nueva página
+            yPosition = 50; // Reset en nueva página
         }
+        
+        // Asegurar que las firmas siempre estén en la misma posición al fondo
+        // Calculamos la posición FIJA desde el fondo de la página
+        const posicionFirmasY = pageHeight - bottomMargin - espacioParaFirmas;
+        
+        // Si aún tenemos espacio, usamos la posición calculada
+        // Si no, forzamos que estén al menos 50px después del contenido
+        const yFirmas = Math.max(yPosition + 50, posicionFirmasY);
+        
+        console.log(`✍️ Dibujando firmas en Y: ${yFirmas}`);
 
-        // FOOTER - SECCIÓN DE FIRMAS (ahora con espacio garantizado)
+        // FOOTER - SECCIÓN DE FIRMAS con posición GARANTIZADA
         doc.fontSize(8)
-            .text('___________________________', 50, yPosition + 50)
-            .text('Firma del Cliente', 50, yPosition + 70)
-            .text('___________________________', 350, yPosition + 50)
-            .text('Firma del Instalador', 350, yPosition + 70);
+            .text('___________________________', 50, yFirmas)
+            .text('Firma del Cliente', 50, yFirmas + 20)
+            .text(`Fecha: _____________________`, 50, yFirmas + 35);
+        
+        doc.text('___________________________', 350, yFirmas)
+            .text('Firma del Instalador', 350, yFirmas + 20)
+            .text(`Fecha: _____________________`, 350, yFirmas + 35);
+
+        // Línea final decorativa
+        doc.moveTo(50, yFirmas + 60)
+            .lineTo(550, yFirmas + 60)
+            .stroke();
 
         // Finalizar el documento
         doc.end();
