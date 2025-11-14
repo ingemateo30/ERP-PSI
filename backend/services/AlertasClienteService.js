@@ -1,7 +1,7 @@
 // backend/services/AlertasClienteService.js
 // Crear este archivo nuevo
 
-const Database = require('../config/database');
+const { Database } = require('../models/Database');
 
 class AlertasClienteService {
 
