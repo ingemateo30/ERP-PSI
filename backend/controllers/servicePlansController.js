@@ -46,10 +46,11 @@ class ServicePlansController {
         params.push(tipo);
       }
 
-      if (activo !== '' && activo !== undefined) {
-        query += ` AND p.activo = ?`;
-        params.push(activo === 'true' ? 1 : 0);
-      }
+// ✅ Solo aplicar filtro si activo es explícitamente 'true' o 'false', ignorar 'null'
+if (activo !== '' && activo !== undefined && activo !== 'null' && activo !== null) {
+  query += ` AND p.activo = ?`;
+  params.push(activo === 'true' || activo === '1' ? 1 : 0);
+}
 
       if (segmento) {
         query += ` AND p.segmento = ?`;
