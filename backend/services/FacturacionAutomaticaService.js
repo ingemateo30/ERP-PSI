@@ -254,28 +254,27 @@ class FacturacionAutomaticaService {
           }
 
           const ultimaFechaFacturada = new Date(cliente.ultima_fecha_facturada);
-          
+
           // Desde: día siguiente a la última factura
+          // Ejemplo: Si la primera factura terminó el 26 julio, empezamos el 27 julio
           fechaDesde = new Date(ultimaFechaFacturada);
           fechaDesde.setDate(fechaDesde.getDate() + 1);
 
-          // ✅ Hasta: último día del mes ACTUAL (fecha de referencia)
+          // ✅ CORRECCIÓN CRÍTICA: Calcular 30 días después de fechaDesde
+          // Ejemplo: 27 julio + 30 días = 26 agosto
+          const fecha30DiasDepues = new Date(fechaDesde);
+          fecha30DiasDepues.setDate(fecha30DiasDepues.getDate() + 29); // +29 porque ya estamos en el día siguiente
+
+          // ✅ Hasta: último día del mes en que caen los 30 días
+          // Ejemplo: Si los 30 días terminan el 26 agosto, nivelamos hasta el 31 agosto
           fechaHasta = new Date(
-            fechaReferencia.getFullYear(),
-            fechaReferencia.getMonth() + 1,
-            0 // Último día del mes actual
+            fecha30DiasDepues.getFullYear(),
+            fecha30DiasDepues.getMonth() + 1,
+            0 // Último día del mes en que caen los 30 días
           );
 
-          // ✅ VALIDACIÓN: Si fechaHasta es menor o igual a fechaDesde, adelantar un mes
-          if (fechaHasta <= fechaDesde) {
-            fechaHasta = new Date(
-              fechaReferencia.getFullYear(),
-              fechaReferencia.getMonth() + 2,
-              0 // Último día del mes siguiente
-            );
-          }
-
           console.log(`   🔄 2da Factura (nivelación): ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
+          console.log(`      (30 días terminarían el ${fecha30DiasDepues.toLocaleDateString('es-CO')}, nivelando hasta fin de mes)`);
         }
         
         // ========================================================================

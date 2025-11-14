@@ -32,6 +32,7 @@ class InstalacionesController {
     static async listar(req, res) {
         try {
             console.log('📋 Listando instalaciones con parámetros:', req.query);
+            console.log('👤 Usuario autenticado:', req.user);
 
             const {
                 page = 1,
@@ -47,6 +48,13 @@ class InstalacionesController {
             // Construir WHERE clause
             let whereClause = 'WHERE 1=1';
             const params = [];
+
+            // 🔒 FILTRO POR ROL: Si el usuario es instalador, solo puede ver sus propias instalaciones
+            if (req.user && req.user.rol === 'instalador') {
+                whereClause += ' AND i.instalador_id = ?';
+                params.push(req.user.id);
+                console.log(`🔒 Filtro de instalador aplicado: solo instalaciones del usuario ${req.user.id}`);
+            }
 
             if (busqueda.trim()) {
                 whereClause += ` AND (
@@ -64,7 +72,9 @@ class InstalacionesController {
                 params.push(estado);
             }
 
-            if (instalador_id) {
+            // Solo aplicar el filtro de instalador_id si el usuario NO es instalador
+            // (los instaladores ya tienen su filtro aplicado arriba)
+            if (instalador_id && (!req.user || req.user.rol !== 'instalador')) {
                 if (instalador_id === 'sin_asignar') {
                     whereClause += ' AND i.instalador_id IS NULL';
                 } else {
@@ -173,16 +183,16 @@ const instalaciones = await Database.query(selectQuery, params);
                 }
             });
 
-            // Obtener estadísticas
+            // Obtener estadísticas (usando los mismos filtros incluyendo el del instalador)
             const estadisticasQuery = `
-      SELECT 
+      SELECT
         COUNT(*) as total,
         SUM(CASE WHEN i.estado = 'programada' THEN 1 ELSE 0 END) as programadas,
         SUM(CASE WHEN i.estado = 'en_proceso' THEN 1 ELSE 0 END) as en_proceso,
         SUM(CASE WHEN i.estado = 'completada' THEN 1 ELSE 0 END) as completadas,
         SUM(CASE WHEN i.estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas,
         SUM(CASE WHEN i.estado = 'reagendada' THEN 1 ELSE 0 END) as reagendadas,
-        SUM(CASE WHEN DATE(i.fecha_programada) < CURDATE() 
+        SUM(CASE WHEN DATE(i.fecha_programada) < CURDATE()
             AND i.estado NOT IN ('completada', 'cancelada') THEN 1 ELSE 0 END) as vencidas
       ${baseQuery}
     `;

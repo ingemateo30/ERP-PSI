@@ -381,6 +381,7 @@ const validarFormulario = () => {
           return (
             <button
               key={pestaña.id}
+              type="button"
               onClick={() => setPestañaActiva(pestaña.id)}
               className={`${
                 activa

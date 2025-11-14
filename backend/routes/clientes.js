@@ -613,10 +613,20 @@ router.post('/clientes-con-servicios',
 
       // Manejo de errores específicos
       if (error.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({
-          success: false,
-          message: 'Ya existe un cliente con esta identificación'
-        });
+        // Importar helper de cliente existente
+        const { generarRespuestaErrorDuplicado } = require('../utils/clienteExistenteHelper');
+
+        try {
+          const errorInfo = await generarRespuestaErrorDuplicado(datosCliente.identificacion);
+          return res.status(errorInfo.statusCode).json(errorInfo.response);
+        } catch (helperError) {
+          console.error('Error al generar respuesta detallada:', helperError);
+          return res.status(409).json({
+            success: false,
+            message: 'Ya existe un cliente con esta identificación',
+            identificacion: datosCliente.identificacion
+          });
+        }
       }
 
       res.status(500).json({

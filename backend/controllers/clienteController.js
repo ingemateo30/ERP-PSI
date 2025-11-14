@@ -420,12 +420,14 @@ static async crear(req, res) {
 
     console.error('❌ Error al crear cliente:', error);
 
-    if (error.message.includes('Duplicate entry')) {
-      return res.status(409).json({
-        success: false,
-        message: 'Ya existe un cliente con esta identificación'
-      });
-    }
+    // ✅ MODIFICADO: Ya no validamos duplicados por identificación
+    // Se permite el mismo cliente en diferentes direcciones/ciudades
+    // if (error.message.includes('Duplicate entry')) {
+    //   return res.status(409).json({
+    //     success: false,
+    //     message: 'Ya existe un cliente con esta identificación'
+    //   });
+    // }
 
     res.status(500).json({
       success: false,
