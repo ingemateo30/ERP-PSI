@@ -309,21 +309,27 @@ const register = async (userData) => {
 
  // Función para cerrar sesión
 const logout = async () => {
-  dispatch({ type: AuthActions.SET_LOADING });
-
   try {
-    // Intentar logout en el servidor
-    await authService.logout();
-  } catch (error) {
-    console.error('Error al cerrar sesión:', error);
-  } finally {
-    // Limpiar estado
-    dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
+    console.log('🚪 Cerrando sesión...');
     
-    // ✅ CRÍTICO: Limpiar completamente la navegación y forzar ir al login
-    // Esto evita que intente volver a la última página visitada
-    window.history.pushState(null, '', '/login');
+    // Limpiar tokens
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    
+    // ✅ LIMPIAR HISTORIAL DE BÚSQUEDA
+    localStorage.removeItem('searchHistory');
+    localStorage.removeItem('recentSearches');
+    
+    // Resetear estado
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    
+    console.log('✅ Sesión cerrada exitosamente');
+    
+    // Redirigir al login
     window.location.href = '/login';
+  } catch (error) {
+    console.error('❌ Error al cerrar sesión:', error);
   }
 };
 
