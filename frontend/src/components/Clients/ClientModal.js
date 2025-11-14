@@ -340,13 +340,6 @@ const formatDate = (dateString) => {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div>
-                      <p className="text-gray-500">MAC Address</p>
-                      <p className="font-medium text-gray-900">
-                        {client.mac_address || 'No asignada'}
-                      </p>
-                    </div>
-                    
-                    <div>
                       <p className="text-gray-500">IP Asignada</p>
                       <p className="font-medium text-gray-900">
                         {client.ip_asignada || 'No asignada'}
@@ -363,16 +356,9 @@ const formatDate = (dateString) => {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div>
-                      <p className="text-gray-500">TAP</p>
+                      <p className="text-gray-500">Contraseña Wifi</p>
                       <p className="font-medium text-gray-900">
                         {client.tap || 'No asignado'}
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <p className="text-gray-500">Puerto</p>
-                      <p className="font-medium text-gray-900">
-                        {client.puerto || 'No asignado'}
                       </p>
                     </div>
                   </div>
@@ -386,12 +372,6 @@ const formatDate = (dateString) => {
                   </h4>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-gray-500">Número de Contrato</p>
-                      <p className="font-medium text-gray-900">
-                        {client.numero_contrato || 'No asignado'}
-                      </p>
-                    </div>
                     
                     <div>
                       <p className="text-gray-500">Código de Usuario</p>
@@ -399,13 +379,7 @@ const formatDate = (dateString) => {
                         {client.codigo_usuario || 'No asignado'}
                       </p>
                     </div>
-                    
-                    <div>
-                      <p className="text-gray-500">Ruta</p>
-                      <p className="font-medium text-gray-900">
-                        {client.ruta || 'No asignada'}
-                      </p>
-                    </div>
+
                     
                     <div>
                       <p className="text-gray-500">Requiere Reconexión</p>
