@@ -65,73 +65,21 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
     return children;
   }
 
-  // Si llegó aquí, no tiene permisos
+ // Si llegó aquí, no tiene permisos
   console.log('❌ ProtectedRoute - Acceso denegado por falta de permisos');
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-8">
-        <div className="text-center">
-          {/* Icono de acceso denegado */}
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
-            <Lock className="h-8 w-8 text-red-600" />
-          </div>
+  // ✅ CAMBIO: Redirigir automáticamente según el rol en lugar de mostrar pantalla de error
+  const dashboardMap = {
+    'instalador': '/instalador/dashboard',
+    'supervisor': '/dashboard',
+    'administrador': '/dashboard'
+  };
 
-          {/* Título */}
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Acceso Denegado
-          </h2>
-
-          {/* Descripción */}
-          <p className="text-gray-600 mb-6">
-            No tienes permisos para acceder a esta página.
-          </p>
-
-          {/* Información de roles */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-            <div className="flex items-start mb-2">
-              <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Rol requerido:
-                </p>
-                <p className="text-sm text-gray-700 mt-1">
-                  {requiredRole}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start mt-3">
-              <Lock className="w-5 h-5 text-gray-600 mr-2 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Tu rol actual:
-                </p>
-                <p className="text-sm text-gray-700 mt-1">
-                  {userRole || 'No definido'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Botones de acción */}
-          <div className="space-y-3">
-            <button
-              onClick={() => window.history.back()}
-              className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
-            >
-              Volver Atrás
-            </button>
-            <button
-              onClick={() => window.location.href = '/dashboard'}
-              className="w-full px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90 transition-colors font-medium"
-            >
-              Ir al Dashboard
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const redirectPath = dashboardMap[normalizedUserRole] || '/dashboard';
+  
+  console.log(`🔄 ProtectedRoute - Redirigiendo a: ${redirectPath}`);
+  
+  return <Navigate to={redirectPath} replace />;
 };
 
 export default ProtectedRoute;

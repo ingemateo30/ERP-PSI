@@ -203,11 +203,9 @@ export const AuthProvider = ({ children }) => {
     let token, user;
     
     if (response.success && response.data) {
-      // Estructura del backend: { success: true, data: { user: {...}, tokens: {...} } }
       token = response.data.tokens?.accessToken;
       user = response.data.user;
     } else {
-      // Fallback para otras estructuras
       token = response.token || response.accessToken;
       user = response.data?.user || response.user;
     }
@@ -215,10 +213,8 @@ export const AuthProvider = ({ children }) => {
     console.log('🔍 AuthContext - Token extraído:', token ? 'EXISTS' : 'MISSING');
     console.log('🔍 AuthContext - User extraído:', user ? 'EXISTS' : 'MISSING');
 
-    // Si no viene usuario en la respuesta, extraer del token
     if (!user && token) {
       user = authService.getUserFromToken();
-      console.log('🔍 AuthContext - User del token:', user);
     }
 
     if (user && token) {
@@ -227,6 +223,22 @@ export const AuthProvider = ({ children }) => {
         type: AuthActions.SET_AUTHENTICATED,
         payload: { user, token }
       });
+      
+      // ✅ NUEVO: Forzar redirección según rol INMEDIATAMENTE
+      const userRole = (user.rol || user.role).toLowerCase();
+      
+      // Limpiar historial de navegación
+      window.history.replaceState(null, '', window.location.pathname);
+      
+      // Redirigir según rol
+      setTimeout(() => {
+        if (userRole === 'instalador') {
+          window.location.href = '/instalador/dashboard';
+        } else {
+          window.location.href = '/dashboard';
+        }
+      }, 100);
+      
     } else {
       console.error('❌ AuthContext - Faltan datos: user=', !!user, 'token=', !!token);
       throw new Error('Respuesta de login inválida');
@@ -243,7 +255,6 @@ export const AuthProvider = ({ children }) => {
     throw error;
   }
 };
-
   // Función para registrar usuario
   // En tu AuthContext.js - REEMPLAZA el método register
 
