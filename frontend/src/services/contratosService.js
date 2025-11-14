@@ -178,12 +178,14 @@ class ContratosService {
 
             console.log(`📄 Generando PDF del contrato ID: ${id}`);
 
-            const blob = await apiService.request(`${API_BASE}/${id}/pdf`, {
+            const response = await apiService.request(`${API_BASE}/${id}/pdf`, {
                 responseType: 'blob',
                 headers: {
                     'Accept': 'application/pdf'
                 }
             });
+
+            const blob = response.data;
 
             // Validación del blob
             if (!blob || blob.size === 0) {

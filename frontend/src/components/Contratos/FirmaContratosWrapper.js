@@ -270,13 +270,15 @@ const FirmaContratosWrapper = () => {
         const response = await apiService.request(`/contratos/${contratoId}/descargar-pdf`, {
             responseType: 'blob'
         });
-        
-        if (!response || response.size === 0) {
+
+        const blob = response.data;
+
+        if (!blob || blob.size === 0) {
             alert('El PDF está vacío. Verifica que el contrato tenga un PDF generado.');
             return;
         }
-        
-        const url = window.URL.createObjectURL(response);
+
+        const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
@@ -285,7 +287,7 @@ const FirmaContratosWrapper = () => {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        
+
     } catch (error) {
         console.error('Error descargando contrato:', error);
         alert('Error al descargar el contrato: ' + error.message);

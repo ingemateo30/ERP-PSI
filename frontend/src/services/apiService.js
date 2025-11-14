@@ -63,21 +63,21 @@ class ApiService {
 
         if (isBinaryResponse) {
             console.log('📄 ApiService - Respuesta binaria detectada:', contentType);
-            
+
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('❌ ApiService - Error en respuesta binaria:', errorText);
                 throw new Error(errorText || `Error ${response.status}: ${response.statusText}`);
             }
-            
+
             const blob = await response.blob();
             console.log('✅ ApiService - Blob recibido, tamaño:', blob.size, 'tipo:', blob.type);
-            
+
             if (blob.size < 50) {
                 console.error('❌ ApiService - Blob demasiado pequeño:', blob.size);
                 throw new Error('El archivo descargado está vacío o es inválido');
             }
-            
+
             return { data: blob, success: true };
         }
 
