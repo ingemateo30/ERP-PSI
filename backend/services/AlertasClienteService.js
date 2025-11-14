@@ -141,13 +141,25 @@ class AlertasClienteService {
         total_ubicaciones: clientes.length,
 
         cliente: {
-
+          // ✅ CORRECCIÓN: Devolver TODOS los datos del cliente
+          id: clientes[0].id,
           identificacion: clientes[0].identificacion,
-
           tipo_documento: clientes[0].tipo_documento,
-
-          nombre: clientes[0].nombre
-
+          nombre: clientes[0].nombre,
+          correo: clientes[0].correo,
+          telefono: clientes[0].telefono,
+          telefono_2: clientes[0].telefono_2,
+          direccion: clientes[0].direccion,
+          barrio: clientes[0].barrio,
+          estrato: clientes[0].estrato,
+          ciudad_id: clientes[0].ciudad_id,
+          sector_id: clientes[0].sector_id,
+          observaciones: clientes[0].observaciones,
+          estado: clientes[0].estado,
+          fecha_registro: clientes[0].fecha_registro,
+          departamento_nombre: clientes[0].departamento_nombre,
+          ciudad_nombre: clientes[0].ciudad_nombre,
+          sector_nombre: clientes[0].sector_nombre
         },
         ubicaciones: ubicaciones,
         servicios_totales: serviciosTotales,

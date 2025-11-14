@@ -2226,6 +2226,103 @@ const query = `
     }
   }
   /**
+   * ✅ NUEVO: Agregar servicio a cliente existente
+   * Este método permite agregar un nuevo servicio a un cliente que ya existe en el sistema
+   */
+  static async agregarServicioAClienteExistente(clienteId, datosServicio, createdBy = null) {
+    return await Database.transaction(async (conexion) => {
+      console.log(`🔌 Agregando servicio a cliente existente ${clienteId}...`);
+
+      // 1. Verificar que el cliente existe
+      const [clientes] = await conexion.execute(
+        'SELECT * FROM clientes WHERE id = ?',
+        [clienteId]
+      );
+
+      if (clientes.length === 0) {
+        throw new Error('Cliente no encontrado');
+      }
+
+      const cliente = clientes[0];
+
+      // 2. Convertir datos del servicio al formato esperado
+      const servicioData = {
+        planInternetId: datosServicio.planInternetId || datosServicio.plan_internet_id,
+        planTelevisionId: datosServicio.planTelevisionId || datosServicio.plan_television_id,
+        plan_id: datosServicio.plan_id,
+        precioInternetCustom: datosServicio.precioInternetCustom || datosServicio.precio_internet_custom,
+        precioTelevisionCustom: datosServicio.precioTelevisionCustom || datosServicio.precio_television_custom,
+        precio_personalizado: datosServicio.precio_personalizado,
+        tipoContrato: datosServicio.tipo_permanencia || 'sin_permanencia',
+        mesesPermanencia: datosServicio.meses_permanencia || (datosServicio.tipo_permanencia === 'con_permanencia' ? 6 : 0),
+        fechaActivacion: datosServicio.fecha_activacion || new Date().toISOString().split('T')[0],
+        observaciones: datosServicio.observaciones || '',
+        direccion_servicio: datosServicio.direccion_servicio || cliente.direccion,
+        nombre_sede: datosServicio.nombre_sede || 'Servicio Adicional'
+      };
+
+      // 3. Crear los servicios
+      const serviciosCreados = await this.crearServiciosDeSede(
+        conexion,
+        clienteId,
+        servicioData,
+        createdBy
+      );
+
+      if (serviciosCreados.length === 0) {
+        throw new Error('No se pudo crear ningún servicio. Verifique que seleccionó al menos un plan.');
+      }
+
+      // 4. Generar contrato para el nuevo servicio
+      const contratoId = await this.generarContratoParaSede(
+        conexion,
+        clienteId,
+        serviciosCreados,
+        servicioData,
+        createdBy
+      );
+
+      // 5. Generar factura para el nuevo servicio
+      const facturaId = await this.generarFacturaParaSede(
+        conexion,
+        clienteId,
+        serviciosCreados,
+        servicioData,
+        contratoId,
+        createdBy
+      );
+
+      // 6. Generar orden de instalación si se solicita
+      let instalacionId = null;
+      if (datosServicio.programar_instalacion !== false) {
+        const instalacion = await this.generarOrdenInstalacionParaSede(
+          conexion,
+          clienteId,
+          serviciosCreados,
+          servicioData,
+          contratoId,
+          createdBy
+        );
+        instalacionId = instalacion.id;
+      }
+
+      console.log(`✅ Servicio agregado exitosamente al cliente ${clienteId}`);
+
+      return {
+        cliente_id: clienteId,
+        servicios_creados: serviciosCreados,
+        contrato_id: contratoId,
+        factura_id: facturaId,
+        instalacion_id: instalacionId,
+        resumen: {
+          cantidad_servicios: serviciosCreados.length,
+          servicios: serviciosCreados.map(s => `${s.tipo}: ${s.plan_nombre}`).join(', ')
+        }
+      };
+    });
+  }
+
+  /**
    * Obtener resumen estadístico del sistema
    */
   static async obtenerResumenEstadistico() {
@@ -2236,7 +2333,7 @@ const query = `
 
       // Estadísticas de clientes
       const [statsClientes] = await conexion.execute(`
-        SELECT 
+        SELECT
           COUNT(*) as total_clientes,
           COUNT(CASE WHEN estado = 'activo' THEN 1 END) as clientes_activos,
           COUNT(CASE WHEN estado = 'suspendido' THEN 1 END) as clientes_suspendidos,
@@ -2248,7 +2345,7 @@ const query = `
 
       // Estadísticas de facturas
       const [statsFacturas] = await conexion.execute(`
-        SELECT 
+        SELECT
           COUNT(*) as total_facturas,
           COUNT(CASE WHEN estado = 'pendiente' THEN 1 END) as facturas_pendientes,
           COUNT(CASE WHEN estado = 'pagada' THEN 1 END) as facturas_pagadas,
@@ -2263,7 +2360,7 @@ const query = `
 
       // Estadísticas de instalaciones
       const [statsInstalaciones] = await conexion.execute(`
-        SELECT 
+        SELECT
           COUNT(*) as total_instalaciones,
           COUNT(CASE WHEN estado = 'pendiente' THEN 1 END) as instalaciones_pendientes,
           COUNT(CASE WHEN estado = 'completada' THEN 1 END) as instalaciones_completadas
