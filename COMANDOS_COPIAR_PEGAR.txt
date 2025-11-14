@@ -1,0 +1,56 @@
+================================================================================
+   COPIA Y PEGA ESTOS COMANDOS EN TU TERMINAL (psiserver)
+================================================================================
+
+PASO 1: Abortar el merge problemático
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+git merge --abort
+
+
+PASO 2: Resetear archivos conflictivos
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+git reset --hard HEAD
+
+
+PASO 3: Obtener los últimos cambios
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+git fetch origin
+
+
+PASO 4: Cambiar al branch correcto (forzado)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+git checkout -B claude/fix-duplicate-client-errors-011MvaCXRRBFjr4zRPTyK8fG origin/claude/fix-duplicate-client-errors-011MvaCXRRBFjr4zRPTyK8fG
+
+
+PASO 5: Aplicar la migración SQL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+mysql -u root -p1234 jelcom_internet < APLICAR_MIGRACION_CLIENTES.sql
+
+
+PASO 6: Reiniciar el backend
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cd backend
+pm2 restart jelcom-backend
+
+
+================================================================================
+   ¡LISTO! El error de clientes duplicados estará resuelto
+================================================================================
+
+Verifica que funciona:
+1. Intenta crear un cliente con identificación 1005450340
+2. Ya NO debe aparecer el error "Duplicate entry"
+3. Ahora debe mostrar toda la información del cliente existente
+
+================================================================================
+
+ALTERNATIVA: Si prefieres usar el script automático
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Después de hacer git fetch origin, ejecuta:
+
+./SOLUCION_RAPIDA_SERVIDOR.sh
+
+Luego aplica la migración SQL y reinicia el backend (pasos 5 y 6 de arriba)
+
+================================================================================
