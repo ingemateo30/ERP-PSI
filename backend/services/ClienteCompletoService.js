@@ -482,11 +482,11 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
 
     const query = `
       INSERT INTO instalaciones (
-        cliente_id, servicio_cliente_id, contrato_id, numero_orden,
+        cliente_id, servicio_cliente_id, contrato_id,
         direccion_instalacion, barrio, telefono_contacto, persona_recibe,
         fecha_programada, hora_programada, tipo_instalacion,
         costo_instalacion, estado, observaciones, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'programada', ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'programada', ?, ?)
     `;
 
     // Programar para mañana
@@ -497,7 +497,6 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
       clienteId,
       JSON.stringify(serviciosIds), // ✅ CORRECCIÓN 2: JSON con todos los servicios
       contratoId, // ✅ CORRECCIÓN 3: ID del contrato guardado correctamente
-      numeroOrden,
       sedeData.direccion_servicio || cliente.direccion,
       cliente.barrio || sedeData.barrio || 'No especificado',
       sedeData.telefono_sede || cliente.telefono,
@@ -513,7 +512,7 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
     const [resultado] = await conexion.execute(query, parametros);
     const instalacionId = resultado.insertId;
 
-    console.log(`✅ Orden de instalación ${numeroOrden} creada CORREGIDA:`, {
+    console.log(`✅ Orden de instalación ID ${instalacionId} creada CORREGIDA:`, {
       instalacion_id: instalacionId,
       contrato_id: contratoId, // ✅ Confirmado que se guarda
       servicios_ids: serviciosIds, // ✅ Confirmado JSON con todos los servicios
@@ -524,7 +523,6 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
 
     return {
       id: instalacionId,
-      numero: numeroOrden,
       contrato_id: contratoId,
       servicios_cliente_ids: serviciosIds,
       estado: 'programada',
