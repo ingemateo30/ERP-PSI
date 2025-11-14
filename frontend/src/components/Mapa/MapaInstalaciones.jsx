@@ -5,13 +5,14 @@ import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { 
-  MapPin, Navigation, Calendar, CheckCircle, Clock, 
-  XCircle, AlertCircle, Filter, RefreshCw, 
+import {
+  MapPin, Navigation, Calendar, CheckCircle, Clock,
+  XCircle, AlertCircle, Filter, RefreshCw,
   Home, Phone, User, Package, Loader2,
-  BarChart3, Map as MapIcon, Activity
+  BarChart3, Map as MapIcon, Activity, Info
 } from 'lucide-react';
 import apiService from '../../services/apiService';
+import { useAuth } from '../../contexts/AuthContext';
 
 // ==========================================
 // FIX ICONOS LEAFLET
@@ -66,6 +67,7 @@ const AjustarVista = ({ instalaciones }) => {
 // COMPONENTE PRINCIPAL
 // ==========================================
 const MapaInstalaciones = () => {
+  const { user } = useAuth();
   const [instalaciones, setInstalaciones] = useState([]);
   const [instalacionesMapa, setInstalacionesMapa] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +97,9 @@ const MapaInstalaciones = () => {
 
   const CENTRO_MAPA = [6.4667, -73.2667]; // Socorro
   const ZOOM = 13;
+
+  // Verificar si el usuario es instalador
+  const esInstalador = user && user.rol === 'instalador';
 
   // Debounce para el campo de búsqueda
   useEffect(() => {
@@ -270,6 +275,12 @@ const MapaInstalaciones = () => {
               Mapa de Instalaciones
             </h1>
             <p className="text-gray-600">Visualiza instalaciones geográficamente (OpenStreetMap - Gratuito)</p>
+            {esInstalador && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-blue-600">
+                <Info className="w-4 h-4" />
+                <span>Mostrando solo tus instalaciones asignadas</span>
+              </div>
+            )}
           </div>
           
           <div className="flex gap-3">

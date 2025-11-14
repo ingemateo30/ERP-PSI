@@ -109,7 +109,8 @@ export const ROLE_PERMISSIONS = {
     canReschedule: true,
     canViewStats: true,
     canChangeStatus: true,
-    canManageEquipment: true
+    canManageEquipment: true,
+    canViewMap: true
   },
   supervisor: {
     canCreate: true,
@@ -120,18 +121,20 @@ export const ROLE_PERMISSIONS = {
     canReschedule: true,
     canViewStats: true,
     canChangeStatus: true,
-    canManageEquipment: true
+    canManageEquipment: true,
+    canViewMap: true
   },
   instalador: {
     canCreate: false,
     canEdit: false,
     canDelete: false,
-    canViewAll: false,
+    canViewAll: false, // No puede ver todas, solo las asignadas a él
     canAssignInstaller: false,
     canReschedule: false,
     canViewStats: false,
     canChangeStatus: true, // Solo sus propias instalaciones
-    canManageEquipment: false
+    canManageEquipment: false,
+    canViewMap: true // Puede ver el mapa pero solo con sus instalaciones
   }
 };
 
