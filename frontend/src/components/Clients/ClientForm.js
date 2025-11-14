@@ -258,13 +258,13 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     setModoAgregarServicio(true);
     setClienteSeleccionado(cliente);
 
-    // Pre-llenar algunos campos del cliente existente
+    // ✅ CORRECCIÓN: Pre-llenar campos del cliente existente y limpiar servicios completamente
     setFormData(prev => ({
       ...prev,
       identificacion: cliente.identificacion,
       tipo_documento: cliente.tipo_documento,
       nombre: cliente.nombre,
-      email: cliente.correo || '',
+      email: cliente.correo || cliente.email || '',
       telefono: cliente.telefono || '',
       telefono_fijo: cliente.telefono_2 || '',
       direccion: cliente.direccion || '',
@@ -273,18 +273,29 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       ciudad_id: cliente.ciudad_id || '',
       sector_id: cliente.sector_id || '',
       observaciones: cliente.observaciones || '',
-      // Limpiar datos de servicio para nuevo servicio
+
+      // ✅ Limpiar TODOS los datos de servicio para el nuevo servicio
       plan_id: '',
       precio_personalizado: '',
       planInternetId: '',
       planTelevisionId: '',
       precioInternetCustom: '',
       precioTelevisionCustom: '',
+      usarServiciosSeparados: false,
+      observaciones_servicio: '',
+
+      // Restablecer tipo de permanencia a valor predeterminado
+      tipo_permanencia: 'sin_permanencia',
+      meses_permanencia: 6,
+
       // En modo agregar servicio, no generar documentos completos
       generar_documentos: false,
       enviar_bienvenida: false,
       programar_instalacion: true
     }));
+
+    // Limpiar errores previos
+    setErrors({});
   };
 
   const manejarVerHistorial = (cliente) => {
@@ -300,31 +311,61 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   };
 
   const agregarServicioAClienteExistente = async () => {
-    // Preparar datos del nuevo servicio
-    const nuevoServicio = {
-      plan_id: formData.plan_id,
-      precio_personalizado: formData.precio_personalizado,
-      fecha_activacion: formData.fecha_activacion,
-      observaciones: formData.observaciones_servicio,
-      tipo_permanencia: formData.tipo_permanencia,
-      meses_permanencia: formData.meses_permanencia,
-      generar_contrato: true,
-      generar_factura: true,
-      programar_instalacion: formData.programar_instalacion
-    };
+    try {
+      // ✅ CORRECCIÓN: Preparar datos del nuevo servicio con todos los campos necesarios
+      const nuevoServicio = {
+        // Servicios separados o plan único
+        planInternetId: formData.usarServiciosSeparados ? formData.planInternetId : null,
+        planTelevisionId: formData.usarServiciosSeparados ? formData.planTelevisionId : null,
+        plan_id: !formData.usarServiciosSeparados ? formData.plan_id : null,
 
-    const response = await AlertasClienteService.agregarServicioAClienteExistente(
-      clienteSeleccionado.id,
-      nuevoServicio
-    );
+        // Precios personalizados
+        precioInternetCustom: formData.precioInternetCustom || null,
+        precioTelevisionCustom: formData.precioTelevisionCustom || null,
+        precio_personalizado: formData.precio_personalizado || null,
 
-    if (response.success) {
-      if (window.showNotification) {
-        window.showNotification('success', `Servicio agregado exitosamente al cliente ${clienteSeleccionado.nombre}`);
+        // Datos de activación y permanencia
+        fecha_activacion: formData.fecha_activacion,
+        tipo_permanencia: formData.tipo_permanencia,
+        meses_permanencia: formData.tipo_permanencia === 'con_permanencia' ? (formData.meses_permanencia || 6) : 0,
+
+        // Observaciones
+        observaciones: formData.observaciones_servicio || '',
+
+        // Opciones de generación
+        programar_instalacion: formData.programar_instalacion !== false
+      };
+
+      console.log('📤 Enviando datos de nuevo servicio:', nuevoServicio);
+
+      const response = await AlertasClienteService.agregarServicioAClienteExistente(
+        clienteSeleccionado.id,
+        nuevoServicio
+      );
+
+      if (response.success) {
+        const mensaje = `Servicio agregado exitosamente al cliente ${clienteSeleccionado.nombre}`;
+        if (window.showNotification) {
+          window.showNotification('success', mensaje);
+        } else {
+          alert(mensaje);
+        }
+        onSave({ tipo: 'servicio_agregado', cliente: clienteSeleccionado, servicio: response.data });
       } else {
-        alert(`Servicio agregado exitosamente al cliente ${clienteSeleccionado.nombre}`);
+        throw new Error(response.message || 'Error agregando servicio');
       }
-      onSave({ tipo: 'servicio_agregado', cliente: clienteSeleccionado, servicio: response.data });
+    } catch (error) {
+      console.error('❌ Error agregando servicio:', error);
+
+      const mensajeError = error.response?.data?.message || error.message || 'Error agregando servicio al cliente';
+
+      if (window.showNotification) {
+        window.showNotification('error', mensajeError);
+      } else {
+        alert(mensajeError);
+      }
+
+      throw error;
     }
   };
 
@@ -514,35 +555,59 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   const validarFormulario = () => {
     const nuevosErrores = {};
 
-    // Validaciones básicas del cliente
-    if (!formData.identificacion.trim()) {
-      nuevosErrores.identificacion = 'La identificación es requerida';
+    // ✅ Si está en modo agregar servicio, solo validar campos de servicio
+    if (modoAgregarServicio && clienteSeleccionado) {
+      // Validar solo los servicios
+      if (formData.usarServiciosSeparados) {
+        if (!formData.planInternetId && !formData.planTelevisionId) {
+          nuevosErrores.servicios_separados = 'Debe seleccionar al menos un servicio (Internet o Televisión)';
+        }
+      } else {
+        if (!formData.plan_id) {
+          nuevosErrores.plan_id = 'Debe seleccionar un plan de servicio';
+        }
+      }
+
+      // Validar tipo de permanencia
+      if (!formData.tipo_permanencia) {
+        nuevosErrores.tipo_permanencia = 'Debe seleccionar el tipo de permanencia';
+      }
+
+      setErrors(nuevosErrores);
+      return Object.keys(nuevosErrores).length === 0;
     }
 
-    if (!formData.nombre.trim()) {
-      nuevosErrores.nombre = 'El nombre es requerido';
+    // ✅ Validaciones básicas del cliente (solo para cliente nuevo o edición)
+    if (!client && !modoAgregarServicio) {
+      if (!formData.identificacion.trim()) {
+        nuevosErrores.identificacion = 'La identificación es requerida';
+      }
+
+      if (!formData.nombre.trim()) {
+        nuevosErrores.nombre = 'El nombre es requerido';
+      }
+
+      if (!formData.email.trim()) {
+        nuevosErrores.email = 'El email es requerido';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        nuevosErrores.email = 'El email no tiene un formato válido';
+      }
+
+      if (!formData.telefono.trim()) {
+        nuevosErrores.telefono = 'El teléfono es requerido';
+      }
+
+      if (!formData.direccion.trim()) {
+        nuevosErrores.direccion = 'La dirección es requerida';
+      }
+
+      if (!formData.ciudad_id) {
+        nuevosErrores.ciudad_id = 'La ciudad es requerida';
+      }
     }
 
-    if (!formData.email.trim()) {
-      nuevosErrores.email = 'El email es requerido';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      nuevosErrores.email = 'El email no tiene un formato válido';
-    }
-
-    if (!formData.telefono.trim()) {
-      nuevosErrores.telefono = 'El teléfono es requerido';
-    }
-
-    if (!formData.direccion.trim()) {
-      nuevosErrores.direccion = 'La dirección es requerida';
-    }
-
-    if (!formData.ciudad_id) {
-      nuevosErrores.ciudad_id = 'La ciudad es requerida';
-    }
-
-    // ✅ VALIDACIÓN DE SERVICIOS Y PERMANENCIA CORREGIDA
-    if (!client) {
+    // ✅ VALIDACIÓN DE SERVICIOS Y PERMANENCIA (para clientes nuevos)
+    if (!client && !modoAgregarServicio) {
       if (formData.usarServiciosSeparados) {
         // Si usa servicios separados, debe tener al menos uno seleccionado
         if (!formData.planInternetId && !formData.planTelevisionId) {
@@ -601,6 +666,19 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
   // FUNCIÓN CORREGIDA - crearClienteConSede en ClientForm.js
   const crearClienteConSede = async () => {
+    // ✅ PREVENCIÓN DE DUPLICADOS: Verificar si hay un cliente existente detectado
+    if (verificacionCliente && verificacionCliente.existe) {
+      const mensaje = `Ya existe un cliente con la identificación ${formData.identificacion}. Por favor, use la opción "Agregar servicios" en lugar de crear uno nuevo.`;
+
+      if (window.showNotification) {
+        window.showNotification('error', mensaje);
+      } else {
+        alert(mensaje);
+      }
+
+      throw new Error(mensaje);
+    }
+
     const datosCliente = {
       identificacion: formData.identificacion,
       tipo_documento: formData.tipo_documento,
@@ -1227,9 +1305,8 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                 <textarea
                   value={formData.observaciones_servicio}
                   onChange={(e) => handleInputChange('observaciones_servicio', e.target.value)}
-                  disabled={modoAgregarServicio}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
                   placeholder="Observaciones especiales sobre el servicio..."
                 />
               </div>
