@@ -147,7 +147,7 @@ class InstalacionesController {
             const offset = (pageNum - 1) * limitNum;
             const totalPages = Math.ceil(total / limitNum);
 
-           // ✅ DESPUÉS:
+           // ✅ DESPUÉS::
 const selectQuery = `
       SELECT
         i.*,
