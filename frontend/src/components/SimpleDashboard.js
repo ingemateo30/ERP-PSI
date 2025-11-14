@@ -855,54 +855,76 @@ const InstaladorDashboard = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('accessToken');
-            
+
             console.log('🔍 DASHBOARD - Token obtenido:', token ? 'EXISTS' : 'MISSING');
             console.log('🔍 DASHBOARD - Current User:', currentUser);
-            
+
             if (!token) {
                 console.error('❌ DASHBOARD - No hay token disponible');
                 setLoading(false);
                 return;
             }
-            
+
             const headers = {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             };
-            
+
             // Cargar TODAS las instalaciones del instalador
             console.log('📡 DASHBOARD - Haciendo petición a mis instalaciones...');
             console.log('📡 DASHBOARD - URL:', `${process.env.REACT_APP_API_URL}/instalador/mis-instalaciones`);
-            
+
             const respuestaTrabajos = await fetch(`${process.env.REACT_APP_API_URL}/instalador/mis-instalaciones`, {
                 headers
             });
-            
+
             console.log('📊 DASHBOARD - Status trabajos:', respuestaTrabajos.status);
             console.log('📊 DASHBOARD - OK:', respuestaTrabajos.ok);
-            
+
             const dataTrabajos = await respuestaTrabajos.json();
             console.log('📦 DASHBOARD - Data trabajos:', dataTrabajos);
-            
+
             if (dataTrabajos.success) {
                 const instalaciones = dataTrabajos.instalaciones || [];
-                
+
                 // Filtrar solo instalaciones pendientes y en proceso (los "trabajos activos")
-                const trabajosActivos = instalaciones.filter(inst => 
+                const trabajosActivos = instalaciones.filter(inst =>
                     inst.estado === 'programada' || inst.estado === 'en_proceso'
                 );
-                
+
                 setTrabajosHoy(trabajosActivos);
                 console.log('✅ DASHBOARD - Trabajos activos cargados:', trabajosActivos.length);
-                
+
                 // Calcular estadísticas desde las instalaciones
                 const pendientes = instalaciones.filter(inst => inst.estado === 'programada').length;
-                const completadas = instalaciones.filter(inst => inst.estado === 'completada').length;
-                
+
+                // ✅ ARREGLADO: Calcular completadas de la semana actual (últimos 7 días)
+                const hace7Dias = new Date();
+                hace7Dias.setDate(hace7Dias.getDate() - 7);
+                hace7Dias.setHours(0, 0, 0, 0);
+
+                const completadasSemana = instalaciones.filter(inst => {
+                    if (inst.estado !== 'completada') return false;
+
+                    // Usar fecha_completada o fecha_realizada
+                    const fechaStr = inst.fecha_completada || inst.fecha_realizada;
+                    if (!fechaStr) return false;
+
+                    try {
+                        const fecha = new Date(fechaStr);
+                        return fecha >= hace7Dias;
+                    } catch (error) {
+                        console.error('Error parseando fecha:', fechaStr);
+                        return false;
+                    }
+                }).length;
+
+                console.log('📊 DASHBOARD - Completadas en la semana:', completadasSemana);
+
                 setEstadisticas({
                     pendientesHoy: pendientes,
-                    completadasSemana: completadas,
-                    equiposAsignados: estadisticas.equiposAsignados || 0
+                    completadasSemana: completadasSemana,
+                    equiposAsignados: 0 // Será actualizado después
                 });
             } else {
                 console.error('❌ DASHBOARD - Error en trabajos:', dataTrabajos.message);
@@ -911,24 +933,24 @@ const InstaladorDashboard = () => {
             // Cargar estadísticas de equipos
             console.log('📡 DASHBOARD - Haciendo petición a estadísticas...');
             console.log('📡 DASHBOARD - URL:', `${process.env.REACT_APP_API_URL}/instalador/estadisticas`);
-            
+
             const respuestaEstadisticas = await fetch(`${process.env.REACT_APP_API_URL}/instalador/estadisticas`, {
                 headers
             });
-            
+
             console.log('📊 DASHBOARD - Status estadísticas:', respuestaEstadisticas.status);
-            
+
             const dataEstadisticas = await respuestaEstadisticas.json();
             console.log('📦 DASHBOARD - Data estadísticas:', dataEstadisticas);
-            
+
             if (dataEstadisticas.success && dataEstadisticas.estadisticas) {
                 setEstadisticas(prev => ({
                     ...prev,
                     equiposAsignados: dataEstadisticas.estadisticas.equiposAsignados || 0
                 }));
-                console.log('✅ DASHBOARD - Estadísticas de equipos cargadas');
+                console.log('✅ DASHBOARD - Estadísticas de equipos cargadas:', dataEstadisticas.estadisticas.equiposAsignados);
             }
-            
+
         } catch (error) {
             console.error('❌ DASHBOARD - Error cargando datos:', error);
             console.error('❌ DASHBOARD - Error stack:', error.stack);

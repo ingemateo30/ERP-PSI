@@ -73,16 +73,21 @@ const MisTrabajos = () => {
       // Si es 'todas', no filtra
       
       setInstalaciones(instalacionesFiltradas);
-      
-      // Calcular estadísticas con TODAS las instalaciones
+
+      // ✅ ARREGLADO: Calcular estadísticas con TODAS las instalaciones
       const stats = {
         pendientes: todasInstalaciones.filter(inst => inst.estado === 'programada').length,
         en_proceso: todasInstalaciones.filter(inst => inst.estado === 'en_proceso').length,
-        completadas_hoy: todasInstalaciones.filter(inst => 
-          inst.estado === 'completada' && esHoy(inst.fecha_realizada)
-        ).length
+        completadas_hoy: todasInstalaciones.filter(inst => {
+          if (inst.estado !== 'completada') return false;
+
+          // Usar fecha_completada o fecha_realizada
+          const fechaStr = inst.fecha_completada || inst.fecha_realizada;
+          return esHoy(fechaStr);
+        }).length
       };
 
+      console.log('📊 MIS TRABAJOS - Estadísticas calculadas:', stats);
       setEstadisticas(stats);
     }
   } catch (err) {
