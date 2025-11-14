@@ -1798,10 +1798,10 @@ static async actualizar(req, res) {
         });
     }
 }
-    /**
-     * Generar orden de servicio en PDF
-     */
-  static async generarOrdenServicioPDF(req, res) {
+/**
+ * Generar orden de servicio en PDF
+ */
+static async generarOrdenServicioPDF(req, res) {
     try {
         const { id } = req.params;
         console.log(`📄 Generando orden de servicio PDF para instalación ${id}`);
@@ -1928,14 +1928,28 @@ static async actualizar(req, res) {
 
             yPosition += 20;
 
+            // Calcular cuánto espacio ocuparán las observaciones
+            const observacionesHeight = doc.heightOfString(instalacion.observaciones, { width: 500 });
+
             doc.font('Helvetica')
                 .fontSize(10)
                 .text(instalacion.observaciones, 50, yPosition, { width: 500 });
 
-            yPosition += 40;
+            yPosition += observacionesHeight + 40;
         }
 
-        // FOOTER
+        // ✅ CONTROL DE SALTO DE PÁGINA PARA FIRMAS
+        // Si no hay espacio suficiente para las firmas (necesitamos al menos 120px)
+        const espacioNecesarioParaFirmas = 120;
+        const alturaMaximaPagina = doc.page.height - doc.page.margins.bottom;
+
+        if (yPosition + espacioNecesarioParaFirmas > alturaMaximaPagina) {
+            // Forzar salto de página
+            doc.addPage();
+            yPosition = 50; // Reiniciar posición en nueva página
+        }
+
+        // FOOTER - SECCIÓN DE FIRMAS (ahora con espacio garantizado)
         doc.fontSize(8)
             .text('___________________________', 50, yPosition + 50)
             .text('Firma del Cliente', 50, yPosition + 70)
