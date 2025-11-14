@@ -35,13 +35,17 @@ router.post('/backup/generar', async (req, res) => {
       
       console.log('✅ Backup generado:', nombreArchivo, `(${tamanoMB} MB)`);
       
-      res.json({ 
-        success: true, 
-        message: 'Backup generado exitosamente',
-        archivo: nombreArchivo,
-        ruta: rutaBackup,
-        tamano: `${tamanoMB} MB`,
-        fecha: new Date().toLocaleString('es-CO')
+      // ✅ NUEVO: Enviar el archivo para descarga
+      res.download(rutaBackup, nombreArchivo, (err) => {
+        if (err) {
+          console.error('❌ Error al enviar archivo:', err);
+          return res.status(500).json({
+            success: false,
+            message: 'Error al descargar el backup',
+            error: err.message
+          });
+        }
+        console.log('✅ Archivo descargado exitosamente:', nombreArchivo);
       });
     });
     
