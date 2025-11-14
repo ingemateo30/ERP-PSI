@@ -1818,8 +1818,9 @@ static async generarOrdenServicioPDF(req, res) {
 
         const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ 
-            margin: 50,
-            size: 'LETTER' // Asegurar tamaño carta
+            margin: 40,
+            size: 'LETTER',
+            bufferPages: true
         });
 
         // Headers para descarga
@@ -1831,157 +1832,164 @@ static async generarOrdenServicioPDF(req, res) {
 
         // ENCABEZADO DE LA EMPRESA
         doc.font('Helvetica-Bold')
-            .fontSize(20)
-            .text('ORDEN DE SERVICIO', 50, 50, { align: 'center' });
+            .fontSize(18)
+            .text('ORDEN DE SERVICIO', 50, 40, { align: 'center' });
 
-        doc.fontSize(12)
-            .text('InternetCorp S.A.S.', 50, 80, { align: 'center' })
-            .text('NIT: 123.456.789-0', 50, 95, { align: 'center' })
-            .text('Teléfono: (123) 456-7890', 50, 110, { align: 'center' });
+        doc.fontSize(10)
+            .text('PSI - Proveedor de Servicios de Internet', 50, 65, { align: 'center' })
+            .text('NIT: 900.123.456-7', 50, 78, { align: 'center' })
+            .text('Teléfono: (607) 123-4567', 50, 91, { align: 'center' });
 
         // Línea divisoria
-        doc.moveTo(50, 130)
-            .lineTo(550, 130)
+        doc.moveTo(50, 110)
+            .lineTo(562, 110)
             .stroke();
 
-        let yPosition = 150;
+        let yPosition = 130;
 
         // INFORMACIÓN DE LA ORDEN
         doc.font('Helvetica-Bold')
-            .fontSize(14)
+            .fontSize(12)
             .text('INFORMACIÓN DE LA ORDEN', 50, yPosition);
+
+        yPosition += 20;
+
+        doc.font('Helvetica')
+            .fontSize(9)
+            .text(`Orden No: #${String(instalacion.id).padStart(6, '0')}`, 50, yPosition)
+            .text(`Fecha: ${new Date().toLocaleDateString('es-CO', { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit' 
+            })}`, 350, yPosition);
+
+        yPosition += 14;
+
+        doc.text(`Estado: ${instalacion.estado?.toUpperCase() || 'PROGRAMADA'}`, 50, yPosition)
+            .text(`Tipo: ${instalacion.tipo_instalacion || 'Nueva Instalación'}`, 350, yPosition);
 
         yPosition += 25;
 
-        doc.font('Helvetica')
-            .fontSize(10)
-            .text(`Orden No: #${instalacion.id}`, 50, yPosition)
-            .text(`Fecha de emisión: ${new Date().toLocaleDateString('es-CO')}`, 300, yPosition);
-
-        yPosition += 15;
-
-        doc.text(`Estado: ${instalacion.estado?.toUpperCase()}`, 50, yPosition)
-            .text(`Tipo: ${instalacion.tipo_instalacion || 'Nueva Instalación'}`, 300, yPosition);
-
-        yPosition += 30;
-
         // INFORMACIÓN DEL CLIENTE
         doc.font('Helvetica-Bold')
-            .fontSize(12)
+            .fontSize(11)
             .text('INFORMACIÓN DEL CLIENTE', 50, yPosition);
 
-        yPosition += 20;
+        yPosition += 18;
 
         doc.font('Helvetica')
-            .fontSize(10)
-            .text(`Cliente: ${instalacion.cliente_nombre || 'No especificado'}`, 50, yPosition);
+            .fontSize(9)
+            .text(`Nombre: ${instalacion.cliente_nombre || 'No especificado'}`, 50, yPosition);
 
-        yPosition += 15;
+        yPosition += 14;
 
-        doc.text(`Identificación: ${instalacion.cliente_identificacion || 'No especificada'}`, 50, yPosition)
-            .text(`Teléfono: ${instalacion.telefono_contacto || 'No especificado'}`, 300, yPosition);
+        doc.text(`Identificación: ${instalacion.cliente_identificacion || 'N/A'}`, 50, yPosition)
+            .text(`Teléfono: ${instalacion.telefono_contacto || instalacion.cliente_telefono || 'N/A'}`, 350, yPosition);
 
-        yPosition += 15;
+        yPosition += 14;
 
-        doc.text(`Dirección: ${instalacion.direccion_instalacion || 'No especificada'}`, 50, yPosition);
+        doc.text(`Email: ${instalacion.cliente_email || 'No especificado'}`, 50, yPosition);
 
-        yPosition += 30;
+        yPosition += 14;
+
+        doc.text(`Dirección: ${instalacion.direccion_instalacion || 'No especificada'}`, 50, yPosition, {
+            width: 500
+        });
+
+        yPosition += 25;
 
         // INFORMACIÓN DEL SERVICIO
         doc.font('Helvetica-Bold')
-            .fontSize(12)
+            .fontSize(11)
             .text('INFORMACIÓN DEL SERVICIO', 50, yPosition);
 
-        yPosition += 20;
+        yPosition += 18;
 
         doc.font('Helvetica')
-            .fontSize(10)
-            .text(`Plan: ${instalacion.plan_nombre || 'No especificado'}`, 50, yPosition)
-            .text(`Costo: $${instalacion.costo_instalacion?.toLocaleString() || '0'}`, 300, yPosition);
+            .fontSize(9)
+            .text(`Plan: ${instalacion.plan_nombre || 'No especificado'}`, 50, yPosition);
+        
+        yPosition += 14;
 
-        yPosition += 30;
+        doc.text(`Precio Mensual: $${(instalacion.plan_precio || 0).toLocaleString('es-CO')}`, 50, yPosition)
+            .text(`Costo Instalación: $${(instalacion.costo_instalacion || 0).toLocaleString('es-CO')}`, 350, yPosition);
+
+        yPosition += 25;
 
         // INFORMACIÓN DE INSTALACIÓN
         doc.font('Helvetica-Bold')
-            .fontSize(12)
+            .fontSize(11)
             .text('PROGRAMACIÓN DE INSTALACIÓN', 50, yPosition);
 
-        yPosition += 20;
+        yPosition += 18;
 
         const fechaProgramada = instalacion.fecha_programada ? 
             new Date(instalacion.fecha_programada).toLocaleDateString('es-CO') : 
             'Por definir';
 
         doc.font('Helvetica')
-            .fontSize(10)
+            .fontSize(9)
             .text(`Fecha Programada: ${fechaProgramada}`, 50, yPosition)
-            .text(`Hora: ${instalacion.hora_programada || 'Por definir'}`, 300, yPosition);
+            .text(`Hora: ${instalacion.hora_programada || 'Por definir'}`, 350, yPosition);
 
-        yPosition += 15;
+        yPosition += 14;
 
-        doc.text(`Instalador: ${instalacion.instalador_nombre || 'Sin asignar'}`, 50, yPosition);
+        doc.text(`Instalador Asignado: ${instalacion.instalador_nombre || 'Sin asignar'}`, 50, yPosition);
 
-        yPosition += 30;
+        yPosition += 25;
 
         // OBSERVACIONES
-        if (instalacion.observaciones) {
+        if (instalacion.observaciones && instalacion.observaciones.trim()) {
             doc.font('Helvetica-Bold')
-                .fontSize(12)
+                .fontSize(11)
                 .text('OBSERVACIONES', 50, yPosition);
 
-            yPosition += 20;
+            yPosition += 18;
+
+            const observacionesTexto = instalacion.observaciones.substring(0, 300); // Limitar a 300 caracteres
 
             doc.font('Helvetica')
-                .fontSize(10)
-                .text(instalacion.observaciones, 50, yPosition, { width: 500 });
+                .fontSize(9)
+                .text(observacionesTexto, 50, yPosition, { 
+                    width: 500,
+                    lineGap: 2
+                });
 
-            // Calcular altura real de las observaciones
-            const observacionesHeight = doc.heightOfString(instalacion.observaciones, { width: 500 });
-            yPosition += observacionesHeight + 30;
+            const observacionesHeight = doc.heightOfString(observacionesTexto, { width: 500 });
+            yPosition += observacionesHeight + 20;
         }
 
-        // ✅✅✅ SOLUCIÓN DEFINITIVA: POSICIONAMIENTO ABSOLUTO DE FIRMAS ✅✅✅
-        
-        // Calcular altura de la página
-        const pageHeight = doc.page.height;
-        const bottomMargin = doc.page.margins.bottom;
-        const espacioParaFirmas = 150; // Espacio que necesitan las firmas
-        
-        // Límite seguro: si estamos a menos de 200px del final, nueva página
-        const limiteSeguro = pageHeight - bottomMargin - 200;
-        
-        console.log(`📏 Control de página - yPosition: ${yPosition}, límite: ${limiteSeguro}`);
-        
-        if (yPosition > limiteSeguro) {
-            console.log('📄 Agregando nueva página para firmas');
+        // ✅ SOLUCIÓN: POSICIONAR FIRMAS AL FINAL DE LA PÁGINA
+        const pageHeight = 792; // Altura carta en puntos
+        const firmasY = pageHeight - 120; // 120 puntos desde el final
+
+        // Si el contenido ya pasó esa posición, agregar nueva página
+        if (yPosition > firmasY - 30) {
             doc.addPage();
-            yPosition = 50; // Reset en nueva página
+            yPosition = firmasY;
+        } else {
+            yPosition = firmasY;
         }
-        
-        // Asegurar que las firmas siempre estén en la misma posición al fondo
-        // Calculamos la posición FIJA desde el fondo de la página
-        const posicionFirmasY = pageHeight - bottomMargin - espacioParaFirmas;
-        
-        // Si aún tenemos espacio, usamos la posición calculada
-        // Si no, forzamos que estén al menos 50px después del contenido
-        const yFirmas = Math.max(yPosition + 50, posicionFirmasY);
-        
-        console.log(`✍️ Dibujando firmas en Y: ${yFirmas}`);
 
-        // FOOTER - SECCIÓN DE FIRMAS con posición GARANTIZADA
+        // SECCIÓN DE FIRMAS - SIEMPRE EN LA MISMA POSICIÓN
         doc.fontSize(8)
-            .text('___________________________', 50, yFirmas)
-            .text('Firma del Cliente', 50, yFirmas + 20)
-            .text(`Fecha: _____________________`, 50, yFirmas + 35);
+            .text('_____________________________', 70, yPosition, { width: 200 })
+            .text('Firma del Cliente', 70, yPosition + 18, { width: 200, align: 'center' })
+            .text(`Fecha: ___________________`, 70, yPosition + 32, { width: 200 });
         
-        doc.text('___________________________', 350, yFirmas)
-            .text('Firma del Instalador', 350, yFirmas + 20)
-            .text(`Fecha: _____________________`, 350, yFirmas + 35);
+        doc.text('_____________________________', 342, yPosition, { width: 200 })
+            .text('Firma del Instalador', 342, yPosition + 18, { width: 200, align: 'center' })
+            .text(`Fecha: ___________________`, 342, yPosition + 32, { width: 200 });
 
-        // Línea final decorativa
-        doc.moveTo(50, yFirmas + 60)
-            .lineTo(550, yFirmas + 60)
-            .stroke();
+        // Pie de página
+        doc.fontSize(7)
+            .fillColor('#666666')
+            .text(
+                'Este documento es una orden de servicio oficial. Conservar para referencia.',
+                50,
+                yPosition + 60,
+                { align: 'center', width: 512 }
+            );
 
         // Finalizar el documento
         doc.end();
@@ -1990,7 +1998,8 @@ static async generarOrdenServicioPDF(req, res) {
         console.error('❌ Error generando PDF:', error);
         res.status(500).json({
             success: false,
-            message: 'Error generando orden de servicio'
+            message: 'Error generando orden de servicio',
+            error: error.message
         });
     }
 }

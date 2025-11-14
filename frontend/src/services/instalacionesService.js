@@ -518,7 +518,27 @@ async getMisInstalaciones() {
 
   async buscarClientes(termino = '') {
     return this.getClientes({ busqueda: termino, limit: 50, activo: 1 });
+  },
+  // Exportar instalaciones a Excel
+async exportarInstalaciones(filtros = {}) {
+  console.log('📊 Servicio - Exportando instalaciones con filtros:', filtros);
+  
+  try {
+    const response = await apiService.get('/instalaciones/exportar', {
+      params: filtros,
+      responseType: 'blob'
+    });
+
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('❌ Error en servicio de exportación:', error);
+    throw error;
   }
+}
 };
+
 
 export default instalacionesService;

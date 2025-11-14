@@ -442,49 +442,43 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
   };
 
   // ARREGLADO: Función de exportar
-  const exportarDatos = async () => {
-    try {
-      setProcesando(true);
+ const exportarDatos = async () => {
+  try {
+    setProcesando(true);
+    console.log('📊 Iniciando exportación...');
 
-      console.log('📊 Iniciando exportación...');
+    const response = await instalacionesService.exportarInstalaciones({
+      ...filtros,
+      formato: 'excel'
+    });
 
-      // Crear URL con parámetros
-      const params = new URLSearchParams({
-        ...filtros,
-        formato: 'excel'
-      });
-
-      // Hacer petición al endpoint de exportar
-      const response = await fetch(`/api/v1/instalaciones/exportar?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Error en la exportación');
-      }
-
-      // Descargar archivo
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `instalaciones_${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      setSuccess('Reporte exportado exitosamente');
-
-    } catch (error) {
-      console.error('❌ Error exportando:', error);
-      setError(`Error exportando reporte: ${error.message}`);
-    } finally {
-      setProcesando(false);
+    if (!response || !response.data) {
+      throw new Error('No se recibieron datos para exportar');
     }
-  };
+
+    // Crear blob y descargar
+    const blob = new Blob([response.data], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    });
+    
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `instalaciones_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    setSuccess('📊 Archivo exportado exitosamente');
+    
+  } catch (error) {
+    console.error('❌ Error exportando:', error);
+    setError(`Error al exportar instalaciones: ${error.message}`);
+  } finally {
+    setProcesando(false);
+  }
+};
 
   // NUEVO: Función para generar orden de servicio PDF
   const generarOrdenServicioPDF = async (instalacion) => {
