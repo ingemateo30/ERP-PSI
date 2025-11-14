@@ -812,119 +812,6 @@ const validarFormulario = () => {
       )}
     </div>
   );
-
-{/* Pestaña Equipos */}
-{pestañaActiva === 'equipos' && (
-  <div className="space-y-4">
-    <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-      <Package className="w-4 h-4 mr-2" />
-      Equipos Instalados
-    </h4>
-
-    {(() => {
-      // 🔍 DEBUG
-      console.log('🔍 RAW equipos_instalados:', instalacion?.equipos_instalados);
-      console.log('🔍 Tipo:', typeof instalacion?.equipos_instalados);
-
-      // Parsear si es string
-      let equipos = instalacion?.equipos_instalados;
-      
-      if (typeof equipos === 'string') {
-        try {
-          equipos = JSON.parse(equipos);
-          console.log('✅ Equipos parseados:', equipos);
-        } catch (e) {
-          console.error('❌ Error parseando:', e);
-          equipos = [];
-        }
-      }
-
-      // Validar array
-      if (!Array.isArray(equipos) || equipos.length === 0) {
-        return (
-          <div className="text-center py-8 text-gray-500">
-            <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-            <p>No hay equipos instalados registrados</p>
-          </div>
-        );
-      }
-
-      // Renderizar equipos
-      return (
-        <div className="space-y-3">
-          {equipos.map((equipo, index) => {
-            console.log(`🔧 Equipo ${index}:`, equipo);
-            
-            return (
-              <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  
-                  {/* ID del Equipo */}
-                  {equipo.equipo_id && (
-                    <div>
-                      <span className="text-gray-600">ID Equipo:</span>
-                      <p className="font-medium">#{equipo.equipo_id}</p>
-                    </div>
-                  )}
-
-                  {/* Nombre/Tipo */}
-                  <div>
-                    <span className="text-gray-600">Equipo:</span>
-                    <p className="font-medium">
-                      {equipo.nombre || equipo.tipo || equipo.tipo_equipo || 'No especificado'}
-                    </p>
-                  </div>
-
-                  {/* Serie */}
-                  <div>
-                    <span className="text-gray-600">Serie:</span>
-                    <p className="font-medium font-mono">
-                      {equipo.serie || equipo.numero_serie || equipo.serial || 'No especificado'}
-                    </p>
-                  </div>
-
-                  {/* MAC */}
-                  <div>
-                    <span className="text-gray-600">MAC:</span>
-                    <p className="font-medium font-mono">
-                      {equipo.mac || equipo.mac_address || 'No especificado'}
-                    </p>
-                  </div>
-
-                  {/* Marca */}
-                  {equipo.marca && (
-                    <div>
-                      <span className="text-gray-600">Marca:</span>
-                      <p className="font-medium">{equipo.marca}</p>
-                    </div>
-                  )}
-
-                  {/* Modelo */}
-                  {equipo.modelo && (
-                    <div>
-                      <span className="text-gray-600">Modelo:</span>
-                      <p className="font-medium">{equipo.modelo}</p>
-                    </div>
-                  )}
-
-                  {/* Observaciones */}
-                  {equipo.observaciones && (
-                    <div className="col-span-2">
-                      <span className="text-gray-600">Observaciones:</span>
-                      <p className="font-medium">{equipo.observaciones}</p>
-                    </div>
-                  )}
-                  
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
-    })()}
-  </div>
-)}
-
   const renderPestañaHistorial = () => (
     <div className="space-y-6">
       {modo === 'ver' && instalacion ? (
@@ -1054,7 +941,7 @@ const validarFormulario = () => {
     </div>
   );
 
-  const renderContenidoPestaña = () => {
+ const renderContenidoPestaña = () => {
     switch (pestañaActiva) {
       case 'general':
         return renderPestañaGeneral();
@@ -1063,14 +950,123 @@ const validarFormulario = () => {
       case 'ubicacion':
         return renderPestañaUbicacion();
       case 'equipos':
-        return renderPestañaEquipos();
+        return (
+          // ✅ CÓDIGO DE EQUIPOS INLINE
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+              <Package className="w-4 h-4 mr-2" />
+              Equipos Instalados
+            </h4>
+
+            {(() => {
+              // 🔍 DEBUG
+              console.log('🔍 RAW equipos_instalados:', instalacion?.equipos_instalados);
+              console.log('🔍 Tipo:', typeof instalacion?.equipos_instalados);
+
+              // Parsear si es string
+              let equipos = instalacion?.equipos_instalados;
+              
+              if (typeof equipos === 'string') {
+                try {
+                  equipos = JSON.parse(equipos);
+                  console.log('✅ Equipos parseados:', equipos);
+                } catch (e) {
+                  console.error('❌ Error parseando:', e);
+                  equipos = [];
+                }
+              }
+
+              // Validar array
+              if (!Array.isArray(equipos) || equipos.length === 0) {
+                return (
+                  <div className="text-center py-8 text-gray-500">
+                    <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>No hay equipos instalados registrados</p>
+                  </div>
+                );
+              }
+
+              // Renderizar equipos
+              return (
+                <div className="space-y-3">
+                  {equipos.map((equipo, index) => {
+                    console.log(`🔧 Equipo ${index}:`, equipo);
+                    
+                    return (
+                      <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          
+                          {/* ID del Equipo */}
+                          {equipo.equipo_id && (
+                            <div>
+                              <span className="text-gray-600">ID Equipo:</span>
+                              <p className="font-medium">#{equipo.equipo_id}</p>
+                            </div>
+                          )}
+
+                          {/* Nombre/Tipo */}
+                          <div>
+                            <span className="text-gray-600">Equipo:</span>
+                            <p className="font-medium">
+                              {equipo.nombre || equipo.tipo || equipo.tipo_equipo || 'No especificado'}
+                            </p>
+                          </div>
+
+                          {/* Serie */}
+                          <div>
+                            <span className="text-gray-600">Serie:</span>
+                            <p className="font-medium font-mono">
+                              {equipo.serie || equipo.numero_serie || equipo.serial || 'No especificado'}
+                            </p>
+                          </div>
+
+                          {/* MAC */}
+                          <div>
+                            <span className="text-gray-600">MAC:</span>
+                            <p className="font-medium font-mono">
+                              {equipo.mac || equipo.mac_address || 'No especificado'}
+                            </p>
+                          </div>
+
+                          {/* Marca */}
+                          {equipo.marca && (
+                            <div>
+                              <span className="text-gray-600">Marca:</span>
+                              <p className="font-medium">{equipo.marca}</p>
+                            </div>
+                          )}
+
+                          {/* Modelo */}
+                          {equipo.modelo && (
+                            <div>
+                              <span className="text-gray-600">Modelo:</span>
+                              <p className="font-medium">{equipo.modelo}</p>
+                            </div>
+                          )}
+
+                          {/* Observaciones */}
+                          {equipo.observaciones && (
+                            <div className="col-span-2">
+                              <span className="text-gray-600">Observaciones:</span>
+                              <p className="font-medium">{equipo.observaciones}</p>
+                            </div>
+                          )}
+                          
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        );
       case 'historial':
         return renderPestañaHistorial();
       default:
         return renderPestañaGeneral();
     }
   };
-
   // ==========================================
   // RENDER PRINCIPAL
   // ==========================================
