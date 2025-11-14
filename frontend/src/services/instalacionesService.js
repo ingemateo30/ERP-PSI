@@ -540,5 +540,4 @@ async exportarInstalaciones(filtros = {}) {
 }
 };
 
-
 export default instalacionesService;
