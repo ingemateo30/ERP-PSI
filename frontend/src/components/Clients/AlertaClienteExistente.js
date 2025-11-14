@@ -252,11 +252,11 @@ const AlertaClienteExistente = ({
           </h4>
 
           {/* Servicios */}
-          {servicios && servicios.length > 0 && (
+          {servicios_totales && servicios_totales.length > 0 && (
             <div className="mb-5">
-              <h5 className="font-semibold text-gray-900 mb-3">Servicios ({servicios.length})</h5>
+              <h5 className="font-semibold text-gray-900 mb-3">Servicios ({servicios_totales.length})</h5>
               <div className="space-y-2">
-                {servicios.map((servicio, index) => (
+                {servicios_totales.map((servicio, index) => (
                   <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm gap-2">
                     <div className="flex-1 min-w-0">
                       <span className="font-semibold block truncate">{servicio.plan_nombre}</span>
