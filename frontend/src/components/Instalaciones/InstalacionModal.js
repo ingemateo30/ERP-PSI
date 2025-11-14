@@ -85,7 +85,6 @@ const InstalacionModal = ({
     { id: 'general', nombre: 'Información General', icono: User },
     { id: 'detalles', nombre: 'Detalles Técnicos', icono: Settings },
     { id: 'ubicacion', nombre: 'Ubicación', icono: MapPin },
-    { id: 'equipos', nombre: 'Equipos', icono: Package },
     { id: 'historial', nombre: 'Historial', icono: Clock }
   ];
 
