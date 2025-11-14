@@ -208,12 +208,14 @@ router.post('/crear',
     } catch (error) {
       console.error('❌ Error creando cliente completo:', error);
 
-      if (error.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({
-          success: false,
-          message: 'Ya existe un cliente con esta identificación'
-        });
-      }
+      // ✅ MODIFICADO: Ya no validamos duplicados por identificación
+      // Se permite el mismo cliente en diferentes direcciones/ciudades
+      // if (error.code === 'ER_DUP_ENTRY') {
+      //   return res.status(409).json({
+      //     success: false,
+      //     message: 'Ya existe un cliente con esta identificación'
+      //   });
+      // }
 
       if (error.message.includes('undefined')) {
         return res.status(400).json({

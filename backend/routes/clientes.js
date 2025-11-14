@@ -611,13 +611,14 @@ router.post('/clientes-con-servicios',
       await conexion.rollback();
       console.error('❌ Error en creación de cliente con servicios:', error);
 
-      // Manejo de errores específicos
-      if (error.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({
-          success: false,
-          message: 'Ya existe un cliente con esta identificación'
-        });
-      }
+      // ✅ MODIFICADO: Ya no validamos duplicados por identificación
+      // Se permite el mismo cliente en diferentes direcciones/ciudades
+      // if (error.code === 'ER_DUP_ENTRY') {
+      //   return res.status(409).json({
+      //     success: false,
+      //     message: 'Ya existe un cliente con esta identificación'
+      //   });
+      // }
 
       res.status(500).json({
         success: false,

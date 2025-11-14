@@ -76,13 +76,14 @@ class ClienteCompletoController {
     } catch (error) {
       console.error('❌ Error creando cliente completo:', error);
 
-      // Manejo de errores específicos
-      if (error.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({
-          success: false,
-          message: 'Ya existe un cliente con esta identificación'
-        });
-      }
+      // ✅ MODIFICADO: Ya no validamos duplicados por identificación
+      // Se permite el mismo cliente en diferentes direcciones/ciudades
+      // if (error.code === 'ER_DUP_ENTRY') {
+      //   return res.status(409).json({
+      //     success: false,
+      //     message: 'Ya existe un cliente con esta identificación'
+      //   });
+      // }
 
       res.status(500).json({
         success: false,

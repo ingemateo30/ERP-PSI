@@ -1,7 +1,7 @@
 // backend/services/AlertasClienteService.js
 // Crear este archivo nuevo
 
-const Database = require('../config/database');
+const pool = require('../config/database');
 
 class AlertasClienteService {
 
@@ -11,7 +11,7 @@ class AlertasClienteService {
    */
   static async verificarClienteExistente(identificacion, tipoDocumento = 'cedula') {
     try {
-      const conexion = await Database.getConnection();
+      const conexion = await pool.getConnection();
 
       // 1. Buscar TODOS los clientes con esta identificación (múltiples ubicaciones)
       const [clientes] = await conexion.execute(`
