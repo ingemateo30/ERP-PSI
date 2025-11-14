@@ -123,7 +123,7 @@ class AlertasClienteService {
 
       // Generar alertas considerando TODAS las ubicaciones
       const alertas = this.generarAlertasMultiplesUbicaciones(
-        cliente,
+        clientes[0],
         ubicaciones,
         serviciosTotales,
         facturasPendientesTotales,
