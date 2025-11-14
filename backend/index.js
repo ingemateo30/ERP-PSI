@@ -233,6 +233,10 @@ try {
   app.use('/api/v1/clients', clientRoutes);
   console.log('✅ Rutas de clientes cargadas: /api/v1/clients');
 
+  // Rutas de clientes (español) - mismo router
+  app.use('/api/v1/clientes', clientRoutes);
+  console.log('✅ Rutas de clientes cargadas: /api/v1/clientes');
+
   // Rutas de inventario
   console.log('📦 Cargando rutas de inventario...');
   const inventoryRoutes = require('./routes/inventario');
