@@ -437,7 +437,7 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
   try {
     console.log('🔧 Generando orden de instalación para múltiples servicios con trazabilidad completa...');
 
-    const numeroOrden = await this.generarNumeroOrden(conexion);
+    //const numeroOrden = await this.generarNumeroOrden(conexion);
 
     // ✅ CORRECCIÓN 1: Calcular costo CORRECTO según tipo de contrato
     const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
@@ -482,11 +482,11 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
 
     const query = `
       INSERT INTO instalaciones (
-        cliente_id, servicio_cliente_id, contrato_id, numero_orden,
+        cliente_id, servicio_cliente_id, contrato_id,
         direccion_instalacion, barrio, telefono_contacto, persona_recibe,
         fecha_programada, hora_programada, tipo_instalacion,
         costo_instalacion, estado, observaciones, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'programada', ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'programada', ?, ?)
     `;
 
     // Programar para mañana
@@ -497,7 +497,6 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
       clienteId,
       JSON.stringify(serviciosIds), // ✅ CORRECCIÓN 2: JSON con todos los servicios
       contratoId, // ✅ CORRECCIÓN 3: ID del contrato guardado correctamente
-      numeroOrden,
       sedeData.direccion_servicio || cliente.direccion,
       cliente.barrio || sedeData.barrio || 'No especificado',
       sedeData.telefono_sede || cliente.telefono,
