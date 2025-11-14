@@ -300,19 +300,24 @@
       return this.makeRequest(`${this.baseURL}/banks/stats`);
     }
 
-    async getServicePlans(params = {}) {
-      try {
-        const queryParams = new URLSearchParams(params).toString();
-        const url = queryParams ? 
-          `${this.baseURL}/service-plans?${queryParams}` : 
-          `${this.baseURL}/service-plans`;
-          
-        console.log('🔄 ConfigService: Solicitando planes desde:', url);
-        
-        const response = await this.makeRequest(url);
-        console.log('📡 ConfigService: Respuesta recibida:', response);
-        
-        return response;
+async getServicePlans(params = {}) {
+  try {
+    // ✅ Si no se especifica 'activo', filtrar solo activos por defecto
+    if (params.activo === undefined) {
+      params.activo = 'true';
+    }
+    
+    const queryParams = new URLSearchParams(params).toString();
+    const url = queryParams ? 
+      `${this.baseURL}/service-plans?${queryParams}` : 
+      `${this.baseURL}/service-plans`;
+      
+    console.log('🔄 ConfigService: Solicitando planes desde:', url);
+    
+    const response = await this.makeRequest(url);
+    console.log('📡 ConfigService: Respuesta recibida:', response);
+    
+    return response;
       } catch (error) {
         console.error('❌ ConfigService: Error obteniendo planes:', error);
         throw error;
