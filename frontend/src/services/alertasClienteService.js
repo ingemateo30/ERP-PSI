@@ -51,7 +51,7 @@ class AlertasClienteService {
 
   static async agregarServicioAClienteExistente(clienteId, datosServicio) {
     try {
-      const response = await apiService.post(`/clientes/${clienteId}/agregar-servicio`, datosServicio);
+      const response = await apiService.post(`/clients/${clienteId}/agregar-servicio`, datosServicio);
       return response;
     } catch (error) {
       console.error('Error agregando servicio a cliente existente:', error);
@@ -61,7 +61,7 @@ class AlertasClienteService {
 
   static async obtenerResumenCliente(clienteId) {
     try {
-      const response = await apiService.get(`/clientes/${clienteId}/resumen`);
+      const response = await apiService.get(`/clients/${clienteId}/resumen`);
       return response;
     } catch (error) {
       console.error('Error obteniendo resumen de cliente:', error);
