@@ -582,256 +582,263 @@ const htmlContent = `
     <title>Orden de Servicio PSI - ${instalacion.id}</title>
     <style>
         * {
-            box-sizing: border-box; 
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
-        
+
         body {
             font-family: 'Arial', sans-serif;
-            font-size: 9px;
-            line-height: 1.2;
+            font-size: 7px;
+            line-height: 1.1;
             color: #000;
             background: white;
             padding: 0;
             margin: 0;
         }
-        
+
         .psi-container {
             width: 216mm;
             height: 93mm;
-            padding: 2mm 4mm;
+            padding: 2mm 3mm;
             position: relative;
             background: white;
         }
-        
-        /* HEADER MEJORADO */
+
+        /* HEADER ULTRA COMPACTO */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5mm;
-            padding-bottom: 1mm;
-            border-bottom: 2px solid #000;
+            margin-bottom: 1mm;
+            padding-bottom: 0.5mm;
+            border-bottom: 1px solid #000;
         }
-        
+
         .left-header {
             display: flex;
             align-items: center;
-            gap: 2mm;
+            gap: 1.5mm;
         }
-        
+
         .logo-section {
-            width: 14mm;
-            height: 10mm;
+            width: 12mm;
+            height: 8mm;
             display: flex;
             align-items: center;
             justify-content: center;
-            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 2px solid #000; background: white;'}
+            ${logoBase64 ? `background: url('${logoBase64}') no-repeat center center; background-size: contain;` : 'border: 1px solid #000; background: white;'}
         }
-        
+
         .company-info {
             display: flex;
             flex-direction: column;
-            gap: 0.3mm;
+            gap: 0.2mm;
         }
-        
+
         .company-name {
-            font-size: 8px;
-            font-weight: bold;
-            color: #000;
-            letter-spacing: 0.2px;
-        }
-        
-        .company-details {
-            font-size: 6px;
-            color: #333;
-            line-height: 1.2;
-        }
-        
-        .right-header {
-            text-align: right;
-            background: #f5f5f5;
-            padding: 1mm 2mm;
-            border: 1px solid #000;
-        }
-        
-        .order-title {
-            font-size: 8px;
-            font-weight: bold;
-            color: #000;
-            margin-bottom: 0.5mm;
-        }
-        
-        .order-number {
-            font-size: 10px;
-            font-weight: bold;
-            color: #000;
-            margin-bottom: 0.5mm;
-        }
-        
-        .order-date {
-            font-size: 6px;
-            color: #333;
-        }
-        
-        /* SECCIÓN CLIENTE */
-        .client-section {
-            background: white;
-            padding: 1.5mm 2mm;
-            margin-bottom: 1.5mm;
-            border: 1px solid #000;
-        }
-        
-        .section-title {
             font-size: 7px;
             font-weight: bold;
             color: #000;
-            margin-bottom: 1mm;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            border-bottom: 1px solid #000;
-            padding-bottom: 0.5mm;
         }
-        
+
+        .company-details {
+            font-size: 5px;
+            color: #333;
+            line-height: 1.1;
+        }
+
+        .right-header {
+            text-align: right;
+            background: #f0f0f0;
+            padding: 0.5mm 1.5mm;
+            border: 1px solid #000;
+        }
+
+        .order-title {
+            font-size: 7px;
+            font-weight: bold;
+            color: #000;
+        }
+
+        .order-number {
+            font-size: 9px;
+            font-weight: bold;
+            color: #000;
+        }
+
+        .order-date {
+            font-size: 5px;
+            color: #333;
+        }
+
+        /* SECCIÓN CLIENTE COMPACTA */
+        .client-section {
+            background: white;
+            padding: 0.8mm 1.5mm;
+            margin-bottom: 0.8mm;
+            border: 1px solid #000;
+        }
+
+        .section-title {
+            font-size: 6px;
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 0.5mm;
+            text-transform: uppercase;
+            border-bottom: 1px solid #000;
+            padding-bottom: 0.3mm;
+        }
+
         .client-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1mm 3mm;
+            gap: 0.5mm 2mm;
         }
-        
+
         .info-field {
             display: flex;
             align-items: center;
-            gap: 1mm;
+            gap: 0.5mm;
         }
-        
+
         .info-label {
             font-weight: bold;
-            font-size: 7px;
+            font-size: 6px;
             color: #000;
-            min-width: 18mm;
+            min-width: 16mm;
         }
-        
+
         .info-value {
             flex: 1;
-            font-size: 7px;
+            font-size: 6px;
             color: #000;
-            padding: 0.5mm 1mm;
+            padding: 0.3mm 0.8mm;
             background: white;
             border-bottom: 1px solid #000;
         }
-        
-        /* SECCIÓN PROGRAMACIÓN */
-        .scheduling-section {
+
+        /* GRID ÚNICO PARA PROGRAMACIÓN Y SERVICIOS */
+        .combined-section {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2mm;
-            margin-bottom: 1.5mm;
+            grid-template-columns: 1fr 2fr;
+            gap: 1.5mm;
+            margin-bottom: 0.8mm;
         }
-        
+
         .schedule-box {
             background: #f5f5f5;
-            padding: 1mm 2mm;
+            padding: 0.8mm 1.5mm;
             border: 1px solid #000;
         }
-        
+
         .schedule-box .section-title {
-            color: #000;
-            font-size: 7px;
-            margin-bottom: 0.5mm;
+            font-size: 6px;
+            margin-bottom: 0.3mm;
         }
-        
-        /* SECCIÓN SERVICIOS */
-        .services-section {
-            background: white;
-            padding: 1.5mm 2mm;
-            margin-bottom: 1.5mm;
-            border: 1px solid #000;
-        }
-        
-        .services-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 1mm;
-        }
-        
-        .service-field {
-            display: flex;
-            align-items: center;
-            gap: 1mm;
-        }
-        
-        .service-label {
+
+        .schedule-value {
+            text-align: center;
             font-weight: bold;
             font-size: 7px;
-            color: #000;
-        }
-        
-        .service-value {
-            flex: 1;
-            font-size: 7px;
-            padding: 0.5mm 1mm;
             background: white;
+            padding: 0.5mm;
+            border: 1px solid #000;
+            margin-top: 0.5mm;
+        }
+
+        /* SERVICIOS INLINE */
+        .services-box {
+            background: white;
+            padding: 0.8mm 1.5mm;
+            border: 1px solid #000;
+        }
+
+        .services-inline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1mm 2mm;
+            margin-top: 0.5mm;
+        }
+
+        .service-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5mm;
+            font-size: 6px;
+        }
+
+        .service-label {
+            font-weight: bold;
+        }
+
+        .service-value {
+            padding: 0.3mm 1mm;
             border-bottom: 1px solid #000;
+            min-width: 15mm;
         }
-        
-        /* OBSERVACIONES */
+
+        /* OBSERVACIONES MÁS PEQUEÑAS */
         .observations-section {
-            margin-bottom: 2mm;
+            margin-bottom: 0.8mm;
         }
-        
+
         .observations-box {
             background: white;
             border: 1px solid #000;
-            padding: 1.5mm;
-            min-height: 10mm;
-            font-size: 7px;
-            line-height: 1.3;
+            padding: 0.8mm 1mm;
+            min-height: 6mm;
+            max-height: 8mm;
+            font-size: 5.5px;
+            line-height: 1.2;
+            overflow: hidden;
         }
-        
-        /* FIRMAS MEJORADAS */
+
+        /* FIRMAS COMPACTAS */
         .signatures {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 4mm;
-            margin-top: 3mm;
+            gap: 2mm;
+            margin-top: 1mm;
         }
-        
+
         .signature-block {
             text-align: center;
-            padding: 1.5mm;
+            padding: 0.5mm;
             background: white;
             border: 1px solid #000;
         }
-        
+
         .signature-line {
-            border-top: 2px solid #000;
-            margin-bottom: 1mm;
-            height: 12mm;
+            border-top: 1.5px solid #000;
+            margin-bottom: 0.5mm;
+            height: 7mm;
         }
-        
+
         .signature-label {
-            font-size: 7px;
+            font-size: 6px;
             font-weight: bold;
             color: #000;
             text-transform: uppercase;
         }
-        
+
         .signature-sublabel {
-            font-size: 6px;
+            font-size: 5px;
             color: #333;
-            margin-top: 0.5mm;
+            margin-top: 0.3mm;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        
+
         @page {
             size: 216mm 93mm;
             margin: 0;
         }
-        
+
         @media print {
-            body { 
-                margin: 0; 
+            body {
+                margin: 0;
                 padding: 0;
             }
             .psi-container {
@@ -846,33 +853,32 @@ const htmlContent = `
         <div class="header">
             <div class="left-header">
                 <div class="logo-section">
-                    ${!logoBase64 ? '<span style="font-size: 6px; color: #0056b3; font-weight: bold;">PSI</span>' : ''}
+                    ${!logoBase64 ? '<span style="font-size: 5px; color: #0056b3; font-weight: bold;">PSI</span>' : ''}
                 </div>
                 <div class="company-info">
                     <div class="company-name">PROVEEDOR DE TELECOMUNICACIONES S.A.S.</div>
                     <div class="company-details">
-                        NIT: 901.582.657-3 | Registro TIC No. 96006732<br>
-                        Carrera 9 No. 9-94 | WhatsApp: 318 455 0936
+                        NIT: 901.582.657-3 | Registro TIC No. 96006732 | WhatsApp: 318 455 0936
                     </div>
                 </div>
             </div>
-            
+
             <div class="right-header">
                 <div class="order-title">ORDEN DE SERVICIO</div>
                 <div class="order-number">No. ${String(instalacion.id).padStart(6, '0')}</div>
                 <div class="order-date">
-                    ${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO', { 
-                        year: 'numeric', 
-                        month: 'short', 
-                        day: '2-digit' 
-                    }) : ''} - ${instalacion.hora_programada || ''}
+                    ${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric'
+                    }) : ''} ${instalacion.hora_programada || ''}
                 </div>
             </div>
         </div>
 
         <!-- INFORMACIÓN DEL CLIENTE -->
         <div class="client-section">
-            <div class="section-title">Información del Cliente</div>
+            <div class="section-title">Cliente</div>
             <div class="client-grid">
                 <div class="info-field">
                     <span class="info-label">Nombre:</span>
@@ -893,57 +899,50 @@ const htmlContent = `
             </div>
         </div>
 
-        <!-- PROGRAMACIÓN -->
-        <div class="scheduling-section">
-            <div class="schedule-box">
-                <div class="section-title">Fecha Programada</div>
-                <div class="info-field">
-                    <span class="info-value" style="text-align: center; font-weight: bold; background: white; font-size: 7px;">
-                        ${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO', { 
-                            year: 'numeric', 
-                            month: 'short', 
-                            day: 'numeric' 
+        <!-- PROGRAMACIÓN Y SERVICIOS COMBINADOS -->
+        <div class="combined-section">
+            <div>
+                <div class="schedule-box">
+                    <div class="section-title">Programación</div>
+                    <div class="schedule-value">
+                        ${instalacion.fecha_programada ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO', {
+                            day: '2-digit',
+                            month: 'short'
                         }) : ''}
-                    </span>
-                </div>
-            </div>
-            <div class="schedule-box">
-                <div class="section-title">Hora Programada</div>
-                <div class="info-field">
-                    <span class="info-value" style="text-align: center; font-weight: bold; font-size: 9px; background: white;">
+                    </div>
+                    <div class="schedule-value" style="margin-top: 0.5mm; font-size: 8px;">
                         ${instalacion.hora_programada || ''}
-                    </span>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- SERVICIOS A INSTALAR -->
-        <div class="services-section">
-            <div class="section-title">Servicios a Instalar</div>
-            <div class="services-grid">
-                <div class="service-field">
-                    <span class="service-label">Internet:</span>
-                    <span class="service-value">${servicioDescripcion}</span>
-                </div>
-                <div class="service-field">
-                    <span class="service-label">Televisión:</span>
-                    <span class="service-value"></span>
-                </div>
-                <div class="service-field">
-                    <span class="service-label">Telefonía:</span>
-                    <span class="service-value"></span>
-                </div>
-                <div class="service-field">
-                    <span class="service-label">Poste:</span>
-                    <span class="service-value"></span>
-                </div>
-                <div class="service-field">
-                    <span class="service-label">Amarre:</span>
-                    <span class="service-value"></span>
-                </div>
-                <div class="service-field">
-                    <span class="service-label">Instalador:</span>
-                    <span class="service-value" style="font-weight: bold;">${instalacion.instalador_nombre_completo || 'Por asignar'}</span>
+            <div class="services-box">
+                <div class="section-title">Servicios a Instalar</div>
+                <div class="services-inline">
+                    <div class="service-item">
+                        <span class="service-label">Internet:</span>
+                        <span class="service-value">${servicioDescripcion}</span>
+                    </div>
+                    <div class="service-item">
+                        <span class="service-label">TV:</span>
+                        <span class="service-value"></span>
+                    </div>
+                    <div class="service-item">
+                        <span class="service-label">Tel:</span>
+                        <span class="service-value"></span>
+                    </div>
+                    <div class="service-item">
+                        <span class="service-label">Poste:</span>
+                        <span class="service-value"></span>
+                    </div>
+                    <div class="service-item">
+                        <span class="service-label">Amarre:</span>
+                        <span class="service-value"></span>
+                    </div>
+                    <div class="service-item">
+                        <span class="service-label">Instalador:</span>
+                        <span class="service-value" style="font-weight: bold;">${instalacion.instalador_nombre_completo || 'Sin asignar'}</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -956,7 +955,7 @@ const htmlContent = `
             </div>
         </div>
 
-        <!-- FIRMAS -->
+        <!-- FIRMAS COMPACTAS -->
         <div class="signatures">
             <div class="signature-block">
                 <div class="signature-line"></div>
@@ -970,8 +969,8 @@ const htmlContent = `
             </div>
             <div class="signature-block">
                 <div class="signature-line"></div>
-                <div class="signature-label">Fecha y Hora</div>
-                <div class="signature-sublabel">Completado</div>
+                <div class="signature-label">Completado</div>
+                <div class="signature-sublabel">Fecha y Hora</div>
             </div>
         </div>
     </div>
