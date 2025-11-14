@@ -443,7 +443,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const reportesAnalisis = [
     { icon: <PieChartIcon size={22} />, label: 'Reportes', path: '/reportes-regulatorios', permission: 'administrador' },
     { icon: <BarChart3 size={22} />, label: 'Estadísticas', path: '/reports', permission: 'administrador' },
-    { icon: <BarChart3 size={22} />, label: 'Mapa', path: '/mapa-instalaciones', permission: 'administrador,supervisor' }
+    { icon: <BarChart3 size={22} />, label: 'Mapa', path: '/mapa-instalaciones', permission: 'instalador,administrador,supervisor' }
     
   ];
 
