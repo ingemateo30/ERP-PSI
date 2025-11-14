@@ -404,26 +404,34 @@ const validarFormulario = () => {
         // Vista de solo lectura con información completa
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Información del Cliente */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-              <User className="w-4 h-4 mr-2" />
-              Información del Cliente
-            </h4>
-            <div className="space-y-2">
-              <div>
-                <span className="text-sm text-gray-600">Nombre:</span>
-                <p className="font-medium">{instalacion?.cliente_nombre || 'No especificado'}</p>
-              </div>
-              <div>
-                <span className="text-sm text-gray-600">Identificación:</span>
-                <p className="font-medium">{instalacion?.cliente_identificacion || 'No especificado'}</p>
-              </div>
-              <div>
-                <span className="text-sm text-gray-600">Teléfono:</span>
-                <p className="font-medium">{instalacion?.cliente_telefono || 'No especificado'}</p>
-              </div>
-            </div>
-          </div>
+<div className="bg-gray-50 p-4 rounded-lg">
+  <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+    <User className="w-4 h-4 mr-2" />
+    Información del Cliente
+  </h4>
+  <div className="space-y-2">
+    <div>
+      <span className="text-sm text-gray-600">Nombre:</span>
+      <p className="font-medium">{instalacion?.cliente_nombre || 'No especificado'}</p>
+    </div>
+    <div>
+      <span className="text-sm text-gray-600">Identificación:</span>
+      <p className="font-medium">{instalacion?.cliente_identificacion || 'No especificado'}</p>
+    </div>
+    <div>
+      <span className="text-sm text-gray-600">Teléfono:</span>
+      <p className="font-medium">{instalacion?.cliente_telefono || 'No especificado'}</p>
+    </div>
+    <div>
+      <span className="text-sm text-gray-600">Dirección:</span>
+      <p className="font-medium">{instalacion?.cliente_direccion || 'No especificada'}</p>
+    </div>
+    <div>
+      <span className="text-sm text-gray-600">Email:</span>
+      <p className="font-medium">{instalacion?.cliente_email || 'No especificado'}</p>
+    </div>
+  </div>
+</div>
 
           {/* Información de la Programación */}
           <div className="bg-gray-50 p-4 rounded-lg">
