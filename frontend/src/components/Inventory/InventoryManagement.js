@@ -73,8 +73,29 @@ const loadEquipment = useCallback(async () => {
 }, [filters, user.rol]);
   // Cargar estadísticas
 // frontend/src/components/Inventory/InventoryManagement.js
+// ✅ CORREGIDO: Cargar estadísticas según el rol
 const loadStats = async () => {
-    try {
+  try {
+    if (user.rol === 'instalador') {
+      // Para instalador: calcular estadísticas desde sus equipos
+      console.log('📊 Calculando estadísticas del instalador desde equipos...');
+      const response = await inventoryService.getMisEquipos();
+      const misEquipos = response.equipos || [];
+      
+      const statsInstalador = {
+        total: misEquipos.length,
+        disponibles: misEquipos.filter(e => e.estado === 'disponible').length,
+        instalados: misEquipos.filter(e => e.estado === 'instalado').length,
+        asignados: misEquipos.filter(e => e.estado === 'asignado').length,
+        danados: misEquipos.filter(e => e.estado === 'dañado').length
+      };
+      
+      console.log('📊 Estadísticas calculadas del instalador:', statsInstalador);
+      setStats(statsInstalador);
+      
+    } else {
+      // Para admin/supervisor: usar endpoint de estadísticas generales
+      console.log('📊 Obteniendo estadísticas generales...');
       const response = await inventoryService.getStats();
       console.log('📊 Estadísticas recibidas:', response);
       
@@ -86,11 +107,13 @@ const loadStats = async () => {
       } else {
         setStats(response);
       }
-    } catch (error) {
-      console.error('Error cargando estadísticas:', error);
-      // No mostrar error por estadísticas, es opcional
     }
-  };
+  } catch (error) {
+    console.error('❌ Error cargando estadísticas:', error);
+    // No mostrar error por estadísticas, es opcional
+    setStats(null);
+  }
+};
 
  // Exportar equipos a CSV
   const handleExportarCSV = () => {
