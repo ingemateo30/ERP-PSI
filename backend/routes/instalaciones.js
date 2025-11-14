@@ -627,14 +627,13 @@ router.get('/:id/pdf', async (req, res) => {
             });
         }
 
-        // Si no hay servicios, mostrar mensaje genérico
+        // Si no hay servicios, no mostrar nada (el instalador definirá en campo)
         if (servicios.length === 0) {
             serviciosHTML = `
                 <div class="service-item">
                     <span class="service-icon">📦</span>
                     <div class="service-details">
-                        <strong>Instalación de Servicio</strong>
-                        <span class="service-specs">Servicios a definir</span>
+                        <strong>Por definir en campo</strong>
                     </div>
                 </div>
             `;
@@ -667,7 +666,7 @@ const htmlContent = `
         .psi-container {
             width: 216mm;
             height: 93mm;
-            padding: 3mm 4mm;
+            padding: 2mm 3mm;
             position: relative;
             background: white;
         }
@@ -677,8 +676,8 @@ const htmlContent = `
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 2mm;
-            padding-bottom: 1.5mm;
+            margin-bottom: 1mm;
+            padding-bottom: 1mm;
             border-bottom: 2px solid #0056b3;
         }
 
@@ -744,17 +743,17 @@ const htmlContent = `
         /* SECCIÓN CLIENTE */
         .client-section {
             background: #f8f9fa;
-            padding: 1.5mm 2mm;
-            margin-bottom: 1.5mm;
+            padding: 1mm 1.5mm;
+            margin-bottom: 1mm;
             border: 1px solid #dee2e6;
             border-radius: 1mm;
         }
 
         .section-title {
-            font-size: 8px;
+            font-size: 7.5px;
             font-weight: bold;
             color: #0056b3;
-            margin-bottom: 1mm;
+            margin-bottom: 0.5mm;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -762,7 +761,7 @@ const htmlContent = `
         .client-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1mm 3mm;
+            gap: 0.5mm 2mm;
         }
 
         .info-field {
@@ -791,13 +790,13 @@ const htmlContent = `
         .schedule-installer-section {
             display: grid;
             grid-template-columns: 1fr 2fr;
-            gap: 2mm;
-            margin-bottom: 1.5mm;
+            gap: 1.5mm;
+            margin-bottom: 1mm;
         }
 
         .schedule-box {
             background: #fff3cd;
-            padding: 1.5mm 2mm;
+            padding: 1mm 1.5mm;
             border: 1px solid #ffc107;
             border-radius: 1mm;
         }
@@ -805,34 +804,34 @@ const htmlContent = `
         .schedule-content {
             display: flex;
             flex-direction: column;
-            gap: 1mm;
-            margin-top: 1mm;
+            gap: 0.5mm;
+            margin-top: 0.5mm;
         }
 
         .schedule-item {
             background: white;
-            padding: 1mm 1.5mm;
+            padding: 0.5mm 1mm;
             border-radius: 1mm;
             text-align: center;
             font-weight: bold;
-            font-size: 9px;
+            font-size: 8.5px;
             border: 1px solid #ffc107;
         }
 
         .installer-box {
             background: #e7f3ff;
-            padding: 1.5mm 2mm;
+            padding: 1mm 1.5mm;
             border: 1px solid #0056b3;
             border-radius: 1mm;
         }
 
         .installer-name {
             background: white;
-            padding: 1.5mm 2mm;
-            margin-top: 1mm;
+            padding: 1mm 1.5mm;
+            margin-top: 0.5mm;
             border-radius: 1mm;
             font-weight: bold;
-            font-size: 10px;
+            font-size: 9px;
             color: #0056b3;
             text-align: center;
             border: 1px solid #0056b3;
@@ -841,8 +840,8 @@ const htmlContent = `
         /* SERVICIOS A INSTALAR */
         .services-section {
             background: white;
-            padding: 1.5mm 2mm;
-            margin-bottom: 1.5mm;
+            padding: 1mm 1.5mm;
+            margin-bottom: 1mm;
             border: 1px solid #28a745;
             border-radius: 1mm;
         }
@@ -854,56 +853,56 @@ const htmlContent = `
         .services-grid {
             display: flex;
             flex-direction: column;
-            gap: 1.5mm;
-            margin-top: 1mm;
+            gap: 0.5mm;
+            margin-top: 0.5mm;
         }
 
         .service-item {
             display: flex;
             align-items: center;
-            gap: 2mm;
+            gap: 1.5mm;
             background: #f8f9fa;
-            padding: 1.5mm 2mm;
+            padding: 1mm 1.5mm;
             border-radius: 1mm;
             border-left: 3px solid #28a745;
         }
 
         .service-icon {
-            font-size: 12px;
-            min-width: 5mm;
+            font-size: 10px;
+            min-width: 4mm;
         }
 
         .service-details {
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 0.5mm;
+            gap: 0.3mm;
         }
 
         .service-details strong {
-            font-size: 9px;
+            font-size: 8.5px;
             color: #000;
         }
 
         .service-specs {
-            font-size: 8px;
+            font-size: 7.5px;
             color: #6c757d;
         }
 
         /* OBSERVACIONES */
         .observations-section {
-            margin-bottom: 1.5mm;
+            margin-bottom: 1mm;
         }
 
         .observations-box {
             background: #fff;
             border: 1px solid #dee2e6;
             border-radius: 1mm;
-            padding: 1.5mm 2mm;
-            min-height: 8mm;
-            max-height: 12mm;
-            font-size: 8px;
-            line-height: 1.3;
+            padding: 1mm 1.5mm;
+            min-height: 6mm;
+            max-height: 8mm;
+            font-size: 7.5px;
+            line-height: 1.2;
             overflow: hidden;
             color: #495057;
         }
@@ -912,13 +911,13 @@ const htmlContent = `
         .signatures {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 3mm;
+            gap: 2mm;
             margin-top: auto;
         }
 
         .signature-block {
             text-align: center;
-            padding: 1mm;
+            padding: 0.5mm;
             background: #f8f9fa;
             border: 1px solid #dee2e6;
             border-radius: 1mm;
@@ -926,12 +925,12 @@ const htmlContent = `
 
         .signature-line {
             border-top: 2px solid #000;
-            margin-bottom: 1mm;
-            height: 10mm;
+            margin-bottom: 0.5mm;
+            height: 7mm;
         }
 
         .signature-label {
-            font-size: 8px;
+            font-size: 7.5px;
             font-weight: bold;
             color: #000;
             text-transform: uppercase;
@@ -939,9 +938,9 @@ const htmlContent = `
         }
 
         .signature-sublabel {
-            font-size: 7px;
+            font-size: 6.5px;
             color: #6c757d;
-            margin-top: 0.5mm;
+            margin-top: 0.3mm;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
