@@ -1,6 +1,10 @@
 // Script para ejecutar migración de base de datos
-const fs = require('fs').promises;
 const path = require('path');
+const fs = require('fs').promises;
+
+// ✅ IMPORTANTE: Cargar variables de entorno ANTES de importar la configuración de BD
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
 const pool = require('../config/database');
 
 async function ejecutarMigracion() {
