@@ -485,8 +485,8 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
         cliente_id, servicio_cliente_id, contrato_id,
         direccion_instalacion, barrio, telefono_contacto, persona_recibe,
         fecha_programada, hora_programada, tipo_instalacion,
-        costo_instalacion, estado, observaciones, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'programada', ?, ?)
+        costo_instalacion, estado, observaciones
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'programada', ?)
     `;
 
     // Programar para mañana
@@ -506,7 +506,7 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
       'nueva',
       costoInstalacionTotal, // ✅ CORRECCIÓN 1: Costo correcto
       observacionesInstalacion,
-      createdBy || 1
+      
     ];
 
     const [resultado] = await conexion.execute(query, parametros);
