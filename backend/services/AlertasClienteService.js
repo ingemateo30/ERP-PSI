@@ -45,6 +45,9 @@ class AlertasClienteService {
       let facturasPendientesTotales = { total_pendientes: 0, valor_pendiente: 0 };
       let contratosTotales = [];
 
+      // Tomar el primer cliente como referencia para datos generales
+      const cliente = clientes[0];
+
       // Iterar sobre cada ubicación del cliente
       for (const ubicacion of clientes) {
         // Obtener servicios de esta ubicación
