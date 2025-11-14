@@ -209,10 +209,21 @@ router.post('/crear',
       console.error('❌ Error creando cliente completo:', error);
 
       if (error.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({
-          success: false,
-          message: 'Ya existe un cliente con esta identificación'
-        });
+        // Importar helper de cliente existente
+        const { generarRespuestaErrorDuplicado } = require('../utils/clienteExistenteHelper');
+
+        try {
+          const identificacion = req.body.cliente?.identificacion || req.body.identificacion;
+          const errorInfo = await generarRespuestaErrorDuplicado(identificacion);
+          return res.status(errorInfo.statusCode).json(errorInfo.response);
+        } catch (helperError) {
+          console.error('Error al generar respuesta detallada:', helperError);
+          return res.status(409).json({
+            success: false,
+            message: 'Ya existe un cliente con esta identificación',
+            detalle: 'Verifique los datos del cliente existente antes de crear uno nuevo'
+          });
+        }
       }
 
       if (error.message.includes('undefined')) {

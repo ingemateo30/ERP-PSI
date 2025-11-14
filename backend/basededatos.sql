@@ -2162,8 +2162,9 @@ ALTER TABLE `ciudades`
 --
 ALTER TABLE `clientes`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `identificacion` (`identificacion`),
   ADD KEY `idx_identificacion` (`identificacion`),
+  ADD KEY `idx_identificacion_ciudad` (`identificacion`, `ciudad_id`),
+  ADD KEY `idx_identificacion_direccion` (`identificacion`(20), `direccion`(100)),
   ADD KEY `idx_estado` (`estado`),
   ADD KEY `idx_nombre` (`nombre`),
   ADD KEY `idx_telefono` (`telefono`),
