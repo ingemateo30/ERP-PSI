@@ -1,0 +1,42 @@
+================================================================================
+  EJECUTAR ESTOS COMANDOS EN TU SERVIDOR (psiserver)
+================================================================================
+
+1. PRIMERO: Hacer pull del script de resolución
+   ┌────────────────────────────────────────────────────────────────┐
+   │ cd ~/ERP-PSI                                                   │
+   │ git fetch origin                                               │
+   │ git checkout claude/fix-duplicate-client-errors-011MvaCXRRBFjr4zRPTyK8fG │
+   └────────────────────────────────────────────────────────────────┘
+
+2. SEGUNDO: Resolver los conflictos automáticamente
+   ┌────────────────────────────────────────────────────────────────┐
+   │ ./resolver_conflictos.sh                                       │
+   └────────────────────────────────────────────────────────────────┘
+
+3. TERCERO: Hacer commit de la resolución
+   ┌────────────────────────────────────────────────────────────────┐
+   │ git commit -m "fix: resolver conflictos manteniendo mejoras"  │
+   └────────────────────────────────────────────────────────────────┘
+
+4. CUARTO: Aplicar la migración en la base de datos
+   ┌────────────────────────────────────────────────────────────────┐
+   │ mysql -u root -p1234 jelcom_internet < APLICAR_MIGRACION_CLIENTES.sql │
+   └────────────────────────────────────────────────────────────────┘
+
+5. QUINTO: Reiniciar el backend
+   ┌────────────────────────────────────────────────────────────────┐
+   │ cd ~/ERP-PSI/backend                                          │
+   │ pm2 restart jelcom-backend                                    │
+   └────────────────────────────────────────────────────────────────┘
+
+================================================================================
+  LISTO! El error de clientes duplicados estará resuelto
+================================================================================
+
+Para verificar que todo funciona:
+- Intenta crear un cliente con identificación 1005450340
+- Ya NO debe aparecer: "Duplicate entry for key 'clientes.identificacion'"
+- Ahora debe mostrar información completa del cliente existente
+
+================================================================================
