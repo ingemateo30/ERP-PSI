@@ -615,16 +615,6 @@ const LoginComponent = () => {
                 )}
               </div>
 
-              {/* Forgot password con hover al color del layout */}
-              <div className="text-left fade-in-up" style={{ animationDelay: '0.9s' }}>
-                <button
-                  type="button"
-                  onClick={() => alert('Funcionalidad de recuperación en desarrollo')}
-                  className="text-base text-[#0e6493] hover:text-[#0e6493]/80 transition-all duration-300 font-semibold hover:scale-105 transform"
-                >
-                  ¿Olvidaste tu contraseña?
-                </button>
-              </div>
 
               {/* Botón de login con colores del layout */}
               <button
