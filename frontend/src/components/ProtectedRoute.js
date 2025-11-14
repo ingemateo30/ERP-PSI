@@ -70,7 +70,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
   // ✅ CAMBIO: Redirigir automáticamente según el rol en lugar de mostrar pantalla de error
   const dashboardMap = {
-    'instalador': '/instalador/dashboard',
+    'instalador': '/dashboard',
     'supervisor': '/dashboard',
     'administrador': '/dashboard'
   };

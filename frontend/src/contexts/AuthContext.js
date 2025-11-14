@@ -233,7 +233,7 @@ export const AuthProvider = ({ children }) => {
       // Redirigir según rol
       setTimeout(() => {
         if (userRole === 'instalador') {
-          window.location.href = '/instalador/dashboard';
+          window.location.href = '/dashboard'; 
         } else {
           window.location.href = '/dashboard';
         }
