@@ -305,8 +305,12 @@ async getServicePlans(params = {}) {
     // ✅ ASEGURAR que params sea un objeto
     const filtros = params || {};
     
-    // ✅ Si no se especifica 'activo', filtrar solo activos por defecto
-    if (filtros.activo === undefined) {
+    // ✅ Lógica mejorada de filtrado
+    // Si params tiene activo: null, NO enviarlo en la query
+    if (filtros.activo === null) {
+      delete filtros.activo; // Eliminar el parámetro completamente
+    } else if (filtros.activo === undefined) {
+      // Si no se especifica, por defecto solo activos
       filtros.activo = 'true';
     }
     
