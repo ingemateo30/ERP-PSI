@@ -211,6 +211,27 @@ class UsersController {
         createdBy: req.user.id
       });
 
+      // Crear notificación de bienvenida si es instalador
+      if (rol === 'instalador') {
+        try {
+          const Notificacion = require('../models/notificacion');
+          await Notificacion.crear({
+            usuario_id: result.insertId,
+            tipo: 'bienvenida',
+            titulo: 'Bienvenido al Sistema',
+            mensaje: `Hola ${nombre}, tu cuenta de instalador ha sido creada exitosamente. Aquí recibirás notificaciones sobre tus instalaciones asignadas.`,
+            datos_adicionales: {
+              usuario_id: result.insertId,
+              rol: rol
+            }
+          });
+          console.log('✅ Notificación de bienvenida creada para instalador:', result.insertId);
+        } catch (notifError) {
+          console.error('⚠️ Error creando notificación de bienvenida:', notifError);
+          // No fallar la petición si falla la notificación
+        }
+      }
+
       return success(res, 'Usuario creado exitosamente', newUser[0], 201);
 
     } catch (err) {

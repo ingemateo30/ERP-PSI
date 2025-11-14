@@ -1392,6 +1392,20 @@ router.patch('/:id/asignar-instalador',
                 WHERE i.id = ?
             `, [id]);
 
+            // Crear notificación para el instalador
+            const Notificacion = require('../models/notificacion');
+            try {
+                await Notificacion.notificarNuevaInstalacion(
+                    id,
+                    instalacionActualizada.cliente_nombre,
+                    instalador_id
+                );
+                console.log('✅ Notificación creada para instalador:', instalador_id);
+            } catch (notifError) {
+                console.error('⚠️ Error creando notificación:', notifError);
+                // No fallar la petición si falla la notificación
+            }
+
             res.json({
                 success: true,
                 message: 'Instalador asignado exitosamente',
