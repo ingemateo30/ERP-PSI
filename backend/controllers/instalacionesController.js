@@ -1840,7 +1840,7 @@ static async generarOrdenServicioPDF(req, res) {
 
         // Obtener información completa de la instalación
         const instalacion = await this.obtenerInstalacionCompleta(id);
-        
+
         if (!instalacion) {
             return res.status(404).json({
                 success: false,
@@ -1849,8 +1849,8 @@ static async generarOrdenServicioPDF(req, res) {
         }
 
         const PDFDocument = require('pdfkit');
-        const doc = new PDFDocument({ 
-            margin: 40,
+        const doc = new PDFDocument({
+            margin: 30,
             size: 'LETTER',
             bufferPages: true
         });
@@ -1862,165 +1862,245 @@ static async generarOrdenServicioPDF(req, res) {
         // Pipe del documento al response
         doc.pipe(res);
 
-        // ENCABEZADO DE LA EMPRESA
+        let yPosition = 30;
+        const leftMargin = 40;
+        const rightMargin = 572;
+        const midPoint = 306;
+
+        // ENCABEZADO COMPACTO
         doc.font('Helvetica-Bold')
-            .fontSize(18)
-            .text('ORDEN DE SERVICIO', 50, 40, { align: 'center' });
-
-        doc.fontSize(10)
-            .text('PSI - Proveedor de Servicios de Internet', 50, 65, { align: 'center' })
-            .text('NIT: 900.123.456-7', 50, 78, { align: 'center' })
-            .text('Teléfono: (607) 123-4567', 50, 91, { align: 'center' });
-
-        // Línea divisoria
-        doc.moveTo(50, 110)
-            .lineTo(562, 110)
-            .stroke();
-
-        let yPosition = 130;
-
-        // INFORMACIÓN DE LA ORDEN
-        doc.font('Helvetica-Bold')
-            .fontSize(12)
-            .text('INFORMACIÓN DE LA ORDEN', 50, yPosition);
+            .fontSize(16)
+            .text('ORDEN DE SERVICIO', leftMargin, yPosition, { align: 'center', width: 532 });
 
         yPosition += 20;
 
-        doc.font('Helvetica')
-            .fontSize(9)
-            .text(`Orden No: #${String(instalacion.id).padStart(6, '0')}`, 50, yPosition)
-            .text(`Fecha: ${new Date().toLocaleDateString('es-CO', { 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit' 
-            })}`, 350, yPosition);
+        doc.fontSize(8)
+            .font('Helvetica')
+            .text('PSI - Proveedor de Servicios de Internet | NIT: 900.123.456-7 | Tel: (607) 123-4567',
+                leftMargin, yPosition, { align: 'center', width: 532 });
 
-        yPosition += 14;
+        yPosition += 15;
 
-        doc.text(`Estado: ${instalacion.estado?.toUpperCase() || 'PROGRAMADA'}`, 50, yPosition)
-            .text(`Tipo: ${instalacion.tipo_instalacion || 'Nueva Instalación'}`, 350, yPosition);
+        // Línea divisoria
+        doc.moveTo(leftMargin, yPosition)
+            .lineTo(rightMargin, yPosition)
+            .stroke();
 
-        yPosition += 25;
+        yPosition += 10;
 
-        // INFORMACIÓN DEL CLIENTE
+        // INFORMACIÓN DE LA ORDEN (en dos columnas)
         doc.font('Helvetica-Bold')
-            .fontSize(11)
-            .text('INFORMACIÓN DEL CLIENTE', 50, yPosition);
+            .fontSize(8)
+            .text(`ORDEN No: #${String(instalacion.id).padStart(6, '0')}`, leftMargin, yPosition)
+            .text(`FECHA: ${new Date().toLocaleDateString('es-CO')}`, midPoint, yPosition);
+
+        yPosition += 12;
+
+        doc.font('Helvetica')
+            .text(`Estado: ${instalacion.estado?.toUpperCase() || 'PROGRAMADA'}`, leftMargin, yPosition)
+            .text(`Tipo: ${instalacion.tipo_instalacion || 'Nueva'}`, midPoint, yPosition);
+
+        yPosition += 15;
+
+        // RECUADRO DE INFORMACIÓN DEL CLIENTE
+        doc.rect(leftMargin, yPosition, 532, 70).stroke();
+
+        yPosition += 5;
+
+        doc.font('Helvetica-Bold')
+            .fontSize(9)
+            .text('INFORMACIÓN DEL CLIENTE', leftMargin + 5, yPosition);
+
+        yPosition += 13;
+
+        doc.font('Helvetica')
+            .fontSize(8)
+            .text(`Nombre: ${instalacion.cliente_nombre || 'No especificado'}`, leftMargin + 5, yPosition, { width: 522 });
+
+        yPosition += 12;
+
+        doc.text(`Identificación: ${instalacion.cliente_identificacion || 'N/A'}`, leftMargin + 5, yPosition)
+            .text(`Teléfono: ${instalacion.telefono_contacto || instalacion.cliente_telefono || 'N/A'}`, midPoint, yPosition);
+
+        yPosition += 12;
+
+        doc.text(`Email: ${instalacion.cliente_email || 'No especificado'}`, leftMargin + 5, yPosition, { width: 250 });
+
+        yPosition += 12;
+
+        doc.text(`Dirección: ${instalacion.direccion_instalacion || 'No especificada'}`, leftMargin + 5, yPosition, { width: 522 });
 
         yPosition += 18;
 
-        doc.font('Helvetica')
-            .fontSize(9)
-            .text(`Nombre: ${instalacion.cliente_nombre || 'No especificado'}`, 50, yPosition);
+        // RECUADRO DE INFORMACIÓN DEL SERVICIO
+        doc.rect(leftMargin, yPosition, 532, 50).stroke();
 
-        yPosition += 14;
+        yPosition += 5;
 
-        doc.text(`Identificación: ${instalacion.cliente_identificacion || 'N/A'}`, 50, yPosition)
-            .text(`Teléfono: ${instalacion.telefono_contacto || instalacion.cliente_telefono || 'N/A'}`, 350, yPosition);
-
-        yPosition += 14;
-
-        doc.text(`Email: ${instalacion.cliente_email || 'No especificado'}`, 50, yPosition);
-
-        yPosition += 14;
-
-        doc.text(`Dirección: ${instalacion.direccion_instalacion || 'No especificada'}`, 50, yPosition, {
-            width: 500
-        });
-
-        yPosition += 25;
-
-        // INFORMACIÓN DEL SERVICIO
         doc.font('Helvetica-Bold')
-            .fontSize(11)
-            .text('INFORMACIÓN DEL SERVICIO', 50, yPosition);
+            .fontSize(9)
+            .text('INFORMACIÓN DEL SERVICIO', leftMargin + 5, yPosition);
+
+        yPosition += 13;
+
+        doc.font('Helvetica')
+            .fontSize(8)
+            .text(`Plan: ${instalacion.plan_nombre || 'No especificado'}`, leftMargin + 5, yPosition)
+            .text(`IP: ${instalacion.ip_asignada || 'N/A'}`, midPoint, yPosition);
+
+        yPosition += 12;
+
+        doc.text(`Precio Mensual: $${(instalacion.plan_precio || 0).toLocaleString('es-CO')}`, leftMargin + 5, yPosition)
+            .text(`Costo Instalación: $${(instalacion.costo_instalacion || 0).toLocaleString('es-CO')}`, midPoint, yPosition);
+
+        yPosition += 12;
+
+        doc.text(`TAP: ${instalacion.tap || 'N/A'}`, leftMargin + 5, yPosition);
 
         yPosition += 18;
 
-        doc.font('Helvetica')
-            .fontSize(9)
-            .text(`Plan: ${instalacion.plan_nombre || 'No especificado'}`, 50, yPosition);
-        
-        yPosition += 14;
+        // RECUADRO DE PROGRAMACIÓN
+        doc.rect(leftMargin, yPosition, 532, 38).stroke();
 
-        doc.text(`Precio Mensual: $${(instalacion.plan_precio || 0).toLocaleString('es-CO')}`, 50, yPosition)
-            .text(`Costo Instalación: $${(instalacion.costo_instalacion || 0).toLocaleString('es-CO')}`, 350, yPosition);
+        yPosition += 5;
 
-        yPosition += 25;
-
-        // INFORMACIÓN DE INSTALACIÓN
         doc.font('Helvetica-Bold')
-            .fontSize(11)
-            .text('PROGRAMACIÓN DE INSTALACIÓN', 50, yPosition);
+            .fontSize(9)
+            .text('PROGRAMACIÓN DE INSTALACIÓN', leftMargin + 5, yPosition);
 
-        yPosition += 18;
+        yPosition += 13;
 
-        const fechaProgramada = instalacion.fecha_programada ? 
-            new Date(instalacion.fecha_programada).toLocaleDateString('es-CO') : 
+        const fechaProgramada = instalacion.fecha_programada ?
+            new Date(instalacion.fecha_programada).toLocaleDateString('es-CO') :
             'Por definir';
 
         doc.font('Helvetica')
-            .fontSize(9)
-            .text(`Fecha Programada: ${fechaProgramada}`, 50, yPosition)
-            .text(`Hora: ${instalacion.hora_programada || 'Por definir'}`, 350, yPosition);
+            .fontSize(8)
+            .text(`Fecha Programada: ${fechaProgramada}`, leftMargin + 5, yPosition)
+            .text(`Hora: ${instalacion.hora_programada || 'Por definir'}`, midPoint, yPosition);
 
-        yPosition += 14;
+        yPosition += 12;
 
-        doc.text(`Instalador Asignado: ${instalacion.instalador_nombre || 'Sin asignar'}`, 50, yPosition);
+        doc.text(`Instalador: ${instalacion.instalador_nombres || 'Sin asignar'}`, leftMargin + 5, yPosition, { width: 522 });
 
-        yPosition += 25;
+        yPosition += 18;
 
-        // OBSERVACIONES
+        // OBSERVACIONES (si hay espacio)
         if (instalacion.observaciones && instalacion.observaciones.trim()) {
+            const observacionesMaxHeight = 60;
+            const observacionesTexto = instalacion.observaciones.substring(0, 200);
+
+            doc.rect(leftMargin, yPosition, 532, observacionesMaxHeight).stroke();
+
+            yPosition += 5;
+
             doc.font('Helvetica-Bold')
-                .fontSize(11)
-                .text('OBSERVACIONES', 50, yPosition);
+                .fontSize(9)
+                .text('OBSERVACIONES', leftMargin + 5, yPosition);
 
-            yPosition += 18;
-
-            const observacionesTexto = instalacion.observaciones.substring(0, 300); // Limitar a 300 caracteres
+            yPosition += 13;
 
             doc.font('Helvetica')
-                .fontSize(9)
-                .text(observacionesTexto, 50, yPosition, { 
-                    width: 500,
-                    lineGap: 2
+                .fontSize(7)
+                .text(observacionesTexto, leftMargin + 5, yPosition, {
+                    width: 522,
+                    height: observacionesMaxHeight - 20,
+                    ellipsis: true
                 });
 
-            const observacionesHeight = doc.heightOfString(observacionesTexto, { width: 500 });
-            yPosition += observacionesHeight + 20;
+            yPosition += observacionesMaxHeight;
         }
 
-        // ✅ SOLUCIÓN: POSICIONAR FIRMAS AL FINAL DE LA PÁGINA
-        const pageHeight = 792; // Altura carta en puntos
-        const firmasY = pageHeight - 120; // 120 puntos desde el final
+        // EQUIPOS INSTALADOS (si hay)
+        if (instalacion.equipos_instalados && instalacion.equipos_instalados.length > 0) {
+            yPosition += 5;
 
-        // Si el contenido ya pasó esa posición, agregar nueva página
-        if (yPosition > firmasY - 30) {
-            doc.addPage();
+            doc.rect(leftMargin, yPosition, 532, 48).stroke();
+
+            yPosition += 5;
+
+            doc.font('Helvetica-Bold')
+                .fontSize(9)
+                .text('EQUIPOS INSTALADOS', leftMargin + 5, yPosition);
+
+            yPosition += 13;
+
+            doc.font('Helvetica')
+                .fontSize(7);
+
+            const equiposTexto = instalacion.equipos_instalados
+                .slice(0, 3)
+                .map(e => `• ${e.nombre || e.tipo_equipo || 'Equipo'} - SN: ${e.numero_serie || 'N/A'}`)
+                .join('  |  ');
+
+            doc.text(equiposTexto, leftMargin + 5, yPosition, { width: 522 });
+
+            yPosition += 25;
+        }
+
+        // ESPACIO PARA FIRMAS - SIEMPRE AL FINAL
+        const pageHeight = 792;
+        const firmasY = pageHeight - 140;
+
+        // Si estamos muy abajo, dejar espacio mínimo
+        if (yPosition < firmasY - 10) {
             yPosition = firmasY;
         } else {
-            yPosition = firmasY;
+            yPosition += 15;
         }
 
-        // SECCIÓN DE FIRMAS - SIEMPRE EN LA MISMA POSICIÓN
-        doc.fontSize(8)
-            .text('_____________________________', 70, yPosition, { width: 200 })
-            .text('Firma del Cliente', 70, yPosition + 18, { width: 200, align: 'center' })
-            .text(`Fecha: ___________________`, 70, yPosition + 32, { width: 200 });
-        
-        doc.text('_____________________________', 342, yPosition, { width: 200 })
-            .text('Firma del Instalador', 342, yPosition + 18, { width: 200, align: 'center' })
-            .text(`Fecha: ___________________`, 342, yPosition + 32, { width: 200 });
+        // Línea divisoria antes de firmas
+        doc.moveTo(leftMargin, yPosition)
+            .lineTo(rightMargin, yPosition)
+            .strokeColor('#CCCCCC')
+            .stroke()
+            .strokeColor('#000000');
+
+        yPosition += 20;
+
+        // SECCIÓN DE FIRMAS - CON MÁS ESPACIO
+        const firmaWidth = 220;
+        const firmaLeftX = leftMargin + 20;
+        const firmaRightX = rightMargin - firmaWidth - 20;
+
+        doc.font('Helvetica-Bold')
+            .fontSize(8)
+            .text('FIRMA DEL CLIENTE', firmaLeftX, yPosition, { width: firmaWidth, align: 'center' })
+            .text('FIRMA DEL INSTALADOR', firmaRightX, yPosition, { width: firmaWidth, align: 'center' });
+
+        yPosition += 35;
+
+        // Líneas para firmas
+        doc.moveTo(firmaLeftX, yPosition).lineTo(firmaLeftX + firmaWidth, yPosition).stroke();
+        doc.moveTo(firmaRightX, yPosition).lineTo(firmaRightX + firmaWidth, yPosition).stroke();
+
+        yPosition += 15;
+
+        doc.font('Helvetica')
+            .fontSize(7)
+            .text(`Nombre: _______________________`, firmaLeftX, yPosition, { width: firmaWidth })
+            .text(`Nombre: _______________________`, firmaRightX, yPosition, { width: firmaWidth });
+
+        yPosition += 12;
+
+        doc.text(`C.C.: __________________________`, firmaLeftX, yPosition, { width: firmaWidth })
+            .text(`C.C.: __________________________`, firmaRightX, yPosition, { width: firmaWidth });
+
+        yPosition += 12;
+
+        doc.text(`Fecha: _________________________`, firmaLeftX, yPosition, { width: firmaWidth })
+            .text(`Fecha: _________________________`, firmaRightX, yPosition, { width: firmaWidth });
 
         // Pie de página
-        doc.fontSize(7)
+        yPosition += 20;
+
+        doc.fontSize(6)
             .fillColor('#666666')
             .text(
                 'Este documento es una orden de servicio oficial. Conservar para referencia.',
-                50,
-                yPosition + 60,
-                { align: 'center', width: 512 }
+                leftMargin,
+                yPosition,
+                { align: 'center', width: 532 }
             );
 
         // Finalizar el documento
