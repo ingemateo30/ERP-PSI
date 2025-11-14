@@ -1816,7 +1816,6 @@ static async generarOrdenServicioPDF(req, res) {
         const { id } = req.params;
         console.log(`📄 Generando orden de servicio PDF para instalación ${id}`);
 
-        // Obtener información completa de la instalación
         const instalacion = await this.obtenerInstalacionCompleta(id);
         
         if (!instalacion) {
@@ -1828,180 +1827,128 @@ static async generarOrdenServicioPDF(req, res) {
 
         const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ 
-            margin: 40,
+            margin: 50,
             size: 'LETTER',
             bufferPages: true
         });
 
-        // Headers para descarga
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="orden-servicio-${id}.pdf"`);
 
-        // Pipe del documento al response
         doc.pipe(res);
 
-        // ENCABEZADO DE LA EMPRESA
+        // ENCABEZADO
         doc.font('Helvetica-Bold')
-            .fontSize(18)
-            .text('ORDEN DE SERVICIO', 50, 40, { align: 'center' });
+            .fontSize(20)
+            .text('ORDEN DE SERVICIO PSI', 50, 50, { align: 'center' });
 
-        doc.fontSize(10)
-            .text('PSI - Proveedor de Servicios de Internet', 50, 65, { align: 'center' })
-            .text('NIT: 900.123.456-7', 50, 78, { align: 'center' })
-            .text('Teléfono: (607) 123-4567', 50, 91, { align: 'center' });
+        doc.fontSize(11)
+            .text('PSI - Proveedor de Servicios de Internet', 50, 80, { align: 'center' })
+            .text('NIT: 900.123.456-7', 50, 95, { align: 'center' })
+            .text('Tel: (607) 123-4567', 50, 110, { align: 'center' });
 
-        // Línea divisoria
-        doc.moveTo(50, 110)
-            .lineTo(562, 110)
-            .stroke();
+        doc.moveTo(50, 130).lineTo(562, 130).stroke();
 
-        let yPosition = 130;
+        let y = 150;
 
         // INFORMACIÓN DE LA ORDEN
-        doc.font('Helvetica-Bold')
-            .fontSize(12)
-            .text('INFORMACIÓN DE LA ORDEN', 50, yPosition);
+        doc.font('Helvetica-Bold').fontSize(12).text('INFORMACIÓN DE LA ORDEN', 50, y);
+        y += 20;
 
-        yPosition += 20;
+        doc.font('Helvetica').fontSize(10)
+            .text(`Orden No: #${String(instalacion.id).padStart(6, '0')}`, 50, y)
+            .text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 350, y);
+        y += 15;
 
-        doc.font('Helvetica')
-            .fontSize(9)
-            .text(`Orden No: #${String(instalacion.id).padStart(6, '0')}`, 50, yPosition)
-            .text(`Fecha: ${new Date().toLocaleDateString('es-CO', { 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit' 
-            })}`, 350, yPosition);
-
-        yPosition += 14;
-
-        doc.text(`Estado: ${instalacion.estado?.toUpperCase() || 'PROGRAMADA'}`, 50, yPosition)
-            .text(`Tipo: ${instalacion.tipo_instalacion || 'Nueva Instalación'}`, 350, yPosition);
-
-        yPosition += 25;
+        doc.text(`Estado: ${(instalacion.estado || 'PROGRAMADA').toUpperCase()}`, 50, y)
+            .text(`Tipo: ${instalacion.tipo_instalacion || 'Nueva'}`, 350, y);
+        y += 25;
 
         // INFORMACIÓN DEL CLIENTE
-        doc.font('Helvetica-Bold')
-            .fontSize(11)
-            .text('INFORMACIÓN DEL CLIENTE', 50, yPosition);
+        doc.font('Helvetica-Bold').fontSize(12).text('INFORMACIÓN DEL CLIENTE', 50, y);
+        y += 20;
 
-        yPosition += 18;
+        doc.font('Helvetica').fontSize(10)
+            .text(`Cliente: ${instalacion.cliente_nombre || 'N/A'}`, 50, y);
+        y += 15;
 
-        doc.font('Helvetica')
-            .fontSize(9)
-            .text(`Nombre: ${instalacion.cliente_nombre || 'No especificado'}`, 50, yPosition);
+        doc.text(`CC/NIT: ${instalacion.cliente_identificacion || 'N/A'}`, 50, y)
+            .text(`Tel: ${instalacion.telefono_contacto || instalacion.cliente_telefono || 'N/A'}`, 350, y);
+        y += 15;
 
-        yPosition += 14;
+        doc.text(`Email: ${instalacion.cliente_email || 'N/A'}`, 50, y);
+        y += 15;
 
-        doc.text(`Identificación: ${instalacion.cliente_identificacion || 'N/A'}`, 50, yPosition)
-            .text(`Teléfono: ${instalacion.telefono_contacto || instalacion.cliente_telefono || 'N/A'}`, 350, yPosition);
-
-        yPosition += 14;
-
-        doc.text(`Email: ${instalacion.cliente_email || 'No especificado'}`, 50, yPosition);
-
-        yPosition += 14;
-
-        doc.text(`Dirección: ${instalacion.direccion_instalacion || 'No especificada'}`, 50, yPosition, {
-            width: 500
-        });
-
-        yPosition += 25;
+        const direccionTexto = instalacion.direccion_instalacion || 'No especificada';
+        doc.text(`Dirección: ${direccionTexto}`, 50, y, { width: 500 });
+        y += Math.max(15, doc.heightOfString(direccionTexto, { width: 500 }));
+        y += 10;
 
         // INFORMACIÓN DEL SERVICIO
-        doc.font('Helvetica-Bold')
-            .fontSize(11)
-            .text('INFORMACIÓN DEL SERVICIO', 50, yPosition);
+        doc.font('Helvetica-Bold').fontSize(12).text('INFORMACIÓN DEL SERVICIO', 50, y);
+        y += 20;
 
-        yPosition += 18;
+        doc.font('Helvetica').fontSize(10)
+            .text(`Plan: ${instalacion.plan_nombre || 'N/A'}`, 50, y);
+        y += 15;
 
-        doc.font('Helvetica')
-            .fontSize(9)
-            .text(`Plan: ${instalacion.plan_nombre || 'No especificado'}`, 50, yPosition);
-        
-        yPosition += 14;
+        doc.text(`Precio Mensual: $${(instalacion.plan_precio || 0).toLocaleString('es-CO')}`, 50, y)
+            .text(`Costo Instalación: $${(instalacion.costo_instalacion || 0).toLocaleString('es-CO')}`, 350, y);
+        y += 25;
 
-        doc.text(`Precio Mensual: $${(instalacion.plan_precio || 0).toLocaleString('es-CO')}`, 50, yPosition)
-            .text(`Costo Instalación: $${(instalacion.costo_instalacion || 0).toLocaleString('es-CO')}`, 350, yPosition);
+        // PROGRAMACIÓN
+        doc.font('Helvetica-Bold').fontSize(12).text('PROGRAMACIÓN DE INSTALACIÓN', 50, y);
+        y += 20;
 
-        yPosition += 25;
+        const fechaProg = instalacion.fecha_programada ? 
+            new Date(instalacion.fecha_programada).toLocaleDateString('es-CO') : 'Por definir';
 
-        // INFORMACIÓN DE INSTALACIÓN
-        doc.font('Helvetica-Bold')
-            .fontSize(11)
-            .text('PROGRAMACIÓN DE INSTALACIÓN', 50, yPosition);
+        doc.font('Helvetica').fontSize(10)
+            .text(`Fecha: ${fechaProg}`, 50, y)
+            .text(`Hora: ${instalacion.hora_programada || 'Por definir'}`, 350, y);
+        y += 15;
 
-        yPosition += 18;
+        doc.text(`Instalador: ${instalacion.instalador_nombre || 'Sin asignar'}`, 50, y);
+        y += 25;
 
-        const fechaProgramada = instalacion.fecha_programada ? 
-            new Date(instalacion.fecha_programada).toLocaleDateString('es-CO') : 
-            'Por definir';
-
-        doc.font('Helvetica')
-            .fontSize(9)
-            .text(`Fecha Programada: ${fechaProgramada}`, 50, yPosition)
-            .text(`Hora: ${instalacion.hora_programada || 'Por definir'}`, 350, yPosition);
-
-        yPosition += 14;
-
-        doc.text(`Instalador Asignado: ${instalacion.instalador_nombre || 'Sin asignar'}`, 50, yPosition);
-
-        yPosition += 25;
-
-        // OBSERVACIONES
+        // OBSERVACIONES (limitadas)
         if (instalacion.observaciones && instalacion.observaciones.trim()) {
-            doc.font('Helvetica-Bold')
-                .fontSize(11)
-                .text('OBSERVACIONES', 50, yPosition);
+            doc.font('Helvetica-Bold').fontSize(12).text('OBSERVACIONES', 50, y);
+            y += 20;
 
-            yPosition += 18;
-
-            const observacionesTexto = instalacion.observaciones.substring(0, 300); // Limitar a 300 caracteres
-
-            doc.font('Helvetica')
-                .fontSize(9)
-                .text(observacionesTexto, 50, yPosition, { 
-                    width: 500,
-                    lineGap: 2
-                });
-
-            const observacionesHeight = doc.heightOfString(observacionesTexto, { width: 500 });
-            yPosition += observacionesHeight + 20;
+            const obs = instalacion.observaciones.substring(0, 200);
+            doc.font('Helvetica').fontSize(9).text(obs, 50, y, { width: 500 });
+            y += doc.heightOfString(obs, { width: 500 }) + 15;
         }
 
-        // ✅ SOLUCIÓN: POSICIONAR FIRMAS AL FINAL DE LA PÁGINA
-        const pageHeight = 792; // Altura carta en puntos
-        const firmasY = pageHeight - 120; // 120 puntos desde el final
+        // ✅ SOLUCIÓN FIRMAS: Verificar espacio antes de dibujar
+        const espacioNecesario = 120;
+        const limiteInferior = 700; // Límite antes del final de la página
 
-        // Si el contenido ya pasó esa posición, agregar nueva página
-        if (yPosition > firmasY - 30) {
+        if (y > limiteInferior) {
+            console.log('📄 Agregando nueva página para firmas');
             doc.addPage();
-            yPosition = firmasY;
+            y = 100; // Reset en nueva página
         } else {
-            yPosition = firmasY;
+            // Posicionar firmas al final si hay espacio
+            y = Math.max(y + 30, 640);
         }
 
-        // SECCIÓN DE FIRMAS - SIEMPRE EN LA MISMA POSICIÓN
-        doc.fontSize(8)
-            .text('_____________________________', 70, yPosition, { width: 200 })
-            .text('Firma del Cliente', 70, yPosition + 18, { width: 200, align: 'center' })
-            .text(`Fecha: ___________________`, 70, yPosition + 32, { width: 200 });
-        
-        doc.text('_____________________________', 342, yPosition, { width: 200 })
-            .text('Firma del Instalador', 342, yPosition + 18, { width: 200, align: 'center' })
-            .text(`Fecha: ___________________`, 342, yPosition + 32, { width: 200 });
+        // FIRMAS
+        doc.fontSize(9)
+            .text('_____________________________', 70, y, { width: 200 })
+            .text('Firma del Cliente', 70, y + 20, { width: 200, align: 'center' })
+            .text('Fecha: _______________', 70, y + 35, { width: 200, align: 'center' });
 
-        // Pie de página
+        doc.text('_____________________________', 342, y, { width: 200 })
+            .text('Firma del Instalador', 342, y + 20, { width: 200, align: 'center' })
+            .text('Fecha: _______________', 342, y + 35, { width: 200, align: 'center' });
+
+        // PIE DE PÁGINA
         doc.fontSize(7)
             .fillColor('#666666')
-            .text(
-                'Este documento es una orden de servicio oficial. Conservar para referencia.',
-                50,
-                yPosition + 60,
-                { align: 'center', width: 512 }
-            );
+            .text('Documento oficial - PSI Telecomunicaciones', 50, y + 65, { align: 'center', width: 512 });
 
-        // Finalizar el documento
         doc.end();
 
     } catch (error) {
