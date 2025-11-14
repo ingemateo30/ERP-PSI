@@ -43,8 +43,16 @@ const AlertaClienteExistente = ({
     );
   }
 
-  const { cliente, servicios, facturas_pendientes, alertas } = verificacion;
-  const serviciosActivos = servicios.filter(s => s.estado === 'activo');
+  // ✅ ACTUALIZADO: Nueva estructura con múltiples ubicaciones
+  const {
+    cliente,
+    ubicaciones = [],
+    servicios_totales = [],
+    facturas_pendientes_totales,
+    alertas = []
+  } = verificacion;
+
+  const serviciosActivos = servicios_totales.filter(s => s.estado === 'activo');
 
   const getIconoAlerta = (tipo) => {
     const iconos = {
@@ -147,7 +155,7 @@ const AlertaClienteExistente = ({
             </div>
           </div>
 
-          {facturas_pendientes && (
+          {facturas_pendientes_totales && (
             <>
               <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
                 <div className="flex items-center gap-2">
@@ -157,13 +165,13 @@ const AlertaClienteExistente = ({
                   <div className="flex-1 min-w-0">
                     <div className="text-xs text-gray-600">Facturas pendientes</div>
                     <div className="text-lg font-bold text-yellow-600">
-                      {facturas_pendientes.total_pendientes || 0}
+                      {facturas_pendientes_totales.total_pendientes || 0}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {facturas_pendientes.valor_pendiente > 0 && (
+              {facturas_pendientes_totales.valor_pendiente > 0 && (
                 <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
                   <div className="flex items-center gap-2">
                     <div className="p-2 bg-red-100 rounded-lg">
@@ -172,7 +180,7 @@ const AlertaClienteExistente = ({
                     <div className="flex-1 min-w-0">
                       <div className="text-xs text-gray-600 truncate">Valor pendiente</div>
                       <div className="text-lg font-bold text-red-600 truncate">
-                        ${facturas_pendientes.valor_pendiente.toLocaleString()}
+                        ${facturas_pendientes_totales.valor_pendiente.toLocaleString()}
                       </div>
                     </div>
                   </div>
