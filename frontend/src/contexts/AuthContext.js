@@ -307,18 +307,25 @@ const register = async (userData) => {
   }
 };
 
-  // Función para cerrar sesión
-  const logout = async () => {
-    dispatch({ type: AuthActions.SET_LOADING });
+ // Función para cerrar sesión
+const logout = async () => {
+  dispatch({ type: AuthActions.SET_LOADING });
 
-    try {
-      await authService.logout();
-    } catch (error) {
-      console.error('Error al cerrar sesión:', error);
-    } finally {
-      dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
-    }
-  };
+  try {
+    // Intentar logout en el servidor
+    await authService.logout();
+  } catch (error) {
+    console.error('Error al cerrar sesión:', error);
+  } finally {
+    // Limpiar estado
+    dispatch({ type: AuthActions.SET_UNAUTHENTICATED });
+    
+    // ✅ CRÍTICO: Limpiar completamente la navegación y forzar ir al login
+    // Esto evita que intente volver a la última página visitada
+    window.history.pushState(null, '', '/login');
+    window.location.href = '/login';
+  }
+};
 
   // Función para limpiar errores
   const clearError = () => {
