@@ -63,7 +63,7 @@ class Notificacion {
         query += ' AND n.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
       } else if (rol === 'instalador') {
         // Instaladores solo ven notificaciones de instalaciones
-        query += ' AND n.tipo IN ("nueva_instalacion", "instalacion_actualizada")';
+        query += ' AND n.tipo IN ("nueva_instalacion", "instalacion_actualizada", "bienvenida")';
         query += ' AND n.created_at >= DATE_SUB(NOW(), INTERVAL 3 DAY)';
       }
 
@@ -73,9 +73,14 @@ class Notificacion {
       const limite = filtros.limite || 50;
       query += ` LIMIT ${parseInt(limite)}`;
 
+      console.log('🔍 Query de notificaciones:', query);
+      console.log('📊 Parámetros:', params);
+
       const connection = await pool.getConnection();
       const [filas] = await connection.execute(query, params);
       connection.release();
+
+      console.log('📬 Filas obtenidas de BD:', filas.length);
 
       // Parsear datos adicionales
       return filas.map(fila => ({
@@ -141,12 +146,14 @@ class Notificacion {
 
       // Filtrar por rol
       if (rol === 'instalador') {
-        query += ' AND tipo IN ("nueva_instalacion", "instalacion_actualizada")';
+        query += ' AND tipo IN ("nueva_instalacion", "instalacion_actualizada", "bienvenida")';
       }
 
       const connection = await pool.getConnection();
       const [filas] = await connection.execute(query, params);
       connection.release();
+
+      console.log(`🔢 Conteo de notificaciones no leídas para usuario ${usuarioId} (${rol}):`, filas[0].total);
 
       return filas[0].total;
     } catch (error) {
