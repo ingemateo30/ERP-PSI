@@ -416,9 +416,10 @@ async obtenerHistorialCliente(params = {}) {
       if (!id || isNaN(id)) {
         throw new Error('ID de factura inválido');
       }
-      
-const blob = await apiService.getBlob(`${API_BASE}/${id}/pdf`);
-      
+
+const response = await apiService.getBlob(`${API_BASE}/${id}/pdf`);
+const blob = response.data;
+
 if (download && blob) {
   // Crear enlace de descarga
   const url = window.URL.createObjectURL(blob);
@@ -446,13 +447,14 @@ return blob;
 async verPDF(id) {
 try {
   console.log(`👁️ Visualizando PDF para factura ID: ${id}`);
-  
+
   if (!id || isNaN(id)) {
     throw new Error('ID de factura inválido');
   }
-  
-  const blob = await apiService.getBlob(`${API_BASE}/${id}/ver-pdf`);
-  
+
+  const response = await apiService.getBlob(`${API_BASE}/${id}/ver-pdf`);
+  const blob = response.data;
+
   if (blob) {
     const url = window.URL.createObjectURL(blob);
     window.open(url, '_blank');
