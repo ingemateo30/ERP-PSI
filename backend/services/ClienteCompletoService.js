@@ -512,7 +512,7 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
     const [resultado] = await conexion.execute(query, parametros);
     const instalacionId = resultado.insertId;
 
-    console.log(`✅ Orden de instalación ${numeroOrden} creada CORREGIDA:`, {
+    console.log(`✅ Orden de instalación creada CORREGIDA:`, {
       instalacion_id: instalacionId,
       contrato_id: contratoId, // ✅ Confirmado que se guarda
       servicios_ids: serviciosIds, // ✅ Confirmado JSON con todos los servicios
@@ -523,7 +523,7 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
 
     return {
       id: instalacionId,
-      numero: numeroOrden,
+      numero: '0',
       contrato_id: contratoId,
       servicios_cliente_ids: serviciosIds,
       estado: 'programada',
