@@ -181,7 +181,7 @@ class EmailService {
 
         // Verificar si es un array JSON o un ID simple
         let servicioIds = [];
-        if (servicioId.startsWith('[')) {
+        if (typeof servicioId === 'string' && servicioId.startsWith('[')) {
           servicioIds = JSON.parse(servicioId);
         } else {
           servicioIds = [parseInt(servicioId)];
@@ -210,12 +210,40 @@ class EmailService {
       // Preparar datos para el generador de PDF
       const datosContrato = {
         ...contrato,
-        servicios: servicios,
-        empresa: empresa
+        servicios: servicios
       };
 
-      // Generar PDF usando ContratoPDFGenerator
-      const pdfBuffer = await ContratoPDFGenerator.generarPDFCompleto(datosContrato);
+      // Generar HTML usando ContratoPDFGenerator
+      const htmlContrato = ContratoPDFGenerator.generarHTML(datosContrato, empresa);
+
+      // Convertir HTML a PDF usando puppeteer
+      const puppeteer = require('puppeteer');
+
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu'
+        ]
+      });
+
+      const page = await browser.newPage();
+      await page.setContent(htmlContrato, { waitUntil: 'networkidle0' });
+
+      const pdfBuffer = await page.pdf({
+        format: 'Letter',
+        printBackground: true,
+        margin: {
+          top: '10mm',
+          right: '10mm',
+          bottom: '10mm',
+          left: '10mm'
+        }
+      });
+
+      await browser.close();
 
       return pdfBuffer;
     } finally {
