@@ -445,9 +445,15 @@ const EstadisticasGeneral = () => {
       {/* MÉTRICAS GERENCIALES DESTACADAS */}
       {/* ========================================= */}
       {metricas_gerenciales && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        metricas_gerenciales.arpu?.ingresos_totales > 0 ||
+        metricas_gerenciales.proyeccion?.mrr > 0 ||
+        metricas_gerenciales.retencion?.total_evaluados > 0 ||
+        metricas_gerenciales.ltv?.promedio > 0 ||
+        metricas_gerenciales.cobro?.dso > 0
+      ) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* ARPU */}
-          {metricas_gerenciales.arpu && metricas_gerenciales.arpu.total_clientes > 0 && (
+          {metricas_gerenciales.arpu && metricas_gerenciales.arpu.ingresos_totales > 0 && (
             <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -460,13 +466,32 @@ const EstadisticasGeneral = () => {
                 ${(metricas_gerenciales.arpu.valor || 0).toLocaleString('es-CO')}
               </p>
               <p className="text-xs text-gray-500">
-                Basado en {metricas_gerenciales.arpu.total_clientes} clientes activos
+                {metricas_gerenciales.arpu.total_clientes} clientes en período
+              </p>
+            </div>
+          )}
+
+          {/* LTV */}
+          {metricas_gerenciales.ltv && metricas_gerenciales.ltv.promedio > 0 && (
+            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Award className="w-6 h-6 text-purple-600" />
+                </div>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">LTV</span>
+              </div>
+              <h3 className="text-sm text-gray-600 mb-1">Valor de Vida del Cliente</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-2">
+                ${(metricas_gerenciales.ltv.promedio || 0).toLocaleString('es-CO')}
+              </p>
+              <p className="text-xs text-gray-500">
+                Promedio histórico por cliente
               </p>
             </div>
           )}
 
           {/* MRR */}
-          {metricas_gerenciales.proyeccion && metricas_gerenciales.proyeccion.contratos_activos > 0 && (
+          {metricas_gerenciales.proyeccion && metricas_gerenciales.proyeccion.mrr > 0 && (
             <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -479,7 +504,26 @@ const EstadisticasGeneral = () => {
                 ${(metricas_gerenciales.proyeccion.mrr || 0).toLocaleString('es-CO')}
               </p>
               <p className="text-xs text-gray-500">
-                {metricas_gerenciales.proyeccion.contratos_activos} contratos activos
+                ARR proyectado: ${(metricas_gerenciales.proyeccion.arr || 0).toLocaleString('es-CO')}
+              </p>
+            </div>
+          )}
+
+          {/* DSO */}
+          {metricas_gerenciales.cobro && metricas_gerenciales.cobro.dso > 0 && (
+            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-orange-600" />
+                </div>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">DSO</span>
+              </div>
+              <h3 className="text-sm text-gray-600 mb-1">Días Promedio de Cobro</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-2">
+                {Math.round(metricas_gerenciales.cobro.dso || 0)}
+              </p>
+              <p className="text-xs text-gray-500">
+                Days Sales Outstanding
               </p>
             </div>
           )}
@@ -488,17 +532,17 @@ const EstadisticasGeneral = () => {
           {metricas_gerenciales.retencion && metricas_gerenciales.retencion.total_evaluados > 0 && (
             <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
               <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <Award className="w-6 h-6 text-purple-600" />
+                <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <Target className="w-6 h-6 text-indigo-600" />
                 </div>
                 <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Retención</span>
               </div>
-              <h3 className="text-sm text-gray-600 mb-1">Tasa de Retención (6 meses)</h3>
+              <h3 className="text-sm text-gray-600 mb-1">Tasa de Retención</h3>
               <p className="text-3xl font-bold text-gray-900 mb-2">
                 {(metricas_gerenciales.retencion.tasa || 0).toFixed(1)}%
               </p>
               <p className="text-xs text-gray-500">
-                {metricas_gerenciales.retencion.clientes_retenidos} de {metricas_gerenciales.retencion.total_evaluados} clientes
+                {metricas_gerenciales.retencion.clientes_retenidos} de {metricas_gerenciales.retencion.total_evaluados} clientes +6 meses
               </p>
             </div>
           )}
