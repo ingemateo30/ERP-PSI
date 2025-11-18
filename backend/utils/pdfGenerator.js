@@ -113,7 +113,7 @@ class PDFGenerator {
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', xOffset, y)
             .fontSize(10).font('Helvetica')
             .text(`ID Cliente ${factura.identificacion_cliente || '1005450340'} / ${factura.codigo_cliente || '200'}`, xOffset, y + 14)
-            .text(`Dirección: ${factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN'}`, xOffset, y + 26);
+            .text(`Dirección: ${factura.cliente_direccion || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN'}`, xOffset, y + 26);
 
         y += 45;
 
