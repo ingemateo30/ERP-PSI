@@ -21,18 +21,47 @@ class EstadisticasController {
 
       console.log(`📅 Rango de fechas: ${fechaDesde} - ${fechaHasta}`);
 
+      // Calcular período anterior para comparación
+      const diasDiferencia = Math.ceil((new Date(fechaHasta) - new Date(fechaDesde)) / (1000 * 60 * 60 * 24));
+      const fechaDesdeAnterior = new Date(new Date(fechaDesde).getTime() - diasDiferencia * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const fechaHastaAnterior = new Date(new Date(fechaDesde).getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
       // Ejecutar todas las consultas en paralelo
       const [
         financieras,
+        financierasAnterior,
         clientes,
         operacionales,
-        tendencias
+        tendencias,
+        metricasGerenciales
       ] = await Promise.all([
         EstadisticasController.getEstadisticasFinancieras(fechaDesde, fechaHasta),
+        EstadisticasController.getEstadisticasFinancieras(fechaDesdeAnterior, fechaHastaAnterior),
         EstadisticasController.getEstadisticasClientes(),
         EstadisticasController.getEstadisticasOperacionales(),
-        EstadisticasController.getTendenciasMensuales()
+        EstadisticasController.getTendenciasMensuales(),
+        EstadisticasController.getMetricasGerenciales(fechaDesde, fechaHasta)
       ]);
+
+      // Calcular variaciones porcentuales
+      const comparaciones = {
+        facturacion: EstadisticasController.calcularVariacion(
+          financieras.periodo.total_facturado,
+          financierasAnterior.periodo.total_facturado
+        ),
+        recaudo: EstadisticasController.calcularVariacion(
+          financieras.periodo.total_recaudado,
+          financierasAnterior.periodo.total_recaudado
+        ),
+        cartera_vencida: EstadisticasController.calcularVariacion(
+          financieras.cartera.cartera_vencida,
+          financierasAnterior.cartera.cartera_vencida
+        ),
+        clientes_nuevos: EstadisticasController.calcularVariacion(
+          clientes.resumen.nuevos_mes,
+          0 // Se puede mejorar comparando con mes anterior
+        )
+      };
 
       const response = {
         success: true,
@@ -45,6 +74,8 @@ class EstadisticasController {
           clientes,
           operacionales,
           tendencias,
+          metricas_gerenciales: metricasGerenciales,
+          comparaciones,
           fecha_actualizacion: new Date().toISOString()
         },
         message: 'Estadísticas del dashboard obtenidas exitosamente'
@@ -60,6 +91,178 @@ class EstadisticasController {
         message: 'Error obteniendo estadísticas del dashboard',
         error: error.message
       });
+    }
+  }
+
+  /**
+   * Calcular variación porcentual entre dos valores
+   */
+  static calcularVariacion(valorActual, valorAnterior) {
+    if (!valorAnterior || valorAnterior === 0) {
+      return valorActual > 0 ? 100 : 0;
+    }
+    const variacion = ((valorActual - valorAnterior) / valorAnterior) * 100;
+    return parseFloat(variacion.toFixed(2));
+  }
+
+  /**
+   * Obtener métricas gerenciales avanzadas
+   */
+  static async getMetricasGerenciales(fechaDesde, fechaHasta) {
+    try {
+      console.log('📊 Obteniendo métricas gerenciales avanzadas...');
+
+      // ARPU (Average Revenue Per User) - Ingreso promedio por usuario
+      const [arpu] = await Database.query(`
+        SELECT
+          COUNT(DISTINCT c.id) as total_clientes_activos,
+          COALESCE(SUM(f.total), 0) as ingresos_totales,
+          COALESCE(SUM(f.total) / NULLIF(COUNT(DISTINCT c.id), 0), 0) as arpu
+        FROM clientes c
+        LEFT JOIN facturas f ON c.id = f.cliente_id
+          AND f.fecha_emision BETWEEN ? AND ?
+          AND f.activo = '1'
+        WHERE c.estado = 'activo'
+      `, [fechaDesde, fechaHasta]);
+
+      // LTV (Customer Lifetime Value) - Valor de vida del cliente
+      const [ltv] = await Database.query(`
+        SELECT
+          AVG(valor_total_cliente) as ltv_promedio,
+          MAX(valor_total_cliente) as ltv_maximo,
+          MIN(valor_total_cliente) as ltv_minimo
+        FROM (
+          SELECT
+            cliente_id,
+            SUM(total) as valor_total_cliente
+          FROM facturas
+          WHERE estado = 'pagada'
+            AND activo = '1'
+          GROUP BY cliente_id
+        ) as clientes_ltv
+      `);
+
+      // Tasa de retención
+      const [retencion] = await Database.query(`
+        SELECT
+          COUNT(DISTINCT CASE WHEN estado = 'activo' AND created_at < DATE_SUB(CURDATE(), INTERVAL 6 MONTH) THEN id END) as clientes_antiguos_activos,
+          COUNT(DISTINCT CASE WHEN created_at < DATE_SUB(CURDATE(), INTERVAL 6 MONTH) THEN id END) as total_clientes_antiguos
+        FROM clientes
+      `);
+
+      const tasaRetencion = retencion.total_clientes_antiguos > 0
+        ? (retencion.clientes_antiguos_activos / retencion.total_clientes_antiguos) * 100
+        : 0;
+
+      // Eficiencia de cobro (DSO - Days Sales Outstanding)
+      const [dso] = await Database.query(`
+        SELECT
+          AVG(DATEDIFF(COALESCE(fecha_pago, CURDATE()), fecha_emision)) as dias_promedio_cobro
+        FROM facturas
+        WHERE fecha_emision BETWEEN ? AND ?
+          AND activo = '1'
+      `, [fechaDesde, fechaHasta]);
+
+      // ROI de instalaciones
+      const [roiInstalaciones] = await Database.query(`
+        SELECT
+          SUM(costo_instalacion) as ingresos_instalaciones,
+          COUNT(DISTINCT cliente_id) as clientes_instalados,
+          AVG(costo_instalacion) as costo_promedio_instalacion
+        FROM instalaciones
+        WHERE estado = 'completada'
+          AND fecha_instalacion BETWEEN ? AND ?
+      `, [fechaDesde, fechaHasta]);
+
+      // Ingresos proyectados (basado en contratos activos)
+      const [proyeccion] = await Database.query(`
+        SELECT
+          COUNT(*) as contratos_activos,
+          SUM(COALESCE(sc.precio_personalizado, ps.precio)) as mrr_actual,
+          SUM(COALESCE(sc.precio_personalizado, ps.precio)) * 12 as arr_proyectado
+        FROM servicios_cliente sc
+        INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
+        WHERE sc.estado = 'activo'
+      `);
+
+      // Eficiencia operativa
+      const [eficiencia] = await Database.query(`
+        SELECT
+          COUNT(CASE WHEN estado = 'completada' THEN 1 END) as instalaciones_completadas,
+          COUNT(*) as total_instalaciones,
+          COUNT(CASE WHEN estado = 'completada' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0) as tasa_exito_instalaciones,
+          AVG(CASE WHEN estado = 'completada' THEN DATEDIFF(fecha_instalacion, fecha_programada) END) as dias_promedio_instalacion
+        FROM instalaciones
+        WHERE created_at BETWEEN ? AND ?
+      `, [fechaDesde, fechaHasta]);
+
+      // Satisfacción del cliente (basado en PQRs resueltas vs escaladas)
+      const [satisfaccion] = await Database.query(`
+        SELECT
+          COUNT(CASE WHEN estado IN ('resuelto', 'cerrado') THEN 1 END) as pqr_resueltas,
+          COUNT(CASE WHEN estado = 'escalado' THEN 1 END) as pqr_escaladas,
+          COUNT(*) as total_pqr,
+          COUNT(CASE WHEN estado IN ('resuelto', 'cerrado') THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0) as indice_satisfaccion
+        FROM pqr
+        WHERE fecha_recepcion BETWEEN ? AND ?
+      `, [fechaDesde, fechaHasta]);
+
+      return {
+        arpu: {
+          valor: parseFloat(arpu.arpu) || 0,
+          total_clientes: parseInt(arpu.total_clientes_activos) || 0,
+          ingresos_totales: parseFloat(arpu.ingresos_totales) || 0
+        },
+        ltv: {
+          promedio: parseFloat(ltv.ltv_promedio) || 0,
+          maximo: parseFloat(ltv.ltv_maximo) || 0,
+          minimo: parseFloat(ltv.ltv_minimo) || 0
+        },
+        retencion: {
+          tasa: parseFloat(tasaRetencion.toFixed(2)),
+          clientes_retenidos: parseInt(retencion.clientes_antiguos_activos) || 0,
+          total_evaluados: parseInt(retencion.total_clientes_antiguos) || 0
+        },
+        cobro: {
+          dso: parseFloat(dso.dias_promedio_cobro) || 0,
+          descripcion: 'Días promedio para cobrar una factura'
+        },
+        instalaciones: {
+          ingresos: parseFloat(roiInstalaciones.ingresos_instalaciones) || 0,
+          clientes_instalados: parseInt(roiInstalaciones.clientes_instalados) || 0,
+          costo_promedio: parseFloat(roiInstalaciones.costo_promedio_instalacion) || 0
+        },
+        proyeccion: {
+          mrr: parseFloat(proyeccion.mrr_actual) || 0, // Monthly Recurring Revenue
+          arr: parseFloat(proyeccion.arr_proyectado) || 0, // Annual Recurring Revenue
+          contratos_activos: parseInt(proyeccion.contratos_activos) || 0
+        },
+        eficiencia_operativa: {
+          tasa_exito_instalaciones: parseFloat(eficiencia.tasa_exito_instalaciones) || 0,
+          dias_promedio_instalacion: parseFloat(eficiencia.dias_promedio_instalacion) || 0,
+          instalaciones_completadas: parseInt(eficiencia.instalaciones_completadas) || 0,
+          total_instalaciones: parseInt(eficiencia.total_instalaciones) || 0
+        },
+        satisfaccion_cliente: {
+          indice: parseFloat(satisfaccion.indice_satisfaccion) || 0,
+          pqr_resueltas: parseInt(satisfaccion.pqr_resueltas) || 0,
+          pqr_escaladas: parseInt(satisfaccion.pqr_escaladas) || 0,
+          total_pqr: parseInt(satisfaccion.total_pqr) || 0
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo métricas gerenciales:', error);
+      // Retornar valores por defecto en caso de error
+      return {
+        arpu: { valor: 0, total_clientes: 0, ingresos_totales: 0 },
+        ltv: { promedio: 0, maximo: 0, minimo: 0 },
+        retencion: { tasa: 0, clientes_retenidos: 0, total_evaluados: 0 },
+        cobro: { dso: 0, descripcion: 'Días promedio para cobrar una factura' },
+        instalaciones: { ingresos: 0, clientes_instalados: 0, costo_promedio: 0 },
+        proyeccion: { mrr: 0, arr: 0, contratos_activos: 0 },
+        eficiencia_operativa: { tasa_exito_instalaciones: 0, dias_promedio_instalacion: 0, instalaciones_completadas: 0, total_instalaciones: 0 },
+        satisfaccion_cliente: { indice: 0, pqr_resueltas: 0, pqr_escaladas: 0, total_pqr: 0 }
+      };
     }
   }
 
