@@ -201,7 +201,15 @@ class FacturacionAutomaticaController {
     try {
       console.log('🏗️ Iniciando generación de facturación mensual...');
       console.log('📋 Parámetros recibidos:', req.body);
-      
+
+      // Validar días de vencimiento si se proporciona
+      if (req.body.diasVencimiento && (req.body.diasVencimiento < 1 || req.body.diasVencimiento > 365)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Los días de vencimiento deben estar entre 1 y 365'
+        });
+      }
+
       const resultado = await FacturacionAutomaticaService.generarFacturacionMensual(req.body);
       
       console.log('✅ Facturación completada');
