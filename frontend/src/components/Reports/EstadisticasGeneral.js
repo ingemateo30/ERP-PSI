@@ -171,12 +171,17 @@ const EstadisticasGeneral = () => {
     if (!estadisticas?.clientes?.resumen) return [];
 
     const resumen = estadisticas.clientes.resumen;
-    return [
+    const datos = [
       { name: 'Activos', value: resumen.activos || 0, color: COLORS.success },
       { name: 'Suspendidos', value: resumen.suspendidos || 0, color: COLORS.warning },
       { name: 'Cortados', value: resumen.cortados || 0, color: COLORS.danger },
-      { name: 'Retirados', value: resumen.retirados || 0, color: COLORS.info }
-    ].filter(item => item.value > 0);
+      { name: 'Retirados', value: resumen.retirados || 0, color: COLORS.info },
+      { name: 'Inactivos', value: resumen.inactivos || 0, color: '#9CA3AF' }
+    ];
+
+    // Verificar si hay al menos un cliente
+    const totalClientes = datos.reduce((sum, item) => sum + item.value, 0);
+    return totalClientes > 0 ? datos : [];
   }, [estadisticas]);
 
   const datosRendimientoEquipo = useMemo(() => {
@@ -627,42 +632,59 @@ const EstadisticasGeneral = () => {
             </h3>
           </div>
 
-          <div className="h-80 flex items-center">
+          <div className="h-80">
             {datosClientesPorEstado.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartPieChart>
-                  <Pie
-                    data={datosClientesPorEstado}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={100}
-                    innerRadius={60}
-                    fill="#8884d8"
-                    dataKey="value"
-                    animationBegin={0}
-                    animationDuration={800}
-                  >
-                    {datosClientesPorEstado.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                      borderRadius: '12px',
-                      border: 'none',
-                      boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
-                    }}
-                    formatter={(value) => `${value} clientes`}
-                  />
-                </RechartPieChart>
-              </ResponsiveContainer>
+              <div className="h-full">
+                <ResponsiveContainer width="100%" height="70%">
+                  <RechartPieChart>
+                    <Pie
+                      data={datosClientesPorEstado.filter(item => item.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, value }) => `${name}: ${value}`}
+                      outerRadius={90}
+                      innerRadius={50}
+                      fill="#8884d8"
+                      dataKey="value"
+                      animationBegin={0}
+                      animationDuration={800}
+                    >
+                      {datosClientesPorEstado.filter(item => item.value > 0).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: '12px',
+                        border: 'none',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+                      }}
+                      formatter={(value) => `${value} clientes`}
+                    />
+                  </RechartPieChart>
+                </ResponsiveContainer>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {datosClientesPorEstado.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <div
+                        className="w-4 h-4 rounded-full"
+                        style={{ backgroundColor: item.color, opacity: item.value > 0 ? 1 : 0.3 }}
+                      />
+                      <span className={`text-sm ${item.value > 0 ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>
+                        {item.name}: {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
-              <div className="w-full text-center text-gray-400">
-                <PieChart className="w-12 h-12 mx-auto mb-2" />
-                <p className="text-sm">No hay datos de distribución disponibles</p>
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <div className="text-center">
+                  <PieChart className="w-12 h-12 mx-auto mb-2" />
+                  <p className="text-sm">No hay datos de distribución disponibles</p>
+                </div>
               </div>
             )}
           </div>
