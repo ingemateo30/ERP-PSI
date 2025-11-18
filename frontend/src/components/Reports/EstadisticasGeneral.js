@@ -6,7 +6,8 @@ import {
   ArrowUp, ArrowDown, Minus, Download, Filter, MapPin,
   Zap, Target, Award, Briefcase, PhoneCall, Mail,
   WifiOff, Wifi, UserPlus, UserMinus, TrendingUpDown,
-  ShoppingCart, CreditCard, Building, Globe, Star
+  ShoppingCart, CreditCard, Building, Globe, Star,
+  Percent, TrendingUpIcon, Shield, AlertCircle, Info
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
@@ -120,6 +121,10 @@ const EstadisticasGeneral = () => {
     });
   };
 
+  const handleExportPDF = () => {
+    window.print();
+  };
+
   // Colores para gráficos
   const COLORS = {
     primary: '#0e6493',
@@ -143,27 +148,23 @@ const EstadisticasGeneral = () => {
     COLORS.danger
   ];
 
-  // Datos de ejemplo para gráficos avanzados (en producción vendrían del backend)
+  // Datos de tendencias mensuales REALES del backend
   const datosIngresosMensuales = useMemo(() => {
-    if (!estadisticas) return [];
+    if (!estadisticas?.tendencias?.facturacion) return [];
 
-    // Generar datos de los últimos 6 meses
-    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    const mesActual = new Date().getMonth();
-    const datos = [];
+    const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-    for (let i = 5; i >= 0; i--) {
-      const mesIndex = (mesActual - i + 12) % 12;
-      const factorVariacion = 0.8 + Math.random() * 0.4;
-      datos.push({
-        mes: meses[mesIndex],
-        ingresos: Math.round((estadisticas.financieras?.periodo?.total_facturado || 0) * factorVariacion / 6),
-        gastos: Math.round((estadisticas.financieras?.periodo?.total_facturado || 0) * factorVariacion * 0.6 / 6),
-        utilidad: Math.round((estadisticas.financieras?.periodo?.total_facturado || 0) * factorVariacion * 0.4 / 6)
-      });
-    }
+    return estadisticas.tendencias.facturacion.map(mes => {
+      const [year, month] = mes.periodo.split('-');
+      const mesIndex = parseInt(month) - 1;
 
-    return datos;
+      return {
+        mes: mesesNombres[mesIndex],
+        ingresos: parseFloat(mes.valor_total_facturado) || 0,
+        recaudado: parseFloat(mes.valor_recaudado) || 0,
+        pendiente: parseFloat(mes.valor_pendiente_cobro) || 0
+      };
+    }).slice(-6); // Últimos 6 meses
   }, [estadisticas]);
 
   const datosClientesPorEstado = useMemo(() => {
@@ -201,6 +202,60 @@ const EstadisticasGeneral = () => {
     ];
   }, [estadisticas]);
 
+  // Generar alertas y recomendaciones inteligentes
+  const alertasRecomendaciones = useMemo(() => {
+    if (!estadisticas) return [];
+
+    const alertas = [];
+
+    // Alerta de cartera vencida alta
+    const tasaCarteraVencida = estadisticas.financieras?.cartera?.cartera_vencida || 0;
+    const totalFacturado = estadisticas.financieras?.periodo?.total_facturado || 1;
+    if ((tasaCarteraVencida / totalFacturado) > 0.2) {
+      alertas.push({
+        tipo: 'warning',
+        titulo: 'Cartera Vencida Alta',
+        mensaje: `La cartera vencida representa más del 20% de la facturación. Considere intensificar las estrategias de cobro.`,
+        icono: AlertTriangle
+      });
+    }
+
+    // Alerta de churn rate
+    const churnRate = estadisticas.clientes?.churn?.tasa_churn || 0;
+    if (churnRate > 5) {
+      alertas.push({
+        tipo: 'danger',
+        titulo: 'Tasa de Abandono Alta',
+        mensaje: `La tasa de churn es ${churnRate.toFixed(1)}%. Implemente estrategias de retención de clientes.`,
+        icono: AlertCircle
+      });
+    }
+
+    // Recomendación de eficiencia operativa
+    const eficienciaInstalaciones = estadisticas.metricas_gerenciales?.eficiencia_operativa?.tasa_exito_instalaciones || 0;
+    if (eficienciaInstalaciones < 80) {
+      alertas.push({
+        tipo: 'info',
+        titulo: 'Oportunidad de Mejora',
+        mensaje: `La tasa de éxito de instalaciones es ${eficienciaInstalaciones.toFixed(1)}%. Optimice procesos para alcanzar el 90%.`,
+        icono: Info
+      });
+    }
+
+    // Alerta positiva - buen desempeño
+    const tasaRecaudo = estadisticas.financieras?.periodo?.tasa_recaudo || 0;
+    if (tasaRecaudo > 85) {
+      alertas.push({
+        tipo: 'success',
+        titulo: 'Excelente Recaudo',
+        mensaje: `La tasa de recaudo es ${tasaRecaudo.toFixed(1)}%. ¡Continúe con las buenas prácticas de cobro!`,
+        icono: CheckCircle
+      });
+    }
+
+    return alertas;
+  }, [estadisticas]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
@@ -212,7 +267,7 @@ const EstadisticasGeneral = () => {
             </div>
           </div>
           <p className="text-gray-600 text-lg font-medium">Cargando estadísticas...</p>
-          <p className="text-gray-400 text-sm mt-2">Preparando datos increíbles para ti</p>
+          <p className="text-gray-400 text-sm mt-2">Preparando datos ejecutivos</p>
         </div>
       </div>
     );
@@ -258,7 +313,7 @@ const EstadisticasGeneral = () => {
     );
   }
 
-  const { financieras, clientes, operacionales } = estadisticas;
+  const { financieras, clientes, operacionales, metricas_gerenciales, comparaciones } = estadisticas;
 
   return (
     <div className="space-y-6 p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
@@ -269,7 +324,7 @@ const EstadisticasGeneral = () => {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-[#0e6493] to-[#e21f25] bg-clip-text text-transparent mb-2">
-              Dashboard de Estadísticas
+              Dashboard Ejecutivo
             </h1>
             <p className="text-gray-600 flex items-center gap-2">
               <Calendar className="w-4 h-4" />
@@ -304,7 +359,10 @@ const EstadisticasGeneral = () => {
               <span className="hidden sm:inline">Actualizar</span>
             </button>
 
-            <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#10b981]/80 text-white rounded-lg hover:shadow-lg transition-all transform hover:scale-105">
+            <button
+              onClick={handleExportPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#10b981]/80 text-white rounded-lg hover:shadow-lg transition-all transform hover:scale-105"
+            >
               <Download className="w-5 h-5" />
               <span className="hidden sm:inline">Exportar</span>
             </button>
@@ -313,137 +371,172 @@ const EstadisticasGeneral = () => {
       </div>
 
       {/* ========================================= */}
-      {/* KPIs PRINCIPALES CON ANIMACIONES */}
+      {/* ALERTAS Y RECOMENDACIONES */}
+      {/* ========================================= */}
+      {alertasRecomendaciones.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {alertasRecomendaciones.map((alerta, index) => (
+            <AlertCard key={index} {...alerta} />
+          ))}
+        </div>
+      )}
+
+      {/* ========================================= */}
+      {/* KPIs PRINCIPALES CON COMPARACIÓN */}
       {/* ========================================= */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Facturado */}
-        <div className="group relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12 group-hover:scale-150 transition-transform duration-500"></div>
-
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <DollarSign className="w-6 h-6" />
-              </div>
-              <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
-                Mes Actual
-              </span>
-            </div>
-
-            <h3 className="text-sm font-medium mb-2 opacity-90">Total Facturado</h3>
-            <p className="text-3xl font-bold mb-2 font-mono">
-              ${(animatedValues.totalFacturado || 0).toLocaleString('es-CO')}
-            </p>
-
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                <span>{financieras?.periodo?.total_facturas || 0} facturas</span>
-              </div>
-              <div className="flex items-center bg-white/20 px-2 py-1 rounded-full">
-                <ArrowUp className="w-3 h-3 mr-1" />
-                <span>12%</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <KPICard
+          title="Total Facturado"
+          value={animatedValues.totalFacturado || 0}
+          prefix="$"
+          icon={<DollarSign className="w-6 h-6" />}
+          color="from-blue-500 to-blue-600"
+          variacion={comparaciones?.facturacion}
+          subtitle={`${financieras?.periodo?.total_facturas || 0} facturas`}
+        />
 
         {/* Total Recaudado */}
-        <div className="group relative overflow-hidden bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12 group-hover:scale-150 transition-transform duration-500"></div>
-
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <CheckCircle className="w-6 h-6" />
-              </div>
-              <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
-                {estadisticasService.formatPercentage(financieras?.periodo?.tasa_recaudo || 0)}
-              </span>
-            </div>
-
-            <h3 className="text-sm font-medium mb-2 opacity-90">Total Recaudado</h3>
-            <p className="text-3xl font-bold mb-2 font-mono">
-              ${(animatedValues.totalRecaudado || 0).toLocaleString('es-CO')}
-            </p>
-
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center">
-                <Activity className="w-4 h-4 mr-1" />
-                <span>Tasa de recaudo</span>
-              </div>
-              <div className="flex items-center bg-white/20 px-2 py-1 rounded-full">
-                <ArrowUp className="w-3 h-3 mr-1" />
-                <span>8%</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <KPICard
+          title="Total Recaudado"
+          value={animatedValues.totalRecaudado || 0}
+          prefix="$"
+          icon={<CheckCircle className="w-6 h-6" />}
+          color="from-green-500 to-green-600"
+          variacion={comparaciones?.recaudo}
+          subtitle={`${estadisticasService.formatPercentage(financieras?.periodo?.tasa_recaudo || 0)} tasa de recaudo`}
+          badge={estadisticasService.formatPercentage(financieras?.periodo?.tasa_recaudo || 0)}
+        />
 
         {/* Cartera Vencida */}
-        <div className="group relative overflow-hidden bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg p-6 text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12 group-hover:scale-150 transition-transform duration-500"></div>
+        <KPICard
+          title="Cartera Vencida"
+          value={animatedValues.carteraVencida || 0}
+          prefix="$"
+          icon={<AlertTriangle className="w-6 h-6" />}
+          color="from-red-500 to-red-600"
+          variacion={comparaciones?.cartera_vencida}
+          subtitle={`${financieras?.cartera?.clientes_con_deuda || 0} clientes`}
+          badge="Mora"
+          invertVariation={true}
+        />
 
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <AlertTriangle className="w-6 h-6" />
+        {/* Clientes Activos */}
+        <KPICard
+          title="Clientes Activos"
+          value={animatedValues.clientesActivos || 0}
+          icon={<Users className="w-6 h-6" />}
+          color="from-purple-500 to-purple-600"
+          variacion={comparaciones?.clientes_nuevos}
+          subtitle={`${clientes?.resumen?.nuevos_mes || 0} nuevos este mes`}
+        />
+      </div>
+
+      {/* ========================================= */}
+      {/* MÉTRICAS GERENCIALES AVANZADAS */}
+      {/* ========================================= */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <MetricaGerencialCard
+          title="ARPU"
+          subtitle="Ingreso Promedio por Usuario"
+          value={metricas_gerenciales?.arpu?.valor || 0}
+          prefix="$"
+          icon={<DollarSign className="w-5 h-5" />}
+          color="bg-gradient-to-br from-blue-400 to-blue-500"
+          description={`Basado en ${metricas_gerenciales?.arpu?.total_clientes || 0} clientes`}
+        />
+
+        <MetricaGerencialCard
+          title="LTV"
+          subtitle="Valor de Vida del Cliente"
+          value={metricas_gerenciales?.ltv?.promedio || 0}
+          prefix="$"
+          icon={<TrendingUpIcon className="w-5 h-5" />}
+          color="bg-gradient-to-br from-green-400 to-green-500"
+          description="Promedio histórico"
+        />
+
+        <MetricaGerencialCard
+          title="Retención"
+          subtitle="Tasa de Retención"
+          value={metricas_gerenciales?.retencion?.tasa || 0}
+          suffix="%"
+          icon={<Shield className="w-5 h-5" />}
+          color="bg-gradient-to-br from-purple-400 to-purple-500"
+          description={`${metricas_gerenciales?.retencion?.clientes_retenidos || 0} clientes retenidos`}
+        />
+
+        <MetricaGerencialCard
+          title="DSO"
+          subtitle="Días Promedio de Cobro"
+          value={metricas_gerenciales?.cobro?.dso || 0}
+          suffix=" días"
+          icon={<Clock className="w-5 h-5" />}
+          color="bg-gradient-to-br from-orange-400 to-orange-500"
+          description="Days Sales Outstanding"
+        />
+      </div>
+
+      {/* ========================================= */}
+      {/* PROYECCIONES FINANCIERAS */}
+      {/* ========================================= */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Target className="w-5 h-5 text-[#0e6493]" />
+            Ingresos Recurrentes
+          </h3>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">MRR - Ingreso Mensual Recurrente</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  ${(metricas_gerenciales?.proyeccion?.mrr || 0).toLocaleString('es-CO')}
+                </p>
               </div>
-              <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm animate-pulse">
-                Mora
-              </span>
+              <TrendingUp className="w-8 h-8 text-blue-600" />
             </div>
-
-            <h3 className="text-sm font-medium mb-2 opacity-90">Cartera Vencida</h3>
-            <p className="text-3xl font-bold mb-2 font-mono">
-              ${(animatedValues.carteraVencida || 0).toLocaleString('es-CO')}
-            </p>
-
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center">
-                <Users className="w-4 h-4 mr-1" />
-                <span>{financieras?.cartera?.clientes_con_deuda || 0} clientes</span>
+            <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">ARR - Ingreso Anual Proyectado</p>
+                <p className="text-2xl font-bold text-green-600">
+                  ${(metricas_gerenciales?.proyeccion?.arr || 0).toLocaleString('es-CO')}
+                </p>
               </div>
-              <div className="flex items-center bg-white/20 px-2 py-1 rounded-full">
-                <ArrowDown className="w-3 h-3 mr-1" />
-                <span>5%</span>
-              </div>
+              <Award className="w-8 h-8 text-green-600" />
+            </div>
+            <div className="text-center text-sm text-gray-500 pt-2">
+              Basado en {metricas_gerenciales?.proyeccion?.contratos_activos || 0} contratos activos
             </div>
           </div>
         </div>
 
-        {/* Clientes Activos */}
-        <div className="group relative overflow-hidden bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12 group-hover:scale-150 transition-transform duration-500"></div>
-
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <Users className="w-6 h-6" />
-              </div>
-              <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
-                Total
-              </span>
-            </div>
-
-            <h3 className="text-sm font-medium mb-2 opacity-90">Clientes Activos</h3>
-            <p className="text-3xl font-bold mb-2 font-mono">
-              {(animatedValues.clientesActivos || 0).toLocaleString('es-CO')}
-            </p>
-
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center">
-                <UserPlus className="w-4 h-4 mr-1" />
-                <span>{clientes?.resumen?.nuevos_mes || 0} nuevos</span>
-              </div>
-              <div className="flex items-center bg-white/20 px-2 py-1 rounded-full">
-                <ArrowUp className="w-3 h-3 mr-1" />
-                <span>15%</span>
-              </div>
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-[#0e6493]" />
+            Indicadores de Eficiencia
+          </h3>
+          <div className="space-y-4">
+            <IndicadorProgreso
+              titulo="Tasa de Éxito Instalaciones"
+              valor={metricas_gerenciales?.eficiencia_operativa?.tasa_exito_instalaciones || 0}
+              meta={90}
+              color="bg-blue-500"
+            />
+            <IndicadorProgreso
+              titulo="Satisfacción del Cliente"
+              valor={metricas_gerenciales?.satisfaccion_cliente?.indice || 0}
+              meta={95}
+              color="bg-green-500"
+            />
+            <IndicadorProgreso
+              titulo="Tasa de Retención"
+              valor={metricas_gerenciales?.retencion?.tasa || 0}
+              meta={85}
+              color="bg-purple-500"
+            />
+            <div className="text-center text-sm text-gray-500 pt-2">
+              {metricas_gerenciales?.satisfaccion_cliente?.pqr_resueltas || 0} PQRs resueltas de {metricas_gerenciales?.satisfaccion_cliente?.total_pqr || 0}
             </div>
           </div>
         </div>
@@ -499,12 +592,12 @@ const EstadisticasGeneral = () => {
       {/* GRÁFICOS DE TENDENCIAS */}
       {/* ========================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfico de Ingresos vs Gastos */}
+        {/* Gráfico de Ingresos (DATOS REALES) */}
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-2xl transition-shadow">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-[#0e6493]" />
-              Ingresos vs Gastos (6 meses)
+              Tendencia de Ingresos (6 meses)
             </h3>
             <button className="text-gray-400 hover:text-gray-600">
               <Download className="w-5 h-5" />
@@ -519,9 +612,9 @@ const EstadisticasGeneral = () => {
                     <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8}/>
                     <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0.1}/>
                   </linearGradient>
-                  <linearGradient id="colorGastos" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS.secondary} stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor={COLORS.secondary} stopOpacity={0.1}/>
+                  <linearGradient id="colorRecaudado" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLORS.success} stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor={COLORS.success} stopOpacity={0.1}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -540,23 +633,26 @@ const EstadisticasGeneral = () => {
                 <Area
                   type="monotone"
                   dataKey="ingresos"
+                  name="Facturado"
                   fill="url(#colorIngresos)"
                   stroke={COLORS.primary}
                   strokeWidth={3}
                 />
                 <Area
                   type="monotone"
-                  dataKey="gastos"
-                  fill="url(#colorGastos)"
-                  stroke={COLORS.secondary}
+                  dataKey="recaudado"
+                  name="Recaudado"
+                  fill="url(#colorRecaudado)"
+                  stroke={COLORS.success}
                   strokeWidth={3}
                 />
                 <Line
                   type="monotone"
-                  dataKey="utilidad"
-                  stroke={COLORS.success}
-                  strokeWidth={3}
-                  dot={{ r: 5, fill: COLORS.success }}
+                  dataKey="pendiente"
+                  name="Pendiente"
+                  stroke={COLORS.warning}
+                  strokeWidth={2}
+                  dot={{ r: 4, fill: COLORS.warning }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
@@ -825,7 +921,7 @@ const EstadisticasGeneral = () => {
       {/* ========================================= */}
       {/* FOOTER CON INFORMACIÓN ADICIONAL */}
       {/* ========================================= */}
-      <div className="bg-gradient-to-r from-[#0e6493] to-[#e21f25] rounded-xl shadow-lg p-6 text-white">
+      <div className="bg-gradient-to-r from-[#0e6493] to-[#e21f25] rounded-xl shadow-lg p-6 text-white print:hidden">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="text-center">
             <Activity className="w-8 h-8 mx-auto mb-2 opacity-80" />
@@ -834,8 +930,8 @@ const EstadisticasGeneral = () => {
           </div>
           <div className="text-center">
             <Zap className="w-8 h-8 mx-auto mb-2 opacity-80" />
-            <p className="text-sm opacity-90 mb-1">Próxima Actualización</p>
-            <p className="text-lg font-bold">Automática en 5 min</p>
+            <p className="text-sm opacity-90 mb-1">Tasa de Churn</p>
+            <p className="text-lg font-bold">{(clientes?.churn?.tasa_churn || 0).toFixed(2)}%</p>
           </div>
           <div className="text-center">
             <Star className="w-8 h-8 mx-auto mb-2 opacity-80" />
@@ -854,6 +950,75 @@ const EstadisticasGeneral = () => {
 // =========================================
 // COMPONENTES AUXILIARES
 // =========================================
+
+const KPICard = ({ title, value, prefix = '', suffix = '', icon, color, variacion, subtitle, badge, invertVariation = false }) => {
+  const getVariacionColor = () => {
+    if (!variacion && variacion !== 0) return 'text-gray-400';
+    const isPositive = variacion > 0;
+    const shouldBeGreen = invertVariation ? !isPositive : isPositive;
+    return shouldBeGreen ? 'text-green-400' : 'text-red-400';
+  };
+
+  const getVariacionIcon = () => {
+    if (!variacion && variacion !== 0) return <Minus className="w-3 h-3" />;
+    return variacion > 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
+  };
+
+  return (
+    <div className={`group relative overflow-hidden bg-gradient-to-br ${color} rounded-xl shadow-lg p-6 text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl`}>
+      <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
+      <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12 group-hover:scale-150 transition-transform duration-500"></div>
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+            {icon}
+          </div>
+          {badge && (
+            <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
+              {badge}
+            </span>
+          )}
+        </div>
+
+        <h3 className="text-sm font-medium mb-2 opacity-90">{title}</h3>
+        <p className="text-3xl font-bold mb-2 font-mono">
+          {prefix}{value.toLocaleString('es-CO')}{suffix}
+        </p>
+
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center">
+            <span>{subtitle}</span>
+          </div>
+          {(variacion || variacion === 0) && (
+            <div className={`flex items-center bg-white/20 px-2 py-1 rounded-full ${getVariacionColor()}`}>
+              {getVariacionIcon()}
+              <span>{Math.abs(variacion).toFixed(1)}%</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MetricaGerencialCard = ({ title, subtitle, value, prefix = '', suffix = '', icon, color, description }) => {
+  return (
+    <div className={`${color} rounded-lg shadow-md p-4 text-white transform transition-all duration-300 hover:scale-105 hover:shadow-xl`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+          {icon}
+        </div>
+      </div>
+      <p className="text-xs font-medium opacity-90 mb-1">{title}</p>
+      <p className="text-xs opacity-75 mb-2">{subtitle}</p>
+      <p className="text-2xl font-bold mb-1">{prefix}{value.toLocaleString('es-CO')}{suffix}</p>
+      {description && (
+        <p className="text-xs opacity-75">{description}</p>
+      )}
+    </div>
+  );
+};
 
 const MiniKPICard = ({ title, value, total, icon, color }) => {
   const percentage = total ? Math.round((value / total) * 100) : 100;
@@ -915,5 +1080,64 @@ const EstadoClienteCard = ({ icon, label, value, color, bgColor }) => (
     <p className="text-sm font-medium text-gray-600">{label}</p>
   </div>
 );
+
+const IndicadorProgreso = ({ titulo, valor, meta, color }) => {
+  const porcentaje = Math.min((valor / meta) * 100, 100);
+  const cumpleMeta = valor >= meta;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-gray-700">{titulo}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-gray-900">{valor.toFixed(1)}%</span>
+          {cumpleMeta && <CheckCircle className="w-4 h-4 text-green-500" />}
+        </div>
+      </div>
+      <div className="relative">
+        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+          <div
+            className={`${color} h-2 rounded-full transition-all duration-500`}
+            style={{ width: `${porcentaje}%` }}
+          ></div>
+        </div>
+        <div className="absolute top-0 left-0 w-full h-2 flex items-center" style={{ paddingLeft: `${(meta / 100) * 100}%` }}>
+          <div className="w-px h-4 bg-gray-400"></div>
+        </div>
+      </div>
+      <div className="flex justify-between text-xs text-gray-500 mt-1">
+        <span>0%</span>
+        <span>Meta: {meta}%</span>
+        <span>100%</span>
+      </div>
+    </div>
+  );
+};
+
+const AlertCard = ({ tipo, titulo, mensaje, icono: Icon }) => {
+  const estilos = {
+    success: 'bg-green-50 border-green-200 text-green-800',
+    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+    danger: 'bg-red-50 border-red-200 text-red-800',
+    info: 'bg-blue-50 border-blue-200 text-blue-800'
+  };
+
+  const iconosColores = {
+    success: 'text-green-600',
+    warning: 'text-yellow-600',
+    danger: 'text-red-600',
+    info: 'text-blue-600'
+  };
+
+  return (
+    <div className={`${estilos[tipo]} border rounded-lg p-4 flex items-start gap-3`}>
+      <Icon className={`w-5 h-5 ${iconosColores[tipo]} flex-shrink-0 mt-0.5`} />
+      <div>
+        <h4 className="font-semibold text-sm mb-1">{titulo}</h4>
+        <p className="text-xs">{mensaje}</p>
+      </div>
+    </div>
+  );
+};
 
 export default EstadisticasGeneral;
