@@ -22,6 +22,9 @@ class FacturacionAutomaticaService {
 
       const fechaActual = new Date();
       const periodo = parametros.periodo || `${fechaActual.getFullYear()}-${String(fechaActual.getMonth() + 1).padStart(2, '0')}`;
+      const diasVencimiento = parametros.diasVencimiento || 15; // Días para vencimiento (por defecto 15)
+
+      console.log(`📅 Días de vencimiento configurados: ${diasVencimiento}`);
 
       // 1. Obtener clientes activos para facturar
       const clientesParaFacturar = await this.obtenerClientesParaFacturar(fechaActual);
@@ -70,7 +73,7 @@ class FacturacionAutomaticaService {
           }
 
           // 6. Generar la factura
-          const factura = await this.crearFacturaCompleta(cliente, conceptos, periodoCliente);
+          const factura = await this.crearFacturaCompleta(cliente, conceptos, periodoCliente, diasVencimiento);
 
           facturasGeneradas++;
           resultadosDetallados.push({
@@ -664,7 +667,7 @@ class FacturacionAutomaticaService {
   // CREACIÓN DE FACTURA COMPLETA
   // ========================================================================
 
-  static async crearFacturaCompleta(cliente, conceptos, periodo) {
+  static async crearFacturaCompleta(cliente, conceptos, periodo, diasVencimiento = 15) {
     try {
       const conexion = await Database.getConnection();
 
@@ -678,7 +681,7 @@ class FacturacionAutomaticaService {
         // Fechas de la factura
         const fechaEmision = new Date();
         const fechaVencimiento = new Date();
-        fechaVencimiento.setDate(fechaVencimiento.getDate() + 15); // 15 días para vencimiento
+        fechaVencimiento.setDate(fechaVencimiento.getDate() + diasVencimiento); // Días de vencimiento configurados
 
         // Crear factura
         const [resultado] = await conexion.execute(`

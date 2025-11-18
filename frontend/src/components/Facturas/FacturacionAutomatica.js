@@ -15,7 +15,8 @@ const FacturacionAutomatica = () => {
   const [preview, setPreview] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [expandedCliente, setExpandedCliente] = useState(null);
-  
+  const [diasVencimiento, setDiasVencimiento] = useState(15); // Días de vencimiento por defecto
+
   const { user } = useAuth();
 
   // Limpiar estados
@@ -56,20 +57,23 @@ const FacturacionAutomatica = () => {
   // Ejecutar facturación
   const ejecutarFacturacion = async () => {
     if (!window.confirm(
-      'Esta acción generará la facturación mensual para todos los clientes activos.\n\n' +
-      '⚠️ ESTA ACCIÓN NO SE PUEDE DESHACER.\n\n' +
-      '¿Desea continuar?'
+      `Esta acción generará la facturación mensual para todos los clientes activos.\n\n` +
+      `Días de vencimiento: ${diasVencimiento} días\n\n` +
+      `⚠️ ESTA ACCIÓN NO SE PUEDE DESHACER.\n\n` +
+      `¿Desea continuar?`
     )) {
       return;
     }
 
     setLoading(true);
-    
+
     try {
       console.log('⚡ Ejecutando facturación mensual...');
-      
+      console.log(`📅 Días de vencimiento: ${diasVencimiento}`);
+
       const response = await facturasService.generarFacturacionMensual({
-        periodo: new Date().toISOString().slice(0, 7)
+        periodo: new Date().toISOString().slice(0, 7),
+        diasVencimiento: parseInt(diasVencimiento)
       });
       
       console.log('✅ Facturación completada:', response);
@@ -183,6 +187,48 @@ const FacturacionAutomatica = () => {
           </div>
         </div>
       )}
+
+      {/* Configuración de Facturación */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Calendar className="w-5 h-5 text-gray-600" />
+          <h3 className="text-lg font-semibold text-gray-900">Configuración de Facturación</h3>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Días para Vencimiento de Pago
+            </label>
+            <p className="text-xs text-gray-500 mb-3">
+              Seleccione cuántos días después de la emisión vence el pago de las facturas
+            </p>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min="1"
+                max="365"
+                value={diasVencimiento}
+                onChange={(e) => setDiasVencimiento(e.target.value)}
+                className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-lg font-semibold"
+              />
+              <span className="text-gray-600">días</span>
+            </div>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex-1">
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold">Fecha de emisión:</span> Hoy
+            </p>
+            <p className="text-sm text-gray-700 mt-1">
+              <span className="font-semibold">Fecha de vencimiento:</span>{' '}
+              {new Date(Date.now() + diasVencimiento * 24 * 60 * 60 * 1000).toLocaleDateString('es-CO', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Botones de acción */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
