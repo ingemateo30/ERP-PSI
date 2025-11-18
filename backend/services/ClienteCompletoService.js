@@ -845,16 +845,31 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
   }
 
   /**
-   * Enviar correo de bienvenida
+   * Enviar correo de bienvenida con factura y contrato adjuntos
    */
   static async enviarCorreoBienvenida(clienteId, datosCliente) {
     console.log('📧 Enviando correo de bienvenida...');
 
-    // Implementar envío de correo aquí
-    // Por ahora solo simulamos
-    console.log(`📧 Correo enviado a: ${datosCliente.email}`);
+    // Importar EmailService dinámicamente para evitar dependencias circulares
+    const EmailService = require('./EmailService');
 
-    return true;
+    try {
+      const resultado = await EmailService.enviarCorreoBienvenida(clienteId, datosCliente);
+
+      if (resultado.enviado) {
+        console.log(`✅ Correo de bienvenida enviado exitosamente a: ${resultado.destinatario}`);
+        console.log(`📎 Adjuntos incluidos: ${resultado.adjuntos}`);
+        return true;
+      } else {
+        console.warn(`⚠️ No se pudo enviar correo: ${resultado.motivo}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error enviando correo de bienvenida:', error);
+      // No lanzar error para evitar que falle toda la transacción
+      // El cliente se creó exitosamente, solo falló el envío del correo
+      return false;
+    }
   }
 
   /**
