@@ -272,7 +272,7 @@ class PDFGenerator {
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', xOffset, y)
             .fontSize(11).font('Helvetica')
             .text(factura.identificacion_cliente || '1005450340', xOffset, y + 15)
-            .text(factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN', xOffset, y + 30);
+            .text(factura.cliente_direccion || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN', xOffset, y + 30);
 
         // PERIODO FACTURADO (derecha)
         const yPeriodo = y - 10;
@@ -336,7 +336,7 @@ class PDFGenerator {
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', xOffset, y)
             .fontSize(11).font('Helvetica')
             .text(factura.identificacion_cliente || '1005450340', xOffset, y + 15)
-            .text(factura.direccion_cliente || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN', xOffset, y + 30);
+            .text(factura.cliente_direccion || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN', xOffset, y + 30);
 
         // TOTAL grande (derecha)
         doc.fontSize(12).font('Helvetica-Bold')
