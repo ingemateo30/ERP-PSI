@@ -354,15 +354,19 @@ class EmailService {
       try {
         await conexion.execute(`
           INSERT INTO notificaciones (
-            tipo, destinatario, asunto, mensaje, estado,
-            cliente_id, created_at
-          ) VALUES (?, ?, ?, ?, 'enviado', ?, NOW())
+            tipo, titulo, mensaje, datos_adicionales, created_at
+          ) VALUES (?, ?, ?, ?, NOW())
         `, [
           'email_bienvenida',
-          cliente.correo,
           asunto,
           'Correo de bienvenida con factura y contrato adjuntos',
-          clienteId
+          JSON.stringify({
+            cliente_id: clienteId,
+            destinatario: cliente.correo,
+            estado: 'enviado',
+            adjuntos: adjuntos.length,
+            fecha_envio: new Date().toISOString()
+          })
         ]);
       } catch (error) {
         console.warn('⚠️ No se pudo registrar notificación en BD:', error.message);
@@ -382,15 +386,19 @@ class EmailService {
       try {
         await conexion.execute(`
           INSERT INTO notificaciones (
-            tipo, destinatario, asunto, mensaje, estado,
-            cliente_id, created_at
-          ) VALUES (?, ?, ?, ?, 'fallido', ?, NOW())
+            tipo, titulo, mensaje, datos_adicionales, created_at
+          ) VALUES (?, ?, ?, ?, NOW())
         `, [
           'email_bienvenida',
-          datosCliente.email || datosCliente.correo || 'desconocido',
-          'Error en envío',
+          'Error al enviar correo de bienvenida',
           error.message,
-          clienteId
+          JSON.stringify({
+            cliente_id: clienteId,
+            destinatario: datosCliente.email || datosCliente.correo || 'desconocido',
+            estado: 'fallido',
+            error: error.message,
+            fecha_intento: new Date().toISOString()
+          })
         ]);
       } catch (dbError) {
         console.warn('⚠️ No se pudo registrar error en BD:', dbError.message);

@@ -1478,7 +1478,8 @@ const query = `
   }
 
   static async crearClienteConServicios(datosCompletos, createdBy = null) {
-    return await Database.transaction(async (conexion) => {
+    // Ejecutar la transacción primero
+    const resultado = await Database.transaction(async (conexion) => {
       console.log('🚀 Creando cliente con servicios agrupados por sede...');
 
       // 1. CREAR CLIENTE UNA SOLA VEZ
@@ -1519,7 +1520,7 @@ const query = `
           contratoId,
           createdBy
         );
-        
+
         const instalacionid = await this.generarOrdenInstalacionInterno(
           conexion,
           clienteId,
@@ -1541,13 +1542,6 @@ const query = `
 
       console.log(`🎉 Cliente creado con ${sedesCreadas.length} sede(s) independiente(s)`);
 
-      // 3. ENVIAR CORREO DE BIENVENIDA (si se solicita)
-      let correoEnviado = false;
-      if (datosCompletos.opciones?.enviar_bienvenida) {
-        correoEnviado = await this.enviarCorreoBienvenida(clienteId, datosCompletos.cliente);
-        console.log(`✅ Correo de bienvenida procesado: ${correoEnviado}`);
-      }
-
       return {
         cliente_id: clienteId,
         sedes_creadas: sedesCreadas,
@@ -1556,11 +1550,28 @@ const query = `
           total_contratos: sedesCreadas.length, // 1 contrato por sede
           total_facturas: sedesCreadas.length,  // 1 factura por sede
           total_instalaciones: sedesCreadas.length,  // 1 instalación por sede
-          total_servicios: sedesCreadas.reduce((sum, sede) => sum + sede.total_servicios, 0),
-          correo_bienvenida_enviado: correoEnviado
+          total_servicios: sedesCreadas.reduce((sum, sede) => sum + sede.total_servicios, 0)
         }
       };
     });
+
+    // 3. ENVIAR CORREO DE BIENVENIDA DESPUÉS de que la transacción se confirme
+    // Esto evita problemas de "cliente no encontrado" porque ya está confirmado en la BD
+    let correoEnviado = false;
+    if (datosCompletos.opciones?.enviar_bienvenida) {
+      try {
+        correoEnviado = await this.enviarCorreoBienvenida(resultado.cliente_id, datosCompletos.cliente);
+        console.log(`✅ Correo de bienvenida procesado: ${correoEnviado}`);
+      } catch (error) {
+        console.error('⚠️ Error al enviar correo (cliente ya creado):', error.message);
+        // No lanzar el error para que no falle la respuesta, el cliente ya fue creado exitosamente
+      }
+    }
+
+    // Agregar estado del correo al resultado
+    resultado.resumen.correo_bienvenida_enviado = correoEnviado;
+
+    return resultado;
   }
 
   /**
