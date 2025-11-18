@@ -112,25 +112,23 @@ class EstadisticasController {
     try {
       console.log('📊 Obteniendo métricas gerenciales avanzadas...');
 
-      // ARPU (Average Revenue Per User) - Ingreso promedio por usuario
+      // ARPU (Average Revenue Per User) - Basado en facturación del período
       const [arpu] = await Database.query(`
         SELECT
-          COUNT(DISTINCT c.id) as total_clientes_activos,
+          (SELECT COUNT(*) FROM clientes WHERE estado = 'activo') as total_clientes_activos,
           COALESCE(SUM(f.total), 0) as ingresos_totales,
-          COALESCE(SUM(f.total) / NULLIF(COUNT(DISTINCT c.id), 0), 0) as arpu
-        FROM clientes c
-        LEFT JOIN facturas f ON c.id = f.cliente_id
-          AND f.fecha_emision BETWEEN ? AND ?
+          COALESCE(SUM(f.total) / NULLIF((SELECT COUNT(*) FROM clientes WHERE estado = 'activo'), 0), 0) as arpu
+        FROM facturas f
+        WHERE f.fecha_emision BETWEEN ? AND ?
           AND f.activo = '1'
-        WHERE c.estado = 'activo'
       `, [fechaDesde, fechaHasta]);
 
-      // LTV (Customer Lifetime Value) - Valor de vida del cliente
+      // LTV (Customer Lifetime Value) - Valor promedio histórico por cliente
       const [ltv] = await Database.query(`
         SELECT
-          AVG(valor_total_cliente) as ltv_promedio,
-          MAX(valor_total_cliente) as ltv_maximo,
-          MIN(valor_total_cliente) as ltv_minimo
+          COALESCE(AVG(valor_total_cliente), 0) as ltv_promedio,
+          COALESCE(MAX(valor_total_cliente), 0) as ltv_maximo,
+          COALESCE(MIN(valor_total_cliente), 0) as ltv_minimo
         FROM (
           SELECT
             cliente_id,
@@ -139,14 +137,15 @@ class EstadisticasController {
           WHERE estado = 'pagada'
             AND activo = '1'
           GROUP BY cliente_id
+          HAVING SUM(total) > 0
         ) as clientes_ltv
       `);
 
-      // Tasa de retención
+      // Tasa de retención (clientes con más de 6 meses)
       const [retencion] = await Database.query(`
         SELECT
-          COUNT(DISTINCT CASE WHEN estado = 'activo' AND created_at < DATE_SUB(CURDATE(), INTERVAL 6 MONTH) THEN id END) as clientes_antiguos_activos,
-          COUNT(DISTINCT CASE WHEN created_at < DATE_SUB(CURDATE(), INTERVAL 6 MONTH) THEN id END) as total_clientes_antiguos
+          COUNT(CASE WHEN estado = 'activo' AND created_at < DATE_SUB(CURDATE(), INTERVAL 6 MONTH) THEN 1 END) as clientes_antiguos_activos,
+          COUNT(CASE WHEN created_at < DATE_SUB(CURDATE(), INTERVAL 6 MONTH) THEN 1 END) as total_clientes_antiguos
         FROM clientes
       `);
 
@@ -154,58 +153,43 @@ class EstadisticasController {
         ? (retencion.clientes_antiguos_activos / retencion.total_clientes_antiguos) * 100
         : 0;
 
-      // Eficiencia de cobro (DSO - Days Sales Outstanding)
+      // DSO - Días promedio de cobro (solo facturas pagadas)
       const [dso] = await Database.query(`
         SELECT
-          AVG(DATEDIFF(COALESCE(fecha_pago, CURDATE()), fecha_emision)) as dias_promedio_cobro
+          COALESCE(AVG(DATEDIFF(fecha_pago, fecha_emision)), 0) as dias_promedio_cobro
         FROM facturas
-        WHERE fecha_emision BETWEEN ? AND ?
+        WHERE estado = 'pagada'
+          AND fecha_pago IS NOT NULL
+          AND fecha_emision BETWEEN ? AND ?
           AND activo = '1'
       `, [fechaDesde, fechaHasta]);
 
-      // ROI de instalaciones
-      const [roiInstalaciones] = await Database.query(`
-        SELECT
-          SUM(costo_instalacion) as ingresos_instalaciones,
-          COUNT(DISTINCT cliente_id) as clientes_instalados,
-          AVG(costo_instalacion) as costo_promedio_instalacion
-        FROM instalaciones
-        WHERE estado = 'completada'
-          AND fecha_instalacion BETWEEN ? AND ?
-      `, [fechaDesde, fechaHasta]);
-
-      // Ingresos proyectados (basado en contratos activos)
-      const [proyeccion] = await Database.query(`
-        SELECT
-          COUNT(*) as contratos_activos,
-          SUM(COALESCE(sc.precio_personalizado, ps.precio)) as mrr_actual,
-          SUM(COALESCE(sc.precio_personalizado, ps.precio)) * 12 as arr_proyectado
-        FROM servicios_cliente sc
-        INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
-        WHERE sc.estado = 'activo'
-      `);
-
-      // Eficiencia operativa
-      const [eficiencia] = await Database.query(`
-        SELECT
-          COUNT(CASE WHEN estado = 'completada' THEN 1 END) as instalaciones_completadas,
-          COUNT(*) as total_instalaciones,
-          COUNT(CASE WHEN estado = 'completada' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0) as tasa_exito_instalaciones,
-          AVG(CASE WHEN estado = 'completada' THEN DATEDIFF(fecha_instalacion, fecha_programada) END) as dias_promedio_instalacion
-        FROM instalaciones
-        WHERE created_at BETWEEN ? AND ?
-      `, [fechaDesde, fechaHasta]);
-
-      // Satisfacción del cliente (basado en PQRs resueltas vs escaladas)
-      const [satisfaccion] = await Database.query(`
-        SELECT
-          COUNT(CASE WHEN estado IN ('resuelto', 'cerrado') THEN 1 END) as pqr_resueltas,
-          COUNT(CASE WHEN estado = 'escalado' THEN 1 END) as pqr_escaladas,
-          COUNT(*) as total_pqr,
-          COUNT(CASE WHEN estado IN ('resuelto', 'cerrado') THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0) as indice_satisfaccion
-        FROM pqr
-        WHERE fecha_recepcion BETWEEN ? AND ?
-      `, [fechaDesde, fechaHasta]);
+      // MRR/ARR - Ingresos recurrentes (basado en servicios activos O promedio de facturación)
+      // Primero intentar con servicios_cliente
+      let proyeccion;
+      try {
+        [proyeccion] = await Database.query(`
+          SELECT
+            COUNT(*) as contratos_activos,
+            COALESCE(SUM(COALESCE(sc.precio_personalizado, ps.precio)), 0) as mrr_actual,
+            COALESCE(SUM(COALESCE(sc.precio_personalizado, ps.precio)) * 12, 0) as arr_proyectado
+          FROM servicios_cliente sc
+          INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
+          WHERE sc.estado = 'activo'
+        `);
+      } catch (err) {
+        // Si no existe la tabla, calcular MRR basado en promedio de facturación
+        console.log('⚠️ No se pudo obtener MRR de servicios_cliente, calculando desde facturas');
+        [proyeccion] = await Database.query(`
+          SELECT
+            (SELECT COUNT(*) FROM clientes WHERE estado = 'activo') as contratos_activos,
+            COALESCE(AVG(total), 0) * (SELECT COUNT(*) FROM clientes WHERE estado = 'activo') as mrr_actual,
+            COALESCE(AVG(total), 0) * (SELECT COUNT(*) FROM clientes WHERE estado = 'activo') * 12 as arr_proyectado
+          FROM facturas
+          WHERE fecha_emision >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
+            AND activo = '1'
+        `);
+      }
 
       return {
         arpu: {
@@ -227,41 +211,22 @@ class EstadisticasController {
           dso: parseFloat(dso.dias_promedio_cobro) || 0,
           descripcion: 'Días promedio para cobrar una factura'
         },
-        instalaciones: {
-          ingresos: parseFloat(roiInstalaciones.ingresos_instalaciones) || 0,
-          clientes_instalados: parseInt(roiInstalaciones.clientes_instalados) || 0,
-          costo_promedio: parseFloat(roiInstalaciones.costo_promedio_instalacion) || 0
-        },
         proyeccion: {
-          mrr: parseFloat(proyeccion.mrr_actual) || 0, // Monthly Recurring Revenue
-          arr: parseFloat(proyeccion.arr_proyectado) || 0, // Annual Recurring Revenue
+          mrr: parseFloat(proyeccion.mrr_actual) || 0,
+          arr: parseFloat(proyeccion.arr_proyectado) || 0,
           contratos_activos: parseInt(proyeccion.contratos_activos) || 0
-        },
-        eficiencia_operativa: {
-          tasa_exito_instalaciones: parseFloat(eficiencia.tasa_exito_instalaciones) || 0,
-          dias_promedio_instalacion: parseFloat(eficiencia.dias_promedio_instalacion) || 0,
-          instalaciones_completadas: parseInt(eficiencia.instalaciones_completadas) || 0,
-          total_instalaciones: parseInt(eficiencia.total_instalaciones) || 0
-        },
-        satisfaccion_cliente: {
-          indice: parseFloat(satisfaccion.indice_satisfaccion) || 0,
-          pqr_resueltas: parseInt(satisfaccion.pqr_resueltas) || 0,
-          pqr_escaladas: parseInt(satisfaccion.pqr_escaladas) || 0,
-          total_pqr: parseInt(satisfaccion.total_pqr) || 0
         }
       };
     } catch (error) {
       console.error('❌ Error obteniendo métricas gerenciales:', error);
+      console.error(error);
       // Retornar valores por defecto en caso de error
       return {
         arpu: { valor: 0, total_clientes: 0, ingresos_totales: 0 },
         ltv: { promedio: 0, maximo: 0, minimo: 0 },
         retencion: { tasa: 0, clientes_retenidos: 0, total_evaluados: 0 },
         cobro: { dso: 0, descripcion: 'Días promedio para cobrar una factura' },
-        instalaciones: { ingresos: 0, clientes_instalados: 0, costo_promedio: 0 },
-        proyeccion: { mrr: 0, arr: 0, contratos_activos: 0 },
-        eficiencia_operativa: { tasa_exito_instalaciones: 0, dias_promedio_instalacion: 0, instalaciones_completadas: 0, total_instalaciones: 0 },
-        satisfaccion_cliente: { indice: 0, pqr_resueltas: 0, pqr_escaladas: 0, total_pqr: 0 }
+        proyeccion: { mrr: 0, arr: 0, contratos_activos: 0 }
       };
     }
   }
