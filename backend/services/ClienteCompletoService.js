@@ -1541,6 +1541,13 @@ const query = `
 
       console.log(`🎉 Cliente creado con ${sedesCreadas.length} sede(s) independiente(s)`);
 
+      // 3. ENVIAR CORREO DE BIENVENIDA (si se solicita)
+      let correoEnviado = false;
+      if (datosCompletos.opciones?.enviar_bienvenida) {
+        correoEnviado = await this.enviarCorreoBienvenida(clienteId, datosCompletos.cliente);
+        console.log(`✅ Correo de bienvenida procesado: ${correoEnviado}`);
+      }
+
       return {
         cliente_id: clienteId,
         sedes_creadas: sedesCreadas,
@@ -1549,7 +1556,8 @@ const query = `
           total_contratos: sedesCreadas.length, // 1 contrato por sede
           total_facturas: sedesCreadas.length,  // 1 factura por sede
           total_instalaciones: sedesCreadas.length,  // 1 instalación por sede
-          total_servicios: sedesCreadas.reduce((sum, sede) => sum + sede.total_servicios, 0)
+          total_servicios: sedesCreadas.reduce((sum, sede) => sum + sede.total_servicios, 0),
+          correo_bienvenida_enviado: correoEnviado
         }
       };
     });
