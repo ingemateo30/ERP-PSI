@@ -3,19 +3,16 @@ import {
   DollarSign, TrendingUp, TrendingDown, Users, Package,
   FileText, Wrench, AlertTriangle, CheckCircle, Clock,
   BarChart3, PieChart, Activity, RefreshCw, Calendar,
-  ArrowUp, ArrowDown, Minus, Download, Filter, MapPin,
-  Zap, Target, Award, Briefcase, PhoneCall, Mail,
-  WifiOff, Wifi, UserPlus, UserMinus, TrendingUpDown,
-  ShoppingCart, CreditCard, Building, Globe, Star,
-  Percent, TrendingUpIcon, Shield, AlertCircle, Info
+  ArrowUp, ArrowDown, Minus, Download, MapPin,
+  Zap, Target, Award,
+  WifiOff, UserPlus, UserMinus,
+  CreditCard, Star
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   PieChart as RechartPieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, RadarChart, PolarGrid,
-  PolarAngleAxis, PolarRadiusAxis, Radar,
-  ComposedChart
+  ResponsiveContainer, ComposedChart
 } from 'recharts';
 import estadisticasService from '../../services/estadisticasService';
 
@@ -122,7 +119,11 @@ const EstadisticasGeneral = () => {
   };
 
   const handleExportPDF = () => {
+    // Agregar clase para impresión
+    document.body.classList.add('printing');
     window.print();
+    // Remover clase después de imprimir
+    setTimeout(() => document.body.classList.remove('printing'), 100);
   };
 
   // Colores para gráficos
@@ -160,9 +161,8 @@ const EstadisticasGeneral = () => {
 
       return {
         mes: mesesNombres[mesIndex],
-        ingresos: parseFloat(mes.valor_total_facturado) || 0,
+        facturado: parseFloat(mes.valor_total_facturado) || 0,
         recaudado: parseFloat(mes.valor_recaudado) || 0,
-        pendiente: parseFloat(mes.valor_pendiente_cobro) || 0
       };
     }).slice(-6); // Últimos 6 meses
   }, [estadisticas]);
@@ -197,63 +197,9 @@ const EstadisticasGeneral = () => {
       {
         categoria: 'Contratos',
         completadas: estadisticas.operacionales?.contratos?.activos || 0,
-        pendientes: estadisticas.operacionales?.contratos?.pendientes || 0
+        pendientes: estadisticas.operacionales?.contratos?.vencidos || 0
       }
     ];
-  }, [estadisticas]);
-
-  // Generar alertas y recomendaciones inteligentes
-  const alertasRecomendaciones = useMemo(() => {
-    if (!estadisticas) return [];
-
-    const alertas = [];
-
-    // Alerta de cartera vencida alta
-    const tasaCarteraVencida = estadisticas.financieras?.cartera?.cartera_vencida || 0;
-    const totalFacturado = estadisticas.financieras?.periodo?.total_facturado || 1;
-    if ((tasaCarteraVencida / totalFacturado) > 0.2) {
-      alertas.push({
-        tipo: 'warning',
-        titulo: 'Cartera Vencida Alta',
-        mensaje: `La cartera vencida representa más del 20% de la facturación. Considere intensificar las estrategias de cobro.`,
-        icono: AlertTriangle
-      });
-    }
-
-    // Alerta de churn rate
-    const churnRate = estadisticas.clientes?.churn?.tasa_churn || 0;
-    if (churnRate > 5) {
-      alertas.push({
-        tipo: 'danger',
-        titulo: 'Tasa de Abandono Alta',
-        mensaje: `La tasa de churn es ${churnRate.toFixed(1)}%. Implemente estrategias de retención de clientes.`,
-        icono: AlertCircle
-      });
-    }
-
-    // Recomendación de eficiencia operativa
-    const eficienciaInstalaciones = estadisticas.metricas_gerenciales?.eficiencia_operativa?.tasa_exito_instalaciones || 0;
-    if (eficienciaInstalaciones < 80) {
-      alertas.push({
-        tipo: 'info',
-        titulo: 'Oportunidad de Mejora',
-        mensaje: `La tasa de éxito de instalaciones es ${eficienciaInstalaciones.toFixed(1)}%. Optimice procesos para alcanzar el 90%.`,
-        icono: Info
-      });
-    }
-
-    // Alerta positiva - buen desempeño
-    const tasaRecaudo = estadisticas.financieras?.periodo?.tasa_recaudo || 0;
-    if (tasaRecaudo > 85) {
-      alertas.push({
-        tipo: 'success',
-        titulo: 'Excelente Recaudo',
-        mensaje: `La tasa de recaudo es ${tasaRecaudo.toFixed(1)}%. ¡Continúe con las buenas prácticas de cobro!`,
-        icono: CheckCircle
-      });
-    }
-
-    return alertas;
   }, [estadisticas]);
 
   if (loading) {
@@ -266,8 +212,7 @@ const EstadisticasGeneral = () => {
               <div className="w-full h-full rounded-full bg-[#0e6493] opacity-20"></div>
             </div>
           </div>
-          <p className="text-gray-600 text-lg font-medium">Cargando estadísticas...</p>
-          <p className="text-gray-400 text-sm mt-2">Preparando datos ejecutivos</p>
+          <p className="text-gray-600 text-lg font-medium">Cargando dashboard...</p>
         </div>
       </div>
     );
@@ -275,24 +220,26 @@ const EstadisticasGeneral = () => {
 
   if (error) {
     return (
-      <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-300 rounded-xl p-8 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <div className="w-16 h-16 bg-red-200 rounded-full flex items-center justify-center mr-4">
-              <AlertTriangle className="w-8 h-8 text-red-600" />
+      <div className="p-6">
+        <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-300 rounded-xl p-8 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-16 h-16 bg-red-200 rounded-full flex items-center justify-center mr-4">
+                <AlertTriangle className="w-8 h-8 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-red-900 font-bold text-xl">Error al cargar estadísticas</h3>
+                <p className="text-red-700 text-sm mt-1">{error}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-red-900 font-bold text-xl">Error al cargar estadísticas</h3>
-              <p className="text-red-700 text-sm mt-1">{error}</p>
-            </div>
+            <button
+              onClick={handleRefresh}
+              className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all transform hover:scale-105 shadow-lg flex items-center gap-2"
+            >
+              <RefreshCw className="w-5 h-5" />
+              Reintentar
+            </button>
           </div>
-          <button
-            onClick={handleRefresh}
-            className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all transform hover:scale-105 shadow-lg flex items-center gap-2"
-          >
-            <RefreshCw className="w-5 h-5" />
-            Reintentar
-          </button>
         </div>
       </div>
     );
@@ -300,23 +247,51 @@ const EstadisticasGeneral = () => {
 
   if (!estadisticas) {
     return (
-      <div className="text-center py-16 bg-white rounded-xl shadow-lg">
-        <BarChart3 className="w-24 h-24 text-gray-400 mx-auto mb-4 animate-pulse" />
-        <p className="text-gray-600 text-lg">No hay datos disponibles</p>
-        <button
-          onClick={handleRefresh}
-          className="mt-4 px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90"
-        >
-          Actualizar
-        </button>
+      <div className="p-6">
+        <div className="text-center py-16 bg-white rounded-xl shadow-lg">
+          <BarChart3 className="w-24 h-24 text-gray-400 mx-auto mb-4 animate-pulse" />
+          <p className="text-gray-600 text-lg">No hay datos disponibles</p>
+          <button
+            onClick={handleRefresh}
+            className="mt-4 px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90"
+          >
+            Actualizar
+          </button>
+        </div>
       </div>
     );
   }
 
   const { financieras, clientes, operacionales, metricas_gerenciales, comparaciones } = estadisticas;
 
+  // Formatear variación de manera más clara
+  const formatVariacion = (variacion) => {
+    if (!variacion && variacion !== 0) return null;
+    if (variacion > 100) return '+100%'; // Limitar a 100% para mejor visualización
+    if (variacion < -100) return '-100%';
+    return variacion > 0 ? `+${variacion.toFixed(1)}%` : `${variacion.toFixed(1)}%`;
+  };
+
   return (
     <div className="space-y-6 p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+      <style>{`
+        @media print {
+          body {
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+          .print\\:hidden {
+            display: none !important;
+          }
+          .space-y-6 {
+            gap: 1rem;
+          }
+          button {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       {/* ========================================= */}
       {/* HEADER CON FILTROS Y ACCIONES */}
       {/* ========================================= */}
@@ -328,11 +303,13 @@ const EstadisticasGeneral = () => {
             </h1>
             <p className="text-gray-600 flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              Periodo: {new Date(filtros.fecha_desde).toLocaleDateString('es-CO')} - {new Date(filtros.fecha_hasta).toLocaleDateString('es-CO')}
+              {new Date(filtros.fecha_desde).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+              {' - '}
+              {new Date(filtros.fecha_hasta).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 print:hidden">
             {/* Selector de período */}
             <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
               {['semana', 'mes', 'trimestre', 'año'].map((period) => (
@@ -364,36 +341,25 @@ const EstadisticasGeneral = () => {
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#10b981]/80 text-white rounded-lg hover:shadow-lg transition-all transform hover:scale-105"
             >
               <Download className="w-5 h-5" />
-              <span className="hidden sm:inline">Exportar</span>
+              <span className="hidden sm:inline">Exportar PDF</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* ========================================= */}
-      {/* ALERTAS Y RECOMENDACIONES */}
-      {/* ========================================= */}
-      {alertasRecomendaciones.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {alertasRecomendaciones.map((alerta, index) => (
-            <AlertCard key={index} {...alerta} />
-          ))}
-        </div>
-      )}
-
-      {/* ========================================= */}
-      {/* KPIs PRINCIPALES CON COMPARACIÓN */}
+      {/* KPIs PRINCIPALES */}
       {/* ========================================= */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Facturado */}
         <KPICard
-          title="Total Facturado"
+          title="Facturación Total"
           value={animatedValues.totalFacturado || 0}
           prefix="$"
           icon={<DollarSign className="w-6 h-6" />}
           color="from-blue-500 to-blue-600"
-          variacion={comparaciones?.facturacion}
-          subtitle={`${financieras?.periodo?.total_facturas || 0} facturas`}
+          variacion={formatVariacion(comparaciones?.facturacion)}
+          subtitle={`${financieras?.periodo?.total_facturas || 0} facturas emitidas`}
         />
 
         {/* Total Recaudado */}
@@ -403,21 +369,19 @@ const EstadisticasGeneral = () => {
           prefix="$"
           icon={<CheckCircle className="w-6 h-6" />}
           color="from-green-500 to-green-600"
-          variacion={comparaciones?.recaudo}
-          subtitle={`${estadisticasService.formatPercentage(financieras?.periodo?.tasa_recaudo || 0)} tasa de recaudo`}
-          badge={estadisticasService.formatPercentage(financieras?.periodo?.tasa_recaudo || 0)}
+          variacion={formatVariacion(comparaciones?.recaudo)}
+          subtitle={`Tasa de recaudo: ${(financieras?.periodo?.tasa_recaudo || 0).toFixed(1)}%`}
         />
 
         {/* Cartera Vencida */}
         <KPICard
-          title="Cartera Vencida"
+          title="Cartera en Mora"
           value={animatedValues.carteraVencida || 0}
           prefix="$"
           icon={<AlertTriangle className="w-6 h-6" />}
           color="from-red-500 to-red-600"
-          variacion={comparaciones?.cartera_vencida}
-          subtitle={`${financieras?.cartera?.clientes_con_deuda || 0} clientes`}
-          badge="Mora"
+          variacion={formatVariacion(comparaciones?.cartera_vencida)}
+          subtitle={`${financieras?.cartera?.clientes_con_deuda || 0} clientes con deuda`}
           invertVariation={true}
         />
 
@@ -427,134 +391,24 @@ const EstadisticasGeneral = () => {
           value={animatedValues.clientesActivos || 0}
           icon={<Users className="w-6 h-6" />}
           color="from-purple-500 to-purple-600"
-          variacion={comparaciones?.clientes_nuevos}
+          variacion={formatVariacion(comparaciones?.clientes_nuevos)}
           subtitle={`${clientes?.resumen?.nuevos_mes || 0} nuevos este mes`}
         />
       </div>
 
       {/* ========================================= */}
-      {/* MÉTRICAS GERENCIALES AVANZADAS */}
-      {/* ========================================= */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricaGerencialCard
-          title="ARPU"
-          subtitle="Ingreso Promedio por Usuario"
-          value={metricas_gerenciales?.arpu?.valor || 0}
-          prefix="$"
-          icon={<DollarSign className="w-5 h-5" />}
-          color="bg-gradient-to-br from-blue-400 to-blue-500"
-          description={`Basado en ${metricas_gerenciales?.arpu?.total_clientes || 0} clientes`}
-        />
-
-        <MetricaGerencialCard
-          title="LTV"
-          subtitle="Valor de Vida del Cliente"
-          value={metricas_gerenciales?.ltv?.promedio || 0}
-          prefix="$"
-          icon={<TrendingUpIcon className="w-5 h-5" />}
-          color="bg-gradient-to-br from-green-400 to-green-500"
-          description="Promedio histórico"
-        />
-
-        <MetricaGerencialCard
-          title="Retención"
-          subtitle="Tasa de Retención"
-          value={metricas_gerenciales?.retencion?.tasa || 0}
-          suffix="%"
-          icon={<Shield className="w-5 h-5" />}
-          color="bg-gradient-to-br from-purple-400 to-purple-500"
-          description={`${metricas_gerenciales?.retencion?.clientes_retenidos || 0} clientes retenidos`}
-        />
-
-        <MetricaGerencialCard
-          title="DSO"
-          subtitle="Días Promedio de Cobro"
-          value={metricas_gerenciales?.cobro?.dso || 0}
-          suffix=" días"
-          icon={<Clock className="w-5 h-5" />}
-          color="bg-gradient-to-br from-orange-400 to-orange-500"
-          description="Days Sales Outstanding"
-        />
-      </div>
-
-      {/* ========================================= */}
-      {/* PROYECCIONES FINANCIERAS */}
-      {/* ========================================= */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Target className="w-5 h-5 text-[#0e6493]" />
-            Ingresos Recurrentes
-          </h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">MRR - Ingreso Mensual Recurrente</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  ${(metricas_gerenciales?.proyeccion?.mrr || 0).toLocaleString('es-CO')}
-                </p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-blue-600" />
-            </div>
-            <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">ARR - Ingreso Anual Proyectado</p>
-                <p className="text-2xl font-bold text-green-600">
-                  ${(metricas_gerenciales?.proyeccion?.arr || 0).toLocaleString('es-CO')}
-                </p>
-              </div>
-              <Award className="w-8 h-8 text-green-600" />
-            </div>
-            <div className="text-center text-sm text-gray-500 pt-2">
-              Basado en {metricas_gerenciales?.proyeccion?.contratos_activos || 0} contratos activos
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-[#0e6493]" />
-            Indicadores de Eficiencia
-          </h3>
-          <div className="space-y-4">
-            <IndicadorProgreso
-              titulo="Tasa de Éxito Instalaciones"
-              valor={metricas_gerenciales?.eficiencia_operativa?.tasa_exito_instalaciones || 0}
-              meta={90}
-              color="bg-blue-500"
-            />
-            <IndicadorProgreso
-              titulo="Satisfacción del Cliente"
-              valor={metricas_gerenciales?.satisfaccion_cliente?.indice || 0}
-              meta={95}
-              color="bg-green-500"
-            />
-            <IndicadorProgreso
-              titulo="Tasa de Retención"
-              valor={metricas_gerenciales?.retencion?.tasa || 0}
-              meta={85}
-              color="bg-purple-500"
-            />
-            <div className="text-center text-sm text-gray-500 pt-2">
-              {metricas_gerenciales?.satisfaccion_cliente?.pqr_resueltas || 0} PQRs resueltas de {metricas_gerenciales?.satisfaccion_cliente?.total_pqr || 0}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================= */}
-      {/* SEGUNDA FILA DE KPIs */}
+      {/* MÉTRICAS OPERACIONALES */}
       {/* ========================================= */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <MiniKPICard
-          title="Instalaciones"
+          title="Instalaciones Completadas"
           value={operacionales?.instalaciones?.completadas || 0}
           total={operacionales?.instalaciones?.total_instalaciones || 0}
           icon={<Wrench className="w-5 h-5" />}
           color="from-blue-400 to-blue-500"
         />
         <MiniKPICard
-          title="Equipos"
+          title="Equipos Disponibles"
           value={operacionales?.inventario?.disponibles || 0}
           total={operacionales?.inventario?.total_equipos || 0}
           icon={<Package className="w-5 h-5" />}
@@ -568,9 +422,8 @@ const EstadisticasGeneral = () => {
           color="from-yellow-400 to-yellow-500"
         />
         <MiniKPICard
-          title="Contratos"
+          title="Contratos Activos"
           value={operacionales?.contratos?.activos || 0}
-          total={operacionales?.contratos?.total || 0}
           icon={<FileText className="w-5 h-5" />}
           color="from-purple-400 to-purple-500"
         />
@@ -589,119 +442,185 @@ const EstadisticasGeneral = () => {
       </div>
 
       {/* ========================================= */}
+      {/* MÉTRICAS GERENCIALES DESTACADAS */}
+      {/* ========================================= */}
+      {metricas_gerenciales && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* ARPU */}
+          {metricas_gerenciales.arpu && metricas_gerenciales.arpu.total_clientes > 0 && (
+            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-blue-600" />
+                </div>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">ARPU</span>
+              </div>
+              <h3 className="text-sm text-gray-600 mb-1">Ingreso Promedio por Cliente</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-2">
+                ${(metricas_gerenciales.arpu.valor || 0).toLocaleString('es-CO')}
+              </p>
+              <p className="text-xs text-gray-500">
+                Basado en {metricas_gerenciales.arpu.total_clientes} clientes activos
+              </p>
+            </div>
+          )}
+
+          {/* MRR */}
+          {metricas_gerenciales.proyeccion && metricas_gerenciales.proyeccion.contratos_activos > 0 && (
+            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-green-600" />
+                </div>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">MRR</span>
+              </div>
+              <h3 className="text-sm text-gray-600 mb-1">Ingresos Recurrentes Mensuales</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-2">
+                ${(metricas_gerenciales.proyeccion.mrr || 0).toLocaleString('es-CO')}
+              </p>
+              <p className="text-xs text-gray-500">
+                {metricas_gerenciales.proyeccion.contratos_activos} contratos activos
+              </p>
+            </div>
+          )}
+
+          {/* Tasa de Retención */}
+          {metricas_gerenciales.retencion && metricas_gerenciales.retencion.total_evaluados > 0 && (
+            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Award className="w-6 h-6 text-purple-600" />
+                </div>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Retención</span>
+              </div>
+              <h3 className="text-sm text-gray-600 mb-1">Tasa de Retención (6 meses)</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-2">
+                {(metricas_gerenciales.retencion.tasa || 0).toFixed(1)}%
+              </p>
+              <p className="text-xs text-gray-500">
+                {metricas_gerenciales.retencion.clientes_retenidos} de {metricas_gerenciales.retencion.total_evaluados} clientes
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================= */}
       {/* GRÁFICOS DE TENDENCIAS */}
       {/* ========================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gráfico de Ingresos (DATOS REALES) */}
-        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-2xl transition-shadow">
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-[#0e6493]" />
               Tendencia de Ingresos (6 meses)
             </h3>
-            <button className="text-gray-400 hover:text-gray-600">
-              <Download className="w-5 h-5" />
-            </button>
           </div>
 
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={datosIngresosMensuales}>
-                <defs>
-                  <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0.1}/>
-                  </linearGradient>
-                  <linearGradient id="colorRecaudado" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS.success} stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor={COLORS.success} stopOpacity={0.1}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#6b7280' }} />
-                <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    borderRadius: '12px',
-                    border: 'none',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
-                  }}
-                  formatter={(value) => `$${value.toLocaleString('es-CO')}`}
-                />
-                <Legend wrapperStyle={{ fontSize: 13, fontWeight: 500 }} />
-                <Area
-                  type="monotone"
-                  dataKey="ingresos"
-                  name="Facturado"
-                  fill="url(#colorIngresos)"
-                  stroke={COLORS.primary}
-                  strokeWidth={3}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="recaudado"
-                  name="Recaudado"
-                  fill="url(#colorRecaudado)"
-                  stroke={COLORS.success}
-                  strokeWidth={3}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="pendiente"
-                  name="Pendiente"
-                  stroke={COLORS.warning}
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: COLORS.warning }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
+            {datosIngresosMensuales.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={datosIngresosMensuales}>
+                  <defs>
+                    <linearGradient id="colorFacturado" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0.1}/>
+                    </linearGradient>
+                    <linearGradient id="colorRecaudado" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={COLORS.success} stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor={COLORS.success} stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#6b7280' }} />
+                  <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      borderRadius: '12px',
+                      border: 'none',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+                    }}
+                    formatter={(value) => `$${value.toLocaleString('es-CO')}`}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 13, fontWeight: 500 }} />
+                  <Area
+                    type="monotone"
+                    dataKey="facturado"
+                    name="Facturado"
+                    fill="url(#colorFacturado)"
+                    stroke={COLORS.primary}
+                    strokeWidth={3}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="recaudado"
+                    name="Recaudado"
+                    fill="url(#colorRecaudado)"
+                    stroke={COLORS.success}
+                    strokeWidth={3}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <div className="text-center">
+                  <BarChart3 className="w-12 h-12 mx-auto mb-2" />
+                  <p className="text-sm">No hay datos de tendencias disponibles</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Gráfico de Distribución de Clientes */}
-        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-2xl transition-shadow">
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <PieChart className="w-5 h-5 text-[#0e6493]" />
               Distribución de Clientes
             </h3>
-            <button className="text-gray-400 hover:text-gray-600">
-              <Download className="w-5 h-5" />
-            </button>
           </div>
 
           <div className="h-80 flex items-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartPieChart>
-                <Pie
-                  data={datosClientesPorEstado}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={100}
-                  innerRadius={60}
-                  fill="#8884d8"
-                  dataKey="value"
-                  animationBegin={0}
-                  animationDuration={800}
-                >
-                  {datosClientesPorEstado.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    borderRadius: '12px',
-                    border: 'none',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
-                  }}
-                  formatter={(value) => `${value} clientes`}
-                />
-              </RechartPieChart>
-            </ResponsiveContainer>
+            {datosClientesPorEstado.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartPieChart>
+                  <Pie
+                    data={datosClientesPorEstado}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    innerRadius={60}
+                    fill="#8884d8"
+                    dataKey="value"
+                    animationBegin={0}
+                    animationDuration={800}
+                  >
+                    {datosClientesPorEstado.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      borderRadius: '12px',
+                      border: 'none',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+                    }}
+                    formatter={(value) => `${value} clientes`}
+                  />
+                </RechartPieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full text-center text-gray-400">
+                <PieChart className="w-12 h-12 mx-auto mb-2" />
+                <p className="text-sm">No hay datos de distribución disponibles</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -714,7 +633,7 @@ const EstadisticasGeneral = () => {
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
           <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-[#0e6493]" />
-            Edades de Cartera
+            Antigüedad de Cartera en Mora
           </h3>
 
           <div className="space-y-4">
@@ -739,9 +658,9 @@ const EstadisticasGeneral = () => {
           </div>
 
           <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Total Cartera Vencida</span>
-              <span className="text-lg font-bold text-gray-900">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 font-medium">Total Cartera en Mora</span>
+              <span className="text-2xl font-bold text-red-600">
                 ${(financieras?.cartera?.cartera_vencida || 0).toLocaleString('es-CO')}
               </span>
             </div>
@@ -752,7 +671,7 @@ const EstadisticasGeneral = () => {
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
           <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
             <Activity className="w-5 h-5 text-[#0e6493]" />
-            Rendimiento del Equipo
+            Rendimiento Operacional
           </h3>
 
           <div className="h-64">
@@ -770,102 +689,10 @@ const EstadisticasGeneral = () => {
                   }}
                 />
                 <Legend />
-                <Bar dataKey="completadas" fill={COLORS.success} radius={[8, 8, 0, 0]} />
-                <Bar dataKey="pendientes" fill={COLORS.warning} radius={[8, 8, 0, 0]} />
+                <Bar dataKey="completadas" name="Completadas" fill={COLORS.success} radius={[8, 8, 0, 0]} />
+                <Bar dataKey="pendientes" name="Pendientes" fill={COLORS.warning} radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================= */}
-      {/* MÉTRICAS DETALLADAS */}
-      {/* ========================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Métodos de Pago */}
-        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-[#0e6493]" />
-            Métodos de Pago
-          </h3>
-
-          <div className="space-y-3">
-            {financieras?.pagos?.por_metodo?.map((metodo, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full`} style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}></div>
-                  <span className="text-sm font-medium text-gray-700 capitalize">{metodo.metodo_pago || 'N/A'}</span>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-gray-500">{metodo.cantidad} pagos</div>
-                  <div className="text-sm font-bold text-gray-900">
-                    ${(metodo.monto_total || 0).toLocaleString('es-CO')}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Top Sectores */}
-        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 lg:col-span-2">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-[#0e6493]" />
-            Top Sectores por Clientes
-          </h3>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Sector
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Ciudad
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Activos
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Tasa
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {clientes?.distribucion?.por_sectores?.slice(0, 5).map((sector, index) => (
-                  <tr key={index} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold`}
-                             style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}>
-                          {index + 1}
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900">{sector.codigo}</div>
-                          <div className="text-xs text-gray-500">{sector.sector}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{sector.ciudad}</td>
-                    <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                      {sector.total_clientes}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">
-                      {sector.clientes_activos}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        {sector.total_clientes > 0 ? Math.round((sector.clientes_activos / sector.total_clientes) * 100) : 0}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
@@ -876,7 +703,7 @@ const EstadisticasGeneral = () => {
       <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
         <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
           <Users className="w-5 h-5 text-[#0e6493]" />
-          Distribución Detallada de Clientes
+          Estado de Clientes
         </h3>
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
@@ -926,12 +753,12 @@ const EstadisticasGeneral = () => {
           <div className="text-center">
             <Activity className="w-8 h-8 mx-auto mb-2 opacity-80" />
             <p className="text-sm opacity-90 mb-1">Última Actualización</p>
-            <p className="text-lg font-bold">{new Date().toLocaleString('es-CO')}</p>
+            <p className="text-lg font-bold">{new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</p>
           </div>
           <div className="text-center">
-            <Zap className="w-8 h-8 mx-auto mb-2 opacity-80" />
-            <p className="text-sm opacity-90 mb-1">Tasa de Churn</p>
-            <p className="text-lg font-bold">{(clientes?.churn?.tasa_churn || 0).toFixed(2)}%</p>
+            <Target className="w-8 h-8 mx-auto mb-2 opacity-80" />
+            <p className="text-sm opacity-90 mb-1">Tasa de Recaudo</p>
+            <p className="text-lg font-bold">{(financieras?.periodo?.tasa_recaudo || 0).toFixed(1)}%</p>
           </div>
           <div className="text-center">
             <Star className="w-8 h-8 mx-auto mb-2 opacity-80" />
@@ -951,17 +778,18 @@ const EstadisticasGeneral = () => {
 // COMPONENTES AUXILIARES
 // =========================================
 
-const KPICard = ({ title, value, prefix = '', suffix = '', icon, color, variacion, subtitle, badge, invertVariation = false }) => {
+const KPICard = ({ title, value, prefix = '', suffix = '', icon, color, variacion, subtitle, invertVariation = false }) => {
   const getVariacionColor = () => {
-    if (!variacion && variacion !== 0) return 'text-gray-400';
-    const isPositive = variacion > 0;
+    if (!variacion) return 'text-gray-400';
+    const isPositive = variacion.includes('+');
     const shouldBeGreen = invertVariation ? !isPositive : isPositive;
     return shouldBeGreen ? 'text-green-400' : 'text-red-400';
   };
 
   const getVariacionIcon = () => {
-    if (!variacion && variacion !== 0) return <Minus className="w-3 h-3" />;
-    return variacion > 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
+    if (!variacion) return <Minus className="w-3 h-3" />;
+    const isPositive = variacion.includes('+');
+    return isPositive ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
   };
 
   return (
@@ -974,10 +802,11 @@ const KPICard = ({ title, value, prefix = '', suffix = '', icon, color, variacio
           <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
             {icon}
           </div>
-          {badge && (
-            <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
-              {badge}
-            </span>
+          {variacion && (
+            <div className={`flex items-center bg-white/20 px-2 py-1 rounded-full text-xs ${getVariacionColor()}`}>
+              {getVariacionIcon()}
+              <span className="ml-1">{variacion}</span>
+            </div>
           )}
         </div>
 
@@ -986,36 +815,8 @@ const KPICard = ({ title, value, prefix = '', suffix = '', icon, color, variacio
           {prefix}{value.toLocaleString('es-CO')}{suffix}
         </p>
 
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center">
-            <span>{subtitle}</span>
-          </div>
-          {(variacion || variacion === 0) && (
-            <div className={`flex items-center bg-white/20 px-2 py-1 rounded-full ${getVariacionColor()}`}>
-              {getVariacionIcon()}
-              <span>{Math.abs(variacion).toFixed(1)}%</span>
-            </div>
-          )}
-        </div>
+        <p className="text-sm opacity-80">{subtitle}</p>
       </div>
-    </div>
-  );
-};
-
-const MetricaGerencialCard = ({ title, subtitle, value, prefix = '', suffix = '', icon, color, description }) => {
-  return (
-    <div className={`${color} rounded-lg shadow-md p-4 text-white transform transition-all duration-300 hover:scale-105 hover:shadow-xl`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-          {icon}
-        </div>
-      </div>
-      <p className="text-xs font-medium opacity-90 mb-1">{title}</p>
-      <p className="text-xs opacity-75 mb-2">{subtitle}</p>
-      <p className="text-2xl font-bold mb-1">{prefix}{value.toLocaleString('es-CO')}{suffix}</p>
-      {description && (
-        <p className="text-xs opacity-75">{description}</p>
-      )}
     </div>
   );
 };
@@ -1030,9 +831,9 @@ const MiniKPICard = ({ title, value, total, icon, color }) => {
           {icon}
         </div>
       </div>
-      <p className="text-xs font-medium opacity-90 mb-1">{title}</p>
-      <p className="text-2xl font-bold mb-1">{value}</p>
-      {total && (
+      <p className="text-xs font-medium opacity-90 mb-1 truncate" title={title}>{title}</p>
+      <p className="text-2xl font-bold mb-1">{value.toLocaleString('es-CO')}</p>
+      {total > 0 && (
         <div className="w-full bg-white/20 rounded-full h-1.5 mt-2">
           <div
             className="bg-white h-1.5 rounded-full transition-all duration-500"
@@ -1045,7 +846,7 @@ const MiniKPICard = ({ title, value, total, icon, color }) => {
 };
 
 const CarteraBar = ({ label, value, color, max }) => {
-  const percentage = max ? (value / max) * 100 : 0;
+  const percentage = max && max > 0 ? (value / max) * 100 : 0;
 
   return (
     <div>
@@ -1080,64 +881,5 @@ const EstadoClienteCard = ({ icon, label, value, color, bgColor }) => (
     <p className="text-sm font-medium text-gray-600">{label}</p>
   </div>
 );
-
-const IndicadorProgreso = ({ titulo, valor, meta, color }) => {
-  const porcentaje = Math.min((valor / meta) * 100, 100);
-  const cumpleMeta = valor >= meta;
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-gray-700">{titulo}</span>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-bold text-gray-900">{valor.toFixed(1)}%</span>
-          {cumpleMeta && <CheckCircle className="w-4 h-4 text-green-500" />}
-        </div>
-      </div>
-      <div className="relative">
-        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-          <div
-            className={`${color} h-2 rounded-full transition-all duration-500`}
-            style={{ width: `${porcentaje}%` }}
-          ></div>
-        </div>
-        <div className="absolute top-0 left-0 w-full h-2 flex items-center" style={{ paddingLeft: `${(meta / 100) * 100}%` }}>
-          <div className="w-px h-4 bg-gray-400"></div>
-        </div>
-      </div>
-      <div className="flex justify-between text-xs text-gray-500 mt-1">
-        <span>0%</span>
-        <span>Meta: {meta}%</span>
-        <span>100%</span>
-      </div>
-    </div>
-  );
-};
-
-const AlertCard = ({ tipo, titulo, mensaje, icono: Icon }) => {
-  const estilos = {
-    success: 'bg-green-50 border-green-200 text-green-800',
-    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    danger: 'bg-red-50 border-red-200 text-red-800',
-    info: 'bg-blue-50 border-blue-200 text-blue-800'
-  };
-
-  const iconosColores = {
-    success: 'text-green-600',
-    warning: 'text-yellow-600',
-    danger: 'text-red-600',
-    info: 'text-blue-600'
-  };
-
-  return (
-    <div className={`${estilos[tipo]} border rounded-lg p-4 flex items-start gap-3`}>
-      <Icon className={`w-5 h-5 ${iconosColores[tipo]} flex-shrink-0 mt-0.5`} />
-      <div>
-        <h4 className="font-semibold text-sm mb-1">{titulo}</h4>
-        <p className="text-xs">{mensaje}</p>
-      </div>
-    </div>
-  );
-};
 
 export default EstadisticasGeneral;
