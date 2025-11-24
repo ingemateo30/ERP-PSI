@@ -396,6 +396,21 @@ export const facturasService = {
       'anulada': 'Anulada'
     };
     return descripciones[estado?.toLowerCase()] || estado || 'Estado desconocido';
+  },
+
+  /**
+   * Generar archivos XML DIAN para facturas del período
+   * @param {Object} params - Parámetros (periodo)
+   * @returns {Promise} Respuesta con archivo ZIP
+   */
+  async generarXMLDIAN(params = {}) {
+    try {
+      const response = await apiService.post(`${API_BASE}/automatica/generar-xml-dian`, params);
+      return response;
+    } catch (error) {
+      console.error('Error generando XML DIAN:', error);
+      throw error;
+    }
   }
 };
 

@@ -102,6 +102,109 @@ const FacturacionAutomatica = () => {
     }).format(valor || 0);
   };
 
+  // Exportar facturas a Excel/CSV
+  const exportarFacturasExcel = () => {
+    if (!preview?.detalles || preview.detalles.length === 0) {
+      alert('No hay datos para exportar');
+      return;
+    }
+
+    // Generar CSV compatible con SIIGO
+    const headers = [
+      'No. Contrato',
+      'Cliente',
+      'Identificación',
+      'Tipo Factura',
+      'Fecha Desde',
+      'Fecha Hasta',
+      'Días',
+      'Internet',
+      'Televisión',
+      'Instalación',
+      'Varios',
+      'Subtotal',
+      'IVA',
+      'Total',
+      'Estrato'
+    ];
+
+    let csvContent = headers.join(',') + '\n';
+
+    preview.detalles.forEach(cliente => {
+      const row = [
+        cliente.numero_contrato || '',
+        `"${cliente.nombre}"`,
+        cliente.identificacion,
+        cliente.tipo_factura === 'primera' ? '1ra Factura' :
+        cliente.tipo_factura === 'segunda' ? '2da Nivelación' : 'Mensual',
+        new Date(cliente.periodo_facturacion.fecha_desde).toLocaleDateString('es-CO'),
+        new Date(cliente.periodo_facturacion.fecha_hasta).toLocaleDateString('es-CO'),
+        cliente.periodo_facturacion.dias,
+        cliente.totales.internet || 0,
+        cliente.totales.television || 0,
+        cliente.totales.instalacion || 0,
+        cliente.totales.varios || 0,
+        cliente.totales.subtotal,
+        cliente.totales.iva,
+        cliente.totales.total,
+        cliente.estrato
+      ];
+      csvContent += row.join(',') + '\n';
+    });
+
+    // Agregar resumen al final
+    csvContent += '\n';
+    csvContent += 'RESUMEN\n';
+    csvContent += `Total Clientes,${preview.resumen.total_clientes}\n`;
+    csvContent += `Servicios Totales,${preview.resumen.servicios_totales}\n`;
+    csvContent += `Monto Total,${preview.resumen.monto_total_estimado}\n`;
+
+    // Descargar archivo
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `facturacion_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Exportar archivo XML DIAN
+  const exportarXMLDIAN = async () => {
+    if (!resultado || !resultado.facturas_generadas) {
+      alert('Primero debe ejecutar la facturación para generar los archivos XML DIAN');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('📄 Generando archivo XML DIAN...');
+
+      const response = await facturasService.generarXMLDIAN({
+        periodo: new Date().toISOString().slice(0, 7)
+      });
+
+      if (response.success && response.data?.zip_file) {
+        // Descargar el archivo ZIP con todos los XML
+        const link = document.createElement('a');
+        link.href = response.data.zip_file;
+        link.download = `facturas_dian_${new Date().toISOString().slice(0, 10)}.zip`;
+        link.click();
+
+        console.log('✅ Archivo XML DIAN descargado');
+      } else {
+        alert('No se pudo generar el archivo XML DIAN');
+      }
+    } catch (error) {
+      console.error('❌ Error generando XML DIAN:', error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Toggle expandir detalle
   const toggleExpandir = (clienteId) => {
     setExpandedCliente(expandedCliente === clienteId ? null : clienteId);
@@ -299,11 +402,12 @@ const FacturacionAutomatica = () => {
               </p>
             </div>
             <button
-              onClick={() => {/* Exportar lógica */}}
+              onClick={exportarFacturasExcel}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+              title="Exportar facturas a CSV para SIIGO"
             >
               <Download className="w-4 h-4" />
-              Exportar Excel
+              Exportar CSV
             </button>
           </div>
 
@@ -512,7 +616,7 @@ const FacturacionAutomatica = () => {
                   <XCircle className="w-6 h-6 text-red-600" />
                 )}
               </div>
-              <div>
+              <div className="flex-1">
                 <h4 className="text-lg font-semibold text-gray-900">
                   {resultado.message || 'Proceso completado'}
                 </h4>
@@ -520,6 +624,21 @@ const FacturacionAutomatica = () => {
                   {resultado.success !== false ? 'Facturación realizada exitosamente' : 'Ocurrió un error'}
                 </p>
               </div>
+              {resultado.success !== false && resultado.facturas_generadas > 0 && (
+                <button
+                  onClick={exportarXMLDIAN}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  title="Descargar archivos XML para DIAN"
+                >
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Download className="w-5 h-5" />
+                  )}
+                  Descargar XML DIAN
+                </button>
+              )}
             </div>
             {resultado.facturas_generadas > 0 && (
               <div className="grid grid-cols-3 gap-4 mt-4">
