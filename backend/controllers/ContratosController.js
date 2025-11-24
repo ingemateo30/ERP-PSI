@@ -1,6 +1,7 @@
 // backend/controllers/ContratosController.js
 const { Database } = require('../models/Database');
-const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator');
+const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator'); // Antiguo (mantener para compatibilidad)
+const ContratoPDFGeneratorMINTIC = require('../utils/ContratoPDFGeneratorMINTIC'); // Nuevo modelo MINTIC
 const puppeteer = require('puppeteer');
 const FirmaPDFService = require('../services/FirmaPDFService');
 const fs = require('fs');
@@ -414,9 +415,8 @@ static async generarPDF(req, res) {
 
             const empresa = empresaConfig[0];
 
-            // Generar HTML del contrato
-            const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator');
-            const htmlContent = ContratoPDFGenerator.generarHTML(contratoData, empresa);
+            // ✅ ACTUALIZADO: Generar HTML del contrato usando modelo MINTIC
+            const htmlContent = ContratoPDFGeneratorMINTIC.generarHTML(contratoData, empresa);
 
             // Generar PDF con Puppeteer
             const browser = await puppeteer.launch({
@@ -429,13 +429,13 @@ static async generarPDF(req, res) {
             await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
             pdfBuffer = await page.pdf({
-                format: 'A4',
+                format: 'Letter', // ✅ ACTUALIZADO: Letter en lugar de A4 (modelo MINTIC)
                 margin: {
-                    top: '10mm',
+                    top: '8mm',
                     right: '10mm',
-                    bottom: '10mm',
+                    bottom: '8mm',
                     left: '10mm'
-                },
+                }, // ✅ ACTUALIZADO: Márgenes del modelo MINTIC
                 preferCSSPageSize: true,
                 displayHeaderFooter: false
             });

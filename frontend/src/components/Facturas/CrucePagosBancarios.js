@@ -22,6 +22,7 @@ const CrucePagosBancarios = () => {
     const [facturasPagadas, setFacturasPagadas] = useState([]);
     const [loading, setLoading] = useState(false);
     const [loadingPagadas, setLoadingPagadas] = useState(false);
+    const [buscando, setBuscando] = useState(false); // ✅ NUEVO: Estado de búsqueda activa
     const [filtros, setFiltros] = useState({
         banco: '',
         fecha_inicio: new Date(new Date().setDate(1)).toISOString().split('T')[0],
@@ -34,6 +35,9 @@ const CrucePagosBancarios = () => {
         fecha_fin: new Date().toISOString().split('T')[0],
         busqueda: ''
     });
+    // ✅ NUEVO: Estados temporales para los filtros
+    const [filtrosTemp, setFiltrosTemp] = useState(filtros);
+    const [filtrosPagadasTemp, setFiltrosPagadasTemp] = useState(filtrosPagadas);
     const [mostrarModalCruce, setMostrarModalCruce] = useState(false);
     const [mostrarModalDetalle, setMostrarModalDetalle] = useState(false);
     const [facturaSeleccionada, setFacturaSeleccionada] = useState(null);
@@ -56,31 +60,11 @@ const CrucePagosBancarios = () => {
         { id: 7, nombre: 'Caja Social', codigo: 'CAJA_SOCIAL' }
     ];
 
+    // ✅ ACTUALIZADO: Cargar datos iniciales solo una vez
     useEffect(() => {
-        // Agregar debounce para evitar múltiples peticiones
-        const timer = setTimeout(() => {
-            cargarFacturasPendientes();
-        }, 300);
-        
-        return () => clearTimeout(timer);
-    }, [filtros]);
-
-    useEffect(() => {
-        // Validar fechas antes de cargar
-        if (filtrosPagadas.fecha_inicio && filtrosPagadas.fecha_fin) {
-            const fechaInicio = new Date(filtrosPagadas.fecha_inicio);
-            const fechaFin = new Date(filtrosPagadas.fecha_fin);
-            
-            // Solo cargar si la fecha fin es mayor o igual a la fecha inicio
-            if (fechaFin >= fechaInicio) {
-                const timer = setTimeout(() => {
-                    cargarFacturasPagadas();
-                }, 300);
-                
-                return () => clearTimeout(timer);
-            }
-        }
-    }, [filtrosPagadas]);
+        cargarFacturasPendientes();
+        cargarFacturasPagadas();
+    }, []);
 
     const cargarFacturasPendientes = async () => {
         try {
@@ -108,7 +92,7 @@ const CrucePagosBancarios = () => {
    const cargarFacturasPagadas = async () => {
     try {
         setLoadingPagadas(true);
-        
+
         const params = new URLSearchParams({
             estado: 'pagada',
             // ✅ CAMBIO: Usar fecha_pago_inicio y fecha_pago_fin para filtrar por fecha del pago
@@ -124,15 +108,15 @@ const CrucePagosBancarios = () => {
         }
 
         const response = await apiService.get(`/facturacion/facturas?${params.toString()}`);
-        
+
         if (response && response.success) {
-            const facturas = Array.isArray(response.data) 
-                ? response.data 
+            const facturas = Array.isArray(response.data)
+                ? response.data
                 : (response.data?.facturas || []);
-            
+
             console.log('💳 PAGOS RECIBIDOS:', facturas.length);
             console.log('💳 PRIMER PAGO:', facturas[0]);
-            
+
             setFacturasPagadas(facturas);
         } else {
             setFacturasPagadas([]);
@@ -144,6 +128,46 @@ const CrucePagosBancarios = () => {
         setLoadingPagadas(false);
     }
 };
+
+    // ✅ NUEVO: Ejecutar búsqueda de facturas pendientes
+    const ejecutarBusquedaPendientes = () => {
+        setFiltros(filtrosTemp);
+        setBuscando(true);
+        cargarFacturasPendientes().finally(() => setBuscando(false));
+    };
+
+    // ✅ NUEVO: Ejecutar búsqueda de facturas pagadas
+    const ejecutarBusquedaPagadas = () => {
+        setFiltrosPagadas(filtrosPagadasTemp);
+        setBuscando(true);
+        cargarFacturasPagadas().finally(() => setBuscando(false));
+    };
+
+    // ✅ NUEVO: Limpiar filtros de pendientes
+    const limpiarFiltrosPendientes = () => {
+        const filtrosLimpios = {
+            banco: '',
+            fecha_inicio: new Date(new Date().setDate(1)).toISOString().split('T')[0],
+            fecha_fin: new Date().toISOString().split('T')[0],
+            busqueda: ''
+        };
+        setFiltrosTemp(filtrosLimpios);
+        setFiltros(filtrosLimpios);
+        cargarFacturasPendientes();
+    };
+
+    // ✅ NUEVO: Limpiar filtros de pagadas
+    const limpiarFiltrosPagadas = () => {
+        const filtrosLimpios = {
+            banco: '',
+            fecha_inicio: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
+            fecha_fin: new Date().toISOString().split('T')[0],
+            busqueda: ''
+        };
+        setFiltrosPagadasTemp(filtrosLimpios);
+        setFiltrosPagadas(filtrosLimpios);
+        cargarFacturasPagadas();
+    };
     const abrirModalCruce = (factura) => {
         setFacturaSeleccionada(factura);
         setDatosPago({
@@ -292,23 +316,9 @@ const CrucePagosBancarios = () => {
                         </label>
                         <input
                             type="date"
-                            value={filtros.fecha_inicio}
-                            onChange={(e) => {
-                                const nuevaFechaInicio = e.target.value;
-                                const fechaFin = new Date(filtros.fecha_fin);
-                                const fechaInicio = new Date(nuevaFechaInicio);
-                                
-                                if (fechaInicio > fechaFin) {
-                                    setFiltros({ 
-                                        ...filtros, 
-                                        fecha_inicio: nuevaFechaInicio,
-                                        fecha_fin: nuevaFechaInicio
-                                    });
-                                } else {
-                                    setFiltros({ ...filtros, fecha_inicio: nuevaFechaInicio });
-                                }
-                            }}
-                            className="w-full px-3 py-2 border rounded-lg"
+                            value={filtrosTemp.fecha_inicio}
+                            onChange={(e) => setFiltrosTemp({ ...filtrosTemp, fecha_inicio: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                     </div>
                     <div>
@@ -317,24 +327,9 @@ const CrucePagosBancarios = () => {
                         </label>
                         <input
                             type="date"
-                            value={filtros.fecha_fin}
-                            onChange={(e) => {
-                                const nuevaFechaFin = e.target.value;
-                                const fechaInicio = new Date(filtros.fecha_inicio);
-                                const fechaFin = new Date(nuevaFechaFin);
-                                
-                                if (fechaFin < fechaInicio) {
-                                    setFiltros({ 
-                                        ...filtros, 
-                                        fecha_inicio: nuevaFechaFin,
-                                        fecha_fin: nuevaFechaFin
-                                    });
-                                } else {
-                                    setFiltros({ ...filtros, fecha_fin: nuevaFechaFin });
-                                }
-                            }}
-                            min={filtros.fecha_inicio}
-                            className="w-full px-3 py-2 border rounded-lg"
+                            value={filtrosTemp.fecha_fin}
+                            onChange={(e) => setFiltrosTemp({ ...filtrosTemp, fecha_fin: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                     </div>
                     <div>
@@ -342,9 +337,9 @@ const CrucePagosBancarios = () => {
                             Banco
                         </label>
                         <select
-                            value={filtros.banco}
-                            onChange={(e) => setFiltros({ ...filtros, banco: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-lg"
+                            value={filtrosTemp.banco}
+                            onChange={(e) => setFiltrosTemp({ ...filtrosTemp, banco: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="">Todos los bancos</option>
                             {bancos.map(banco => (
@@ -361,12 +356,42 @@ const CrucePagosBancarios = () => {
                             <input
                                 type="text"
                                 placeholder="Factura, cliente..."
-                                value={filtros.busqueda}
-                                onChange={(e) => setFiltros({ ...filtros, busqueda: e.target.value })}
-                                className="w-full pl-10 pr-3 py-2 border rounded-lg"
+                                value={filtrosTemp.busqueda}
+                                onChange={(e) => setFiltrosTemp({ ...filtrosTemp, busqueda: e.target.value })}
+                                onKeyPress={(e) => e.key === 'Enter' && ejecutarBusquedaPendientes()}
+                                className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
                         </div>
                     </div>
+                </div>
+
+                {/* ✅ NUEVO: Botones de acción */}
+                <div className="flex justify-end gap-2 mb-4">
+                    <button
+                        onClick={limpiarFiltrosPendientes}
+                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+                        disabled={loading || buscando}
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        Limpiar
+                    </button>
+                    <button
+                        onClick={ejecutarBusquedaPendientes}
+                        disabled={loading || buscando}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {buscando ? (
+                            <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                Buscando...
+                            </>
+                        ) : (
+                            <>
+                                <Search className="w-4 h-4" />
+                                Buscar
+                            </>
+                        )}
+                    </button>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -441,24 +466,9 @@ const CrucePagosBancarios = () => {
                         </label>
                         <input
                             type="date"
-                            value={filtrosPagadas.fecha_inicio}
-                            onChange={(e) => {
-                                const nuevaFechaInicio = e.target.value;
-                                const fechaFin = new Date(filtrosPagadas.fecha_fin);
-                                const fechaInicio = new Date(nuevaFechaInicio);
-                                
-                                // Si fecha inicio es mayor que fecha fin, ajustar fecha fin
-                                if (fechaInicio > fechaFin) {
-                                    setFiltrosPagadas({ 
-                                        ...filtrosPagadas, 
-                                        fecha_inicio: nuevaFechaInicio,
-                                        fecha_fin: nuevaFechaInicio
-                                    });
-                                } else {
-                                    setFiltrosPagadas({ ...filtrosPagadas, fecha_inicio: nuevaFechaInicio });
-                                }
-                            }}
-                            className="w-full px-3 py-2 border rounded-lg"
+                            value={filtrosPagadasTemp.fecha_inicio}
+                            onChange={(e) => setFiltrosPagadasTemp({ ...filtrosPagadasTemp, fecha_inicio: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                     </div>
                     <div>
@@ -467,25 +477,9 @@ const CrucePagosBancarios = () => {
                         </label>
                         <input
                             type="date"
-                            value={filtrosPagadas.fecha_fin}
-                            onChange={(e) => {
-                                const nuevaFechaFin = e.target.value;
-                                const fechaInicio = new Date(filtrosPagadas.fecha_inicio);
-                                const fechaFin = new Date(nuevaFechaFin);
-                                
-                                // Si fecha fin es menor que fecha inicio, ajustar fecha inicio
-                                if (fechaFin < fechaInicio) {
-                                    setFiltrosPagadas({ 
-                                        ...filtrosPagadas, 
-                                        fecha_inicio: nuevaFechaFin,
-                                        fecha_fin: nuevaFechaFin
-                                    });
-                                } else {
-                                    setFiltrosPagadas({ ...filtrosPagadas, fecha_fin: nuevaFechaFin });
-                                }
-                            }}
-                            min={filtrosPagadas.fecha_inicio}
-                            className="w-full px-3 py-2 border rounded-lg"
+                            value={filtrosPagadasTemp.fecha_fin}
+                            onChange={(e) => setFiltrosPagadasTemp({ ...filtrosPagadasTemp, fecha_fin: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                     </div>
                     <div>
@@ -493,9 +487,9 @@ const CrucePagosBancarios = () => {
                             Banco
                         </label>
                         <select
-                            value={filtrosPagadas.banco}
-                            onChange={(e) => setFiltrosPagadas({ ...filtrosPagadas, banco: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-lg"
+                            value={filtrosPagadasTemp.banco}
+                            onChange={(e) => setFiltrosPagadasTemp({ ...filtrosPagadasTemp, banco: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="">Todos los bancos</option>
                             {bancos.map(banco => (
@@ -512,12 +506,42 @@ const CrucePagosBancarios = () => {
                             <input
                                 type="text"
                                 placeholder="Factura, cliente..."
-                                value={filtrosPagadas.busqueda}
-                                onChange={(e) => setFiltrosPagadas({ ...filtrosPagadas, busqueda: e.target.value })}
-                                className="w-full pl-10 pr-3 py-2 border rounded-lg"
+                                value={filtrosPagadasTemp.busqueda}
+                                onChange={(e) => setFiltrosPagadasTemp({ ...filtrosPagadasTemp, busqueda: e.target.value })}
+                                onKeyPress={(e) => e.key === 'Enter' && ejecutarBusquedaPagadas()}
+                                className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
                         </div>
                     </div>
+                </div>
+
+                {/* ✅ NUEVO: Botones de acción */}
+                <div className="flex justify-end gap-2 mb-4">
+                    <button
+                        onClick={limpiarFiltrosPagadas}
+                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+                        disabled={loadingPagadas || buscando}
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        Limpiar
+                    </button>
+                    <button
+                        onClick={ejecutarBusquedaPagadas}
+                        disabled={loadingPagadas || buscando}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {buscando ? (
+                            <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                Buscando...
+                            </>
+                        ) : (
+                            <>
+                                <Search className="w-4 h-4" />
+                                Buscar
+                            </>
+                        )}
+                    </button>
                 </div>
 
                 <div className="overflow-x-auto">
