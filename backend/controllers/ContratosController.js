@@ -266,7 +266,8 @@ const params = [];
 static async generarPDF(req, res) {
     try {
         const { id } = req.params;
-        console.log(`📄 Generando PDF del contrato ID: ${id}`);
+        const { regenerar } = req.query; // ✅ NUEVO: Parámetro para forzar regeneración
+        console.log(`📄 Generando PDF del contrato ID: ${id} (Regenerar: ${regenerar === 'true'})`);
 
         if (!id || isNaN(id)) {
             return res.status(400).json({
@@ -394,12 +395,20 @@ static async generarPDF(req, res) {
 
         let pdfBuffer;
 
-        // Verificar si ya existe PDF generado
-        if (contratoData.documento_pdf_path && fs.existsSync(contratoData.documento_pdf_path)) {
+        // ✅ ACTUALIZADO: Verificar si ya existe PDF generado (a menos que se fuerce regenerar)
+        const usarPDFExistente = regenerar !== 'true' &&
+                                 contratoData.documento_pdf_path &&
+                                 fs.existsSync(contratoData.documento_pdf_path);
+
+        if (usarPDFExistente) {
             console.log('📁 Usando PDF existente:', contratoData.documento_pdf_path);
             pdfBuffer = fs.readFileSync(contratoData.documento_pdf_path);
         } else {
-            console.log('🔨 Generando nuevo PDF...');
+            if (regenerar === 'true') {
+                console.log('🔄 Forzando regeneración del PDF...');
+            } else {
+                console.log('🔨 Generando nuevo PDF...');
+            }
 
             // Obtener configuración de empresa
             const empresaConfig = await Database.query(`
