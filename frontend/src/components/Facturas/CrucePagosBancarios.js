@@ -14,7 +14,8 @@ import {
     CreditCard,
     AlertCircle,
     Eye,
-    History
+    History,
+    RefreshCw
 } from 'lucide-react';
 
 const CrucePagosBancarios = () => {
