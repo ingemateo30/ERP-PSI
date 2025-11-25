@@ -663,6 +663,7 @@ class ContratoPDFGeneratorMINTIC {
   }
 
   static async generarPDFCompleto(datosContrato) {
+    console.log('📝 Generando PDF del contrato completo...');
     let logoPath = '';
     try {
       const logoFilePath = path.join(__dirname, '../public/logo2.png');
@@ -693,6 +694,7 @@ class ContratoPDFGeneratorMINTIC {
   }
 
   static async generarPDF(contratoData, empresaData, rutaSalida) {
+    console.log('📝 Generando PDF del contrato normal...');
     const pdfBuffer = await this.generarPDFCompleto(contratoData);
     await fs.writeFile(rutaSalida, pdfBuffer);
     console.log(`✅ PDF generado: ${rutaSalida}`);
