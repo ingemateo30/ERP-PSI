@@ -110,8 +110,9 @@ class EmailService {
   /**
    * Generar PDF de factura como buffer
    */
-  static async generarPDFFactura(facturaId) {
-    const conexion = await pool.getConnection();
+   static async generarPDFFactura(facturaId, conexionExistente = null) {
+
+    const conexion = conexionExistente || await pool.getConnection();
 
     try {
       // Obtener datos completos de la factura
@@ -143,15 +144,20 @@ class EmailService {
 
       return pdfBuffer;
     } finally {
-      conexion.release();
+      if (!conexionExistente) {
+
+        conexion.release();
+
+      }
     }
   }
 
   /**
    * Generar PDF de contrato como buffer
    */
-  static async generarPDFContrato(contratoId) {
-    const conexion = await pool.getConnection();
+ static async generarPDFContrato(contratoId, conexionExistente = null) {
+
+    const conexion = conexionExistente || await pool.getConnection();
 
     try {
       // Obtener datos completos del contrato
@@ -219,7 +225,11 @@ class EmailService {
 
       return pdfBuffer;
     } finally {
-      conexion.release();
+       if (!conexionExistente) {
+
+        conexion.release();
+
+      }
     }
   }
 
@@ -310,22 +320,37 @@ class EmailService {
       // Adjuntar factura si existe
       if (facturas.length > 0) {
         try {
-          const pdfFactura = await this.generarPDFFactura(facturas[0].id);
+          const pdfFactura = await this.generarPDFFactura(facturas[0].id, conexion);
+
           adjuntos.push({
+
             filename: `Factura_${facturas[0].numero_factura}.pdf`,
+
             content: pdfFactura,
+
             contentType: 'application/pdf'
+
           });
+
           console.log(`✅ PDF de factura generado: ${facturas[0].numero_factura}`);
+
         } catch (error) {
+
           console.error('❌ Error generando PDF de factura:', error);
+
         }
+
       }
 
+ 
+
       // Adjuntar contrato si existe
+
       if (contratos.length > 0) {
+
         try {
-          const pdfContrato = await this.generarPDFContrato(contratos[0].id);
+
+          const pdfContrato = await this.generarPDFContrato(contratos[0].id, conexion);
           adjuntos.push({
             filename: `Contrato_${contratos[0].numero_contrato}.pdf`,
             content: pdfContrato,
