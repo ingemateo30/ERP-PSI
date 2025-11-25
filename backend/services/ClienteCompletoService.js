@@ -1529,6 +1529,11 @@ const query = `
           createdBy
         );
 
+          if (datosCompletos.opciones?.enviar_bienvenida) {
+        await this.enviarCorreoBienvenida(conexion, clienteId, datosCompletos.cliente);
+        console.log(`✅ Correo de bienvenida enviado`);
+      }
+
 
         sedesCreadas.push({
           sede_nombre: sedeData.nombre_sede || `Sede ${i + 1}`,
