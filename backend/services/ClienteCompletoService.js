@@ -1504,11 +1504,11 @@ const query = `
         );
 
         // 2.2 Crear UN SOLO contrato para todos los servicios de esta sede
-        const contratoId = await this.generarContratoParaSede(
+        const contratoId = await this.generarContratoInterno(
           conexion,
           clienteId,
-          serviciosDeLaSede,
-          sedeData,
+          servicioId,
+          servicioData,
           createdBy
         );
 
