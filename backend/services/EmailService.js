@@ -229,7 +229,9 @@ class EmailService {
   static async enviarCorreoBienvenida(clienteId, datosCliente, opciones = {}) {
     console.log(`📧 Preparando correo de bienvenida para cliente ${clienteId}...`);
 
-    const conexion = await pool.getConnection();
+    // Aceptar conexión existente o crear una nueva
+    const conexionProvista = opciones.conexion;
+    const conexion = conexionProvista || await pool.getConnection();
 
     try {
       // 1. Obtener datos completos del cliente
@@ -239,7 +241,7 @@ class EmailService {
       );
 
       if (clientes.length === 0) {
-        throw new Error('Cliente no encontrado');
+        throw new Error(`Cliente no encontrado con ID: ${clienteId}`);
       }
 
       const cliente = clientes[0];
@@ -398,7 +400,10 @@ class EmailService {
 
       throw error;
     } finally {
-      conexion.release();
+      // Solo liberar la conexión si no fue provista externamente
+      if (!conexionProvista) {
+        conexion.release();
+      }
     }
   }
 
