@@ -165,30 +165,29 @@ class ContratoPDFGeneratorMINTIC {
             text-align: center;
         }
 
-        /* Info grid SIN bordes visibles */
-        .info-grid {
-            display: grid;
-            grid-template-columns: auto 1fr auto 1fr;
-            gap: 0;
+        /* Tabla de información CON BORDES VISIBLES */
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
             margin-bottom: 8px;
             font-size: 8.5px;
-            line-height: 1.4;
         }
 
-        .info-label {
+        .info-table td {
+            border: 1px solid #999;
+            padding: 4px 6px;
+            vertical-align: middle;
+        }
+
+        .info-table td:nth-child(odd) {
             font-weight: bold;
-            padding: 2px 8px 2px 0;
+            background: #f5f5f5;
+            width: 20%;
         }
 
-        .info-value {
-            padding: 2px 8px 2px 4px;
-        }
-
-        .info-full {
-            grid-column: 1 / -1;
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 0;
+        .info-table td:nth-child(even) {
+            background: white;
+            width: 30%;
         }
 
         /* Cajas de contenido */
@@ -323,39 +322,42 @@ class ContratoPDFGeneratorMINTIC {
         <!-- Header -->
         ${this.generarEncabezado(contratoData, empresaData, fechaHoy, logoPath)}
 
-        <!-- Información del Suscriptor - Grid sin bordes visibles -->
+        <!-- Información del Suscriptor - TABLA CON BORDES -->
         <div class="info-section">INFORMACIÒN DEL SUSCRIPTOR</div>
-        <div class="info-grid">
-            <div class="info-label">Contrato No.</div>
-            <div class="info-value">${contratoData.numero_contrato || ''}</div>
-            <div class="info-label"><strong>Departamento</strong></div>
-            <div class="info-value">${contratoData.departamento_nombre || 'Santander'}</div>
-            
-            <div class="info-label">Nombre</div>
-            <div class="info-value">${contratoData.cliente_nombre || ''}</div>
-            <div class="info-label"><strong>Municipio</strong></div>
-            <div class="info-value">${contratoData.ciudad_nombre || 'San Gil'}</div>
-            
-            <div class="info-label">Identificación</div>
-            <div class="info-value">${contratoData.cliente_identificacion || ''}</div>
-            <div class="info-label"><strong>Correo electrónico</strong></div>
-            <div class="info-value">${contratoData.cliente_email || ''}</div>
-            
-            <div class="info-label">Teléfono de contacto</div>
-            <div class="info-value">${contratoData.cliente_telefono || ''}</div>
-            <div class="info-label"><strong>Estrato</strong></div>
-            <div class="info-value">${contratoData.cliente_estrato || ''}</div>
-            
-            <div class="info-full">
-                <div class="info-label">Dirección servicio</div>
-                <div class="info-value">${contratoData.cliente_direccion || ''}</div>
-            </div>
-            
-            <div class="info-full">
-                <div class="info-label">Dirección suscriptor</div>
-                <div class="info-value">${contratoData.cliente_direccion || ''}</div>
-            </div>
-        </div>
+        <table class="info-table">
+            <tr>
+                <td>Contrato No.</td>
+                <td>${contratoData.numero_contrato || ''}</td>
+                <td><strong>Departamento</strong></td>
+                <td>${contratoData.departamento_nombre || 'Santander'}</td>
+            </tr>
+            <tr>
+                <td>Nombre</td>
+                <td>${contratoData.cliente_nombre || ''}</td>
+                <td><strong>Municipio</strong></td>
+                <td>${contratoData.ciudad_nombre || 'San Gil'}</td>
+            </tr>
+            <tr>
+                <td>Identificación</td>
+                <td>${contratoData.cliente_identificacion || ''}</td>
+                <td><strong>Correo electrónico</strong></td>
+                <td>${contratoData.cliente_email || ''}</td>
+            </tr>
+            <tr>
+                <td>Teléfono de contacto</td>
+                <td>${contratoData.cliente_telefono || ''}</td>
+                <td><strong>Estrato</strong></td>
+                <td>${contratoData.cliente_estrato || ''}</td>
+            </tr>
+            <tr>
+                <td>Dirección servicio</td>
+                <td colspan="3">${contratoData.cliente_direccion || ''}</td>
+            </tr>
+            <tr>
+                <td>Dirección suscriptor</td>
+                <td colspan="3">${contratoData.cliente_direccion || ''}</td>
+            </tr>
+        </table>
 
         <!-- Texto introductorio - Ocupa todo el ancho -->
         <p class="box-content" style="margin-bottom: 6px; text-align: justify;">
@@ -626,39 +628,42 @@ class ContratoPDFGeneratorMINTIC {
     <div class="page">
         ${this.generarEncabezado(contratoData, empresaData, fechaHoy, logoPath)}
 
-        <!-- Información del Suscriptor (repetida) - Grid sin bordes -->
+        <!-- Información del Suscriptor (repetida) - TABLA CON BORDES -->
         <div class="info-section">INFORMACIÒN DEL SUSCRIPTOR</div>
-        <div class="info-grid">
-            <div class="info-label">Contrato No.</div>
-            <div class="info-value">${contratoData.numero_contrato || ''}</div>
-            <div class="info-label"><strong>Departamento</strong></div>
-            <div class="info-value">${contratoData.departamento_nombre || 'Santander'}</div>
-            
-            <div class="info-label">Nombre</div>
-            <div class="info-value">${contratoData.cliente_nombre || ''}</div>
-            <div class="info-label"><strong>Municipio</strong></div>
-            <div class="info-value">${contratoData.ciudad_nombre || 'San Gil'}</div>
-            
-            <div class="info-label">Identificación</div>
-            <div class="info-value">${contratoData.cliente_identificacion || ''}</div>
-            <div class="info-label"><strong>Correo electrónico</strong></div>
-            <div class="info-value">${contratoData.cliente_email || ''}</div>
-            
-            <div class="info-label">Teléfono de contacto</div>
-            <div class="info-value">${contratoData.cliente_telefono || ''}</div>
-            <div class="info-label"><strong>Estrato</strong></div>
-            <div class="info-value">${contratoData.cliente_estrato || ''}</div>
-            
-            <div class="info-full">
-                <div class="info-label">Dirección servicio</div>
-                <div class="info-value">${contratoData.cliente_direccion || ''}</div>
-            </div>
-            
-            <div class="info-full">
-                <div class="info-label">Dirección suscriptor</div>
-                <div class="info-value">${contratoData.cliente_direccion || ''}</div>
-            </div>
-        </div>
+        <table class="info-table">
+            <tr>
+                <td>Contrato No.</td>
+                <td>${contratoData.numero_contrato || ''}</td>
+                <td><strong>Departamento</strong></td>
+                <td>${contratoData.departamento_nombre || 'Santander'}</td>
+            </tr>
+            <tr>
+                <td>Nombre</td>
+                <td>${contratoData.cliente_nombre || ''}</td>
+                <td><strong>Municipio</strong></td>
+                <td>${contratoData.ciudad_nombre || 'San Gil'}</td>
+            </tr>
+            <tr>
+                <td>Identificación</td>
+                <td>${contratoData.cliente_identificacion || ''}</td>
+                <td><strong>Correo electrónico</strong></td>
+                <td>${contratoData.cliente_email || ''}</td>
+            </tr>
+            <tr>
+                <td>Teléfono de contacto</td>
+                <td>${contratoData.cliente_telefono || ''}</td>
+                <td><strong>Estrato</strong></td>
+                <td>${contratoData.cliente_estrato || ''}</td>
+            </tr>
+            <tr>
+                <td>Dirección servicio</td>
+                <td colspan="3">${contratoData.cliente_direccion || ''}</td>
+            </tr>
+            <tr>
+                <td>Dirección suscriptor</td>
+                <td colspan="3">${contratoData.cliente_direccion || ''}</td>
+            </tr>
+        </table>
 
         <p style="text-align: center; font-weight: bold; font-size: 8px; margin: 6px 0;">${contratoData.ciudad_nombre || 'San Gil'}</p>
         <p style="text-align: center; font-size: 8px; margin-bottom: 8px;">Estrato ${contratoData.cliente_estrato || ''}</p>
