@@ -587,6 +587,55 @@ class ContratoPDFGenerator {
   static formatearPrecio(precio) {
     return new Intl.NumberFormat('es-CO').format(precio || 0);
   }
+
+  /**
+   * Generar PDF completo del contrato como buffer (para adjuntar a correos)
+   */
+  static async generarPDFCompleto(datosContrato) {
+    // Cargar logo como base64
+    let logoPath = '';
+    try {
+      const logoFilePath = path.join(__dirname, '../../frontend/public/logo.png');
+      const logoBuffer = await fs.readFile(logoFilePath);
+      const logoBase64 = logoBuffer.toString('base64');
+      logoPath = `data:image/png;base64,${logoBase64}`;
+    } catch (error) {
+      console.warn('⚠️  No se pudo cargar el logo para contrato:', error.message);
+    }
+
+    // Generar HTML del contrato
+    const html = this.generarHTML(datosContrato, datosContrato.empresa);
+
+    // Lanzar navegador headless
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+
+      // Generar PDF como buffer
+      const pdfBuffer = await page.pdf({
+        format: 'Letter',
+        printBackground: true,
+        margin: {
+          top: '8mm',
+          right: '10mm',
+          bottom: '8mm',
+          left: '10mm'
+        }
+      });
+
+      console.log(`✅ PDF del contrato generado como buffer - Tamaño: ${pdfBuffer.length} bytes`);
+
+      return pdfBuffer;
+
+    } finally {
+      await browser.close();
+    }
+  }
 }
 
 module.exports = ContratoPDFGenerator;
