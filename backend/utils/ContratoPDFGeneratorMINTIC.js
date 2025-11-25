@@ -1,6 +1,6 @@
 // backend/utils/ContratoPDFGeneratorMINTIC.js
-// Generador de PDF de contratos según modelo MINTIC
-// Formato de 2-3 páginas con diseño a 2 columnas
+// Generador de PDF de contratos IDÉNTICO al modelo MINTIC
+// Formato exacto: 2-3 páginas con diseño a 2 columnas
 
 const puppeteer = require('puppeteer');
 const fs = require('fs').promises;
@@ -9,7 +9,7 @@ const path = require('path');
 class ContratoPDFGeneratorMINTIC {
 
   /**
-   * Generar HTML del contrato según modelo MINTIC
+   * Generar HTML del contrato EXACTAMENTE igual al modelo MINTIC
    */
   static generarHTML(contratoData, empresaData, logoPath = '') {
     const fechaHoy = new Date().toLocaleDateString('es-CO', {
@@ -688,100 +688,54 @@ class ContratoPDFGeneratorMINTIC {
   }
 
   /**
-
    * Generar PDF completo del contrato como buffer (para adjuntar a correos)
-
    */
-
   static async generarPDFCompleto(datosContrato) {
-
     // Cargar logo como base64
-
     let logoPath = '';
-
     try {
-
-      const logoFilePath = path.join(__dirname, '../../backend/public/logo2.png');
-
+      const logoFilePath = path.join(__dirname, '../public/logo2.png');
       const logoBuffer = await fs.readFile(logoFilePath);
-
       const logoBase64 = logoBuffer.toString('base64');
-
       logoPath = `data:image/png;base64,${logoBase64}`;
-
     } catch (error) {
-
       console.warn('⚠️  No se pudo cargar el logo para contrato:', error.message);
-
     }
 
- 
-
     // Generar HTML del contrato
-
-    const html = this.generarHTML(datosContrato, datosContrato.empresa);
-
- 
+    const html = this.generarHTML(datosContrato, datosContrato.empresa || {}, logoPath);
 
     // Lanzar navegador headless
-
     const browser = await puppeteer.launch({
-
       headless: true,
-
       args: ['--no-sandbox', '--disable-setuid-sandbox']
-
     });
 
- 
-
     try {
-
       const page = await browser.newPage();
-
       await page.setContent(html, { waitUntil: 'networkidle0' });
 
- 
-
       // Generar PDF como buffer
-
       const pdfBuffer = await page.pdf({
-
         format: 'Letter',
-
         printBackground: true,
-
         margin: {
-
           top: '8mm',
-
           right: '10mm',
-
           bottom: '8mm',
-
           left: '10mm'
-
         }
-
       });
-
- 
 
       console.log(`✅ PDF del contrato generado como buffer - Tamaño: ${pdfBuffer.length} bytes`);
 
- 
-
       return pdfBuffer;
 
- 
-
     } finally {
-
       await browser.close();
-
     }
-
   }
+
   /**
    * Generar PDF del contrato
    */
@@ -789,7 +743,7 @@ class ContratoPDFGeneratorMINTIC {
     // Cargar logo como base64
     let logoPath = '';
     try {
-      const logoFilePath = path.join(__dirname, '../../frontend/public/logo2.png');
+      const logoFilePath = path.join(__dirname, '../public/logo2.png');
       const logoBuffer = await fs.readFile(logoFilePath);
       const logoBase64 = logoBuffer.toString('base64');
       logoPath = `data:image/png;base64,${logoBase64}`;
