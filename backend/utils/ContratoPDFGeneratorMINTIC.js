@@ -693,12 +693,7 @@ class ContratoPDFGeneratorMINTIC {
     }
   }
 
-  static async generarPDF(contratoData, empresaData, rutaSalida) {
-    console.log('📝 Generando PDF del contrato normal...');
-    const pdfBuffer = await this.generarPDFCompleto(contratoData);
-    await fs.writeFile(rutaSalida, pdfBuffer);
-    console.log(`✅ PDF generado: ${rutaSalida}`);
-  }
+ 
 }
 
 module.exports = ContratoPDFGeneratorMINTIC;
