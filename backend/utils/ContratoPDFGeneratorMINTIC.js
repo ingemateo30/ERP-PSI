@@ -1,6 +1,6 @@
 // backend/utils/ContratoPDFGeneratorMINTIC.js
 // Generador de PDF de contratos IDÉNTICO al modelo Word de PSI
-// Replicación exacta del documento original con formato preciso
+// **FORMATO CORRECTO**: Sin tablas, con columnas reales, texto simple
 
 const puppeteer = require('puppeteer');
 const fs = require('fs').promises;
@@ -8,9 +8,6 @@ const path = require('path');
 
 class ContratoPDFGeneratorMINTIC {
 
-  /**
-   * Generar HTML IDÉNTICO al Word
-   */
   static generarHTML(contratoData, empresaData, logoPath = '') {
     const fechaHoy = new Date().toLocaleDateString('es-CO', {
       day: '2-digit',
@@ -20,24 +17,11 @@ class ContratoPDFGeneratorMINTIC {
 
     // Determinar servicios contratados
     const servicios = this.determinarServicios(contratoData);
-
-    // Calcular valores
     const precioInternet = parseFloat(contratoData.precio_internet || 0);
     const precioTelevision = parseFloat(contratoData.precio_television || 0);
     const valorTotal = precioInternet + precioTelevision;
-
-    // Determinar permanencia
     const permanenciaMeses = parseInt(contratoData.permanencia_meses || 1);
     const tienePermanencia = permanenciaMeses > 1;
-
-    // Fecha de activación (15 días hábiles después)
-    const fechaActivacion = new Date();
-    fechaActivacion.setDate(fechaActivacion.getDate() + 15);
-    const fechaActivacionStr = fechaActivacion.toLocaleDateString('es-CO', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric'
-    });
 
     return `
 <!DOCTYPE html>
@@ -48,7 +32,7 @@ class ContratoPDFGeneratorMINTIC {
     <style>
         @page {
             size: Letter;
-            margin: 15mm 20mm 15mm 20mm;
+            margin: 19mm;
         }
 
         * {
@@ -59,271 +43,219 @@ class ContratoPDFGeneratorMINTIC {
 
         body {
             font-family: Calibri, Arial, sans-serif;
-            font-size: 10pt;
+            font-size: 11pt;
             line-height: 1.15;
             color: #000;
         }
 
-        .page {
-            width: 100%;
-            page-break-after: always;
-        }
-
-        .page:last-child {
-            page-break-after: avoid;
-        }
-
-        /* ========== ENCABEZADO ========== */
+        /* ENCABEZADO */
         .header {
-            width: 100%;
-            margin-bottom: 8mm;
+            display: flex;
+            align-items: flex-start;
             border-bottom: 2px solid #000;
-            padding-bottom: 2mm;
-        }
-
-        .header-content {
-            display: table;
-            width: 100%;
+            padding-bottom: 3mm;
+            margin-bottom: 5mm;
         }
 
         .header-left {
-            display: table-cell;
             width: 15%;
-            vertical-align: middle;
         }
 
         .logo-img {
-            height: 45px;
-            width: auto;
+            width: 100%;
+            max-width: 60px;
         }
 
         .header-center {
-            display: table-cell;
             width: 55%;
             text-align: center;
-            vertical-align: middle;
+            padding: 0 10px;
         }
 
         .company-name {
-            font-size: 11pt;
+            font-size: 10pt;
             font-weight: bold;
-            margin-bottom: 2px;
         }
 
         .company-nit {
             font-size: 10pt;
-            margin-bottom: 0;
         }
 
         .header-right {
-            display: table-cell;
             width: 30%;
             text-align: right;
-            vertical-align: top;
-            padding-top: 2px;
         }
 
         .contract-title {
             font-size: 10pt;
             font-weight: bold;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
 
         .contract-date {
             font-size: 10pt;
-            padding: 2px 6px;
             border: 1px solid #000;
             display: inline-block;
+            padding: 2px 5px;
         }
 
-        /* ========== TABLA INFO SUSCRIPTOR ========== */
-        .info-section-title {
-            background: #d9d9d9;
-            border: 1px solid #000;
-            padding: 4px;
+        /* SECCIÓN INFORMACIÓN DEL SUSCRIPTOR */
+        .section-title {
+            background-color: #d0d0d0;
             text-align: center;
             font-weight: bold;
-            font-size: 10pt;
-            margin: 6mm 0 3mm 0;
-        }
-
-        .info-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 10pt;
-            margin-bottom: 5mm;
-        }
-
-        .info-table td {
+            font-size: 11pt;
+            padding: 3px;
+            margin: 8mm 0 3mm 0;
             border: 1px solid #000;
-            padding: 4px 6px;
-            vertical-align: middle;
-            height: 22px;
         }
 
-        .info-table .label-cell {
+        /* INFORMACIÓN DEL SUSCRIPTOR - FORMATO SIMPLE */
+        .info-block {
+            margin-bottom: 5mm;
+            font-size: 11pt;
+            line-height: 1.4;
+        }
+
+        .info-line {
+            margin-bottom: 2mm;
+        }
+
+        .info-label {
             font-weight: bold;
-            background: #f2f2f2;
-            width: 20%;
+            display: inline;
         }
 
-        .info-table .value-cell {
-            width: 30%;
+        .info-value {
+            display: inline;
+            margin-left: 5px;
         }
 
-        /* ========== TEXTO INTRO ========== */
+        /* TEXTO INTRO */
         .intro-text {
-            font-size: 10pt;
             text-align: justify;
-            line-height: 1.2;
+            font-size: 10pt;
+            line-height: 1.3;
             margin-bottom: 4mm;
         }
 
         .city-name {
             text-align: center;
             font-weight: bold;
-            font-size: 10pt;
-            margin-bottom: 5mm;
+            font-size: 11pt;
+            margin: 5mm 0;
         }
 
-        /* ========== DOS COLUMNAS ========== */
+        /* COLUMNAS - USANDO CSS COLUMNS */
         .two-columns {
-            display: table;
-            width: 100%;
-            table-layout: fixed;
+            column-count: 2;
+            column-gap: 8mm;
+            column-rule: 1px solid #000;
         }
 
-        .column {
-            display: table-cell;
-            width: 50%;
-            vertical-align: top;
-            padding: 0 2mm;
-        }
-
-        .column:first-child {
-            border-right: 1px solid #000;
-            padding-left: 0;
-            padding-right: 4mm;
-        }
-
-        .column:last-child {
-            padding-right: 0;
-            padding-left: 4mm;
-        }
-
-        /* ========== CAJAS DE CONTENIDO ========== */
-        .content-box {
-            border: 1px solid #000;
+        .column-content {
+            break-inside: avoid-column;
             margin-bottom: 4mm;
         }
 
+        /* CAJAS DE CONTENIDO */
+        .content-box {
+            border: 1px solid #000;
+            margin-bottom: 4mm;
+            break-inside: avoid;
+        }
+
         .box-title {
-            background: #f2f2f2;
+            background-color: #f2f2f2;
             border-bottom: 1px solid #000;
-            padding: 3px 5px;
+            padding: 2px 4px;
             font-weight: bold;
-            font-size: 10pt;
+            font-size: 9.5pt;
             text-align: center;
         }
 
         .box-content {
-            padding: 5px 6px;
-            font-size: 9.5pt;
-            line-height: 1.15;
+            padding: 4px 5px;
+            font-size: 9pt;
+            line-height: 1.2;
             text-align: justify;
         }
 
         .box-content p {
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
 
-        .box-content p:last-child {
-            margin-bottom: 0;
-        }
-
-        /* ========== CHECKBOXES ========== */
-        .service-checkboxes {
-            display: flex;
-            gap: 10px;
-            margin: 5px 0;
-        }
-
-        .checkbox-item {
-            display: flex;
-            align-items: center;
-            gap: 4px;
+        /* CHECKBOXES */
+        .checkboxes {
+            margin: 4px 0;
         }
 
         .checkbox {
-            width: 13px;
-            height: 13px;
-            border: 1.5px solid #000;
             display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 1.5px solid #000;
+            margin-right: 3px;
             text-align: center;
-            line-height: 11px;
-            font-size: 10pt;
-            font-weight: bold;
+            line-height: 10px;
+            font-size: 9pt;
         }
 
         .checkbox.checked::before {
             content: "✓";
         }
 
-        /* ========== VALOR TOTAL ========== */
+        /* VALOR TOTAL */
         .valor-total {
             border: 1px solid #000;
-            padding: 4px;
+            padding: 3px;
             text-align: center;
             font-weight: bold;
-            font-size: 10pt;
             margin: 4mm 0;
         }
 
-        /* ========== LISTA NUMERADA ========== */
+        /* LISTA NUMERADA */
         .numbered-list {
-            counter-reset: item;
             list-style: none;
+            counter-reset: item;
             padding-left: 0;
-            margin: 4px 0;
+            margin: 3px 0;
         }
 
         .numbered-list li {
             counter-increment: item;
-            margin-bottom: 4px;
-            padding-left: 20px;
+            margin-bottom: 3px;
+            padding-left: 18px;
             position: relative;
         }
 
         .numbered-list li::before {
             content: counter(item) ")";
-            font-weight: bold;
             position: absolute;
             left: 0;
+            font-weight: bold;
         }
 
-        /* ========== NOTA PEQUEÑA ========== */
-        .small-note {
-            font-size: 8pt;
-            margin-top: 4mm;
-            font-style: italic;
+        /* PÁGINA 2 - SIN COLUMNAS */
+        .page-break {
+            page-break-after: always;
         }
 
-        /* ========== PÁGINA 2 - TEXTO LEGAL ========== */
-        .legal-content {
+        .legal-text {
             font-size: 9.5pt;
             text-align: justify;
-            line-height: 1.2;
+            line-height: 1.25;
         }
 
-        .legal-content p {
+        .legal-text p {
             margin-bottom: 4mm;
         }
 
-        .legal-content strong {
+        .legal-text strong {
             font-weight: bold;
         }
 
-        /* ========== CAJA DE MEDIOS DE ATENCIÓN ========== */
+        /* CAJA DE CONTACTO */
         .contact-box {
             border: 1px solid #000;
             padding: 5mm;
@@ -344,16 +276,15 @@ class ContratoPDFGeneratorMINTIC {
         }
 
         .contact-number {
-            min-width: 28px;
-            height: 28px;
+            min-width: 25px;
+            height: 25px;
             border: 1.5px solid #000;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            margin-right: 6px;
+            margin-right: 5px;
             flex-shrink: 0;
-            font-size: 11pt;
         }
 
         .contact-text {
@@ -363,148 +294,159 @@ class ContratoPDFGeneratorMINTIC {
             text-align: justify;
         }
 
-        /* ========== FIRMA ========== */
+        /* FIRMA */
         .signature-section {
-            margin-top: 6mm;
+            margin-top: 8mm;
             text-align: center;
         }
 
         .signature-note {
-            font-size: 8.5pt;
+            font-size: 9pt;
             margin-bottom: 3mm;
         }
 
         .signature-title {
             font-weight: bold;
-            font-size: 9.5pt;
+            font-size: 10pt;
             margin-bottom: 3mm;
         }
 
-        .signature-box {
+        .signature-data {
             border: 1px solid #000;
             display: inline-block;
             padding: 3px 10px;
             margin-bottom: 4mm;
         }
 
-        .signature-box table {
-            border-collapse: collapse;
-            font-size: 9.5pt;
-        }
-
-        .signature-box td {
-            padding: 4px 10px;
-            border-right: 1px solid #000;
-        }
-
-        .signature-box td:last-child {
-            border-right: none;
-        }
-
         .signature-line {
             width: 300px;
             height: 30px;
             border-bottom: 2px solid #000;
-            margin: 0 auto 4mm auto;
+            margin: 0 auto 3mm auto;
         }
 
-        .footer-note {
-            font-size: 8pt;
+        .footer-text {
+            font-size: 8.5pt;
             text-align: center;
-            margin-top: 4mm;
+        }
+
+        .small-note {
+            font-size: 8pt;
+            font-style: italic;
+            margin-top: 3mm;
         }
     </style>
 </head>
 <body>
-    <!-- ============================================ -->
     <!-- PÁGINA 1 -->
-    <!-- ============================================ -->
     <div class="page">
-        ${this.generarEncabezado(contratoData, empresaData, fechaHoy, logoPath)}
+        ${this.generarEncabezado(logoPath, fechaHoy)}
+        
+        <!-- INFORMACIÓN DEL SUSCRIPTOR -->
+        <div class="section-title">INFORMACIÓN DEL SUSCRIPTOR</div>
+        
+        <div class="info-block">
+            <div class="info-line">
+                <span class="info-label">Contrato No.</span>
+                <span class="info-value">${contratoData.numero_contrato || ''}</span>
+                <span class="info-label" style="margin-left: 30px;">Departamento</span>
+                <span class="info-value">${contratoData.departamento_nombre || 'Santander'}</span>
+            </div>
+            
+            <div class="info-line">
+                <span class="info-label">Nombre</span>
+                <span class="info-value">${contratoData.cliente_nombre || ''}</span>
+            </div>
+            
+            <div class="info-line">
+                <span class="info-label">Identificación</span>
+                <span class="info-value">${contratoData.cliente_identificacion || ''}</span>
+                <span class="info-label" style="margin-left: 30px;">Municipio</span>
+                <span class="info-value">${contratoData.ciudad_nombre || 'San Gil'}</span>
+            </div>
+            
+            <div class="info-line">
+                <span class="info-label">Teléfono de contacto</span>
+                <span class="info-value">${contratoData.cliente_telefono || ''}</span>
+                <span class="info-label" style="margin-left: 30px;">Correo electrónico</span>
+                <span class="info-value">${contratoData.cliente_email || ''}</span>
+            </div>
+            
+            <div class="info-line">
+                <span class="info-label">Estrato</span>
+                <span class="info-value">${contratoData.cliente_estrato || ''}</span>
+            </div>
+            
+            <div class="info-line">
+                <span class="info-label">Dirección servicio</span>
+                <span class="info-value">${contratoData.cliente_direccion || ''}</span>
+            </div>
+            
+            <div class="info-line">
+                <span class="info-label">Dirección suscriptor</span>
+                <span class="info-value">${contratoData.cliente_direccion || ''}</span>
+            </div>
+        </div>
 
-        <!-- Información del Suscriptor -->
-        <div class="info-section-title">INFORMACIÓN DEL SUSCRIPTOR</div>
-        <table class="info-table">
-            <tr>
-                <td class="label-cell">Contrato No.</td>
-                <td class="value-cell">${contratoData.numero_contrato || ''}</td>
-                <td class="label-cell">Departamento</td>
-                <td class="value-cell">${contratoData.departamento_nombre || 'Santander'}</td>
-            </tr>
-            <tr>
-                <td class="label-cell">Nombre</td>
-                <td class="value-cell">${contratoData.cliente_nombre || ''}</td>
-                <td class="label-cell">Municipio</td>
-                <td class="value-cell">${contratoData.ciudad_nombre || 'San Gil'}</td>
-            </tr>
-            <tr>
-                <td class="label-cell">Identificación</td>
-                <td class="value-cell">${contratoData.cliente_identificacion || ''}</td>
-                <td class="label-cell">Correo electrónico</td>
-                <td class="value-cell">${contratoData.cliente_email || ''}</td>
-            </tr>
-            <tr>
-                <td class="label-cell">Teléfono de contacto</td>
-                <td class="value-cell">${contratoData.cliente_telefono || ''}</td>
-                <td class="label-cell">Estrato</td>
-                <td class="value-cell">${contratoData.cliente_estrato || ''}</td>
-            </tr>
-            <tr>
-                <td class="label-cell">Dirección servicio</td>
-                <td colspan="3" class="value-cell">${contratoData.cliente_direccion || ''}</td>
-            </tr>
-            <tr>
-                <td class="label-cell">Dirección suscriptor</td>
-                <td colspan="3" class="value-cell">${contratoData.cliente_direccion || ''}</td>
-            </tr>
-        </table>
-
-        <!-- Texto introductorio -->
         <p class="intro-text">
             Este contrato explica las condiciones para la prestación de los servicios entre usted y PROVEEDOR DE SERVICIOS DE INTERNET SAS, por el que pagará mínimo mensualmente $${this.formatearPrecio(valorTotal)}. Este contrato tendrá vigencia de ${permanenciaMeses} mes(es), contados a partir del día de la instalación. El plazo máximo de instalación es de 15 días hábiles. Acepto que mi contrato se renueve sucesiva y automáticamente por un plazo igual al inicial de ${permanenciaMeses} mes(es).
         </p>
 
         <p class="city-name">${contratoData.ciudad_nombre || 'San Gil'}</p>
 
-        <!-- Dos columnas -->
+        <!-- DOS COLUMNAS -->
         <div class="two-columns">
+            ${this.generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, permanenciaMeses)}
+        </div>
+    </div>
+
+    ${this.generarPagina2(logoPath, fechaHoy, contratoData)}
+    ${tienePermanencia ? this.generarPagina3Permanencia(logoPath, fechaHoy, contratoData, permanenciaMeses) : ''}
+</body>
+</html>`;
+  }
+
+  static generarEncabezado(logoPath, fecha) {
+    return `
+        <div class="header">
+            <div class="header-left">
+                <img src="${logoPath}" class="logo-img" alt="Logo" />
+            </div>
+            <div class="header-center">
+                <div class="company-name">PROVEEDOR DE SERVICIOS DE INTERNET</div>
+                <div class="company-nit">NIT: 901.582.657-3</div>
+            </div>
+            <div class="header-right">
+                <div class="contract-title">CONTRATO ÚNICO DE<br/>SERVICIOS FIJOS</div>
+                <div class="contract-date">Fecha<br/>${fecha}</div>
+            </div>
+        </div>`;
+  }
+
+  static generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, meses) {
+    return `
             <!-- COLUMNA IZQUIERDA -->
-            <div class="column">
-                <!-- EL SERVICIO -->
+            <div class="column-content">
                 <div class="content-box">
                     <div class="box-title">EL SERVICIO</div>
                     <div class="box-content">
                         <p>Con este contrato nos comprometemos a prestarle los servicios que usted elija*:</p>
-                        <div class="service-checkboxes">
-                            <div class="checkbox-item">
-                                <span class="checkbox ${servicios.internet ? 'checked' : ''}"></span>
-                                Internet Fijo
-                            </div>
-                            <div class="checkbox-item">
-                                <span class="checkbox ${servicios.television ? 'checked' : ''}"></span>
-                                Televisión
-                            </div>
-                            <div class="checkbox-item">
-                                <span class="checkbox"></span>
-                                Publicidad
-                            </div>
+                        <div class="checkboxes">
+                            <span class="checkbox ${servicios.internet ? 'checked' : ''}"></span> Internet Fijo
+                            <span class="checkbox ${servicios.television ? 'checked' : ''}" style="margin-left: 10px;"></span> Televisión
+                            <span class="checkbox" style="margin-left: 10px;"></span> Publicidad
                         </div>
-                        <p style="margin-top: 4px;">
-                            Servicios adicionales__________________________
-                        </p>
-                        <p style="margin-top: 4px;">
-                            Usted se compromete a pagar oportunamente el precio acordado. El servicio se activará a más tardar el día <strong>${fechaActivacionStr}</strong>
-                        </p>
+                        <p>Servicios adicionales_________________</p>
+                        <p>Usted se compromete a pagar oportunamente el precio acordado. El servicio se activará a más tardar el día [FECHA]</p>
                     </div>
                 </div>
 
-                <!-- CONDICIONES COMERCIALES -->
                 <div class="content-box">
                     <div class="box-title">CONDICIONES COMERCIALES</div>
                     <div class="box-content">
-                        <p style="font-weight: bold; margin-bottom: 4px;">CARACTERÍSTICAS DEL PLAN</p>
+                        <p><strong>CARACTERÍSTICAS DEL PLAN</strong></p>
                         ${this.generarDetallesServicios(contratoData, servicios)}
-                        ${tienePermanencia ? `<p style="margin-top: 4px;"><strong>CLÁUSULA PERMANENCIA ${permanenciaMeses} MESES - MÓDEM EN CALIDAD DE PRÉSTAMO</strong></p>` : ''}
+                        ${tienePermanencia ? `<p><strong>CLÁUSULA PERMANENCIA ${meses} MESES - MÓDEM EN CALIDAD DE PRÉSTAMO</strong></p>` : ''}
                     </div>
                 </div>
 
@@ -512,7 +454,6 @@ class ContratoPDFGeneratorMINTIC {
                     Valor Total $${this.formatearPrecio(valorTotal)}
                 </div>
 
-                <!-- PRINCIPALES OBLIGACIONES -->
                 <div class="content-box">
                     <div class="box-title">PRINCIPALES OBLIGACIONES DEL USUARIO</div>
                     <div class="box-content">
@@ -527,7 +468,6 @@ class ContratoPDFGeneratorMINTIC {
                     </div>
                 </div>
 
-                <!-- CALIDAD Y COMPENSACIÓN -->
                 <div class="content-box">
                     <div class="box-title">CALIDAD Y COMPENSACIÓN</div>
                     <div class="box-content">
@@ -539,8 +479,7 @@ class ContratoPDFGeneratorMINTIC {
             </div>
 
             <!-- COLUMNA DERECHA -->
-            <div class="column">
-                <!-- CESIÓN -->
+            <div class="column-content">
                 <div class="content-box">
                     <div class="box-title">CESIÓN</div>
                     <div class="box-content">
@@ -548,7 +487,6 @@ class ContratoPDFGeneratorMINTIC {
                     </div>
                 </div>
 
-                <!-- MODIFICACIÓN -->
                 <div class="content-box">
                     <div class="box-title">MODIFICACIÓN</div>
                     <div class="box-content">
@@ -556,7 +494,6 @@ class ContratoPDFGeneratorMINTIC {
                     </div>
                 </div>
 
-                <!-- SUSPENSIÓN -->
                 <div class="content-box">
                     <div class="box-title">SUSPENSIÓN</div>
                     <div class="box-content">
@@ -564,66 +501,34 @@ class ContratoPDFGeneratorMINTIC {
                     </div>
                 </div>
 
-                <!-- TERMINACIÓN -->
                 <div class="content-box">
                     <div class="box-title">TERMINACIÓN</div>
                     <div class="box-content">
                         Usted puede terminar el contrato en cualquier momento sin penalidades. Para esto debe realizar una solicitud a través de cualquiera de nuestros Medios de Atención mínimo 3 días hábiles antes del corte de facturación (su corte de facturación es el día 1 de cada mes). Si presenta la solicitud con una anticipación menor, la terminación del servicio se dará en el siguiente período de facturación. Así mismo, usted puede cancelar cualquiera de los servicios contratados, para lo que le informaremos las condiciones en las que serán prestados los servicios no cancelados y actualizaremos el contrato. Así mismo, si el operador no inicia la prestación de servicio en el plazo acordado, usted puede pedir la restitución de su dinero y la terminación del contrato.
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    ${this.generarPagina2(contratoData, empresaData, fechaHoy, logoPath)}
-    ${tienePermanencia ? this.generarPagina3Permanencia(contratoData, empresaData, fechaHoy, logoPath, permanenciaMeses) : ''}
-</body>
-</html>`;
-  }
-
-  static generarEncabezado(contratoData, empresaData, fechaHoy, logoPath) {
-    return `
-        <div class="header">
-            <div class="header-content">
-                <div class="header-left">
-                    <img src="${logoPath}" class="logo-img" alt="Logo PSI" />
-                </div>
-                <div class="header-center">
-                    <div class="company-name">PROVEEDOR DE SERVICIOS DE INTERNET SAS</div>
-                    <div class="company-nit">NIT: ${empresaData.empresa_nit || '901.582.657-3'}</div>
-                </div>
-                <div class="header-right">
-                    <div class="contract-title">CONTRATO ÚNICO DE<br/>SERVICIOS FIJOS</div>
-                    <div class="contract-date">Fecha: ${fechaHoy}</div>
-                </div>
-            </div>
-        </div>`;
+            </div>`;
   }
 
   static generarDetallesServicios(contratoData, servicios) {
     let detalles = '';
-
     if (servicios.internet) {
-      const nombreServicio = contratoData.servicio_nombre || contratoData.internet_data?.nombre || 'INTERNET FIBRA 300 MEGAS';
+      const nombreServicio = contratoData.servicio_nombre || 'INTERNET FIBRA 300 MEGAS';
       detalles += `<p><strong>INTERNET FIBRA $${this.formatearPrecio(contratoData.precio_internet)}</strong> ${nombreServicio} ESTRATO ${contratoData.cliente_estrato || '1,2,3'}</p>`;
     }
-
     if (servicios.television) {
-      detalles += `<p><strong>TELEVISIÓN $${this.formatearPrecio(contratoData.precio_television)}</strong> TELEVISIÓN $${this.formatearPrecio(contratoData.precio_television)} ESTRATO ${contratoData.cliente_estrato || '1,2,3'} + IVA</p>`;
+      detalles += `<p><strong>TELEVISIÓN $${this.formatearPrecio(contratoData.precio_television)}</strong> ESTRATO ${contratoData.cliente_estrato || '1,2,3'} + IVA</p>`;
     }
-
     return detalles;
   }
 
-  static generarPagina2(contratoData, empresaData, fechaHoy, logoPath) {
+  static generarPagina2(logoPath, fecha, contratoData) {
     return `
-    <!-- ============================================ -->
-    <!-- PÁGINA 2 -->
-    <!-- ============================================ -->
+    <div class="page-break"></div>
     <div class="page">
-        ${this.generarEncabezado(contratoData, empresaData, fechaHoy, logoPath)}
-
-        <div class="legal-content">
+        ${this.generarEncabezado(logoPath, fecha)}
+        
+        <div class="legal-text">
             <p><strong>PAGO Y FACTURACIÓN</strong><br/>
             La factura le debe llegar como mínimo 5 días hábiles antes de la fecha de pago. Si no llega, puede solicitarla a través de nuestros Medios de Atención y debe pagarla oportunamente. Si no paga a tiempo, previo aviso, suspenderemos su servicio hasta que pague sus saldos pendientes. Contamos con 3 días hábiles luego de su pago para reconectarle el servicio. Si no paga a tiempo, también podemos reportar su deuda a las centrales de riesgo. Para esto tenemos que avisarle por lo menos con 20 días calendario de anticipación. Si paga luego de este reporte tenemos la obligación dentro del mes de seguimiento de informar su pago para que ya no aparezca reportado. Si tiene un reclamo sobre su factura, puede presentarlo antes de la fecha de pago y en ese caso no debe pagar las sumas reclamadas hasta que resolvamos su solicitud. Si ya pagó, tiene 6 meses para presentar la reclamación.</p>
 
@@ -652,119 +557,104 @@ class ContratoPDFGeneratorMINTIC {
             <p><strong>ESTE CONTRATO PRESTA MÉRITO EJECUTIVO:</strong> para hacer exigibles las obligaciones y prestaciones contenidas en él.</p>
         </div>
 
-        <!-- Caja de medios de atención -->
         <div class="contact-box">
             <div class="contact-title">CÓMO COMUNICARSE CON NOSOTROS<br/>(MEDIOS DE ATENCIÓN)</div>
-
             <div class="contact-item">
                 <div class="contact-number">1</div>
                 <div class="contact-text">Nuestros medios de atención son: oficinas físicas, página web, redes sociales y líneas telefónicas gratuitas.</div>
             </div>
-
             <div class="contact-item">
                 <div class="contact-number">2</div>
                 <div class="contact-text">Presente cualquier queja, petición/reclamo o recurso a través de estos medios y le responderemos en máximo 15 días hábiles.</div>
             </div>
-
             <div class="contact-item">
                 <div class="contact-number">3</div>
                 <div class="contact-text">Cuando su queja o petición sea por los servicios de internet, y esté relacionada con actos de negativa del contrato, suspensión del servicio, terminación del contrato, corte y facturación; usted puede insistir en su solicitud ante nosotros, dentro de los 10 días hábiles siguientes a la respuesta, y pedir que si no llegamos a una solución satisfactoria para usted, enviemos su reclamo directamente a la SIC (Superintendencia de Industria y Comercio) quien resolverá de manera definitiva su solicitud. Esto se llama recurso de reposición y en subsidio apelación.</div>
             </div>
-
             <div class="contact-item">
                 <div class="contact-number">4</div>
                 <div class="contact-text">Cuando su queja o petición sea por el servicio de televisión, puede enviar la misma a la Autoridad Nacional de Televisión, para que esta Entidad resuelva su solicitud.</div>
             </div>
-
             <p style="margin-top: 4mm; font-size: 9.5pt;">Si no respondemos es porque aceptamos su petición o reclamo. Esto se llama silencio administrativo positivo y aplica para internet.</p>
-
             <p style="text-align: center; font-weight: bold; margin-top: 4mm; font-size: 9.5pt;">Si no está de acuerdo con nuestra respuesta</p>
         </div>
 
-        <!-- Firma -->
         <div class="signature-section">
             <p class="signature-note">Con esta firma acepta recibir la factura por medios electrónicos</p>
             <p class="signature-title">Aceptación contrato mediante firma o cualquier otro medio válido</p>
-            <div class="signature-box">
-                <table>
-                    <tr>
-                        <td><strong>CC/CE</strong> ${contratoData.cliente_identificacion || ''}</td>
-                        <td><strong>FECHA</strong> ${fechaHoy}</td>
-                    </tr>
-                </table>
+            <div class="signature-data">
+                <strong>CC/CE</strong> ${contratoData.cliente_identificacion || ''} | <strong>FECHA</strong> ${fecha}
             </div>
             <div class="signature-line"></div>
-            <p class="footer-note">Consulte el régimen de protección de usuarios en www.crcom.gov.co</p>
+            <p class="footer-text">Consulte el régimen de protección de usuarios en www.crcom.gov.co</p>
         </div>
     </div>`;
   }
 
-  static generarPagina3Permanencia(contratoData, empresaData, fechaHoy, logoPath, meses) {
+  static generarPagina3Permanencia(logoPath, fecha, contratoData, meses) {
     return `
-    <!-- ============================================ -->
-    <!-- PÁGINA 3 - ANEXO DE PERMANENCIA -->
-    <!-- ============================================ -->
+    <div class="page-break"></div>
     <div class="page">
-        ${this.generarEncabezado(contratoData, empresaData, fechaHoy, logoPath)}
-
-        <!-- Información del Suscriptor (repetida) -->
-        <div class="info-section-title">INFORMACIÓN DEL SUSCRIPTOR</div>
-        <table class="info-table">
-            <tr>
-                <td class="label-cell">Contrato No.</td>
-                <td class="value-cell">${contratoData.numero_contrato || ''}</td>
-                <td class="label-cell">Departamento</td>
-                <td class="value-cell">${contratoData.departamento_nombre || 'Santander'}</td>
-            </tr>
-            <tr>
-                <td class="label-cell">Nombre</td>
-                <td class="value-cell">${contratoData.cliente_nombre || ''}</td>
-                <td class="label-cell">Municipio</td>
-                <td class="value-cell">${contratoData.ciudad_nombre || 'San Gil'}</td>
-            </tr>
-            <tr>
-                <td class="label-cell">Identificación</td>
-                <td class="value-cell">${contratoData.cliente_identificacion || ''}</td>
-                <td class="label-cell">Correo electrónico</td>
-                <td class="value-cell">${contratoData.cliente_email || ''}</td>
-            </tr>
-            <tr>
-                <td class="label-cell">Teléfono de contacto</td>
-                <td class="value-cell">${contratoData.cliente_telefono || ''}</td>
-                <td class="label-cell">Estrato</td>
-                <td class="value-cell">${contratoData.cliente_estrato || ''}</td>
-            </tr>
-            <tr>
-                <td class="label-cell">Dirección servicio</td>
-                <td colspan="3" class="value-cell">${contratoData.cliente_direccion || ''}</td>
-            </tr>
-            <tr>
-                <td class="label-cell">Dirección suscriptor</td>
-                <td colspan="3" class="value-cell">${contratoData.cliente_direccion || ''}</td>
-            </tr>
-        </table>
+        ${this.generarEncabezado(logoPath, fecha)}
+        
+        <div class="section-title">INFORMACIÓN DEL SUSCRIPTOR</div>
+        
+        <div class="info-block">
+            <div class="info-line">
+                <span class="info-label">Contrato No.</span>
+                <span class="info-value">${contratoData.numero_contrato || ''}</span>
+                <span class="info-label" style="margin-left: 30px;">Departamento</span>
+                <span class="info-value">${contratoData.departamento_nombre || 'Santander'}</span>
+            </div>
+            <div class="info-line">
+                <span class="info-label">Nombre</span>
+                <span class="info-value">${contratoData.cliente_nombre || ''}</span>
+            </div>
+            <div class="info-line">
+                <span class="info-label">Identificación</span>
+                <span class="info-value">${contratoData.cliente_identificacion || ''}</span>
+                <span class="info-label" style="margin-left: 30px;">Municipio</span>
+                <span class="info-value">${contratoData.ciudad_nombre || 'San Gil'}</span>
+            </div>
+            <div class="info-line">
+                <span class="info-label">Teléfono de contacto</span>
+                <span class="info-value">${contratoData.cliente_telefono || ''}</span>
+                <span class="info-label" style="margin-left: 30px;">Correo electrónico</span>
+                <span class="info-value">${contratoData.cliente_email || ''}</span>
+            </div>
+            <div class="info-line">
+                <span class="info-label">Estrato</span>
+                <span class="info-value">${contratoData.cliente_estrato || ''}</span>
+            </div>
+            <div class="info-line">
+                <span class="info-label">Dirección servicio</span>
+                <span class="info-value">${contratoData.cliente_direccion || ''}</span>
+            </div>
+            <div class="info-line">
+                <span class="info-label">Dirección suscriptor</span>
+                <span class="info-value">${contratoData.cliente_direccion || ''}</span>
+            </div>
+        </div>
 
         <p class="city-name">${contratoData.ciudad_nombre || 'San Gil'}</p>
-        <p style="text-align: center; font-size: 10pt; margin-bottom: 5mm;">Estrato ${contratoData.cliente_estrato || ''}</p>
+        <p style="text-align: center; font-size: 11pt; margin-bottom: 5mm;">Estrato ${contratoData.cliente_estrato || ''}</p>
 
-        <!-- Anexo de Permanencia -->
-        <div class="info-section-title">ANEXO DE COMPROMISO DE PERMANENCIA MÍNIMA</div>
+        <div class="section-title">ANEXO DE COMPROMISO DE PERMANENCIA MÍNIMA</div>
+        
         <p class="intro-text" style="margin-top: 5mm;">
             Señor usuario, el presente contrato lo obliga a estar vinculado con PROVEEDOR DE SERVICIOS DE INTERNET SAS durante un tiempo de ${meses} mes(es), además cuando venza el plazo indicado, el presente contrato se renovará en forma automática indefinidamente, y finalmente, en caso que usted decida terminar el contrato antes de que venza el periodo de permanencia mínima señalado usted deberá pagar los valores que se determinan en el siguiente punto. En caso de que el usuario que celebró el contrato lo dé por terminado antes del vencimiento del periodo estipulado, pagará una suma equivalente al valor del servicio mensual por los meses faltantes para la terminación de la permanencia mínima, dividido en dos; su forma es: VALOR POR TERMINADO DEL CONTRATO=((VALOR DEL SERVICIO MENSUAL * MESES FALTANTES PARA COMPLETAR LA PERMANENCIA) / 2). Una vez esta condición sea aceptada expresamente por usted, debe permanecer con el contrato por el tiempo acordado en la presente cláusula, y queda vinculado con PROVEEDOR DE SERVICIOS DE INTERNET SAS de acuerdo con las condiciones del presente contrato. Prórroga: El usuario que celebró el contrato conoce y acepta la prórroga automática del plan tarifario estipulada en el clausurado del contrato.
         </p>
 
-        <div class="signature-line" style="margin-top: 50mm;"></div>
-        <p style="text-align: center; font-weight: bold; font-size: 9.5pt;">Firma del usuario que celebró el contrato</p>
+        <div style="height: 50mm;"></div>
+        <div class="signature-line"></div>
+        <p style="text-align: center; font-weight: bold; font-size: 10pt;">Firma del usuario que celebró el contrato</p>
     </div>`;
   }
 
   static determinarServicios(contratoData) {
-    const precioInternet = parseFloat(contratoData.precio_internet || 0);
-    const precioTelevision = parseFloat(contratoData.precio_television || 0);
-
     return {
-      internet: precioInternet > 0,
-      television: precioTelevision > 0
+      internet: parseFloat(contratoData.precio_internet || 0) > 0,
+      television: parseFloat(contratoData.precio_television || 0) > 0
     };
   }
 
@@ -772,22 +662,17 @@ class ContratoPDFGeneratorMINTIC {
     return new Intl.NumberFormat('es-CO').format(Math.round(precio || 0));
   }
 
-  /**
-   * Generar PDF completo del contrato como buffer (para adjuntar a correos)
-   */
   static async generarPDFCompleto(datosContrato) {
     let logoPath = '';
     try {
       const logoFilePath = path.join(__dirname, '../public/logo2.png');
       const logoBuffer = await fs.readFile(logoFilePath);
-      const logoBase64 = logoBuffer.toString('base64');
-      logoPath = `data:image/png;base64,${logoBase64}`;
+      logoPath = `data:image/png;base64,${logoBuffer.toString('base64')}`;
     } catch (error) {
-      console.warn('⚠️  No se pudo cargar el logo para contrato:', error.message);
+      console.warn('⚠️  Logo no encontrado');
     }
 
     const html = this.generarHTML(datosContrato, datosContrato.empresa || {}, logoPath);
-
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -796,68 +681,21 @@ class ContratoPDFGeneratorMINTIC {
     try {
       const page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'networkidle0' });
-
       const pdfBuffer = await page.pdf({
         format: 'Letter',
         printBackground: true,
-        margin: {
-          top: '15mm',
-          right: '20mm',
-          bottom: '15mm',
-          left: '20mm'
-        }
+        margin: { top: '19mm', right: '19mm', bottom: '19mm', left: '19mm' }
       });
-
-      console.log(`✅ PDF del contrato generado como buffer - Tamaño: ${pdfBuffer.length} bytes`);
       return pdfBuffer;
-
     } finally {
       await browser.close();
     }
   }
 
-  /**
-   * Generar PDF del contrato
-   */
   static async generarPDF(contratoData, empresaData, rutaSalida) {
-    let logoPath = '';
-    try {
-      const logoFilePath = path.join(__dirname, '../public/logo2.png');
-      const logoBuffer = await fs.readFile(logoFilePath);
-      const logoBase64 = logoBuffer.toString('base64');
-      logoPath = `data:image/png;base64,${logoBase64}`;
-    } catch (error) {
-      console.warn('⚠️  No se pudo cargar el logo, se usará el HTML sin logo:', error.message);
-    }
-
-    const html = this.generarHTML(contratoData, empresaData, logoPath);
-
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-
-    try {
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
-
-      await page.pdf({
-        path: rutaSalida,
-        format: 'Letter',
-        printBackground: true,
-        margin: {
-          top: '15mm',
-          right: '20mm',
-          bottom: '15mm',
-          left: '20mm'
-        }
-      });
-
-      console.log(`✅ PDF del contrato generado: ${rutaSalida}`);
-
-    } finally {
-      await browser.close();
-    }
+    const pdfBuffer = await this.generarPDFCompleto(contratoData);
+    await fs.writeFile(rutaSalida, pdfBuffer);
+    console.log(`✅ PDF generado: ${rutaSalida}`);
   }
 }
 
