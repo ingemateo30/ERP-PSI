@@ -278,7 +278,7 @@ static async generarPDF(req, res) {
 
         // 🔥 NUEVA CONSULTA: Obtener TODOS los servicios del cliente
         const contratos = await Database.query(`
-            SELECT 
+            SELECT
                 c.*,
                 cl.nombre as cliente_nombre,
                 cl.identificacion as cliente_identificacion,
@@ -286,9 +286,13 @@ static async generarPDF(req, res) {
                 cl.correo as cliente_email,
                 cl.direccion as cliente_direccion,
                 cl.barrio as cliente_barrio,
-                cl.estrato as cliente_estrato
+                cl.estrato as cliente_estrato,
+                ci.nombre as ciudad_nombre,
+                d.nombre as departamento_nombre
             FROM contratos c
             INNER JOIN clientes cl ON c.cliente_id = cl.id
+            LEFT JOIN ciudades ci ON cl.ciudad_id = ci.id
+            LEFT JOIN departamentos d ON ci.departamento_id = d.id
             WHERE c.id = ? AND c.estado IN ('activo', 'anulado', 'terminado')
             LIMIT 1
         `, [id]);

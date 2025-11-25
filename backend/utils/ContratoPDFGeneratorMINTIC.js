@@ -368,7 +368,7 @@ class ContratoPDFGeneratorMINTIC {
                 </table>
 
                 <p class="box-content" style="margin-bottom: 6px;">
-                    Este contrato explica las condiciones para la prestación de los servicios entre usted y <strong>PROVEEDOR DE TELECOMUNICACIONES SAS</strong>, por el que pagará mínimo mensualmente <strong>$${this.formatearPrecio(valorTotal)}</strong>. Este contrato tendrá vigencia de <strong>${permanenciaMeses} mes(es)</strong>, contados a partir del día de la instalación. El plazo máximo de instalación es de <strong>15 días hábiles</strong>. Acepto que mi contrato se renueve sucesiva y automáticamente por un plazo igual al inicial de ${permanenciaMeses} mes(es).
+                    Este contrato explica las condiciones para la prestación de los servicios entre usted y PROVEEDOR DE TELECOMUNICACIONES SAS, por el que pagará mínimo mensualmente $${Math.round(valorTotal)}. Este contrato tendrá vigencia de ${permanenciaMeses} mes(es), contados a partir del día de la instalación. El plazo máximo de instalación es de 15 días hábiles. Acepto que mi contrato se renueve sucesiva y automáticamente por un plazo igual al inicial de ${permanenciaMeses} mes(es).
                 </p>
 
                 <!-- EL SERVICIO -->
@@ -405,7 +405,7 @@ class ContratoPDFGeneratorMINTIC {
                     <div class="box-content">
                         <p style="font-weight: bold; margin-bottom: 3px;">CARACTERÍSTICAS DEL PLAN</p>
                         ${this.generarDetallesServicios(contratoData, servicios)}
-                        ${tienePermanencia ? `<p style="margin-top: 4px;"><strong>CLAUSULA PERMANENCIA ${permanenciaMeses} MESES - MODEM EN CALIDAD DE PRESTAMO</strong></p>` : ''}
+                        ${tienePermanencia ? `<p style="margin-top: 4px;"><strong>CLAUSULA PERMENENCIA ${permanenciaMeses} MEESES-MODEN EN CALIDAD DE PRESTAMO</strong></p>` : ''}
                     </div>
                 </div>
 
@@ -434,7 +434,7 @@ class ContratoPDFGeneratorMINTIC {
                     </div>
                 </div>
 
-                <p class="small-text" style="margin-top: 6px;">* Espacio diligenciado por el usuario</p>
+                <p class="small-text" style="margin-top: 6px;">* Espacio dilingenciado por el usuario</p>
             </div>
 
             <!-- COLUMNA DERECHA -->
@@ -505,11 +505,12 @@ class ContratoPDFGeneratorMINTIC {
     let detalles = '';
 
     if (servicios.internet) {
-      detalles += `<p><strong>INTERNET FIBRA $${this.formatearPrecio(contratoData.precio_internet)}</strong> ${contratoData.servicio_nombre || 'INTERNET FIBRA 300 MEGAS'} ESTRATO ${contratoData.cliente_estrato || '1,2,3'}</p>`;
+      const nombreServicio = contratoData.servicio_nombre || contratoData.internet_data?.nombre || 'INTERNET FIBRA 300 MEGAS';
+      detalles += `<p><strong>INTERNET FIBRA $ ${this.formatearPrecio(contratoData.precio_internet)}</strong> ${nombreServicio} ESTRATO ${contratoData.cliente_estrato || '1,2,3'}</p>`;
     }
 
     if (servicios.television) {
-      detalles += `<p><strong>TELEVISION $${this.formatearPrecio(contratoData.precio_television)}</strong> TELEVISION $${this.formatearPrecio(contratoData.precio_television)} ESTRATO ${contratoData.cliente_estrato || '1,2,3'} + IVA</p>`;
+      detalles += `<p><strong>TELEVISION $ ${this.formatearPrecio(contratoData.precio_television)}</strong> TELEVISION $${this.formatearPrecio(contratoData.precio_television)} ESTRATO ${contratoData.cliente_estrato || '1,2,3'} + IVA</p>`;
     }
 
     return detalles;
@@ -575,7 +576,7 @@ class ContratoPDFGeneratorMINTIC {
                 <div class="content-box">
                     <div class="box-title">COBRO POR RECONEXIÓN DEL SERVICIO</div>
                     <div class="box-content">
-                        En caso de suspensión del servicio por mora en el pago, podremos cobrarle un valor por reconexión que corresponderá estrictamente a los costos asociados a la operación de reconexión. En caso de servicios empaquetados procede máximo un cobro de reconexión por cada tipo de conexión empleado en la prestación de los servicios. Costo reconexión: $10.000 + iva.
+                        En caso de suspensión del servicio por mora en el pago, podremos cobrarle un valor por reconexión que corresponderá estrictamente a los costos asociados a la operación de reconexión. En caso de servicios, empaquetados procede máximo un cobro de reconexión por cada tipo de conexión empleado en la prestación de los servicios. Costo reconexión: $10.000 + iva.
                     </div>
                 </div>
 
@@ -587,7 +588,7 @@ class ContratoPDFGeneratorMINTIC {
                     <br/><br/>
                     <strong>LOS CANALES DE TELEVISIÓN:</strong> se debe entender como ofertas generales no caracterizadas por ningún canal; por lo anterior el usuario expresamente autoriza a PSI para que, por razones de orden técnico o comercial, suprima, amplíe o modifique los canales que componen la programación del servicio que recibe el usuario.
                     <br/><br/>
-                    <strong>SUSPENSIÓN Y TERMINACIÓN POR:</strong> incumplimiento de sus obligaciones, incluyendo el no pago de 1 o más facturas consecutivas; Fuerza mayor/caso fortuito; Uso inadecuado de la red o del servicio; Por prevención de fraude; no viabilidad técnica o económica para prestar el servicio; irregularidades en los documentos suministrados; o por evolución tecnológica.
+                    <strong>SUSPENSIÓN Y TERMINACIÓN POR:</strong> incumpliendo de sus obligaciones, incluyendo el no pago de 1 o más facturas consecutivas; Fuerza mayor/caso fortuito; Uso inadecuado de la red o del servicio; Por prevencion de fraude; no viabilidad técnica o económica para prestar el servicio; iregularidades en los documentos suministrados; o por evolución tecnológica.
                     <br/><br/>
                     <strong>EL USUARIO RESPONDE POR:</strong> los equipos entregados para prestación y operación del servicio y autoriza el cobro de su reposición por daño o pérdida. Deberá entregarlos a la terminación del contrato del modo establecido en la regulación, de no hacerlo pagará el valor comercial de los mismos.
                     <br/><br/>
@@ -667,15 +668,7 @@ class ContratoPDFGeneratorMINTIC {
         <!-- Anexo de Permanencia -->
         <div class="info-section">ANEXO DE COMPROMISO DE PERMANENCIA MÍNIMA</div>
         <div class="box-content" style="text-align: justify; margin-top: 8px;">
-            Señor usuario, el presente contrato lo obliga a estar vinculado con <strong>PROVEEDOR DE TELECOMUNICACIONES SAS.</strong> durante un tiempo de <strong>${meses} mes(es)</strong>, además cuando venza el plazo indicado, el presente contrato se renovará en forma automática indefinidamente, y finalmente, en caso que usted decida terminar el contrato antes de que venza el periodo de permanencia mínima señalado usted deberá pagar los valores que se determinan en el siguiente punto.
-            <br/><br/>
-            En caso de que el usuario que celebró el contrato lo dé por terminado antes del vencimiento del periodo estipulado, pagará una suma equivalente al valor del servicio mensual por los meses faltantes para la terminación de la permanencia mínima, dividido en dos; su forma es:
-            <br/><br/>
-            <strong>VALOR POR TERMINADO DEL CONTRATO = ((VALOR DEL SERVICIO MENSUAL * MESES FALTANTES PARA COMPLETAR LA PERMANENCIA) / 2).</strong>
-            <br/><br/>
-            Una vez esta condición sea aceptada expresamente por usted, debe permanecer con el contrato por el tiempo acordado en la presente cláusula, y queda vinculado con <strong>PROVEEDOR DE TELECOMUNICACIONES SAS.</strong> de acuerdo con las condiciones del presente contrato.
-            <br/><br/>
-            <strong>Prórroga:</strong> El usuario que celebró el contrato conoce y acepta la prórroga automática del plan tarifario estipulada en el clausurado del contrato.
+            Señor usuario, el presente contrato lo obliga a estar vinculado con PROVEEDOR DE TELECOMUNICACIONES SAS. durante un tiempo de ${meses} mes(es), además cuando venza el plazo indicado, el presente contrato se renovará en forma automática indefinidamente, y finalmente, en caso que usted decida terminar el contrato antes de que venza el periodo de permanencia mínima señalado usted deberá pagar los valores que se determinan en el siguiente punto. En caso de que el usuario que celebró el contrato lo dé por terminado antes del vencimiento del periodo estipulado, pagará una suma equivalente al valor del servicio mensual por los meses faltantes para la termininacion de la permanencia mínima, dividido en dos; su forma es: VALOR POR TERMINADO DEL CONTRATO=((VALOR DEL SERVICIO MENSUAL * MESES FALTANTES PARA COMPLETAR LA PERMANENCIA) / 2). Una vez esta condición sea aceptada expresamente por usted, debe permanecer con el contrato por el tiempo acordado en la presente cláusula, y queda vinculado con PROVEEDOR DE TELECOMUNICACIONES SAS. de acuerdo con las condiciones del presente contrato. Prórroga: El usuario que celebró el contrato conoce y acepta la prórroga automática del plan tarifario estipulada en el clausurado del contrato.
         </div>
 
         <!-- Firma -->
