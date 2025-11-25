@@ -330,14 +330,15 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
       // 5. Insertar factura
       const queryFactura = `
         INSERT INTO facturas (
-          numero_factura, cliente_id, fecha_emision, fecha_vencimiento,
+          numero_factura, cliente_id, identificacion_cliente, fecha_emision, fecha_vencimiento,
           subtotal, iva, total, estado, resolucion, observaciones, created_by
-        ) VALUES (?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), ?, ?, ?, 'pendiente', ?, ?, ?)
+        ) VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), ?, ?, ?, 'pendiente', ?, ?, ?)
       `;
 
       const valoresFactura = [
         numeroFactura,
         clienteId,
+        datosCliente.identificacion || '',
         subtotal,
         iva,
         total,
