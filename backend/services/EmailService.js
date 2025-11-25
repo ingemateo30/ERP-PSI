@@ -4,7 +4,7 @@
 const nodemailer = require('nodemailer');
 const pool = require('../config/database');
 const PDFGenerator = require('../utils/pdfGenerator');
-const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator');
+const ContratoPDFGeneratorMINTIC = require('../utils/ContratoPDFGeneratorMINTIC');
 
 class EmailService {
   /**
@@ -221,7 +221,7 @@ class EmailService {
       };
 
       // Generar PDF usando ContratoPDFGenerator
-      const pdfBuffer = await ContratoPDFGenerator.generarPDFCompleto(datosContrato);
+      const pdfBuffer = await ContratoPDFGeneratorMINTIC.generarPDFCompleto(datosContrato);
 
       return pdfBuffer;
     } finally {
