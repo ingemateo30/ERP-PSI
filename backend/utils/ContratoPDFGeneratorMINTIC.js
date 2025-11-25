@@ -1,6 +1,6 @@
 // backend/utils/ContratoPDFGeneratorMINTIC.js
-// Generador de PDF de contratos EXACTAMENTE IGUAL al modelo Word
-// Replicación pixel-perfect del documento original
+// Generador de PDF de contratos IDÉNTICO al modelo Word de PSI
+// Replicación exacta del documento original con formato preciso
 
 const puppeteer = require('puppeteer');
 const fs = require('fs').promises;
@@ -9,7 +9,7 @@ const path = require('path');
 class ContratoPDFGeneratorMINTIC {
 
   /**
-   * Generar HTML EXACTAMENTE igual al Word
+   * Generar HTML IDÉNTICO al Word
    */
   static generarHTML(contratoData, empresaData, logoPath = '') {
     const fechaHoy = new Date().toLocaleDateString('es-CO', {
@@ -48,7 +48,7 @@ class ContratoPDFGeneratorMINTIC {
     <style>
         @page {
             size: Letter;
-            margin: 16mm 19mm 5mm 19mm;
+            margin: 15mm 20mm 15mm 20mm;
         }
 
         * {
@@ -73,10 +73,10 @@ class ContratoPDFGeneratorMINTIC {
             page-break-after: avoid;
         }
 
-        /* HEADER */
+        /* ========== ENCABEZADO ========== */
         .header {
             width: 100%;
-            margin-bottom: 3mm;
+            margin-bottom: 8mm;
             border-bottom: 2px solid #000;
             padding-bottom: 2mm;
         }
@@ -93,21 +93,21 @@ class ContratoPDFGeneratorMINTIC {
         }
 
         .logo-img {
-            height: 42px;
+            height: 45px;
             width: auto;
         }
 
         .header-center {
             display: table-cell;
-            width: 60%;
+            width: 55%;
             text-align: center;
             vertical-align: middle;
         }
 
         .company-name {
-            font-size: 10pt;
+            font-size: 11pt;
             font-weight: bold;
-            margin-bottom: 1px;
+            margin-bottom: 2px;
         }
 
         .company-nit {
@@ -117,74 +117,76 @@ class ContratoPDFGeneratorMINTIC {
 
         .header-right {
             display: table-cell;
-            width: 25%;
+            width: 30%;
             text-align: right;
             vertical-align: top;
+            padding-top: 2px;
         }
 
         .contract-title {
             font-size: 10pt;
             font-weight: bold;
-            margin-bottom: 2px;
+            margin-bottom: 4px;
         }
 
         .contract-date {
             font-size: 10pt;
-            padding: 1px 3px;
+            padding: 2px 6px;
             border: 1px solid #000;
             display: inline-block;
         }
 
-        /* TABLA INFO SUSCRIPTOR */
+        /* ========== TABLA INFO SUSCRIPTOR ========== */
         .info-section-title {
             background: #d9d9d9;
             border: 1px solid #000;
-            padding: 3px;
+            padding: 4px;
             text-align: center;
             font-weight: bold;
             font-size: 10pt;
-            margin: 3mm 0 2mm 0;
+            margin: 6mm 0 3mm 0;
         }
 
         .info-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 10pt;
-            margin-bottom: 3mm;
+            margin-bottom: 5mm;
         }
 
         .info-table td {
-            border: 1px solid #bfbfbf;
-            padding: 3px 5px;
+            border: 1px solid #000;
+            padding: 4px 6px;
             vertical-align: middle;
+            height: 22px;
         }
 
         .info-table .label-cell {
             font-weight: bold;
             background: #f2f2f2;
-            width: 18%;
+            width: 20%;
         }
 
         .info-table .value-cell {
-            width: 32%;
+            width: 30%;
         }
 
-        /* TEXTO INTRO */
+        /* ========== TEXTO INTRO ========== */
         .intro-text {
             font-size: 10pt;
             text-align: justify;
-            line-height: 1.15;
-            margin-bottom: 2mm;
+            line-height: 1.2;
+            margin-bottom: 4mm;
         }
 
         .city-name {
             text-align: center;
             font-weight: bold;
             font-size: 10pt;
-            margin-bottom: 3mm;
+            margin-bottom: 5mm;
         }
 
-        /* DOS COLUMNAS */
+        /* ========== DOS COLUMNAS ========== */
         .two-columns {
             display: table;
             width: 100%;
@@ -199,59 +201,67 @@ class ContratoPDFGeneratorMINTIC {
         }
 
         .column:first-child {
-            border-right: 1px solid #bfbfbf;
+            border-right: 1px solid #000;
             padding-left: 0;
-            padding-right: 3mm;
+            padding-right: 4mm;
         }
 
         .column:last-child {
             padding-right: 0;
-            padding-left: 3mm;
+            padding-left: 4mm;
         }
 
-        /* CAJAS DE CONTENIDO */
+        /* ========== CAJAS DE CONTENIDO ========== */
         .content-box {
             border: 1px solid #000;
-            margin-bottom: 3mm;
+            margin-bottom: 4mm;
         }
 
         .box-title {
             background: #f2f2f2;
             border-bottom: 1px solid #000;
-            padding: 2px 4px;
+            padding: 3px 5px;
             font-weight: bold;
             font-size: 10pt;
             text-align: center;
         }
 
         .box-content {
-            padding: 4px 5px;
+            padding: 5px 6px;
             font-size: 9.5pt;
             line-height: 1.15;
             text-align: justify;
         }
 
-        /* CHECKBOXES */
+        .box-content p {
+            margin-bottom: 4px;
+        }
+
+        .box-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* ========== CHECKBOXES ========== */
         .service-checkboxes {
             display: flex;
-            gap: 8px;
-            margin: 3px 0;
+            gap: 10px;
+            margin: 5px 0;
         }
 
         .checkbox-item {
             display: flex;
             align-items: center;
-            gap: 3px;
+            gap: 4px;
         }
 
         .checkbox {
-            width: 12px;
-            height: 12px;
+            width: 13px;
+            height: 13px;
             border: 1.5px solid #000;
             display: inline-block;
             text-align: center;
-            line-height: 10px;
-            font-size: 9pt;
+            line-height: 11px;
+            font-size: 10pt;
             font-weight: bold;
         }
 
@@ -259,28 +269,28 @@ class ContratoPDFGeneratorMINTIC {
             content: "✓";
         }
 
-        /* VALOR TOTAL */
+        /* ========== VALOR TOTAL ========== */
         .valor-total {
             border: 1px solid #000;
-            padding: 3px;
+            padding: 4px;
             text-align: center;
             font-weight: bold;
             font-size: 10pt;
-            margin: 3mm 0;
+            margin: 4mm 0;
         }
 
-        /* LISTA NUMERADA */
+        /* ========== LISTA NUMERADA ========== */
         .numbered-list {
             counter-reset: item;
             list-style: none;
             padding-left: 0;
-            margin: 3px 0;
+            margin: 4px 0;
         }
 
         .numbered-list li {
             counter-increment: item;
-            margin-bottom: 3px;
-            padding-left: 18px;
+            margin-bottom: 4px;
+            padding-left: 20px;
             position: relative;
         }
 
@@ -291,88 +301,90 @@ class ContratoPDFGeneratorMINTIC {
             left: 0;
         }
 
-        /* NOTA PEQUEÑA */
+        /* ========== NOTA PEQUEÑA ========== */
         .small-note {
             font-size: 8pt;
-            margin-top: 3mm;
+            margin-top: 4mm;
+            font-style: italic;
         }
 
-        /* PÁGINA 2 - TEXTO LEGAL */
+        /* ========== PÁGINA 2 - TEXTO LEGAL ========== */
         .legal-content {
             font-size: 9.5pt;
             text-align: justify;
-            line-height: 1.15;
+            line-height: 1.2;
         }
 
         .legal-content p {
-            margin-bottom: 3mm;
+            margin-bottom: 4mm;
         }
 
         .legal-content strong {
             font-weight: bold;
         }
 
-        /* CAJA DE MEDIOS DE ATENCIÓN */
+        /* ========== CAJA DE MEDIOS DE ATENCIÓN ========== */
         .contact-box {
             border: 1px solid #000;
             padding: 5mm;
-            margin: 4mm 0;
+            margin: 5mm 0;
         }
 
         .contact-title {
             text-align: center;
             font-weight: bold;
             font-size: 10pt;
-            margin-bottom: 3mm;
+            margin-bottom: 4mm;
         }
 
         .contact-item {
             display: flex;
-            margin-bottom: 3mm;
+            margin-bottom: 4mm;
             align-items: flex-start;
         }
 
         .contact-number {
-            min-width: 25px;
-            height: 25px;
+            min-width: 28px;
+            height: 28px;
             border: 1.5px solid #000;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            margin-right: 5px;
+            margin-right: 6px;
             flex-shrink: 0;
+            font-size: 11pt;
         }
 
         .contact-text {
             flex: 1;
             font-size: 9.5pt;
-            line-height: 1.15;
+            line-height: 1.2;
             text-align: justify;
         }
 
-        /* FIRMA */
+        /* ========== FIRMA ========== */
         .signature-section {
-            margin-top: 5mm;
+            margin-top: 6mm;
             text-align: center;
         }
 
         .signature-note {
-            font-size: 8pt;
-            margin-bottom: 2mm;
+            font-size: 8.5pt;
+            margin-bottom: 3mm;
         }
 
         .signature-title {
             font-weight: bold;
             font-size: 9.5pt;
-            margin-bottom: 2mm;
+            margin-bottom: 3mm;
         }
 
         .signature-box {
             border: 1px solid #000;
             display: inline-block;
-            padding: 2px 8px;
-            margin-bottom: 3mm;
+            padding: 3px 10px;
+            margin-bottom: 4mm;
         }
 
         .signature-box table {
@@ -381,7 +393,7 @@ class ContratoPDFGeneratorMINTIC {
         }
 
         .signature-box td {
-            padding: 3px 8px;
+            padding: 4px 10px;
             border-right: 1px solid #000;
         }
 
@@ -390,16 +402,16 @@ class ContratoPDFGeneratorMINTIC {
         }
 
         .signature-line {
-            width: 280px;
-            height: 25px;
+            width: 300px;
+            height: 30px;
             border-bottom: 2px solid #000;
-            margin: 0 auto 3mm auto;
+            margin: 0 auto 4mm auto;
         }
 
         .footer-note {
             font-size: 8pt;
             text-align: center;
-            margin-top: 3mm;
+            margin-top: 4mm;
         }
     </style>
 </head>
@@ -411,30 +423,30 @@ class ContratoPDFGeneratorMINTIC {
         ${this.generarEncabezado(contratoData, empresaData, fechaHoy, logoPath)}
 
         <!-- Información del Suscriptor -->
-        <div class="info-section-title">INFORMACIÒN DEL SUSCRIPTOR</div>
+        <div class="info-section-title">INFORMACIÓN DEL SUSCRIPTOR</div>
         <table class="info-table">
             <tr>
                 <td class="label-cell">Contrato No.</td>
                 <td class="value-cell">${contratoData.numero_contrato || ''}</td>
-                <td class="label-cell"><strong>Departamento</strong></td>
+                <td class="label-cell">Departamento</td>
                 <td class="value-cell">${contratoData.departamento_nombre || 'Santander'}</td>
             </tr>
             <tr>
                 <td class="label-cell">Nombre</td>
                 <td class="value-cell">${contratoData.cliente_nombre || ''}</td>
-                <td class="label-cell"><strong>Municipio</strong></td>
+                <td class="label-cell">Municipio</td>
                 <td class="value-cell">${contratoData.ciudad_nombre || 'San Gil'}</td>
             </tr>
             <tr>
                 <td class="label-cell">Identificación</td>
                 <td class="value-cell">${contratoData.cliente_identificacion || ''}</td>
-                <td class="label-cell"><strong>Correo electrónico</strong></td>
+                <td class="label-cell">Correo electrónico</td>
                 <td class="value-cell">${contratoData.cliente_email || ''}</td>
             </tr>
             <tr>
                 <td class="label-cell">Teléfono de contacto</td>
                 <td class="value-cell">${contratoData.cliente_telefono || ''}</td>
-                <td class="label-cell"><strong>Estrato</strong></td>
+                <td class="label-cell">Estrato</td>
                 <td class="value-cell">${contratoData.cliente_estrato || ''}</td>
             </tr>
             <tr>
@@ -449,7 +461,7 @@ class ContratoPDFGeneratorMINTIC {
 
         <!-- Texto introductorio -->
         <p class="intro-text">
-            Este contrato explica las condiciones para la prestación de los servicios entre usted y PROVEEDOR DE TELECOMUNICACIONES SAS, por el que pagará mínimo mensualmente $${this.formatearPrecio(valorTotal)}. Este contrato tendrá vigencia de ${permanenciaMeses} mes(es), contados a partir del día de la instalación. El plazo máximo de instalación es de 15 días hábiles. Acepto que mi contrato se renueve sucesiva y automáticamente por un plazo igual al inicial de ${permanenciaMeses} mes(es).
+            Este contrato explica las condiciones para la prestación de los servicios entre usted y PROVEEDOR DE SERVICIOS DE INTERNET SAS, por el que pagará mínimo mensualmente $${this.formatearPrecio(valorTotal)}. Este contrato tendrá vigencia de ${permanenciaMeses} mes(es), contados a partir del día de la instalación. El plazo máximo de instalación es de 15 días hábiles. Acepto que mi contrato se renueve sucesiva y automáticamente por un plazo igual al inicial de ${permanenciaMeses} mes(es).
         </p>
 
         <p class="city-name">${contratoData.ciudad_nombre || 'San Gil'}</p>
@@ -477,10 +489,10 @@ class ContratoPDFGeneratorMINTIC {
                                 Publicidad
                             </div>
                         </div>
-                        <p style="margin-top: 3px;">
+                        <p style="margin-top: 4px;">
                             Servicios adicionales__________________________
                         </p>
-                        <p style="margin-top: 3px;">
+                        <p style="margin-top: 4px;">
                             Usted se compromete a pagar oportunamente el precio acordado. El servicio se activará a más tardar el día <strong>${fechaActivacionStr}</strong>
                         </p>
                     </div>
@@ -490,9 +502,9 @@ class ContratoPDFGeneratorMINTIC {
                 <div class="content-box">
                     <div class="box-title">CONDICIONES COMERCIALES</div>
                     <div class="box-content">
-                        <p style="font-weight: bold; margin-bottom: 3px;">CARACTERÍSTICAS DEL PLAN</p>
+                        <p style="font-weight: bold; margin-bottom: 4px;">CARACTERÍSTICAS DEL PLAN</p>
                         ${this.generarDetallesServicios(contratoData, servicios)}
-                        ${tienePermanencia ? `<p style="margin-top: 3px;"><strong>CLAUSULA PERMENENCIA ${permanenciaMeses} MEESES-MODEN EN CALIDAD DE PRESTAMO</strong></p>` : ''}
+                        ${tienePermanencia ? `<p style="margin-top: 4px;"><strong>CLÁUSULA PERMANENCIA ${permanenciaMeses} MESES - MÓDEM EN CALIDAD DE PRÉSTAMO</strong></p>` : ''}
                     </div>
                 </div>
 
@@ -523,7 +535,7 @@ class ContratoPDFGeneratorMINTIC {
                     </div>
                 </div>
 
-                <p class="small-note">* Espacio dilingenciado por el usuario</p>
+                <p class="small-note">* Espacio diligenciado por el usuario</p>
             </div>
 
             <!-- COLUMNA DERECHA -->
@@ -577,11 +589,11 @@ class ContratoPDFGeneratorMINTIC {
                     <img src="${logoPath}" class="logo-img" alt="Logo PSI" />
                 </div>
                 <div class="header-center">
-                    <div class="company-name">PROVEEDOR DE TELECOMUNICACIONES SAS</div>
+                    <div class="company-name">PROVEEDOR DE SERVICIOS DE INTERNET SAS</div>
                     <div class="company-nit">NIT: ${empresaData.empresa_nit || '901.582.657-3'}</div>
                 </div>
                 <div class="header-right">
-                    <div class="contract-title">CONTRATO ÚNICO DE SERVICIOS FIJOS</div>
+                    <div class="contract-title">CONTRATO ÚNICO DE<br/>SERVICIOS FIJOS</div>
                     <div class="contract-date">Fecha: ${fechaHoy}</div>
                 </div>
             </div>
@@ -593,11 +605,11 @@ class ContratoPDFGeneratorMINTIC {
 
     if (servicios.internet) {
       const nombreServicio = contratoData.servicio_nombre || contratoData.internet_data?.nombre || 'INTERNET FIBRA 300 MEGAS';
-      detalles += `<p><strong>INTERNET FIBRA $ ${this.formatearPrecio(contratoData.precio_internet)}</strong> ${nombreServicio} ESTRATO ${contratoData.cliente_estrato || '1,2,3'}</p>`;
+      detalles += `<p><strong>INTERNET FIBRA $${this.formatearPrecio(contratoData.precio_internet)}</strong> ${nombreServicio} ESTRATO ${contratoData.cliente_estrato || '1,2,3'}</p>`;
     }
 
     if (servicios.television) {
-      detalles += `<p><strong>TELEVISION $ ${this.formatearPrecio(contratoData.precio_television)}</strong> TELEVISION $${this.formatearPrecio(contratoData.precio_television)} ESTRATO ${contratoData.cliente_estrato || '1,2,3'} + IVA</p>`;
+      detalles += `<p><strong>TELEVISIÓN $${this.formatearPrecio(contratoData.precio_television)}</strong> TELEVISIÓN $${this.formatearPrecio(contratoData.precio_television)} ESTRATO ${contratoData.cliente_estrato || '1,2,3'} + IVA</p>`;
     }
 
     return detalles;
@@ -619,7 +631,7 @@ class ContratoPDFGeneratorMINTIC {
             Usted puede cambiar de domicilio y continuar con el servicio siempre que sea técnicamente posible. Si desde el punto de vista técnico no es viable el traslado del servicio, usted puede ceder su contrato a un tercero o terminarlo pagando el valor de la cláusula de permanencia mínima si esta vigente.</p>
 
             <p><strong>COBRO POR RECONEXIÓN DEL SERVICIO</strong><br/>
-            En caso de suspensión del servicio por mora en el pago, podremos cobrarle un valor por reconexión que corresponderá estrictamente a los costos asociados a la operación de reconexión. En caso de servicios, empaquetados procede máximo un cobro de reconexión por cada tipo de conexión empleado en la prestación de los servicios. Costo reconexión: $10.000 + iva.</p>
+            En caso de suspensión del servicio por mora en el pago, podremos cobrarle un valor por reconexión que corresponderá estrictamente a los costos asociados a la operación de reconexión. En caso de servicios empaquetados procede máximo un cobro de reconexión por cada tipo de conexión empleado en la prestación de los servicios. Costo reconexión: $10.000 + IVA.</p>
 
             <p>El usuario es el ÚNICO responsable por el contenido y la información que se curse a través de la red y del uso que se haga de los equipos o de los servicios.</p>
 
@@ -627,7 +639,7 @@ class ContratoPDFGeneratorMINTIC {
 
             <p><strong>LOS CANALES DE TELEVISIÓN:</strong> se debe entender como ofertas generales no caracterizadas por ningún canal; por lo anterior el usuario expresamente autoriza a PSI para que, por razones de orden técnico o comercial, suprima, amplíe o modifique los canales que componen la programación del servicio que recibe el usuario.</p>
 
-            <p><strong>SUSPENSIÓN Y TERMINACIÓN POR:</strong> incumpliendo de sus obligaciones, incluyendo el no pago de 1 o más facturas consecutivas; Fuerza mayor/caso fortuito; Uso inadecuado de la red o del servicio; Por prevencion de fraude; no viabilidad técnica o económica para prestar el servicio; iregularidades en los documentos suministrados; o por evolución tecnológica.</p>
+            <p><strong>SUSPENSIÓN Y TERMINACIÓN POR:</strong> incumplimiento de sus obligaciones, incluyendo el no pago de 1 o más facturas consecutivas; Fuerza mayor/caso fortuito; Uso inadecuado de la red o del servicio; Por prevención de fraude; no viabilidad técnica o económica para prestar el servicio; irregularidades en los documentos suministrados; o por evolución tecnológica.</p>
 
             <p><strong>EL USUARIO RESPONDE POR:</strong> los equipos entregados para prestación y operación del servicio y autoriza el cobro de su reposición por daño o pérdida. Deberá entregarlos a la terminación del contrato del modo establecido en la regulación, de no hacerlo pagará el valor comercial de los mismos.</p>
 
@@ -656,7 +668,7 @@ class ContratoPDFGeneratorMINTIC {
 
             <div class="contact-item">
                 <div class="contact-number">3</div>
-                <div class="contact-text">Cuando su queja o petición sea por los servicios de internet, y esté relacionada con actos de negativa del contrato, suspensión del servicio, terminación del contrato, corte y facturación; usted puede insistir en su solicitud ante nosotros, dentro de los 10 días hábiles siguientes a la respuesta, y pedir que si no llegamos a una solución satisfactoria para usted, enviemos su reclamo directamente a la SIC (Superintendencia de Industria y comercio) quien resolverá de manera definitiva su solicitud. Esto se llama recurso de reposición y en subsidio apelación.</div>
+                <div class="contact-text">Cuando su queja o petición sea por los servicios de internet, y esté relacionada con actos de negativa del contrato, suspensión del servicio, terminación del contrato, corte y facturación; usted puede insistir en su solicitud ante nosotros, dentro de los 10 días hábiles siguientes a la respuesta, y pedir que si no llegamos a una solución satisfactoria para usted, enviemos su reclamo directamente a la SIC (Superintendencia de Industria y Comercio) quien resolverá de manera definitiva su solicitud. Esto se llama recurso de reposición y en subsidio apelación.</div>
             </div>
 
             <div class="contact-item">
@@ -664,9 +676,9 @@ class ContratoPDFGeneratorMINTIC {
                 <div class="contact-text">Cuando su queja o petición sea por el servicio de televisión, puede enviar la misma a la Autoridad Nacional de Televisión, para que esta Entidad resuelva su solicitud.</div>
             </div>
 
-            <p style="margin-top: 3mm; font-size: 9.5pt;">Si no respondemos es porque aceptamos su petición o reclamo. Esto se llama silencio administrativo positivo y aplica para internet.</p>
+            <p style="margin-top: 4mm; font-size: 9.5pt;">Si no respondemos es porque aceptamos su petición o reclamo. Esto se llama silencio administrativo positivo y aplica para internet.</p>
 
-            <p style="text-align: center; font-weight: bold; margin-top: 3mm; font-size: 9.5pt;">Si no está de acuerdo con nuestra respuesta</p>
+            <p style="text-align: center; font-weight: bold; margin-top: 4mm; font-size: 9.5pt;">Si no está de acuerdo con nuestra respuesta</p>
         </div>
 
         <!-- Firma -->
@@ -696,30 +708,30 @@ class ContratoPDFGeneratorMINTIC {
         ${this.generarEncabezado(contratoData, empresaData, fechaHoy, logoPath)}
 
         <!-- Información del Suscriptor (repetida) -->
-        <div class="info-section-title">INFORMACIÒN DEL SUSCRIPTOR</div>
+        <div class="info-section-title">INFORMACIÓN DEL SUSCRIPTOR</div>
         <table class="info-table">
             <tr>
                 <td class="label-cell">Contrato No.</td>
                 <td class="value-cell">${contratoData.numero_contrato || ''}</td>
-                <td class="label-cell"><strong>Departamento</strong></td>
+                <td class="label-cell">Departamento</td>
                 <td class="value-cell">${contratoData.departamento_nombre || 'Santander'}</td>
             </tr>
             <tr>
                 <td class="label-cell">Nombre</td>
                 <td class="value-cell">${contratoData.cliente_nombre || ''}</td>
-                <td class="label-cell"><strong>Municipio</strong></td>
+                <td class="label-cell">Municipio</td>
                 <td class="value-cell">${contratoData.ciudad_nombre || 'San Gil'}</td>
             </tr>
             <tr>
                 <td class="label-cell">Identificación</td>
                 <td class="value-cell">${contratoData.cliente_identificacion || ''}</td>
-                <td class="label-cell"><strong>Correo electrónico</strong></td>
+                <td class="label-cell">Correo electrónico</td>
                 <td class="value-cell">${contratoData.cliente_email || ''}</td>
             </tr>
             <tr>
                 <td class="label-cell">Teléfono de contacto</td>
                 <td class="value-cell">${contratoData.cliente_telefono || ''}</td>
-                <td class="label-cell"><strong>Estrato</strong></td>
+                <td class="label-cell">Estrato</td>
                 <td class="value-cell">${contratoData.cliente_estrato || ''}</td>
             </tr>
             <tr>
@@ -733,15 +745,15 @@ class ContratoPDFGeneratorMINTIC {
         </table>
 
         <p class="city-name">${contratoData.ciudad_nombre || 'San Gil'}</p>
-        <p style="text-align: center; font-size: 10pt; margin-bottom: 3mm;">Estrato ${contratoData.cliente_estrato || ''}</p>
+        <p style="text-align: center; font-size: 10pt; margin-bottom: 5mm;">Estrato ${contratoData.cliente_estrato || ''}</p>
 
         <!-- Anexo de Permanencia -->
         <div class="info-section-title">ANEXO DE COMPROMISO DE PERMANENCIA MÍNIMA</div>
-        <p class="intro-text" style="margin-top: 3mm;">
-            Señor usuario, el presente contrato lo obliga a estar vinculado con PROVEEDOR DE TELECOMUNICACIONES SAS. durante un tiempo de ${meses} mes(es), además cuando venza el plazo indicado, el presente contrato se renovará en forma automática indefinidamente, y finalmente, en caso que usted decida terminar el contrato antes de que venza el periodo de permanencia mínima señalado usted deberá pagar los valores que se determinan en el siguiente punto. En caso de que el usuario que celebró el contrato lo dé por terminado antes del vencimiento del periodo estipulado, pagará una suma equivalente al valor del servicio mensual por los meses faltantes para la termininacion de la permanencia mínima, dividido en dos; su forma es: VALOR POR TERMINADO DEL CONTRATO=((VALOR DEL SERVICIO MENSUAL * MESES FALTANTES PARA COMPLETAR LA PERMANENCIA) / 2). Una vez esta condición sea aceptada expresamente por usted, debe permanecer con el contrato por el tiempo acordado en la presente cláusula, y queda vinculado con PROVEEDOR DE TELECOMUNICACIONES SAS. de acuerdo con las condiciones del presente contrato. Prórroga: El usuario que celebró el contrato conoce y acepta la prórroga automática del plan tarifario estipulada en el clausurado del contrato.
+        <p class="intro-text" style="margin-top: 5mm;">
+            Señor usuario, el presente contrato lo obliga a estar vinculado con PROVEEDOR DE SERVICIOS DE INTERNET SAS durante un tiempo de ${meses} mes(es), además cuando venza el plazo indicado, el presente contrato se renovará en forma automática indefinidamente, y finalmente, en caso que usted decida terminar el contrato antes de que venza el periodo de permanencia mínima señalado usted deberá pagar los valores que se determinan en el siguiente punto. En caso de que el usuario que celebró el contrato lo dé por terminado antes del vencimiento del periodo estipulado, pagará una suma equivalente al valor del servicio mensual por los meses faltantes para la terminación de la permanencia mínima, dividido en dos; su forma es: VALOR POR TERMINADO DEL CONTRATO=((VALOR DEL SERVICIO MENSUAL * MESES FALTANTES PARA COMPLETAR LA PERMANENCIA) / 2). Una vez esta condición sea aceptada expresamente por usted, debe permanecer con el contrato por el tiempo acordado en la presente cláusula, y queda vinculado con PROVEEDOR DE SERVICIOS DE INTERNET SAS de acuerdo con las condiciones del presente contrato. Prórroga: El usuario que celebró el contrato conoce y acepta la prórroga automática del plan tarifario estipulada en el clausurado del contrato.
         </p>
 
-        <div class="signature-line" style="margin-top: 40mm;"></div>
+        <div class="signature-line" style="margin-top: 50mm;"></div>
         <p style="text-align: center; font-weight: bold; font-size: 9.5pt;">Firma del usuario que celebró el contrato</p>
     </div>`;
   }
@@ -789,10 +801,10 @@ class ContratoPDFGeneratorMINTIC {
         format: 'Letter',
         printBackground: true,
         margin: {
-          top: '16mm',
-          right: '19mm',
-          bottom: '5mm',
-          left: '19mm'
+          top: '15mm',
+          right: '20mm',
+          bottom: '15mm',
+          left: '20mm'
         }
       });
 
@@ -834,10 +846,10 @@ class ContratoPDFGeneratorMINTIC {
         format: 'Letter',
         printBackground: true,
         margin: {
-          top: '16mm',
-          right: '19mm',
-          bottom: '5mm',
-          left: '19mm'
+          top: '15mm',
+          right: '20mm',
+          bottom: '15mm',
+          left: '20mm'
         }
       });
 
