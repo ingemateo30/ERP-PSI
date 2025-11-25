@@ -343,7 +343,7 @@ class ContratoPDFGeneratorMINTIC {
         ${this.generarEncabezado(logoPath, fechaHoy)}
         
         <!-- INFORMACIÓN DEL SUSCRIPTOR -->
-        <div class="section-title">INFORMACIÓN DEL SUSCRIPTOR</div>
+        <div class="section-title">Hola</div>
         
         <div class="info-block">
             <div class="info-line">
