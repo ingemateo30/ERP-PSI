@@ -91,7 +91,7 @@ class ClienteCompletoService {
 
       // 6. ENVIAR NOTIFICACIONES (si se solicita)
       if (datosCompletos.opciones?.enviar_bienvenida) {
-        await this.enviarCorreoBienvenida(clienteId, datosCompletos.cliente);
+        await this.enviarCorreoBienvenida(conexion, clienteId, datosCompletos.cliente);
         console.log(`✅ Correo de bienvenida enviado`);
       }
 
@@ -847,14 +847,16 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
   /**
    * Enviar correo de bienvenida con factura y contrato adjuntos
    */
-  static async enviarCorreoBienvenida(clienteId, datosCliente) {
+  static async enviarCorreoBienvenida(conexion, clienteId, datosCliente) {
     console.log('📧 Enviando correo de bienvenida...');
 
     // Importar EmailService dinámicamente para evitar dependencias circulares
     const EmailService = require('./EmailService');
 
     try {
-      const resultado = await EmailService.enviarCorreoBienvenida(clienteId, datosCliente);
+      const resultado = await EmailService.enviarCorreoBienvenida(clienteId, datosCliente, {
+        conexion: conexion
+      });
 
       if (resultado.enviado) {
         console.log(`✅ Correo de bienvenida enviado exitosamente a: ${resultado.destinatario}`);
