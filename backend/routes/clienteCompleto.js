@@ -194,7 +194,7 @@ router.post('/crear',
 
       console.log('🔄 Procesando datos validados');
 
-      const resultado = await ClienteCompletoService.crearClienteCompleto(
+      const resultado = await ClienteCompletoService.crearClienteConServicios(
         datosCompletos,
         createdBy
       );
