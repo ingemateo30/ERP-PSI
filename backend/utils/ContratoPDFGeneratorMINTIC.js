@@ -1,6 +1,7 @@
 // backend/utils/ContratoPDFGeneratorMINTIC.js
 // Generador de PDF de contratos IDÉNTICO al modelo Word de PSI
 // **VERSIÓN CORREGIDA** - Replica exactamente el formato del modelo real
+// **AJUSTE PÁGINA 2** - Optimizado para que todo quepa en una sola hoja
 
 const puppeteer = require('puppeteer');
 const fs = require('fs').promises;
@@ -153,15 +154,16 @@ class ContratoPDFGeneratorMINTIC {
             min-height: 400px;
         }
 
+        /* PÁGINA 2 - OPTIMIZADA PARA UNA SOLA HOJA */
         .two-columns-page2 {
             column-count: 2;
-            column-gap: 6mm;
-            min-height: 350px;
+            column-gap: 4mm;
+            min-height: 250px;
         }
 
         .column-content {
             break-inside: avoid-column;
-            margin-bottom: 2mm;
+            margin-bottom: 1.5mm;
         }
 
         /* CAJAS DE CONTENIDO */
@@ -189,6 +191,23 @@ class ContratoPDFGeneratorMINTIC {
 
         .box-content p {
             margin-bottom: 2px;
+        }
+
+        /* CAJAS PÁGINA 2 - MÁS COMPACTAS */
+        .content-box-page2 {
+            margin-bottom: 1.5mm;
+            break-inside: avoid;
+        }
+
+        .box-content-page2 {
+            padding: 0;
+            font-size: 7.5pt;
+            line-height: 1.05;
+            text-align: justify;
+        }
+
+        .box-content-page2 p {
+            margin-bottom: 1.5px;
         }
 
         /* CHECKBOXES */
@@ -263,80 +282,80 @@ class ContratoPDFGeneratorMINTIC {
             font-weight: bold;
         }
 
-        /* CAJA DE CONTACTO */
+        /* CAJA DE CONTACTO - OPTIMIZADA */
         .contact-box {
             border: 1px solid #000;
-            padding: 3mm;
-            margin: 3mm 0;
+            padding: 2mm;
+            margin: 2mm 0 3mm 0;
         }
 
         .contact-title {
             text-align: center;
             font-weight: bold;
-            font-size: 9pt;
-            margin-bottom: 2mm;
+            font-size: 8.5pt;
+            margin-bottom: 1.5mm;
         }
 
         .contact-item {
             display: flex;
-            margin-bottom: 2mm;
+            margin-bottom: 1.5mm;
             align-items: flex-start;
         }
 
         .contact-number {
-            min-width: 20px;
-            height: 20px;
+            min-width: 18px;
+            height: 18px;
             border: 1.5px solid #000;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            margin-right: 4px;
+            margin-right: 3px;
             flex-shrink: 0;
-            font-size: 8pt;
+            font-size: 7.5pt;
         }
 
         .contact-text {
             flex: 1;
-            font-size: 7.5pt;
-            line-height: 1.15;
+            font-size: 7pt;
+            line-height: 1.1;
             text-align: justify;
         }
 
-        /* FIRMA */
+        /* FIRMA - COMPACTA */
         .signature-section {
-            margin-top: 4mm;
+            margin-top: 2mm;
             text-align: center;
         }
 
         .signature-note {
-            font-size: 8pt;
-            margin-bottom: 2mm;
+            font-size: 7.5pt;
+            margin-bottom: 1.5mm;
         }
 
         .signature-title {
             font-weight: bold;
-            font-size: 9pt;
-            margin-bottom: 2mm;
+            font-size: 8.5pt;
+            margin-bottom: 1.5mm;
         }
 
         .signature-data {
             border: 1px solid #000;
             display: inline-block;
             padding: 2px 8px;
-            margin-bottom: 2mm;
-            font-size: 8pt;
+            margin-bottom: 1.5mm;
+            font-size: 7.5pt;
         }
 
         .signature-line {
             width: 250px;
             height: 25px;
             border-bottom: 2px solid #000;
-            margin: 0 auto 2mm auto;
+            margin: 0 auto 1.5mm auto;
         }
 
         .footer-text {
-            font-size: 7.5pt;
+            font-size: 7pt;
             text-align: center;
         }
 
@@ -537,27 +556,27 @@ class ContratoPDFGeneratorMINTIC {
     <div class="page">
         ${this.generarEncabezado(logoPath, fecha)}
         
-        <!-- PÁGINA 2 EN DOS COLUMNAS -->
+        <!-- PÁGINA 2 EN DOS COLUMNAS - OPTIMIZADA -->
         <div class="two-columns-page2">
             <!-- COLUMNA IZQUIERDA -->
             <div class="column-content">
-                <div class="content-box">
+                <div class="content-box-page2">
                     <div class="box-title">PAGO Y FACTURACIÓN</div>
-                    <div class="box-content">
+                    <div class="box-content-page2">
                         <p>La factura le debe llegar como mínimo 5 días hábiles antes de la fecha de pago. Si no llega, puede solicitarla a través de nuestros Medios de Atención y debe pagarla oportunamente. Si no paga a tiempo, previo aviso, suspenderemos su servicio hasta que pague sus saldos pendientes. Contamos con 3 días hábiles luego de su pago para reconectarle el servicio. Si no paga a tiempo, también podemos reportar su deuda a las centrales de riesgo. Para esto tenemos que avisarle por lo menos con 20 días calendario de anticipación. Si paga luego de este reporte tenemos la obligación dentro del mes de seguimiento de informar su pago para que ya no aparezca reportado. Si tiene un reclamo sobre su factura, puede presentarlo antes de la fecha de pago y en ese caso no debe pagar las sumas reclamadas hasta que resolvamos su solicitud. Si ya pagó, tiene 6 meses para presentar la reclamación.</p>
                     </div>
                 </div>
 
-                <div class="content-box">
+                <div class="content-box-page2">
                     <div class="box-title">CAMBIO DE DOMICILIO</div>
-                    <div class="box-content">
+                    <div class="box-content-page2">
                         <p>Usted puede cambiar de domicilio y continuar con el servicio siempre que sea técnicamente posible. Si desde el punto de vista técnico no es viable el traslado del servicio, usted puede ceder su contrato a un tercero o terminarlo pagando el valor de la cláusula de permanencia mínima si esta vigente.</p>
                     </div>
                 </div>
 
-                <div class="content-box">
+                <div class="content-box-page2">
                     <div class="box-title">COBRO POR RECONEXIÓN DEL SERVICIO</div>
-                    <div class="box-content">
+                    <div class="box-content-page2">
                         <p>En caso de suspensión del servicio por mora en el pago, podremos cobrarle un valor por reconexión que corresponderá estrictamente a los costos asociados a la operación de reconexión. En caso de servicios, empaquetados procede máximo un cobro de reconexión por cada tipo de conexión empleado en la prestación de los servicios. Costo reconexión: $10.000 + iva.</p>
                         <p>El usuario es el ÚNICO responsable por el contenido y la información que se curse a través de la red y del uso que se haga de los equipos o de los servicios.</p>
                         <p>Los equipos de comunicaciones que ya no use son desechos que no deben ser botados a la caneca, consulte nuestra política de recolección de aparatos en desuso.</p>
@@ -567,30 +586,30 @@ class ContratoPDFGeneratorMINTIC {
 
             <!-- COLUMNA DERECHA -->
             <div class="column-content">
-                <div class="content-box">
+                <div class="content-box-page2">
                     <div class="box-title">LOS CANALES DE TELEVISIÓN</div>
-                    <div class="box-content">
+                    <div class="box-content-page2">
                         <p>Se debe entender como ofertas generales no caracterizadas por ningún canal; por lo anterior el usuario expresamente autoriza a PSI para que, por razones de orden técnico o comercial, suprima, amplíe o modifique los canales que componen la programación del servicio que recibe el usuario.</p>
                     </div>
                 </div>
 
-                <div class="content-box">
+                <div class="content-box-page2">
                     <div class="box-title">SUSPENSIÓN Y TERMINACIÓN POR</div>
-                    <div class="box-content">
+                    <div class="box-content-page2">
                         <p>Incumpliendo de sus obligaciones, incluyendo el no pago de 1 o más facturas consecutivas; Fuerza mayor/caso fortuito; Uso inadecuado de la red o del servicio; Por prevencion de fraude; no viabilidad técnica o económica para prestar el servicio; iregularidades en los documentos suministrados; o por evolución tecnológica.</p>
                     </div>
                 </div>
 
-                <div class="content-box">
+                <div class="content-box-page2">
                     <div class="box-title">EL USUARIO RESPONDE POR</div>
-                    <div class="box-content">
+                    <div class="box-content-page2">
                         <p>Los equipos entregados para prestación y operación del servicio y autoriza el cobro de su reposición por daño o pérdida. Deberá entregarlos a la terminación del contrato del modo establecido en la regulación, de no hacerlo pagará el valor comercial de los mismos.</p>
                     </div>
                 </div>
 
-                <div class="content-box">
+                <div class="content-box-page2">
                     <div class="box-title">INFORMACIÓN ADICIONAL</div>
-                    <div class="box-content">
+                    <div class="box-content-page2">
                         <p><strong>LAS TARIFAS:</strong> podrán incrementar por mes o año sin superar el 50% de la tarifa antes del incremento.</p>
                         <p><strong>EL INTERÉS DE MORA:</strong> es el máximo legal, se cobrarán los gastos de cobranza judicial y extrajudicial.</p>
                         <p><strong>NO RESPONDEMOS:</strong> por lucro cesante, daño indirecto, incidentales o consecuenciales.</p>
@@ -618,8 +637,8 @@ class ContratoPDFGeneratorMINTIC {
                 <div class="contact-number">4</div>
                 <div class="contact-text">Cuando su queja o petición sea por el servicio de televisión, puede enviar la misma a la Autoridad Nacional de Televisión, para que esta Entidad resuelva su solicitud.</div>
             </div>
-            <p style="margin-top: 2mm; font-size: 7.5pt;">Si no respondemos es porque aceptamos su petición o reclamo. Esto se llama silencio administrativo positivo y aplica para internet.</p>
-            <p style="text-align: center; font-weight: bold; margin-top: 2mm; font-size: 8pt;">Si no está de acuerdo con nuestra respuesta</p>
+            <p style="margin-top: 1.5mm; font-size: 7pt;">Si no respondemos es porque aceptamos su petición o reclamo. Esto se llama silencio administrativo positivo y aplica para internet.</p>
+            <p style="text-align: center; font-weight: bold; margin-top: 1.5mm; font-size: 7.5pt;">Si no está de acuerdo con nuestra respuesta</p>
         </div>
 
         <div class="signature-section">
