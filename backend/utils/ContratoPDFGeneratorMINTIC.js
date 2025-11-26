@@ -61,7 +61,7 @@ class ContratoPDFGeneratorMINTIC {
 
         .logo-img {
             width: 100%;
-            max-width: 50px;
+            max-width: 80px;
         }
 
         .header-center {
@@ -166,23 +166,23 @@ class ContratoPDFGeneratorMINTIC {
 
         /* CAJAS DE CONTENIDO */
         .content-box {
-            border: 1px solid #000;
-            margin-bottom: 2mm;
+            margin-bottom: 3mm;
             break-inside: avoid;
         }
 
         .box-title {
-            background-color: #f2f2f2;
-            border-bottom: 1px solid #000;
-            padding: 1.5px 3px;
+            background-color: #d0d0d0;
+            border: 1px solid #000;
+            padding: 2px;
             font-weight: bold;
-            font-size: 8pt;
+            font-size: 9pt;
             text-align: center;
+            margin-bottom: 2mm;
         }
 
         .box-content {
-            padding: 3px 4px;
-            font-size: 7.5pt;
+            padding: 0;
+            font-size: 9pt;
             line-height: 1.15;
             text-align: justify;
         }
@@ -361,39 +361,30 @@ class ContratoPDFGeneratorMINTIC {
                 <span class="info-value">${contratoData.numero_contrato || ''}</span>
                 <span class="info-label" style="margin-left: 30px;">Departamento</span>
                 <span class="info-value">${contratoData.departamento_nombre || 'Santander'}</span>
-            </div>
-            
-            <div class="info-line">
-                <span class="info-label">Nombre</span>
-                <span class="info-value">${contratoData.cliente_nombre || ''}</span>
-            </div>
-            
-            <div class="info-line">
-                <span class="info-label">Identificación</span>
-                <span class="info-value">${contratoData.cliente_identificacion || ''}</span>
                 <span class="info-label" style="margin-left: 30px;">Municipio</span>
                 <span class="info-value">${contratoData.ciudad_nombre || 'San Gil'}</span>
             </div>
-            
+
             <div class="info-line">
-                <span class="info-label">Teléfono de contacto</span>
-                <span class="info-value">${contratoData.cliente_telefono || ''}</span>
+                <span class="info-label">Nombre</span>
+                <span class="info-value">${contratoData.cliente_nombre || ''}</span>
                 <span class="info-label" style="margin-left: 30px;">Correo electrónico</span>
                 <span class="info-value">${contratoData.cliente_email || ''}</span>
             </div>
-            
+
             <div class="info-line">
-                <span class="info-label">Estrato</span>
+                <span class="info-label">Identificación</span>
+                <span class="info-value">${contratoData.cliente_identificacion || ''}</span>
+                <span class="info-label" style="margin-left: 30px;">Teléfono de contacto</span>
+                <span class="info-value">${contratoData.cliente_telefono || ''}</span>
+                <span class="info-label" style="margin-left: 30px;">Estrato</span>
                 <span class="info-value">${contratoData.cliente_estrato || ''}</span>
             </div>
-            
+
             <div class="info-line">
                 <span class="info-label">Dirección servicio</span>
                 <span class="info-value">${contratoData.cliente_direccion || ''}</span>
-            </div>
-            
-            <div class="info-line">
-                <span class="info-label">Dirección suscriptor</span>
+                <span class="info-label" style="margin-left: 30px;">Dirección suscriptor</span>
                 <span class="info-value">${contratoData.cliente_direccion || ''}</span>
             </div>
         </div>
@@ -454,7 +445,14 @@ class ContratoPDFGeneratorMINTIC {
                 </div>
 
                 <div class="content-box">
-                    <div class="box-title">CONDICIONES COMERCIALES<br/>CARACTERÍSTICAS DEL PLAN</div>
+                    <div class="box-title">CONDICIONES COMERCIALES</div>
+                    <div class="box-content">
+                        <p>Los servicios contratados estarán sujetos a las tarifas y condiciones establecidas en este documento.</p>
+                    </div>
+                </div>
+
+                <div class="content-box">
+                    <div class="box-title">CARACTERÍSTICAS DEL PLAN</div>
                     <div class="box-content">
                         ${this.generarDetallesServicios(contratoData, servicios)}
                         ${tienePermanencia ? `<p><strong>CLAUSULA PERMENENCIA ${meses} MEESES-MODEN EN CALIDAD DE PRESTAMO</strong></p>` : ''}
@@ -543,38 +541,61 @@ class ContratoPDFGeneratorMINTIC {
         <div class="two-columns-page2">
             <!-- COLUMNA IZQUIERDA -->
             <div class="column-content">
-                <div class="legal-text">
-                    <p><strong>PAGO Y FACTURACIÓN</strong><br/>
-                    La factura le debe llegar como mínimo 5 días hábiles antes de la fecha de pago. Si no llega, puede solicitarla a través de nuestros Medios de Atención y debe pagarla oportunamente. Si no paga a tiempo, previo aviso, suspenderemos su servicio hasta que pague sus saldos pendientes. Contamos con 3 días hábiles luego de su pago para reconectarle el servicio. Si no paga a tiempo, también podemos reportar su deuda a las centrales de riesgo. Para esto tenemos que avisarle por lo menos con 20 días calendario de anticipación. Si paga luego de este reporte tenemos la obligación dentro del mes de seguimiento de informar su pago para que ya no aparezca reportado. Si tiene un reclamo sobre su factura, puede presentarlo antes de la fecha de pago y en ese caso no debe pagar las sumas reclamadas hasta que resolvamos su solicitud. Si ya pagó, tiene 6 meses para presentar la reclamación.</p>
+                <div class="content-box">
+                    <div class="box-title">PAGO Y FACTURACIÓN</div>
+                    <div class="box-content">
+                        <p>La factura le debe llegar como mínimo 5 días hábiles antes de la fecha de pago. Si no llega, puede solicitarla a través de nuestros Medios de Atención y debe pagarla oportunamente. Si no paga a tiempo, previo aviso, suspenderemos su servicio hasta que pague sus saldos pendientes. Contamos con 3 días hábiles luego de su pago para reconectarle el servicio. Si no paga a tiempo, también podemos reportar su deuda a las centrales de riesgo. Para esto tenemos que avisarle por lo menos con 20 días calendario de anticipación. Si paga luego de este reporte tenemos la obligación dentro del mes de seguimiento de informar su pago para que ya no aparezca reportado. Si tiene un reclamo sobre su factura, puede presentarlo antes de la fecha de pago y en ese caso no debe pagar las sumas reclamadas hasta que resolvamos su solicitud. Si ya pagó, tiene 6 meses para presentar la reclamación.</p>
+                    </div>
+                </div>
 
-                    <p><strong>CAMBIO DE DOMICILIO</strong><br/>
-                    Usted puede cambiar de domicilio y continuar con el servicio siempre que sea técnicamente posible. Si desde el punto de vista técnico no es viable el traslado del servicio, usted puede ceder su contrato a un tercero o terminarlo pagando el valor de la cláusula de permanencia mínima si esta vigente.</p>
+                <div class="content-box">
+                    <div class="box-title">CAMBIO DE DOMICILIO</div>
+                    <div class="box-content">
+                        <p>Usted puede cambiar de domicilio y continuar con el servicio siempre que sea técnicamente posible. Si desde el punto de vista técnico no es viable el traslado del servicio, usted puede ceder su contrato a un tercero o terminarlo pagando el valor de la cláusula de permanencia mínima si esta vigente.</p>
+                    </div>
+                </div>
 
-                    <p><strong>COBRO POR RECONEXIÓN DEL SERVICIO</strong><br/>
-                    En caso de suspensión del servicio por mora en el pago, podremos cobrarle un valor por reconexión que corresponderá estrictamente a los costos asociados a la operación de reconexión. En caso de servicios, empaquetados procede máximo un cobro de reconexión por cada tipo de conexión empleado en la prestación de los servicios. Costo reconexión: $10.000 + iva.</p>
-
-                    <p>El usuario es el ÚNICO responsable por el contenido y la información que se curse a través de la red y del uso que se haga de los equipos o de los servicios.</p>
-
-                    <p>Los equipos de comunicaciones que ya no use son desechos que no deben ser botados a la caneca, consulte nuestra política de recolección de aparatos en desuso.</p>
+                <div class="content-box">
+                    <div class="box-title">COBRO POR RECONEXIÓN DEL SERVICIO</div>
+                    <div class="box-content">
+                        <p>En caso de suspensión del servicio por mora en el pago, podremos cobrarle un valor por reconexión que corresponderá estrictamente a los costos asociados a la operación de reconexión. En caso de servicios, empaquetados procede máximo un cobro de reconexión por cada tipo de conexión empleado en la prestación de los servicios. Costo reconexión: $10.000 + iva.</p>
+                        <p>El usuario es el ÚNICO responsable por el contenido y la información que se curse a través de la red y del uso que se haga de los equipos o de los servicios.</p>
+                        <p>Los equipos de comunicaciones que ya no use son desechos que no deben ser botados a la caneca, consulte nuestra política de recolección de aparatos en desuso.</p>
+                    </div>
                 </div>
             </div>
 
             <!-- COLUMNA DERECHA -->
             <div class="column-content">
-                <div class="legal-text">
-                    <p><strong>LOS CANALES DE TELEVISIÓN:</strong> se debe entender como ofertas generales no caracterizadas por ningún canal; por lo anterior el usuario expresamente autoriza a PSI para que, por razones de orden técnico o comercial, suprima, amplíe o modifique los canales que componen la programación del servicio que recibe el usuario.</p>
+                <div class="content-box">
+                    <div class="box-title">LOS CANALES DE TELEVISIÓN</div>
+                    <div class="box-content">
+                        <p>Se debe entender como ofertas generales no caracterizadas por ningún canal; por lo anterior el usuario expresamente autoriza a PSI para que, por razones de orden técnico o comercial, suprima, amplíe o modifique los canales que componen la programación del servicio que recibe el usuario.</p>
+                    </div>
+                </div>
 
-                    <p><strong>SUSPENSIÓN Y TERMINACIÓN POR:</strong> incumpliendo de sus obligaciones, incluyendo el no pago de 1 o más facturas consecutivas; Fuerza mayor/caso fortuito; Uso inadecuado de la red o del servicio; Por prevencion de fraude; no viabilidad técnica o económica para prestar el servicio; iregularidades en los documentos suministrados; o por evolución tecnológica.</p>
-                    
-                    <p><strong>EL USUARIO RESPONDE POR:</strong> los equipos entregados para prestación y operación del servicio y autoriza el cobro de su reposición por daño o pérdida. Deberá entregarlos a la terminación del contrato del modo establecido en la regulación, de no hacerlo pagará el valor comercial de los mismos.</p>
+                <div class="content-box">
+                    <div class="box-title">SUSPENSIÓN Y TERMINACIÓN POR</div>
+                    <div class="box-content">
+                        <p>Incumpliendo de sus obligaciones, incluyendo el no pago de 1 o más facturas consecutivas; Fuerza mayor/caso fortuito; Uso inadecuado de la red o del servicio; Por prevencion de fraude; no viabilidad técnica o económica para prestar el servicio; iregularidades en los documentos suministrados; o por evolución tecnológica.</p>
+                    </div>
+                </div>
 
-                    <p><strong>LAS TARIFAS:</strong> podrán incrementar por mes o año sin superar el 50% de la tarifa antes del incremento.</p>
-                    
-                    <p><strong>EL INTERÉS DE MORA:</strong> es el máximo legal, se cobrarán los gastos de cobranza judicial y extrajudicial.</p>
-                    
-                    <p><strong>NO RESPONDEMOS:</strong> por lucro cesante, daño indirecto, incidentales o consecuenciales.</p>
-                    
-                    <p><strong>ESTE CONTRATO PRESTA MÉRITO EJECUTIVO:</strong> para hacer exigibles las obligaciones y prestaciones contenidas en él.</p>
+                <div class="content-box">
+                    <div class="box-title">EL USUARIO RESPONDE POR</div>
+                    <div class="box-content">
+                        <p>Los equipos entregados para prestación y operación del servicio y autoriza el cobro de su reposición por daño o pérdida. Deberá entregarlos a la terminación del contrato del modo establecido en la regulación, de no hacerlo pagará el valor comercial de los mismos.</p>
+                    </div>
+                </div>
+
+                <div class="content-box">
+                    <div class="box-title">INFORMACIÓN ADICIONAL</div>
+                    <div class="box-content">
+                        <p><strong>LAS TARIFAS:</strong> podrán incrementar por mes o año sin superar el 50% de la tarifa antes del incremento.</p>
+                        <p><strong>EL INTERÉS DE MORA:</strong> es el máximo legal, se cobrarán los gastos de cobranza judicial y extrajudicial.</p>
+                        <p><strong>NO RESPONDEMOS:</strong> por lucro cesante, daño indirecto, incidentales o consecuenciales.</p>
+                        <p><strong>ESTE CONTRATO PRESTA MÉRITO EJECUTIVO:</strong> para hacer exigibles las obligaciones y prestaciones contenidas en él.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -627,33 +648,30 @@ class ContratoPDFGeneratorMINTIC {
                 <span class="info-value">${contratoData.numero_contrato || ''}</span>
                 <span class="info-label" style="margin-left: 30px;">Departamento</span>
                 <span class="info-value">${contratoData.departamento_nombre || 'Santander'}</span>
-            </div>
-            <div class="info-line">
-                <span class="info-label">Nombre</span>
-                <span class="info-value">${contratoData.cliente_nombre || ''}</span>
-            </div>
-            <div class="info-line">
-                <span class="info-label">Identificación</span>
-                <span class="info-value">${contratoData.cliente_identificacion || ''}</span>
                 <span class="info-label" style="margin-left: 30px;">Municipio</span>
                 <span class="info-value">${contratoData.ciudad_nombre || 'San Gil'}</span>
             </div>
+
             <div class="info-line">
-                <span class="info-label">Teléfono de contacto</span>
-                <span class="info-value">${contratoData.cliente_telefono || ''}</span>
+                <span class="info-label">Nombre</span>
+                <span class="info-value">${contratoData.cliente_nombre || ''}</span>
                 <span class="info-label" style="margin-left: 30px;">Correo electrónico</span>
                 <span class="info-value">${contratoData.cliente_email || ''}</span>
             </div>
+
             <div class="info-line">
-                <span class="info-label">Estrato</span>
+                <span class="info-label">Identificación</span>
+                <span class="info-value">${contratoData.cliente_identificacion || ''}</span>
+                <span class="info-label" style="margin-left: 30px;">Teléfono de contacto</span>
+                <span class="info-value">${contratoData.cliente_telefono || ''}</span>
+                <span class="info-label" style="margin-left: 30px;">Estrato</span>
                 <span class="info-value">${contratoData.cliente_estrato || ''}</span>
             </div>
+
             <div class="info-line">
                 <span class="info-label">Dirección servicio</span>
                 <span class="info-value">${contratoData.cliente_direccion || ''}</span>
-            </div>
-            <div class="info-line">
-                <span class="info-label">Dirección suscriptor</span>
+                <span class="info-label" style="margin-left: 30px;">Dirección suscriptor</span>
                 <span class="info-value">${contratoData.cliente_direccion || ''}</span>
             </div>
         </div>
