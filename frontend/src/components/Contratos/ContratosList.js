@@ -26,14 +26,14 @@ const ContratosList = () => {
     estado: '',
     tipo_contrato: '',
     page: 1,
-    limit: 10
+    limit: 50
   });
   const [estadisticas, setEstadisticas] = useState(null);
   const [paginacion, setPaginacion] = useState({
     page: 1,
     totalPages: 1,
     total: 0,
-    limit: 10
+    limit: 50
   });
 
   // Cargar contratos
@@ -260,21 +260,38 @@ const { hasPermission } = useAuth();
             </select>
           </div>
 
-          <div className="flex items-end">
-            <button
-              onClick={() => setFiltros({
-                search: '',
-                estado: '',
-                tipo_contrato: '',
-                page: 1,
-                limit: 10
-              })}
-              className="w-full px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Registros por página
+            </label>
+            <select
+              value={filtros.limit}
+              onChange={(e) => handleFiltroChange('limit', parseInt(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <Filter className="w-4 h-4" />
-              Limpiar Filtros
-            </button>
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+            </select>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <button
+            onClick={() => setFiltros({
+              search: '',
+              estado: '',
+              tipo_contrato: '',
+              page: 1,
+              limit: 50
+            })}
+            className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <Filter className="w-4 h-4" />
+            Limpiar Filtros
+          </button>
         </div>
       </div>
 
