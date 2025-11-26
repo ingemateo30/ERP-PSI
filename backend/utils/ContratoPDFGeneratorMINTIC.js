@@ -1,6 +1,6 @@
 // backend/utils/ContratoPDFGeneratorMINTIC.js
 // Generador de PDF de contratos IDÉNTICO al modelo Word de PSI
-// **FORMATO CORRECTO**: Sin tablas, con columnas reales, texto simple
+// **VERSIÓN CORREGIDA** - Replica exactamente el formato del modelo real
 
 const puppeteer = require('puppeteer');
 const fs = require('fs').promises;
@@ -345,7 +345,7 @@ class ContratoPDFGeneratorMINTIC {
         ${this.generarEncabezado(logoPath, fechaHoy)}
         
         <!-- INFORMACIÓN DEL SUSCRIPTOR -->
-        <div class="section-title">INFORMACIÓN DEL SUSCRIPTOR</div>
+        <div class="section-title">INFORMACIÒN DEL SUSCRIPTOR</div>
         
         <div class="info-block">
             <div class="info-line">
@@ -391,7 +391,7 @@ class ContratoPDFGeneratorMINTIC {
         </div>
 
         <p class="intro-text">
-            Este contrato explica las condiciones para la prestación de los servicios entre usted y PROVEEDOR DE SERVICIOS DE INTERNET SAS, por el que pagará mínimo mensualmente $${this.formatearPrecio(valorTotal)}. Este contrato tendrá vigencia de ${permanenciaMeses} mes(es), contados a partir del día de la instalación. El plazo máximo de instalación es de 15 días hábiles. Acepto que mi contrato se renueve sucesiva y automáticamente por un plazo igual al inicial de ${permanenciaMeses} mes(es).
+            Este contrato explica las condiciones para la prestación de los servicios entre usted y PROVEEDOR DE TELECOMUNICACIONES SAS, por el que pagará mínimo mensualmente $${this.formatearPrecio(valorTotal)}. Este contrato tendrá vigencia de ${permanenciaMeses} mes(es), contados a partir del día de la instalación. El plazo máximo de instalación es de 15 días hábiles. Acepto que mi contrato se renueve sucesiva y automáticamente por un plazo igual al inicial de ${permanenciaMeses} mes(es).
         </p>
 
         <p class="city-name">${contratoData.ciudad_nombre || 'San Gil'}</p>
@@ -415,11 +415,11 @@ class ContratoPDFGeneratorMINTIC {
                 <img src="${logoPath}" class="logo-img" alt="Logo" />
             </div>
             <div class="header-center">
-                <div class="company-name">PROVEEDOR DE SERVICIOS DE INTERNET</div>
+                <div class="company-name">PROVEEDOR DE TELECOMUNICACIONES</div>
                 <div class="company-nit">NIT: 901.582.657-3</div>
             </div>
             <div class="header-right">
-                <div class="contract-title">CONTRATO ÚNICO DE<br/>SERVICIOS FIJOS</div>
+                <div class="contract-title">CONTRATO ÚNICO DE<br/>SERVICIOS FIJOS.</div>
                 <div class="contract-date">Fecha<br/>${fecha}</div>
             </div>
         </div>`;
@@ -438,17 +438,16 @@ class ContratoPDFGeneratorMINTIC {
                             <span class="checkbox ${servicios.television ? 'checked' : ''}" style="margin-left: 10px;"></span> Televisión
                             <span class="checkbox" style="margin-left: 10px;"></span> Publicidad
                         </div>
-                        <p>Servicios adicionales_________________</p>
-                        <p>Usted se compromete a pagar oportunamente el precio acordado. El servicio se activará a más tardar el día [FECHA]</p>
+                        <p>Servicios adicionales_____________________________</p>
+                        <p>Usted se compromete a pagar oportunamente el precio acordado. El servicio se activará a más tardar el día 24 noviembre 2024</p>
                     </div>
                 </div>
 
                 <div class="content-box">
-                    <div class="box-title">CONDICIONES COMERCIALES</div>
+                    <div class="box-title">CONDICIONES COMERCIALES<br/>CARACTERÍSTICAS DEL PLAN</div>
                     <div class="box-content">
-                        <p><strong>CARACTERÍSTICAS DEL PLAN</strong></p>
                         ${this.generarDetallesServicios(contratoData, servicios)}
-                        ${tienePermanencia ? `<p><strong>CLÁUSULA PERMANENCIA ${meses} MESES - MÓDEM EN CALIDAD DE PRÉSTAMO</strong></p>` : ''}
+                        ${tienePermanencia ? `<p><strong>CLAUSULA PERMENENCIA ${meses} MEESES-MODEN EN CALIDAD DE PRESTAMO</strong></p>` : ''}
                     </div>
                 </div>
 
@@ -462,8 +461,8 @@ class ContratoPDFGeneratorMINTIC {
                         <ol class="numbered-list">
                             <li>Pagar oportunamente los servicios prestados, incluyendo los intereses de mora cuando haya incumplimientos.</li>
                             <li>Suministrar información verdadera.</li>
-                            <li>Hacer uso adecuado de los equipos y los servicios.</li>
-                            <li>No divulgar ni acceder a pornografía infantil (Consultar anexo).</li>
+                            <li>Hacer uso adecuado de los equipos y los servicios. </li>
+                            <li>No divulgar ni acceder a pornografía infantil (Consultar anexo). </li>
                             <li>Avisar a las autoridades cualquier evento de robo o hurto de elementos de la red, como el cable.</li>
                             <li>No cometer o ser partícipe de actividades de fraude.</li>
                         </ol>
@@ -477,7 +476,7 @@ class ContratoPDFGeneratorMINTIC {
                     </div>
                 </div>
 
-                <p class="small-note">* Espacio diligenciado por el usuario</p>
+                <p class="small-note">* Espacio dilingenciado por el usuario</p>
             </div>
 
             <!-- COLUMNA DERECHA -->
@@ -515,11 +514,11 @@ class ContratoPDFGeneratorMINTIC {
   static generarDetallesServicios(contratoData, servicios) {
     let detalles = '';
     if (servicios.internet) {
-      const nombreServicio = contratoData.servicio_nombre || 'INTERNET FIBRA 300 MEGAS';
-      detalles += `<p><strong>INTERNET FIBRA $${this.formatearPrecio(contratoData.precio_internet)}</strong> ${nombreServicio} ESTRATO ${contratoData.cliente_estrato || '1,2,3'}</p>`;
+      const nombreServicio = contratoData.servicio_nombre || 'INTERNET FIBRA 300';
+      detalles += `<p><strong>INTERNET FIBRA $ ${this.formatearPrecio(contratoData.precio_internet)}</strong> ${nombreServicio} MEGAS ESTRATO ${contratoData.cliente_estrato || '1,2,3'}</p>`;
     }
     if (servicios.television) {
-      detalles += `<p><strong>TELEVISIÓN $${this.formatearPrecio(contratoData.precio_television)}</strong> ESTRATO ${contratoData.cliente_estrato || '1,2,3'} + IVA</p>`;
+      detalles += `<p><strong>TELEVISION $ ${this.formatearPrecio(contratoData.precio_television)}</strong> TELEVISION $${this.formatearPrecio(contratoData.precio_television)} ESTRATO ${contratoData.cliente_estrato || '1,2,3'} + IVA</p>`;
     }
     return detalles;
   }
@@ -538,25 +537,17 @@ class ContratoPDFGeneratorMINTIC {
             Usted puede cambiar de domicilio y continuar con el servicio siempre que sea técnicamente posible. Si desde el punto de vista técnico no es viable el traslado del servicio, usted puede ceder su contrato a un tercero o terminarlo pagando el valor de la cláusula de permanencia mínima si esta vigente.</p>
 
             <p><strong>COBRO POR RECONEXIÓN DEL SERVICIO</strong><br/>
-            En caso de suspensión del servicio por mora en el pago, podremos cobrarle un valor por reconexión que corresponderá estrictamente a los costos asociados a la operación de reconexión. En caso de servicios empaquetados procede máximo un cobro de reconexión por cada tipo de conexión empleado en la prestación de los servicios. Costo reconexión: $10.000 + IVA.</p>
+            En caso de suspensión del servicio por mora en el pago, podremos cobrarle un valor por reconexión que corresponderá estrictamente a los costos asociados a la operación de reconexión. En caso de servicios, empaquetados procede máximo un cobro de reconexión por cada tipo de conexión empleado en la prestación de los servicios. Costo reconexión: $10.000 + iva.</p>
 
             <p>El usuario es el ÚNICO responsable por el contenido y la información que se curse a través de la red y del uso que se haga de los equipos o de los servicios.</p>
 
             <p>Los equipos de comunicaciones que ya no use son desechos que no deben ser botados a la caneca, consulte nuestra política de recolección de aparatos en desuso.</p>
 
-            <p><strong>LOS CANALES DE TELEVISIÓN:</strong> se debe entender como ofertas generales no caracterizadas por ningún canal; por lo anterior el usuario expresamente autoriza a PSI para que, por razones de orden técnico o comercial, suprima, amplíe o modifique los canales que componen la programación del servicio que recibe el usuario.</p>
+            <p><strong>LOS CANALES DE TELEVISIÓN:</strong> se debe entender como ofertas generales no caracterizadas por ningún canal; por lo anterior el usuario expresamente autoriza a PSI para que, por razones de orden técnico o comercial, suprima, amplíe o modifique los canales que componen la programación del servicio que recibe el usuario. </p>
 
-            <p><strong>SUSPENSIÓN Y TERMINACIÓN POR:</strong> incumplimiento de sus obligaciones, incluyendo el no pago de 1 o más facturas consecutivas; Fuerza mayor/caso fortuito; Uso inadecuado de la red o del servicio; Por prevención de fraude; no viabilidad técnica o económica para prestar el servicio; irregularidades en los documentos suministrados; o por evolución tecnológica.</p>
+            <p><strong>SUSPENSIÓN Y TERMINACIÓN POR:</strong> incumpliendo de sus obligaciones, incluyendo el no pago de 1 o más facturas consecutivas; Fuerza mayor/caso fortuito; Uso inadecuado de la red o del servicio; Por prevencion de fraude; no viabilidad técnica o económica para prestar el servicio; iregularidades en los documentos suministrados; o por evolución tecnológica. <strong>EL USUARIO RESPONDE POR:</strong> los equipos entregados para prestación y operación del servicio y autoriza el cobro de su reposición por daño o pérdida. Deberá entregarlos a la terminación del contrato del modo establecido en la regulación, de no hacerlo pagará el valor comercial de los mismos. </p>
 
-            <p><strong>EL USUARIO RESPONDE POR:</strong> los equipos entregados para prestación y operación del servicio y autoriza el cobro de su reposición por daño o pérdida. Deberá entregarlos a la terminación del contrato del modo establecido en la regulación, de no hacerlo pagará el valor comercial de los mismos.</p>
-
-            <p><strong>LAS TARIFAS:</strong> podrán incrementar por mes o año sin superar el 50% de la tarifa antes del incremento.</p>
-
-            <p><strong>EL INTERÉS DE MORA:</strong> es el máximo legal, se cobrarán los gastos de cobranza judicial y extrajudicial.</p>
-
-            <p><strong>NO RESPONDEMOS:</strong> por lucro cesante, daño indirecto, incidentales o consecuenciales.</p>
-
-            <p><strong>ESTE CONTRATO PRESTA MÉRITO EJECUTIVO:</strong> para hacer exigibles las obligaciones y prestaciones contenidas en él.</p>
+            <p><strong>LAS TARIFAS:</strong> podrán incrementar por mes o año sin superar el 50% de la tarifa antes del incremento. <strong>EL INTERÉS DE MORA:</strong> es el máximo legal, se cobrarán los gastos de cobranza judicial y extrajudicial. <strong>NO RESPONDEMOS:</strong> por lucro cesante, daño indirecto, incidentales o consecuenciales. <strong>ESTE CONTRATO PRESTA MÉRITO EJECUTIVO:</strong> para hacer exigibles las obligaciones y prestaciones contenidas en él.</p>
         </div>
 
         <div class="contact-box">
@@ -571,7 +562,7 @@ class ContratoPDFGeneratorMINTIC {
             </div>
             <div class="contact-item">
                 <div class="contact-number">3</div>
-                <div class="contact-text">Cuando su queja o petición sea por los servicios de internet, y esté relacionada con actos de negativa del contrato, suspensión del servicio, terminación del contrato, corte y facturación; usted puede insistir en su solicitud ante nosotros, dentro de los 10 días hábiles siguientes a la respuesta, y pedir que si no llegamos a una solución satisfactoria para usted, enviemos su reclamo directamente a la SIC (Superintendencia de Industria y Comercio) quien resolverá de manera definitiva su solicitud. Esto se llama recurso de reposición y en subsidio apelación.</div>
+                <div class="contact-text">Cuando su queja o petición sea por los servicios de internet, y esté relacionada con actos de negativa del contrato, suspensión del servicio, terminación del contrato, corte y facturación; usted puede insistir en su solicitud ante nosotros, dentro de los 10 días hábiles siguientes a la respuesta, y pedir que si no llegamos a una solución satisfactoria para usted, enviemos su reclamo directamente a la SIC (Superintendencia de Industria y comercio) quien resolverá de manera definitiva su solicitud. Esto se llama recurso de reposición y en subsidio apelación. </div>
             </div>
             <div class="contact-item">
                 <div class="contact-number">4</div>
@@ -599,7 +590,7 @@ class ContratoPDFGeneratorMINTIC {
     <div class="page">
         ${this.generarEncabezado(logoPath, fecha)}
         
-        <div class="section-title">INFORMACIÓN DEL SUSCRIPTOR</div>
+        <div class="section-title">INFORMACIÒN DEL SUSCRIPTOR</div>
         
         <div class="info-block">
             <div class="info-line">
@@ -644,7 +635,7 @@ class ContratoPDFGeneratorMINTIC {
         <div class="section-title">ANEXO DE COMPROMISO DE PERMANENCIA MÍNIMA</div>
         
         <p class="intro-text" style="margin-top: 5mm;">
-            Señor usuario, el presente contrato lo obliga a estar vinculado con PROVEEDOR DE SERVICIOS DE INTERNET SAS durante un tiempo de ${meses} mes(es), además cuando venza el plazo indicado, el presente contrato se renovará en forma automática indefinidamente, y finalmente, en caso que usted decida terminar el contrato antes de que venza el periodo de permanencia mínima señalado usted deberá pagar los valores que se determinan en el siguiente punto. En caso de que el usuario que celebró el contrato lo dé por terminado antes del vencimiento del periodo estipulado, pagará una suma equivalente al valor del servicio mensual por los meses faltantes para la terminación de la permanencia mínima, dividido en dos; su forma es: VALOR POR TERMINADO DEL CONTRATO=((VALOR DEL SERVICIO MENSUAL * MESES FALTANTES PARA COMPLETAR LA PERMANENCIA) / 2). Una vez esta condición sea aceptada expresamente por usted, debe permanecer con el contrato por el tiempo acordado en la presente cláusula, y queda vinculado con PROVEEDOR DE SERVICIOS DE INTERNET SAS de acuerdo con las condiciones del presente contrato. Prórroga: El usuario que celebró el contrato conoce y acepta la prórroga automática del plan tarifario estipulada en el clausurado del contrato.
+            Señor usuario, el presente contrato lo obliga a estar vinculado con PROVEEDOR DE TELECOMUNICACIONES SAS. durante un tiempo de ${meses} mes(es), además cuando venza el plazo indicado, el presente contrato se renovará en forma automática indefinidamente, y finalmente, en caso que usted decida terminar el contrato antes de que venza el periodo de permanencia mínima señalado usted deberá pagar los valores que se determinan en el siguiente punto. En caso de que el usuario que celebró el contrato lo dé por terminado antes del vencimiento del periodo estipulado, pagará una suma equivalente al valor del servicio mensual por los meses faltantes para la termininacion de la permanencia mínima, dividido en dos; su forma es: VALOR POR TERMINADO DEL CONTRATO=((VALOR DEL SERVICIO MENSUAL * MESES FALTANTES PARA COMPLETAR LA PERMANENCIA) / 2). Una vez esta condición sea aceptada expresamente por usted, debe permanecer con el contrato por el tiempo acordado en la presente cláusula, y queda vinculado con PROVEEDOR DE TELECOMUNICACIONES SAS. de acuerdo con las condiciones del presente contrato. Prórroga: El usuario que celebró el contrato conoce y acepta la prórroga automática del plan tarifario estipulada en el clausurado del contrato.
         </p>
 
         <div style="height: 50mm;"></div>
