@@ -428,8 +428,19 @@ static async generarPDF(req, res) {
 
             const empresa = empresaConfig[0];
 
+            // ✅ Cargar logo en base64
+            let logoPath = '';
+            try {
+                const logoFilePath = path.join(__dirname, '..', 'assets', 'logo2.png');
+                const logoBuffer = fs.readFileSync(logoFilePath);
+                logoPath = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+                console.log('✅ Logo cargado correctamente');
+            } catch (error) {
+                console.warn('⚠️  Logo no encontrado:', error.message);
+            }
+
             // ✅ ACTUALIZADO: Generar HTML del contrato usando modelo MINTIC
-            const htmlContent = ContratoPDFGeneratorMINTIC.generarHTML(contratoData, empresa);
+            const htmlContent = ContratoPDFGeneratorMINTIC.generarHTML(contratoData, empresa, logoPath);
 
             // Generar PDF con Puppeteer
             const browser = await puppeteer.launch({
