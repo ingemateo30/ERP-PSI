@@ -1872,31 +1872,44 @@ class ClienteCompletoService {
       const fechasFacturacion = this.calcularFechasFacturacion();
 
       // 5. CALCULAR TOTALES UNIFICADOS DE TODOS LOS SERVICIOS DE LA SEDE
-      let valorInternet = 0;
-      let valorTelevision = 0;
-      let valorIvaInternet = 0;
-      let valorIvaTelevision = 0;
+let valorInternet = 0;
+let valorTelevision = 0;
+let valorIvaInternet = 0;
+let valorIvaTelevision = 0;
 
-      for (const servicio of serviciosDeLaSede) {
-        const precio = parseFloat(servicio.precio || 0);
+for (const servicio of serviciosDeLaSede) {
+  const precio = parseFloat(servicio.precio || 0);
+  
+  // ✅ Detectar tipo desde plan_nombre si 'tipo' no está disponible
+  let tipoServicio = servicio.tipo;
+  
+  if (!tipoServicio && servicio.plan_nombre) {
+    const nombreLower = servicio.plan_nombre.toLowerCase();
+    if (nombreLower.includes('internet') && nombreLower.includes('tv')) {
+      tipoServicio = 'combo';
+    } else if (nombreLower.includes('internet')) {
+      tipoServicio = 'internet';
+    } else if (nombreLower.includes('tv') || nombreLower.includes('televisión')) {
+      tipoServicio = 'television';
+    }
+  }
 
-        if (servicio.tipo === 'internet') {
-          valorInternet += precio;
-          // IVA para internet: solo estratos 4, 5, 6
-          if (estrato >= 4) {
-            valorIvaInternet += precio * (parseFloat(config.porcentaje_iva) / 100);
-          }
-        } else if (servicio.tipo === 'television') {
-          valorTelevision += precio;
-          // IVA para televisión: todos los estratos
-          valorIvaTelevision += precio * (parseFloat(config.porcentaje_iva) / 100);
-        }
-      }
+  console.log(`📊 Factura - Servicio: ${servicio.plan_nombre}, Tipo: ${tipoServicio}, Precio: $${precio}`);
 
-      const subtotal = valorInternet + valorTelevision;
-      const totalIva = valorIvaInternet + valorIvaTelevision;
-      const total = subtotal + totalIva;
+  // Sumar TODOS los servicios como internet (simplificado)
+  valorInternet += precio;
+  
+  // IVA solo para estratos 4, 5, 6
+  if (estrato >= 4) {
+    valorIvaInternet += precio * (parseFloat(config.porcentaje_iva) / 100);
+  }
+}
 
+const subtotal = valorInternet + valorTelevision;
+const totalIva = valorIvaInternet + valorIvaTelevision;
+const total = subtotal + totalIva;
+
+console.log(`💰 TOTALES FACTURA: Internet=$${valorInternet}, TV=$${valorTelevision}, IVA=$${totalIva}, Total=$${total}`);
       // 6. CREAR DESCRIPCIÓN DE SERVICIOS PARA OBSERVACIONES
       const sedeNombre = sedeData.nombre_sede || 'Sede Principal';
       const serviciosFacturados = serviciosDeLaSede.map(s =>
