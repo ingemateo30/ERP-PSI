@@ -687,7 +687,7 @@ class ContratoPDFGeneratorMINTIC {
   static async generarPDFCompleto(datosContrato) {
     let logoPath = '';
     try {
-      const logoFilePath = path.join(__dirname, '/public/logo2.png');
+      const logoFilePath = path.join(__dirname, '../assets/logo2.png');
       const logoBuffer = await fs.readFile(logoFilePath);
       logoPath = `data:image/png;base64,${logoBuffer.toString('base64')}`;
     } catch (error) {
