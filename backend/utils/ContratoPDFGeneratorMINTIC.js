@@ -532,25 +532,44 @@ class ContratoPDFGeneratorMINTIC {
     <div class="page">
         ${this.generarEncabezado(logoPath, fecha)}
         
-        <div class="legal-text">
-            <p><strong>PAGO Y FACTURACIÓN</strong><br/>
-            La factura le debe llegar como mínimo 5 días hábiles antes de la fecha de pago. Si no llega, puede solicitarla a través de nuestros Medios de Atención y debe pagarla oportunamente. Si no paga a tiempo, previo aviso, suspenderemos su servicio hasta que pague sus saldos pendientes. Contamos con 3 días hábiles luego de su pago para reconectarle el servicio. Si no paga a tiempo, también podemos reportar su deuda a las centrales de riesgo. Para esto tenemos que avisarle por lo menos con 20 días calendario de anticipación. Si paga luego de este reporte tenemos la obligación dentro del mes de seguimiento de informar su pago para que ya no aparezca reportado. Si tiene un reclamo sobre su factura, puede presentarlo antes de la fecha de pago y en ese caso no debe pagar las sumas reclamadas hasta que resolvamos su solicitud. Si ya pagó, tiene 6 meses para presentar la reclamación.</p>
+        <!-- PÁGINA 2 EN DOS COLUMNAS -->
+        <div class="two-columns">
+            <!-- COLUMNA IZQUIERDA -->
+            <div class="column-content">
+                <div class="legal-text">
+                    <p><strong>PAGO Y FACTURACIÓN</strong><br/>
+                    La factura le debe llegar como mínimo 5 días hábiles antes de la fecha de pago. Si no llega, puede solicitarla a través de nuestros Medios de Atención y debe pagarla oportunamente. Si no paga a tiempo, previo aviso, suspenderemos su servicio hasta que pague sus saldos pendientes. Contamos con 3 días hábiles luego de su pago para reconectarle el servicio. Si no paga a tiempo, también podemos reportar su deuda a las centrales de riesgo. Para esto tenemos que avisarle por lo menos con 20 días calendario de anticipación. Si paga luego de este reporte tenemos la obligación dentro del mes de seguimiento de informar su pago para que ya no aparezca reportado. Si tiene un reclamo sobre su factura, puede presentarlo antes de la fecha de pago y en ese caso no debe pagar las sumas reclamadas hasta que resolvamos su solicitud. Si ya pagó, tiene 6 meses para presentar la reclamación.</p>
 
-            <p><strong>CAMBIO DE DOMICILIO</strong><br/>
-            Usted puede cambiar de domicilio y continuar con el servicio siempre que sea técnicamente posible. Si desde el punto de vista técnico no es viable el traslado del servicio, usted puede ceder su contrato a un tercero o terminarlo pagando el valor de la cláusula de permanencia mínima si esta vigente.</p>
+                    <p><strong>CAMBIO DE DOMICILIO</strong><br/>
+                    Usted puede cambiar de domicilio y continuar con el servicio siempre que sea técnicamente posible. Si desde el punto de vista técnico no es viable el traslado del servicio, usted puede ceder su contrato a un tercero o terminarlo pagando el valor de la cláusula de permanencia mínima si esta vigente.</p>
 
-            <p><strong>COBRO POR RECONEXIÓN DEL SERVICIO</strong><br/>
-            En caso de suspensión del servicio por mora en el pago, podremos cobrarle un valor por reconexión que corresponderá estrictamente a los costos asociados a la operación de reconexión. En caso de servicios, empaquetados procede máximo un cobro de reconexión por cada tipo de conexión empleado en la prestación de los servicios. Costo reconexión: $10.000 + iva.</p>
+                    <p><strong>COBRO POR RECONEXIÓN DEL SERVICIO</strong><br/>
+                    En caso de suspensión del servicio por mora en el pago, podremos cobrarle un valor por reconexión que corresponderá estrictamente a los costos asociados a la operación de reconexión. En caso de servicios, empaquetados procede máximo un cobro de reconexión por cada tipo de conexión empleado en la prestación de los servicios. Costo reconexión: $10.000 + iva.</p>
 
-            <p>El usuario es el ÚNICO responsable por el contenido y la información que se curse a través de la red y del uso que se haga de los equipos o de los servicios.</p>
+                    <p>El usuario es el ÚNICO responsable por el contenido y la información que se curse a través de la red y del uso que se haga de los equipos o de los servicios.</p>
 
-            <p>Los equipos de comunicaciones que ya no use son desechos que no deben ser botados a la caneca, consulte nuestra política de recolección de aparatos en desuso.</p>
+                    <p>Los equipos de comunicaciones que ya no use son desechos que no deben ser botados a la caneca, consulte nuestra política de recolección de aparatos en desuso.</p>
+                </div>
+            </div>
 
-            <p><strong>LOS CANALES DE TELEVISIÓN:</strong> se debe entender como ofertas generales no caracterizadas por ningún canal; por lo anterior el usuario expresamente autoriza a PSI para que, por razones de orden técnico o comercial, suprima, amplíe o modifique los canales que componen la programación del servicio que recibe el usuario. </p>
+            <!-- COLUMNA DERECHA -->
+            <div class="column-content">
+                <div class="legal-text">
+                    <p><strong>LOS CANALES DE TELEVISIÓN:</strong> se debe entender como ofertas generales no caracterizadas por ningún canal; por lo anterior el usuario expresamente autoriza a PSI para que, por razones de orden técnico o comercial, suprima, amplíe o modifique los canales que componen la programación del servicio que recibe el usuario.</p>
 
-            <p><strong>SUSPENSIÓN Y TERMINACIÓN POR:</strong> incumpliendo de sus obligaciones, incluyendo el no pago de 1 o más facturas consecutivas; Fuerza mayor/caso fortuito; Uso inadecuado de la red o del servicio; Por prevencion de fraude; no viabilidad técnica o económica para prestar el servicio; iregularidades en los documentos suministrados; o por evolución tecnológica. <strong>EL USUARIO RESPONDE POR:</strong> los equipos entregados para prestación y operación del servicio y autoriza el cobro de su reposición por daño o pérdida. Deberá entregarlos a la terminación del contrato del modo establecido en la regulación, de no hacerlo pagará el valor comercial de los mismos. </p>
+                    <p><strong>SUSPENSIÓN Y TERMINACIÓN POR:</strong> incumpliendo de sus obligaciones, incluyendo el no pago de 1 o más facturas consecutivas; Fuerza mayor/caso fortuito; Uso inadecuado de la red o del servicio; Por prevencion de fraude; no viabilidad técnica o económica para prestar el servicio; iregularidades en los documentos suministrados; o por evolución tecnológica.</p>
+                    
+                    <p><strong>EL USUARIO RESPONDE POR:</strong> los equipos entregados para prestación y operación del servicio y autoriza el cobro de su reposición por daño o pérdida. Deberá entregarlos a la terminación del contrato del modo establecido en la regulación, de no hacerlo pagará el valor comercial de los mismos.</p>
 
-            <p><strong>LAS TARIFAS:</strong> podrán incrementar por mes o año sin superar el 50% de la tarifa antes del incremento. <strong>EL INTERÉS DE MORA:</strong> es el máximo legal, se cobrarán los gastos de cobranza judicial y extrajudicial. <strong>NO RESPONDEMOS:</strong> por lucro cesante, daño indirecto, incidentales o consecuenciales. <strong>ESTE CONTRATO PRESTA MÉRITO EJECUTIVO:</strong> para hacer exigibles las obligaciones y prestaciones contenidas en él.</p>
+                    <p><strong>LAS TARIFAS:</strong> podrán incrementar por mes o año sin superar el 50% de la tarifa antes del incremento.</p>
+                    
+                    <p><strong>EL INTERÉS DE MORA:</strong> es el máximo legal, se cobrarán los gastos de cobranza judicial y extrajudicial.</p>
+                    
+                    <p><strong>NO RESPONDEMOS:</strong> por lucro cesante, daño indirecto, incidentales o consecuenciales.</p>
+                    
+                    <p><strong>ESTE CONTRATO PRESTA MÉRITO EJECUTIVO:</strong> para hacer exigibles las obligaciones y prestaciones contenidas en él.</p>
+                </div>
+            </div>
         </div>
 
         <div class="contact-box">
