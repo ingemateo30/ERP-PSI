@@ -150,7 +150,7 @@ class ContratoPDFGeneratorMINTIC {
         .two-columns {
             column-count: 2;
             column-gap: 6mm;
-            min-height: 500px;
+            min-height: 400px;
         }
 
         .two-columns-page2 {
@@ -161,12 +161,12 @@ class ContratoPDFGeneratorMINTIC {
 
         .column-content {
             break-inside: avoid-column;
-            margin-bottom: 3mm;
+            margin-bottom: 2mm;
         }
 
         /* CAJAS DE CONTENIDO */
         .content-box {
-            margin-bottom: 3mm;
+            margin-bottom: 2mm;
             break-inside: avoid;
         }
 
@@ -177,13 +177,13 @@ class ContratoPDFGeneratorMINTIC {
             font-weight: bold;
             font-size: 9pt;
             text-align: center;
-            margin-bottom: 2mm;
+            margin-bottom: 1mm;
         }
 
         .box-content {
             padding: 0;
-            font-size: 9pt;
-            line-height: 1.15;
+            font-size: 8.5pt;
+            line-height: 1.1;
             text-align: justify;
         }
 
