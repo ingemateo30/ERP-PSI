@@ -16,16 +16,16 @@ static async obtenerTodos(req, res) {
 
         const {
             page = 1,
-            limit = 10,
+            limit = 50,
             cliente_id,
             estado = '',
             tipo_contrato = '',
             search = '',
-            para_firma = false 
+            para_firma = false
         } = req.query;
 
         const pageNum = Math.max(1, parseInt(page) || 1);
-        const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+        const limitNum = Math.min(500, Math.max(1, parseInt(limit) || 50));
         const offsetNum = (pageNum - 1) * limitNum;
 
         // ✅ Query mejorado - maneja servicio_id NULL y JSON arrays
