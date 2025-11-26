@@ -43,8 +43,8 @@ class ContratoPDFGeneratorMINTIC {
 
         body {
             font-family: Calibri, Arial, sans-serif;
-            font-size: 11pt;
-            line-height: 1.15;
+            font-size: 9pt;
+            line-height: 1.1;
             color: #000;
         }
 
@@ -53,8 +53,8 @@ class ContratoPDFGeneratorMINTIC {
             display: flex;
             align-items: flex-start;
             border-bottom: 2px solid #000;
-            padding-bottom: 3mm;
-            margin-bottom: 5mm;
+            padding-bottom: 2mm;
+            margin-bottom: 3mm;
         }
 
         .header-left {
@@ -63,7 +63,7 @@ class ContratoPDFGeneratorMINTIC {
 
         .logo-img {
             width: 100%;
-            max-width: 60px;
+            max-width: 50px;
         }
 
         .header-center {
@@ -73,12 +73,12 @@ class ContratoPDFGeneratorMINTIC {
         }
 
         .company-name {
-            font-size: 10pt;
+            font-size: 9pt;
             font-weight: bold;
         }
 
         .company-nit {
-            font-size: 10pt;
+            font-size: 9pt;
         }
 
         .header-right {
@@ -87,16 +87,16 @@ class ContratoPDFGeneratorMINTIC {
         }
 
         .contract-title {
-            font-size: 10pt;
+            font-size: 9pt;
             font-weight: bold;
-            margin-bottom: 3px;
+            margin-bottom: 2px;
         }
 
         .contract-date {
-            font-size: 10pt;
+            font-size: 9pt;
             border: 1px solid #000;
             display: inline-block;
-            padding: 2px 5px;
+            padding: 1px 4px;
         }
 
         /* SECCIÓN INFORMACIÓN DEL SUSCRIPTOR */
@@ -104,21 +104,21 @@ class ContratoPDFGeneratorMINTIC {
             background-color: #d0d0d0;
             text-align: center;
             font-weight: bold;
-            font-size: 11pt;
-            padding: 3px;
-            margin: 8mm 0 3mm 0;
+            font-size: 9pt;
+            padding: 2px;
+            margin: 3mm 0 2mm 0;
             border: 1px solid #000;
         }
 
         /* INFORMACIÓN DEL SUSCRIPTOR - FORMATO SIMPLE */
         .info-block {
-            margin-bottom: 5mm;
-            font-size: 11pt;
-            line-height: 1.4;
+            margin-bottom: 3mm;
+            font-size: 9pt;
+            line-height: 1.3;
         }
 
         .info-line {
-            margin-bottom: 2mm;
+            margin-bottom: 1.5mm;
         }
 
         .info-label {
@@ -128,77 +128,77 @@ class ContratoPDFGeneratorMINTIC {
 
         .info-value {
             display: inline;
-            margin-left: 5px;
+            margin-left: 3px;
         }
 
         /* TEXTO INTRO */
         .intro-text {
             text-align: justify;
-            font-size: 10pt;
-            line-height: 1.3;
-            margin-bottom: 4mm;
+            font-size: 8.5pt;
+            line-height: 1.2;
+            margin-bottom: 2mm;
         }
 
         .city-name {
             text-align: center;
             font-weight: bold;
-            font-size: 11pt;
-            margin: 5mm 0;
+            font-size: 9pt;
+            margin: 2mm 0;
         }
 
         /* COLUMNAS - USANDO CSS COLUMNS */
         .two-columns {
             column-count: 2;
-            column-gap: 8mm;
+            column-gap: 6mm;
             column-rule: 1px solid #000;
         }
 
         .column-content {
             break-inside: avoid-column;
-            margin-bottom: 4mm;
+            margin-bottom: 2mm;
         }
 
         /* CAJAS DE CONTENIDO */
         .content-box {
             border: 1px solid #000;
-            margin-bottom: 4mm;
+            margin-bottom: 2mm;
             break-inside: avoid;
         }
 
         .box-title {
             background-color: #f2f2f2;
             border-bottom: 1px solid #000;
-            padding: 2px 4px;
+            padding: 1.5px 3px;
             font-weight: bold;
-            font-size: 9.5pt;
+            font-size: 8pt;
             text-align: center;
         }
 
         .box-content {
-            padding: 4px 5px;
-            font-size: 9pt;
-            line-height: 1.2;
+            padding: 3px 4px;
+            font-size: 7.5pt;
+            line-height: 1.15;
             text-align: justify;
         }
 
         .box-content p {
-            margin-bottom: 3px;
+            margin-bottom: 2px;
         }
 
         /* CHECKBOXES */
         .checkboxes {
-            margin: 4px 0;
+            margin: 2px 0;
         }
 
         .checkbox {
             display: inline-block;
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border: 1.5px solid #000;
-            margin-right: 3px;
+            margin-right: 2px;
             text-align: center;
-            line-height: 10px;
-            font-size: 9pt;
+            line-height: 8px;
+            font-size: 8pt;
         }
 
         .checkbox.checked::before {
@@ -208,10 +208,11 @@ class ContratoPDFGeneratorMINTIC {
         /* VALOR TOTAL */
         .valor-total {
             border: 1px solid #000;
-            padding: 3px;
+            padding: 2px;
             text-align: center;
             font-weight: bold;
-            margin: 4mm 0;
+            margin: 2mm 0;
+            font-size: 8.5pt;
         }
 
         /* LISTA NUMERADA */
@@ -219,14 +220,15 @@ class ContratoPDFGeneratorMINTIC {
             list-style: none;
             counter-reset: item;
             padding-left: 0;
-            margin: 3px 0;
+            margin: 2px 0;
         }
 
         .numbered-list li {
             counter-increment: item;
-            margin-bottom: 3px;
-            padding-left: 18px;
+            margin-bottom: 2px;
+            padding-left: 15px;
             position: relative;
+            font-size: 7.5pt;
         }
 
         .numbered-list li::before {
@@ -331,9 +333,9 @@ class ContratoPDFGeneratorMINTIC {
         }
 
         .small-note {
-            font-size: 8pt;
+            font-size: 7pt;
             font-style: italic;
-            margin-top: 3mm;
+            margin-top: 2mm;
         }
     </style>
 </head>
@@ -343,7 +345,7 @@ class ContratoPDFGeneratorMINTIC {
         ${this.generarEncabezado(logoPath, fechaHoy)}
         
         <!-- INFORMACIÓN DEL SUSCRIPTOR -->
-        <div class="section-title">Hola</div>
+        <div class="section-title">INFORMACIÓN DEL SUSCRIPTOR</div>
         
         <div class="info-block">
             <div class="info-line">
@@ -663,10 +665,9 @@ class ContratoPDFGeneratorMINTIC {
   }
 
   static async generarPDFCompleto(datosContrato) {
-    console.log('📝 Generando PDF del contrato completo...');
     let logoPath = '';
     try {
-      const logoFilePath = path.join(__dirname, 'public', 'logo2.png');
+      const logoFilePath = path.join(__dirname, '/public/logo2.png');
       const logoBuffer = await fs.readFile(logoFilePath);
       logoPath = `data:image/png;base64,${logoBuffer.toString('base64')}`;
     } catch (error) {
@@ -693,7 +694,11 @@ class ContratoPDFGeneratorMINTIC {
     }
   }
 
- 
+  static async generarPDF(contratoData, empresaData, rutaSalida) {
+    const pdfBuffer = await this.generarPDFCompleto(contratoData);
+    await fs.writeFile(rutaSalida, pdfBuffer);
+    console.log(`✅ PDF generado: ${rutaSalida}`);
+  }
 }
 
 module.exports = ContratoPDFGeneratorMINTIC;
