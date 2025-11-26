@@ -52,8 +52,6 @@ class ContratoPDFGeneratorMINTIC {
         .header {
             display: flex;
             align-items: flex-start;
-            border-bottom: 2px solid #000;
-            padding-bottom: 2mm;
             margin-bottom: 3mm;
         }
 
@@ -89,14 +87,11 @@ class ContratoPDFGeneratorMINTIC {
         .contract-title {
             font-size: 9pt;
             font-weight: bold;
-            margin-bottom: 2px;
+            margin-bottom: 2mm;
         }
 
         .contract-date {
             font-size: 9pt;
-            border: 1px solid #000;
-            display: inline-block;
-            padding: 1px 4px;
         }
 
         /* SECCIÓN INFORMACIÓN DEL SUSCRIPTOR */
@@ -132,11 +127,16 @@ class ContratoPDFGeneratorMINTIC {
         }
 
         /* TEXTO INTRO */
+        .intro-box {
+            border: 1px solid #000;
+            padding: 3px 4px;
+            margin-bottom: 2mm;
+        }
+
         .intro-text {
             text-align: justify;
             font-size: 8.5pt;
             line-height: 1.2;
-            margin-bottom: 2mm;
         }
 
         .city-name {
@@ -151,11 +151,12 @@ class ContratoPDFGeneratorMINTIC {
             column-count: 2;
             column-gap: 6mm;
             column-rule: 1px solid #000;
+            min-height: 500px;
         }
 
         .column-content {
             break-inside: avoid-column;
-            margin-bottom: 2mm;
+            margin-bottom: 3mm;
         }
 
         /* CAJAS DE CONTENIDO */
@@ -390,9 +391,11 @@ class ContratoPDFGeneratorMINTIC {
             </div>
         </div>
 
-        <p class="intro-text">
-            Este contrato explica las condiciones para la prestación de los servicios entre usted y PROVEEDOR DE TELECOMUNICACIONES SAS, por el que pagará mínimo mensualmente $${this.formatearPrecio(valorTotal)}. Este contrato tendrá vigencia de ${permanenciaMeses} mes(es), contados a partir del día de la instalación. El plazo máximo de instalación es de 15 días hábiles. Acepto que mi contrato se renueve sucesiva y automáticamente por un plazo igual al inicial de ${permanenciaMeses} mes(es).
-        </p>
+        <div class="intro-box">
+            <p class="intro-text">
+                Este contrato explica las condiciones para la prestación de los servicios entre usted y PROVEEDOR DE TELECOMUNICACIONES SAS, por el que pagará mínimo mensualmente $${this.formatearPrecio(valorTotal)}. Este contrato tendrá vigencia de ${permanenciaMeses} mes(es), contados a partir del día de la instalación. El plazo máximo de instalación es de 15 días hábiles. Acepto que mi contrato se renueve sucesiva y automáticamente por un plazo igual al inicial de ${permanenciaMeses} mes(es).
+            </p>
+        </div>
 
         <p class="city-name">${contratoData.ciudad_nombre || 'San Gil'}</p>
 
@@ -419,8 +422,8 @@ class ContratoPDFGeneratorMINTIC {
                 <div class="company-nit">NIT: 901.582.657-3</div>
             </div>
             <div class="header-right">
-                <div class="contract-title">CONTRATO ÚNICO DE<br/>SERVICIOS FIJOS.</div>
-                <div class="contract-date">Fecha<br/>${fecha}</div>
+                <div class="contract-title">CONTRATO ÚNICO DE SERVICIOS FIJOS</div>
+                <div class="contract-date">Fecha ${fecha}</div>
             </div>
         </div>`;
   }
