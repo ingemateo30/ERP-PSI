@@ -47,7 +47,7 @@ class ClienteCompletoController {
         },
         servicio: {
           plan_id: req.body.servicio.plan_id,
-          tipo_permanencia: req.body.servicio.tipo_permanencia || 'sin_permanencia', 
+          tipo_permanencia: req.body.servicio.tipo_permanencia || 'sin_permanencia',
           precio_personalizado: req.body.servicio.precio_personalizado,
           fecha_activacion: req.body.servicio.fecha_activacion || new Date().toISOString().split('T')[0],
           observaciones: req.body.servicio.observaciones
@@ -60,12 +60,8 @@ class ClienteCompletoController {
       };
 
       // Ejecutar creación completa
-      const createdBy = req.user?.id || req.user?.userId || req.userId || 1;
-      const resultado = await ClienteCompletoService.crearClienteCompleto({
-        cliente,
-        servicio,
-        opciones: opciones || {}
-      }, createdBy);
+      const createdBy = req.body.created_by || req.user?.id || req.user?.userId || req.userId || 1;
+      const resultado = await ClienteCompletoService.crearClienteCompleto(datosCompletos, createdBy);
 
       res.status(201).json({
         success: true,

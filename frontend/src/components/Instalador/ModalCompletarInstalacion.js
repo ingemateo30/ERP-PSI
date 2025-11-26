@@ -1,7 +1,8 @@
 // frontend/src/components/Instalador/ModalCompletarInstalacion.js
 
-import React, { useState, useEffect } from 'react';
-import { X, Camera, Upload, Package, CheckCircle, Wifi, Lock } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Camera, Upload, Package, CheckCircle, Wifi, Lock, Pen, RotateCcw } from 'lucide-react';
+import SignatureCanvas from 'react-signature-canvas';
 
 const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -14,6 +15,10 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
   // ✅ NUEVOS CAMPOS
   const [ipAsignada, setIpAsignada] = useState('');
   const [tap, setTap] = useState('');
+
+  // ✅ ESTADOS PARA FIRMA DEL INSTALADOR
+  const sigCanvas = useRef(null);
+  const [firmaCompleta, setFirmaCompleta] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -87,6 +92,19 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
     });
   };
 
+  // ✅ FUNCIÓN PARA LIMPIAR LA FIRMA
+  const limpiarFirma = () => {
+    if (sigCanvas.current) {
+      sigCanvas.current.clear();
+      setFirmaCompleta(false);
+    }
+  };
+
+  // ✅ DETECTAR CUANDO EL USUARIO EMPIEZA A FIRMAR
+  const handleFirmaInicio = () => {
+    setFirmaCompleta(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -121,6 +139,12 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
       return;
     }
 
+    // ✅ VALIDAR FIRMA DEL INSTALADOR
+    if (!firmaCompleta || sigCanvas.current.isEmpty()) {
+      alert('❌ Debes firmar en el área designada antes de completar');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -131,13 +155,17 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
         return;
       }
       
-      // ✅ PAYLOAD CON IP Y TAP
+      // ✅ CAPTURAR FIRMA EN BASE64
+      const firmaBase64 = sigCanvas.current.toDataURL();
+
+      // ✅ PAYLOAD CON IP, TAP Y FIRMA
       const formData = {
         equipos: equiposSeleccionados,
         foto: fotoPreview, // Base64
         observaciones,
         ip_asignada: ipAsignada.trim(),
-        tap: tap.trim()
+        tap: tap.trim(),
+        firma_instalador: firmaBase64 // ✅ NUEVA FIRMA
       };
 
       const response = await fetch(
@@ -176,6 +204,11 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
     setObservaciones('');
     setIpAsignada('');
     setTap('');
+    // ✅ LIMPIAR FIRMA
+    if (sigCanvas.current) {
+      sigCanvas.current.clear();
+    }
+    setFirmaCompleta(false);
     onClose();
   };
 
@@ -251,7 +284,7 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
               <Package className="inline mr-2" size={18} />
               Equipos Instalados * ({equiposSeleccionados.length} seleccionados)
             </label>
-            
+
             {equiposDisponibles.length === 0 ? (
               <div className="text-center py-8 bg-gray-50 rounded-lg">
                 <Package size={48} className="mx-auto text-gray-400 mb-2" />
@@ -313,6 +346,44 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
             />
             <p className="text-xs text-gray-500 mt-1">Mínimo 8 caracteres</p>
+          </div>
+
+          {/* ✅ FIRMA DEL INSTALADOR */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Pen size={16} className="inline mr-1" />
+              Firma del Instalador *
+            </label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 bg-white">
+              <SignatureCanvas
+                ref={sigCanvas}
+                canvasProps={{
+                  width: 500,
+                  height: 150,
+                  className: 'w-full border rounded'
+                }}
+                backgroundColor="rgb(255, 255, 255)"
+                onBegin={handleFirmaInicio}
+              />
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <p className="text-xs text-gray-500">
+                ✍️ Firme con el mouse, dedo o stylus
+              </p>
+              <button
+                type="button"
+                onClick={limpiarFirma}
+                className="flex items-center px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+              >
+                <RotateCcw size={14} className="mr-1" />
+                Limpiar
+              </button>
+            </div>
+            {!firmaCompleta && (
+              <p className="text-xs text-red-500 mt-1">
+                ⚠️ Debe firmar antes de completar la instalación
+              </p>
+            )}
           </div>
 
           {/* Observaciones */}

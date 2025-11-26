@@ -1,44 +1,55 @@
-// frontend/src/components/Facturas/CrucePagosBancarios.js
+// frontend/src/components/Facturas/CrucePagosBancarios.js - VERSIÓN FINAL CORREGIDA
 import React, { useState, useEffect } from 'react';
 import apiService from '../../services/apiService';
 import {
     DollarSign,
     Calendar,
     Search,
-    Filter,
     Download,
     Check,
     X,
-    Building,
     FileText,
     CreditCard,
     AlertCircle,
     Eye,
     History,
-    RefreshCw
+    RefreshCw,
+    BarChart3,
+    TrendingUp,
+    Building,
+    PieChart
 } from 'lucide-react';
 
 const CrucePagosBancarios = () => {
     const [facturasPendientes, setFacturasPendientes] = useState([]);
     const [facturasPagadas, setFacturasPagadas] = useState([]);
+    const [bancos, setBancos] = useState([]);
     const [loading, setLoading] = useState(false);
     const [loadingPagadas, setLoadingPagadas] = useState(false);
-    const [buscando, setBuscando] = useState(false); // ✅ NUEVO: Estado de búsqueda activa
-    const [filtros, setFiltros] = useState({
-        banco: '',
+    const [loadingBancos, setLoadingBancos] = useState(false);
+    
+    // Estados para estadísticas
+    const [estadisticas, setEstadisticas] = useState(null);
+    const [loadingEstadisticas, setLoadingEstadisticas] = useState(false);
+    const [mostrarEstadisticas, setMostrarEstadisticas] = useState(false);
+    const [busquedaRealizada, setBusquedaRealizada] = useState(false); // NUEVO
+
+    // Filtros para pendientes (SIN BANCO)
+    const [filtrosPendientes, setFiltrosPendientes] = useState({
         fecha_inicio: new Date(new Date().setDate(1)).toISOString().split('T')[0],
         fecha_fin: new Date().toISOString().split('T')[0],
         busqueda: ''
     });
+
+    // Filtros para pagadas (CON BANCO Y MÉTODO DE PAGO)
     const [filtrosPagadas, setFiltrosPagadas] = useState({
         banco: '',
+        metodo_pago: '',
         fecha_inicio: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
         fecha_fin: new Date().toISOString().split('T')[0],
         busqueda: ''
     });
-    // ✅ NUEVO: Estados temporales para los filtros
-    const [filtrosTemp, setFiltrosTemp] = useState(filtros);
-    const [filtrosPagadasTemp, setFiltrosPagadasTemp] = useState(filtrosPagadas);
+
     const [mostrarModalCruce, setMostrarModalCruce] = useState(false);
     const [mostrarModalDetalle, setMostrarModalDetalle] = useState(false);
     const [facturaSeleccionada, setFacturaSeleccionada] = useState(null);
@@ -51,124 +62,149 @@ const CrucePagosBancarios = () => {
         observaciones: ''
     });
 
-    const bancos = [
-        { id: 1, nombre: 'Bancolombia', codigo: 'BANCOLOMBIA' },
-        { id: 2, nombre: 'Davivienda', codigo: 'DAVIVIENDA' },
-        { id: 3, nombre: 'Banco de Bogotá', codigo: 'BOGOTA' },
-        { id: 4, nombre: 'BBVA', codigo: 'BBVA' },
-        { id: 5, nombre: 'Comultrasan', codigo: 'COMULTRASAN' },
-        { id: 6, nombre: 'Finecoop', codigo: 'FINECOOP' },
-        { id: 7, nombre: 'Caja Social', codigo: 'CAJA_SOCIAL' }
-    ];
-
-    // ✅ ACTUALIZADO: Cargar datos iniciales solo una vez
     useEffect(() => {
-        cargarFacturasPendientes();
-        cargarFacturasPagadas();
+        cargarBancos();
+cargarFacturasPendientes();
+cargarFacturasPagadasInicial();
     }, []);
+
+    const cargarBancos = async () => {
+        try {
+            setLoadingBancos(true);
+            const response = await apiService.get('/config/banks?activo=true');
+            if (response && response.success) {
+                setBancos(response.data || []);
+            }
+        } catch (error) {
+            console.error('Error cargando bancos:', error);
+        } finally {
+            setLoadingBancos(false);
+        }
+    };
 
     const cargarFacturasPendientes = async () => {
         try {
             setLoading(true);
             const params = new URLSearchParams({
                 estado: 'pendiente',
-                fecha_inicio: filtros.fecha_inicio,
-                fecha_fin: filtros.fecha_fin,
-                ...(filtros.busqueda && { search: filtros.busqueda })
+                fecha_inicio: filtrosPendientes.fecha_inicio,
+                fecha_fin: filtrosPendientes.fecha_fin
             });
+
+            if (filtrosPendientes.busqueda) {
+                params.append('search', filtrosPendientes.busqueda);
+            }
 
             const response = await apiService.get(`/facturacion/facturas?${params}`);
             
             if (response && response.success) {
-                const facturas = Array.isArray(response.data) ? response.data : (response.data?.facturas || response.data?.data || []);
+                const facturas = Array.isArray(response.data) 
+                    ? response.data 
+                    : (response.data?.facturas || []);
                 setFacturasPendientes(facturas);
             }
         } catch (error) {
-            console.error('Error cargando facturas:', error);
+            console.error('Error cargando facturas pendientes:', error);
         } finally {
             setLoading(false);
         }
     };
 
-   const cargarFacturasPagadas = async () => {
-    try {
-        setLoadingPagadas(true);
+    const buscarFacturasPagadas = async () => {
+        try {
+            setLoadingPagadas(true);
+            setBusquedaRealizada(false);
+            setMostrarEstadisticas(false);
+            
+            const params = new URLSearchParams({
+                estado: 'pagada',
+                fecha_pago_inicio: filtrosPagadas.fecha_inicio,
+                fecha_pago_fin: filtrosPagadas.fecha_fin
+            });
 
-        const params = new URLSearchParams({
-            estado: 'pagada',
-            // ✅ CAMBIO: Usar fecha_pago_inicio y fecha_pago_fin para filtrar por fecha del pago
-            fecha_pago_inicio: filtrosPagadas.fecha_inicio,
-            fecha_pago_fin: filtrosPagadas.fecha_fin
-        });
+            if (filtrosPagadas.busqueda) {
+                params.append('search', filtrosPagadas.busqueda);
+            }
+            if (filtrosPagadas.banco) {
+                params.append('banco_id', filtrosPagadas.banco);
+            }
+            if (filtrosPagadas.metodo_pago) {
+                params.append('metodo_pago', filtrosPagadas.metodo_pago);
+            }
 
-        if (filtrosPagadas.busqueda) {
-            params.append('search', filtrosPagadas.busqueda);
+            const response = await apiService.get(`/facturacion/facturas?${params}`);
+            
+            if (response && response.success) {
+                const facturas = Array.isArray(response.data) 
+                    ? response.data 
+                    : (response.data?.facturas || []);
+                setFacturasPagadas(facturas);
+                setBusquedaRealizada(true); // Mostrar botón de estadísticas
+            }
+        } catch (error) {
+            console.error('Error cargando facturas pagadas:', error);
+        } finally {
+            setLoadingPagadas(false);
         }
-        if (filtrosPagadas.banco) {
-            params.append('banco_id', filtrosPagadas.banco);
+    };
+const cargarFacturasPagadasInicial = async () => {
+        try {
+            setLoadingPagadas(true);
+            
+            const params = new URLSearchParams({
+                estado: 'pagada',
+                fecha_pago_inicio: filtrosPagadas.fecha_inicio,
+                fecha_pago_fin: filtrosPagadas.fecha_fin
+            });
+
+            const response = await apiService.get(`/facturacion/facturas?${params}`);
+            
+            if (response && response.success) {
+                const facturas = Array.isArray(response.data) 
+                    ? response.data 
+                    : (response.data?.facturas || []);
+                setFacturasPagadas(facturas);
+                // NO establecer busquedaRealizada = true aquí
+            }
+        } catch (error) {
+            console.error('Error cargando facturas pagadas:', error);
+        } finally {
+            setLoadingPagadas(false);
         }
+    };
+    const generarEstadisticas = async () => {
+        try {
+            setLoadingEstadisticas(true);
+            const params = new URLSearchParams({
+                fecha_inicio: filtrosPagadas.fecha_inicio,
+                fecha_fin: filtrosPagadas.fecha_fin
+            });
 
-        const response = await apiService.get(`/facturacion/facturas?${params.toString()}`);
+            if (filtrosPagadas.banco) {
+                params.append('banco_id', filtrosPagadas.banco);
+            }
+            if (filtrosPagadas.metodo_pago) {
+                params.append('metodo_pago', filtrosPagadas.metodo_pago);
+            }
 
-        if (response && response.success) {
-            const facturas = Array.isArray(response.data)
-                ? response.data
-                : (response.data?.facturas || []);
-
-            console.log('💳 PAGOS RECIBIDOS:', facturas.length);
-            console.log('💳 PRIMER PAGO:', facturas[0]);
-
-            setFacturasPagadas(facturas);
-        } else {
-            setFacturasPagadas([]);
+            console.log('📊 Generando estadísticas con:', params.toString());
+            const response = await apiService.get(`/estadisticas/pagos?${params}`);
+            console.log('📊 Respuesta estadísticas:', response);
+            
+            if (response && response.success) {
+                setEstadisticas(response.data);
+                setMostrarEstadisticas(true);
+            } else {
+                alert('Error al generar estadísticas');
+            }
+        } catch (error) {
+            console.error('Error generando estadísticas:', error);
+            alert('Error al generar estadísticas');
+        } finally {
+            setLoadingEstadisticas(false);
         }
-    } catch (error) {
-        console.error('❌ Error cargando facturas pagadas:', error);
-        setFacturasPagadas([]);
-    } finally {
-        setLoadingPagadas(false);
-    }
-};
-
-    // ✅ NUEVO: Ejecutar búsqueda de facturas pendientes
-    const ejecutarBusquedaPendientes = () => {
-        setFiltros(filtrosTemp);
-        setBuscando(true);
-        cargarFacturasPendientes().finally(() => setBuscando(false));
     };
 
-    // ✅ NUEVO: Ejecutar búsqueda de facturas pagadas
-    const ejecutarBusquedaPagadas = () => {
-        setFiltrosPagadas(filtrosPagadasTemp);
-        setBuscando(true);
-        cargarFacturasPagadas().finally(() => setBuscando(false));
-    };
-
-    // ✅ NUEVO: Limpiar filtros de pendientes
-    const limpiarFiltrosPendientes = () => {
-        const filtrosLimpios = {
-            banco: '',
-            fecha_inicio: new Date(new Date().setDate(1)).toISOString().split('T')[0],
-            fecha_fin: new Date().toISOString().split('T')[0],
-            busqueda: ''
-        };
-        setFiltrosTemp(filtrosLimpios);
-        setFiltros(filtrosLimpios);
-        cargarFacturasPendientes();
-    };
-
-    // ✅ NUEVO: Limpiar filtros de pagadas
-    const limpiarFiltrosPagadas = () => {
-        const filtrosLimpios = {
-            banco: '',
-            fecha_inicio: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
-            fecha_fin: new Date().toISOString().split('T')[0],
-            busqueda: ''
-        };
-        setFiltrosPagadasTemp(filtrosLimpios);
-        setFiltrosPagadas(filtrosLimpios);
-        cargarFacturasPagadas();
-    };
     const abrirModalCruce = (factura) => {
         setFacturaSeleccionada(factura);
         setDatosPago({
@@ -202,42 +238,35 @@ const CrucePagosBancarios = () => {
                 alert('Pago cruzado exitosamente');
                 setMostrarModalCruce(false);
                 cargarFacturasPendientes();
-                cargarFacturasPagadas();
+                if (busquedaRealizada) {
+                    buscarFacturasPagadas();
+                    if (mostrarEstadisticas) {
+                        generarEstadisticas();
+                    }
+                }
             } else {
                 alert('Error: ' + (response?.message || 'Error desconocido'));
             }
         } catch (error) {
             console.error('Error cruzando pago:', error);
-            alert('Error al cruzar el pago: ' + error.message);
+            alert('Error al cruzar el pago');
         }
     };
 
-    const exportarPorBanco = async (bancoId) => {
+    const exportarPorBanco = (bancoId) => {
         try {
             const banco = bancos.find(b => b.id === bancoId);
-            const facturasFiltradas = facturasPendientes.filter(f =>
-                filtros.banco ? f.banco_id === bancoId : true
-            );
-
-            let csvContent = '';
-            const headers = ['Numero Factura', 'Cliente', 'Identificacion', 'Valor', 'Fecha Vencimiento'];
-
-            csvContent = headers.join(',') + '\n';
-            facturasFiltradas.forEach(factura => {
-                const row = [
-                    factura.numero_factura,
-                    `"${factura.nombre_cliente}"`,
-                    factura.identificacion_cliente,
-                    factura.total,
-                    factura.fecha_vencimiento
-                ].join(',');
-                csvContent += row + '\n';
+            let csvContent = '\ufeff';
+            csvContent += 'Numero Factura,Cliente,Identificacion,Valor,Fecha Vencimiento\n';
+            
+            facturasPendientes.forEach(factura => {
+                csvContent += `${factura.numero_factura},"${factura.nombre_cliente}",${factura.identificacion_cliente},${factura.total},${factura.fecha_vencimiento}\n`;
             });
 
-            const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `facturas_${banco.codigo}_${new Date().toISOString().split('T')[0]}.csv`;
+            link.download = `facturas_${banco?.codigo || 'todas'}_${new Date().toISOString().split('T')[0]}.csv`;
             link.click();
         } catch (error) {
             console.error('Error exportando:', error);
@@ -245,34 +274,8 @@ const CrucePagosBancarios = () => {
         }
     };
 
-    const facturasPendientesFiltradas = facturasPendientes.filter(f => {
-    // Solo filtrar por búsqueda local, las fechas y banco ya vienen del servidor
-    if (filtros.busqueda) {
-            const busqueda = filtros.busqueda.toLowerCase();
-            return (
-                f.numero_factura?.toLowerCase().includes(busqueda) ||
-                f.cliente_nombre?.toLowerCase().includes(busqueda) ||
-                f.cliente_identificacion?.includes(busqueda)
-            );
-        }
-        return true;
-    });
-
-    const facturasPagadasFiltradas = facturasPagadas.filter(f => {
-    // El filtro de banco ya se aplica en el servidor, no filtrar aquí
-    if (filtrosPagadas.busqueda) {
-            const busqueda = filtrosPagadas.busqueda.toLowerCase();
-            return (
-                f.numero_factura?.toLowerCase().includes(busqueda) ||
-                f.cliente_nombre?.toLowerCase().includes(busqueda) ||
-                f.cliente_identificacion?.includes(busqueda)
-            );
-        }
-        return true;
-    });
-
     return (
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
@@ -280,118 +283,43 @@ const CrucePagosBancarios = () => {
                     <p className="text-gray-600">Registrar pagos de facturas pendientes</p>
                 </div>
                 <div className="flex gap-2">
-                    <button
-                        onClick={() => exportarPorBanco(5)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-                    >
-                        <Download className="w-4 h-4" />
-                        Exportar Comultrasan
+                    <button onClick={() => exportarPorBanco(5)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 shadow-sm">
+                        <Download className="w-4 h-4" />Exportar Comultrasan
                     </button>
-                    <button
-                        onClick={() => exportarPorBanco(6)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                    >
-                        <Download className="w-4 h-4" />
-                        Exportar Finecoop
+                    <button onClick={() => exportarPorBanco(6)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm">
+                        <Download className="w-4 h-4" />Exportar Finecoop
                     </button>
-                    <button
-                        onClick={() => exportarPorBanco(7)}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
-                    >
-                        <Download className="w-4 h-4" />
-                        Exportar Caja Social
+                    <button onClick={() => exportarPorBanco(7)} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 shadow-sm">
+                        <Download className="w-4 h-4" />Exportar Caja Social
                     </button>
                 </div>
             </div>
 
             {/* FACTURAS PENDIENTES */}
-            <div className="bg-white rounded-lg shadow-md p-4">
-                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-orange-500" />
+            <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-orange-700">
+                    <AlertCircle className="w-5 h-5" />
                     Facturas Pendientes de Pago
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Fecha Inicio
-                        </label>
-                        <input
-                            type="date"
-                            value={filtrosTemp.fecha_inicio}
-                            onChange={(e) => setFiltrosTemp({ ...filtrosTemp, fecha_inicio: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio</label>
+                        <input type="date" value={filtrosPendientes.fecha_inicio} onChange={(e) => setFiltrosPendientes({...filtrosPendientes, fecha_inicio: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Fecha Fin
-                        </label>
-                        <input
-                            type="date"
-                            value={filtrosTemp.fecha_fin}
-                            onChange={(e) => setFiltrosTemp({ ...filtrosTemp, fecha_fin: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Fin</label>
+                        <input type="date" value={filtrosPendientes.fecha_fin} onChange={(e) => setFiltrosPendientes({...filtrosPendientes, fecha_fin: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Banco
-                        </label>
-                        <select
-                            value={filtrosTemp.banco}
-                            onChange={(e) => setFiltrosTemp({ ...filtrosTemp, banco: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">Todos los bancos</option>
-                            {bancos.map(banco => (
-                                <option key={banco.id} value={banco.id}>{banco.nombre}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Buscar
-                        </label>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Factura, cliente..."
-                                value={filtrosTemp.busqueda}
-                                onChange={(e) => setFiltrosTemp({ ...filtrosTemp, busqueda: e.target.value })}
-                                onKeyPress={(e) => e.key === 'Enter' && ejecutarBusquedaPendientes()}
-                                className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+                        <input type="text" placeholder="Factura, cliente..." value={filtrosPendientes.busqueda} onChange={(e) => setFiltrosPendientes({...filtrosPendientes, busqueda: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                     </div>
                 </div>
 
-                {/* ✅ NUEVO: Botones de acción */}
-                <div className="flex justify-end gap-2 mb-4">
-                    <button
-                        onClick={limpiarFiltrosPendientes}
-                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 flex items-center gap-2"
-                        disabled={loading || buscando}
-                    >
-                        <RefreshCw className="w-4 h-4" />
-                        Limpiar
-                    </button>
-                    <button
-                        onClick={ejecutarBusquedaPendientes}
-                        disabled={loading || buscando}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                        {buscando ? (
-                            <>
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                                Buscando...
-                            </>
-                        ) : (
-                            <>
-                                <Search className="w-4 h-4" />
-                                Buscar
-                            </>
-                        )}
+                <div className="flex justify-end mb-4">
+                    <button onClick={cargarFacturasPendientes} disabled={loading} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 shadow-sm">
+                        {loading ? <><RefreshCw className="w-4 h-4 animate-spin" />Buscando...</> : <><Search className="w-4 h-4" />Buscar</>}
                     </button>
                 </div>
 
@@ -399,53 +327,28 @@ const CrucePagosBancarios = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Factura</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimiento</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factura</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimiento</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {loading ? (
-                                <tr>
-                                    <td colSpan="6" className="px-6 py-4 text-center text-gray-500">Cargando...</td>
-                                </tr>
-                            ) : facturasPendientesFiltradas.length === 0 ? (
-                                <tr>
-                                    <td colSpan="6" className="px-6 py-4 text-center text-gray-500">No hay facturas pendientes</td>
-                                </tr>
+                                <tr><td colSpan="6" className="px-6 py-4 text-center text-gray-500">Cargando...</td></tr>
+                            ) : facturasPendientes.length === 0 ? (
+                                <tr><td colSpan="6" className="px-6 py-4 text-center text-gray-500">No hay facturas pendientes</td></tr>
                             ) : (
-                                facturasPendientesFiltradas.map(factura => (
+                                facturasPendientes.map(factura => (
                                     <tr key={factura.id} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-gray-900">{factura.numero_factura}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900">{factura.nombre_cliente}</div>
-                                            <div className="text-sm text-gray-500">{factura.identificacion_cliente}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {new Date(factura.fecha_emision).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {new Date(factura.fecha_vencimiento).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-gray-900">
-                                                ${parseFloat(factura.total).toLocaleString()}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <button
-                                                onClick={() => abrirModalCruce(factura)}
-                                                className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
-                                            >
-                                                <CreditCard className="w-4 h-4" />
-                                                Cruzar Pago
-                                            </button>
-                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{factura.numero_factura}</td>
+                                        <td className="px-6 py-4"><div className="text-sm text-gray-900">{factura.nombre_cliente}</div><div className="text-xs text-gray-500">{factura.identificacion_cliente}</div></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(factura.fecha_emision).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(factura.fecha_vencimiento).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${parseFloat(factura.total).toLocaleString()}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><button onClick={() => abrirModalCruce(factura)} className="text-blue-600 hover:text-blue-900 flex items-center gap-1 font-medium"><CreditCard className="w-4 h-4" />Cruzar Pago</button></td>
                                     </tr>
                                 ))
                             )}
@@ -454,152 +357,141 @@ const CrucePagosBancarios = () => {
                 </div>
             </div>
 
-            {/* HISTORIAL DE PAGOS CRUZADOS */}
-            <div className="bg-white rounded-lg shadow-md p-4">
-                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <History className="w-5 h-5 text-green-500" />
+            {/* HISTORIAL DE PAGOS */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-green-700">
+                    <History className="w-5 h-5" />
                     Historial de Pagos Cruzados
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Fecha Inicio
-                        </label>
-                        <input
-                            type="date"
-                            value={filtrosPagadasTemp.fecha_inicio}
-                            onChange={(e) => setFiltrosPagadasTemp({ ...filtrosPagadasTemp, fecha_inicio: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Fecha Fin
-                        </label>
-                        <input
-                            type="date"
-                            value={filtrosPagadasTemp.fecha_fin}
-                            onChange={(e) => setFiltrosPagadasTemp({ ...filtrosPagadasTemp, fecha_fin: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Banco
-                        </label>
-                        <select
-                            value={filtrosPagadasTemp.banco}
-                            onChange={(e) => setFiltrosPagadasTemp({ ...filtrosPagadasTemp, banco: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">Todos los bancos</option>
-                            {bancos.map(banco => (
-                                <option key={banco.id} value={banco.id}>{banco.nombre}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Buscar
-                        </label>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Factura, cliente..."
-                                value={filtrosPagadasTemp.busqueda}
-                                onChange={(e) => setFiltrosPagadasTemp({ ...filtrosPagadasTemp, busqueda: e.target.value })}
-                                onKeyPress={(e) => e.key === 'Enter' && ejecutarBusquedaPagadas()}
-                                className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
+
+                {/* FILTROS */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg mb-4 border border-blue-100">
+                    <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4" />
+                        Filtros Avanzados
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio</label>
+                            <input type="date" value={filtrosPagadas.fecha_inicio} onChange={(e) => setFiltrosPagadas({...filtrosPagadas, fecha_inicio: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Fin</label>
+                            <input type="date" value={filtrosPagadas.fecha_fin} onChange={(e) => setFiltrosPagadas({...filtrosPagadas, fecha_fin: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1"><Building className="w-4 h-4 inline mr-1" />Banco</label>
+                            <select value={filtrosPagadas.banco} onChange={(e) => setFiltrosPagadas({...filtrosPagadas, banco: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">Todos</option>
+                                {bancos.map(banco => <option key={banco.id} value={banco.id}>{banco.nombre}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1"><CreditCard className="w-4 h-4 inline mr-1" />Método</label>
+                            <select value={filtrosPagadas.metodo_pago} onChange={(e) => setFiltrosPagadas({...filtrosPagadas, metodo_pago: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">Todos</option>
+                                <option value="efectivo">Efectivo</option>
+                                <option value="transferencia">Transferencia</option>
+                                <option value="consignacion">Consignación</option>
+                                <option value="cheque">Cheque</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+                            <input type="text" placeholder="Factura..." value={filtrosPagadas.busqueda} onChange={(e) => setFiltrosPagadas({...filtrosPagadas, busqueda: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                         </div>
                     </div>
                 </div>
 
-                {/* ✅ NUEVO: Botones de acción */}
-                <div className="flex justify-end gap-2 mb-4">
-                    <button
-                        onClick={limpiarFiltrosPagadas}
-                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 flex items-center gap-2"
-                        disabled={loadingPagadas || buscando}
-                    >
-                        <RefreshCw className="w-4 h-4" />
-                        Limpiar
+                {/* BOTONES */}
+                <div className="flex justify-end gap-3 mb-4">
+                    <button onClick={buscarFacturasPagadas} disabled={loadingPagadas} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 shadow-sm">
+                        {loadingPagadas ? <><RefreshCw className="w-4 h-4 animate-spin" />Buscando...</> : <><Search className="w-4 h-4" />Buscar Pagos</>}
                     </button>
-                    <button
-                        onClick={ejecutarBusquedaPagadas}
-                        disabled={loadingPagadas || buscando}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                        {buscando ? (
-                            <>
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                                Buscando...
-                            </>
-                        ) : (
-                            <>
-                                <Search className="w-4 h-4" />
-                                Buscar
-                            </>
-                        )}
-                    </button>
+                    
+                    {busquedaRealizada && (
+                        <button onClick={generarEstadisticas} disabled={loadingEstadisticas} className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 shadow-sm animate-pulse">
+                            {loadingEstadisticas ? <><RefreshCw className="w-4 h-4 animate-spin" />Generando...</> : <><BarChart3 className="w-4 h-4" />Generar Estadísticas</>}
+                        </button>
+                    )}
                 </div>
 
+                {/* ESTADÍSTICAS */}
+                {mostrarEstadisticas && estadisticas && (
+                    <div className="mb-6 animate-fadeIn">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-4 text-white shadow-lg">
+                                <div className="flex items-center justify-between">
+                                    <div><p className="text-sm opacity-90">Total Pagos</p><p className="text-3xl font-bold mt-1">{estadisticas.total_pagos || 0}</p></div>
+                                    <FileText className="w-10 h-10 opacity-80" />
+                                </div>
+                            </div>
+                            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-4 text-white shadow-lg">
+                                <div className="flex items-center justify-between">
+                                    <div><p className="text-sm opacity-90">Monto Total</p><p className="text-3xl font-bold mt-1">${(estadisticas.monto_total || 0).toLocaleString('es-CO')}</p></div>
+                                    <DollarSign className="w-10 h-10 opacity-80" />
+                                </div>
+                            </div>
+                            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-4 text-white shadow-lg">
+                                <div className="flex items-center justify-between">
+                                    <div><p className="text-sm opacity-90">Promedio</p><p className="text-3xl font-bold mt-1">${Math.round(estadisticas.promedio_pago || 0).toLocaleString('es-CO')}</p></div>
+                                    <TrendingUp className="w-10 h-10 opacity-80" />
+                                </div>
+                            </div>
+                            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-4 text-white shadow-lg">
+                                <div className="flex items-center justify-between">
+                                    <div><p className="text-sm opacity-90">En Tabla</p><p className="text-3xl font-bold mt-1">{facturasPagadas.length}</p></div>
+                                    <PieChart className="w-10 h-10 opacity-80" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {estadisticas.por_metodo && Object.keys(estadisticas.por_metodo).length > 0 && (
+                            <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">
+                                <h3 className="text-sm font-semibold text-gray-700 mb-3">📊 Desglose por Método de Pago</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {Object.entries(estadisticas.por_metodo).map(([metodo, datos]) => (
+                                        <div key={metodo} className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+                                            <p className="text-xs text-gray-600 uppercase font-semibold">{metodo}</p>
+                                            <p className="text-2xl font-bold text-gray-900 my-1">{datos.cantidad || 0}</p>
+                                            <p className="text-sm text-gray-600">${(datos.monto || 0).toLocaleString('es-CO')}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* TABLA */}
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Factura</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha Pago</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Método</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Banco</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factura</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Pago</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Método</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banco</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {loadingPagadas ? (
-                                <tr>
-                                    <td colSpan="7" className="px-6 py-4 text-center text-gray-500">Cargando...</td>
-                                </tr>
-                            ) : facturasPagadasFiltradas.length === 0 ? (
-                                <tr>
-                                    <td colSpan="7" className="px-6 py-4 text-center text-gray-500">No hay pagos registrados</td>
-                                </tr>
+                                <tr><td colSpan="7" className="px-6 py-4 text-center text-gray-500">Cargando...</td></tr>
+                            ) : facturasPagadas.length === 0 ? (
+                                <tr><td colSpan="7" className="px-6 py-4 text-center text-gray-500">No hay pagos registrados</td></tr>
                             ) : (
-                                facturasPagadasFiltradas.map(factura => (
+                                facturasPagadas.map(factura => (
                                     <tr key={factura.id} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-gray-900">{factura.numero_factura}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900">{factura.nombre_cliente}</div>
-                                            <div className="text-sm text-gray-500">{factura.identificacion_cliente}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {factura.fecha_pago ? new Date(factura.fecha_pago).toLocaleDateString() : 'N/A'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {factura.metodo_pago || 'N/A'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {bancos.find(b => b.id === factura.banco_id)?.nombre || 'N/A'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-green-600">
-                                                ${parseFloat(factura.total).toLocaleString()}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <button
-                                                onClick={() => abrirModalDetalle(factura)}
-                                                className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
-                                            >
-                                                <Eye className="w-4 h-4" />
-                                                Ver Detalle
-                                            </button>
-                                        </td>
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{factura.numero_factura}</td>
+                                        <td className="px-6 py-4"><div className="text-sm text-gray-900">{factura.nombre_cliente}</div><div className="text-xs text-gray-500">{factura.identificacion_cliente}</div></td>
+                                        <td className="px-6 py-4 text-sm text-gray-600">{factura.fecha_pago ? new Date(factura.fecha_pago).toLocaleDateString() : 'N/A'}</td>
+                                        <td className="px-6 py-4 text-sm"><span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">{factura.metodo_pago || 'N/A'}</span></td>
+                                        <td className="px-6 py-4 text-sm text-gray-600">{bancos.find(b => b.id === factura.banco_id)?.nombre || 'N/A'}</td>
+                                        <td className="px-6 py-4 text-sm font-semibold text-green-600">${parseFloat(factura.total).toLocaleString()}</td>
+                                        <td className="px-6 py-4"><button onClick={() => abrirModalDetalle(factura)} className="text-blue-600 hover:text-blue-900 flex items-center gap-1"><Eye className="w-4 h-4" />Ver</button></td>
                                     </tr>
                                 ))
                             )}
@@ -608,271 +500,43 @@ const CrucePagosBancarios = () => {
                 </div>
             </div>
 
-            {/* Modal Cruzar Pago */}
+            {/* MODALES */}
             {mostrarModalCruce && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-lg max-w-2xl w-full p-6">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold">Cruzar Pago - {facturaSeleccionada?.numero_factura}</h2>
-                            <button
-                                onClick={() => setMostrarModalCruce(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
+                            <h2 className="text-xl font-bold">Cruzar Pago</h2>
+                            <button onClick={() => setMostrarModalCruce(false)}><X className="w-6 h-6" /></button>
                         </div>
-
                         <div className="space-y-4">
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <span className="text-sm text-gray-600">Cliente:</span>
-                                        <p className="font-medium">{facturaSeleccionada?.cliente_nombre}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-gray-600">Total Factura:</span>
-                                        <p className="font-medium">${parseFloat(facturaSeleccionada?.total || 0).toLocaleString()}</p>
-                                    </div>
-                                </div>
-                            </div>
-
+                            <div className="bg-gray-50 p-4 rounded"><p><strong>Factura:</strong> {facturaSeleccionada?.numero_factura}</p><p><strong>Cliente:</strong> {facturaSeleccionada?.nombre_cliente}</p><p><strong>Total:</strong> ${parseFloat(facturaSeleccionada?.total || 0).toLocaleString()}</p></div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Monto Pagado *
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={datosPago.monto}
-                                        onChange={(e) => setDatosPago({ ...datosPago, monto: e.target.value })}
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Fecha de Pago *
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={datosPago.fecha_pago}
-                                        onChange={(e) => setDatosPago({ ...datosPago, fecha_pago: e.target.value })}
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        required
-                                    />
-                                </div>
+                                <div><label className="block text-sm font-medium mb-1">Monto</label><input type="number" value={datosPago.monto} onChange={(e) => setDatosPago({...datosPago, monto: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div>
+                                <div><label className="block text-sm font-medium mb-1">Fecha</label><input type="date" value={datosPago.fecha_pago} onChange={(e) => setDatosPago({...datosPago, fecha_pago: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div>
                             </div>
-
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Banco *
-                                    </label>
-                                    <select
-                                        value={datosPago.banco_id}
-                                        onChange={(e) => setDatosPago({ ...datosPago, banco_id: e.target.value })}
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        required
-                                    >
-                                        <option value="">Seleccionar banco</option>
-                                        {bancos.map(banco => (
-                                            <option key={banco.id} value={banco.id}>{banco.nombre}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Método de Pago *
-                                    </label>
-                                    <select
-                                        value={datosPago.metodo_pago}
-                                        onChange={(e) => setDatosPago({ ...datosPago, metodo_pago: e.target.value })}
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        required
-                                    >
-                                        <option value="transferencia">Transferencia</option>
-                                        <option value="consignacion">Consignación</option>
-                                        <option value="cheque">Cheque</option>
-                                    </select>
-                                </div>
+                                <div><label className="block text-sm font-medium mb-1">Banco</label><select value={datosPago.banco_id} onChange={(e) => setDatosPago({...datosPago, banco_id: e.target.value})} className="w-full px-3 py-2 border rounded-lg"><option value="">Seleccionar</option>{bancos.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></div>
+                                <div><label className="block text-sm font-medium mb-1">Método</label><select value={datosPago.metodo_pago} onChange={(e) => setDatosPago({...datosPago, metodo_pago: e.target.value})} className="w-full px-3 py-2 border rounded-lg"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="consignacion">Consignación</option><option value="cheque">Cheque</option></select></div>
                             </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Referencia / Número de Transacción *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={datosPago.referencia}
-                                    onChange={(e) => setDatosPago({ ...datosPago, referencia: e.target.value })}
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    placeholder="Ej: 123456789"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Observaciones
-                                </label>
-                                <textarea
-                                    value={datosPago.observaciones}
-                                    onChange={(e) => setDatosPago({ ...datosPago, observaciones: e.target.value })}
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    rows="3"
-                                    placeholder="Observaciones adicionales..."
-                                />
-                            </div>
-
-                            <div className="flex justify-end gap-2 pt-4 border-t">
-                                <button
-                                    onClick={() => setMostrarModalCruce(false)}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={cruzarPago}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                                >
-                                    <Check className="w-4 h-4" />
-                                    Confirmar Pago
-                                </button>
-                            </div>
+                            <div><label className="block text-sm font-medium mb-1">Referencia</label><input type="text" value={datosPago.referencia} onChange={(e) => setDatosPago({...datosPago, referencia: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div>
+                            <div><label className="block text-sm font-medium mb-1">Observaciones</label><textarea value={datosPago.observaciones} onChange={(e) => setDatosPago({...datosPago, observaciones: e.target.value})} className="w-full px-3 py-2 border rounded-lg" rows="3" /></div>
+                            <div className="flex justify-end gap-2 pt-4"><button onClick={() => setMostrarModalCruce(false)} className="px-4 py-2 border rounded-lg">Cancelar</button><button onClick={cruzarPago} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Confirmar</button></div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Modal Detalle de Pago */}
             {mostrarModalDetalle && facturaSeleccionada && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-lg max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col">
-                        {/* Header fijo */}
-                        <div className="flex justify-between items-center p-6 border-b border-gray-200 flex-shrink-0">
-                            <h2 className="text-xl font-bold">Detalle del Pago - {facturaSeleccionada?.numero_factura}</h2>
-                            <button
-                                onClick={() => setMostrarModalDetalle(false)}
-                                className="text-gray-400 hover:text-gray-600 flex-shrink-0"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
+                    <div className="bg-white rounded-lg max-w-2xl w-full p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold">Detalle del Pago</h2>
+                            <button onClick={() => setMostrarModalDetalle(false)}><X className="w-6 h-6" /></button>
                         </div>
-
-                        {/* Contenido con scroll */}
-                        <div className="overflow-y-auto flex-1 p-6">
-                            <div className="space-y-6">
-                                {/* Información de la Factura */}
-                                <div className="bg-blue-50 p-4 rounded-lg">
-                                    <h3 className="text-lg font-semibold text-blue-900 mb-3">Información de la Factura</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <span className="text-sm text-blue-700">Número de Factura:</span>
-                                            <p className="font-medium text-blue-900">{facturaSeleccionada?.numero_factura}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-blue-700">Cliente:</span>
-                                            <p className="font-medium text-blue-900">{facturaSeleccionada?.nombre_cliente || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-blue-700">Identificación:</span>
-                                            <p className="font-medium text-blue-900">{facturaSeleccionada?.identificacion_cliente || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-blue-700">Fecha Emisión:</span>
-                                            <p className="font-medium text-blue-900">
-                                                {new Date(facturaSeleccionada?.fecha_emision).toLocaleDateString()}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-blue-700">Total Factura:</span>
-                                            <p className="font-bold text-lg text-blue-900">
-                                                ${parseFloat(facturaSeleccionada?.total || 0).toLocaleString()}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-blue-700">Estado:</span>
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">
-                                                Pagada
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Información del Pago */}
-                                <div className="bg-green-50 p-4 rounded-lg">
-                                    <h3 className="text-lg font-semibold text-green-900 mb-3">Detalles del Pago</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <span className="text-sm text-green-700">Fecha de Pago:</span>
-                                            <p className="font-medium text-green-900">
-                                                {facturaSeleccionada?.fecha_pago 
-                                                    ? new Date(facturaSeleccionada.fecha_pago).toLocaleDateString() 
-                                                    : 'N/A'}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-green-700">Método de Pago:</span>
-                                            <p className="font-medium text-green-900 capitalize">
-                                                {facturaSeleccionada?.metodo_pago || 'N/A'}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-green-700">Banco:</span>
-                                            <p className="font-medium text-green-900">
-                                                {facturaSeleccionada?.banco_nombre || bancos.find(b => b.id === facturaSeleccionada?.banco_id)?.nombre || 'N/A'}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-green-700">Referencia:</span>
-                                            <p className="font-medium text-green-900">
-                                                {facturaSeleccionada?.referencia_pago || 'N/A'}
-                                            </p>
-                                        </div>
-                                        <div className="col-span-2">
-                                            <span className="text-sm text-green-700">Valor Pagado:</span>
-                                            <p className="font-bold text-xl text-green-900">
-                                                ${parseFloat(facturaSeleccionada?.valor_pagado || facturaSeleccionada?.total || 0).toLocaleString()}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Observaciones */}
-                                {facturaSeleccionada?.observaciones && (
-                                    <div className="bg-gray-50 p-4 rounded-lg">
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Observaciones</h3>
-                                        <p className="text-gray-700">{facturaSeleccionada.observaciones}</p>
-                                    </div>
-                                )}
-
-                                {/* Servicios de la Factura */}
-                                {facturaSeleccionada?.servicios && (
-                                    <div className="bg-gray-50 p-4 rounded-lg">
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Servicios Incluidos</h3>
-                                        <div className="space-y-2">
-                                            {JSON.parse(facturaSeleccionada.servicios).map((servicio, index) => (
-                                                <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
-                                                    <span className="text-gray-700">{servicio.descripcion || servicio.plan_nombre}</span>
-                                                    <span className="font-medium text-gray-900">
-                                                        ${parseFloat(servicio.valor || 0).toLocaleString()}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Footer fijo */}
-                        <div className="flex justify-end gap-2 p-6 border-t border-gray-200 flex-shrink-0">
-                            <button
-                                onClick={() => setMostrarModalDetalle(false)}
-                                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-                            >
-                                Cerrar
-                            </button>
+                        <div className="space-y-4">
+                            <div className="bg-blue-50 p-4 rounded"><h3 className="font-semibold mb-2">Factura</h3><p><strong>Número:</strong> {facturaSeleccionada.numero_factura}</p><p><strong>Cliente:</strong> {facturaSeleccionada.nombre_cliente}</p><p><strong>Total:</strong> ${parseFloat(facturaSeleccionada.total).toLocaleString()}</p></div>
+                            <div className="bg-green-50 p-4 rounded"><h3 className="font-semibold mb-2">Pago</h3><p><strong>Fecha:</strong> {facturaSeleccionada.fecha_pago ? new Date(facturaSeleccionada.fecha_pago).toLocaleDateString() : 'N/A'}</p><p><strong>Método:</strong> {facturaSeleccionada.metodo_pago || 'N/A'}</p><p><strong>Banco:</strong> {bancos.find(b => b.id === facturaSeleccionada.banco_id)?.nombre || 'N/A'}</p></div>
+                            <button onClick={() => setMostrarModalDetalle(false)} className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg">Cerrar</button>
                         </div>
                     </div>
                 </div>

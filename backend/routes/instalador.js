@@ -144,7 +144,7 @@ router.post('/instalacion/:id/iniciar', async (req, res) => {
 router.post('/instalacion/:id/completar', async (req, res) => {
   try {
     const { id } = req.params;
-    const { equipos, foto, observaciones, ip_asignada, tap } = req.body;
+    const { equipos, foto, observaciones, ip_asignada, tap, firma_instalador } = req.body;
     
     // ✅ LOGS DE DEBUG
     console.log('🔍 ========== COMPLETAR INSTALACIÓN ==========');
@@ -169,7 +169,7 @@ router.post('/instalacion/:id/completar', async (req, res) => {
           fotos_instalacion = ?,
           observaciones = CONCAT(COALESCE(observaciones, ''), '\n', ?)
       WHERE id = ? AND instalador_id = ?
-    `, [horaFin, fechaRealizada, JSON.stringify(equipos), JSON.stringify([foto]), observaciones || '', id, req.user.id]);
+    `, [horaFin, fechaRealizada, JSON.stringify(equipos), JSON.stringify(firma_instalador ? [foto, firma_instalador] : [foto]), observaciones || '', id, req.user.id]);
     
     // Actualizar estado de equipos a 'instalado'
     if (equipos && equipos.length > 0) {

@@ -286,6 +286,7 @@ router.put('/:id', async (req, res) => {
         console.log('🔍 Body recibido:', JSON.stringify(req.body, null, 2));
 
         const {
+            cliente_id,
             tipo,
             categoria,
             medio_recepcion,
@@ -296,7 +297,8 @@ router.put('/:id', async (req, res) => {
             respuesta,
             usuario_asignado,
             satisfaccion_cliente,
-            notas_internas
+            notas_internas,
+	   firma_cliente 
         } = req.body;
 
         // Verificar que la PQR existe
@@ -323,7 +325,11 @@ router.put('/:id', async (req, res) => {
         if (respuesta) { updateFields.push('respuesta = ?'); params.push(respuesta); }
         if (satisfaccion_cliente) { updateFields.push('satisfaccion_cliente = ?'); params.push(satisfaccion_cliente); }
         if (notas_internas) { updateFields.push('notas_internas = ?'); params.push(notas_internas); }
-
+	if (cliente_id) { updateFields.push('cliente_id = ?'); params.push(cliente_id); }
+if (firma_cliente !== undefined) { 
+    updateFields.push('firma_cliente = ?'); 
+    params.push(firma_cliente); 
+}
         // Estado
         if (estado) {
             updateFields.push('estado = ?');

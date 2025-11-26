@@ -202,6 +202,16 @@ app.get('/system-info', (req, res) => {
 // ============================================
 
 try {
+
+
+// 🌐 RUTA PÚBLICA DE REGISTRO WEB (sin autenticación) - AL INICIO
+console.log('🌐 Cargando rutas de registro web...');
+const registroWebRoutes = require('./routes/registroWeb');
+app.use('/api/v1/registro-web', registroWebRoutes);
+const consultaClienteRoutes = require('./routes/consultaCliente');
+app.use('/api/v1/consulta-cliente', consultaClienteRoutes);
+console.log('✅ Rutas de consulta de cliente cargadas: /api/v1/consulta-cliente');
+console.log('✅ Rutas de registro web cargadas: /api/v1/registro-web');
   console.log('📂 Cargando rutas del sistema...');
 
   // Rutas de autenticación

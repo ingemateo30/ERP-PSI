@@ -1,11 +1,13 @@
 // frontend/src/components/PQR/PQRManagement.js
-import React, { useState, useEffect } from 'react';
-import { 
-    Plus, Search, Filter, MessageCircle, AlertTriangle, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    Plus, Search, Filter, MessageCircle, AlertTriangle,
     CheckCircle, Clock, Eye, Edit, Trash2, FileText,
     Phone, Mail, User, Calendar, X, Save, UserCheck,
-    ExternalLink, History, Star, Download, RefreshCw
+    ExternalLink, History, Star, Download, RefreshCw,
+    Pen, RotateCcw
 } from 'lucide-react';
+import SignatureCanvas from 'react-signature-canvas';
 import pqrService from '../../services/pqrService';
 
 const PQRManagement = () => {
@@ -86,7 +88,7 @@ const PQRManagement = () => {
                 ...filters,
                 page: currentPage
             });
-            
+
             if (response.success) {
                 setPqrs(response.pqrs || []);
                 if (response.pagination) {
@@ -315,7 +317,7 @@ const PQRManagement = () => {
                         />
                     </div>
                 </div>
-                
+
                 <div className="flex justify-end mt-4">
                     <button
                         onClick={limpiarFiltros}
@@ -420,21 +422,21 @@ const PQRManagement = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end space-x-2">
-                                                <button 
+                                                <button
                                                     onClick={() => abrirDetalle(pqr)}
                                                     className="text-blue-600 hover:text-blue-900"
                                                     title="Ver detalle"
                                                 >
                                                     <Eye className="w-4 h-4" />
                                                 </button>
-                                                <button 
+                                                <button
                                                     onClick={() => abrirModal(pqr)}
                                                     className="text-green-600 hover:text-green-900"
                                                     title="Editar"
                                                 >
                                                     <Edit className="w-4 h-4" />
                                                 </button>
-                                                <button 
+                                                <button
                                                     onClick={() => eliminarPQR(pqr.id)}
                                                     className="text-red-600 hover:text-red-900"
                                                     title="Eliminar"
@@ -483,7 +485,7 @@ const PQRManagement = () => {
 
             {/* Modal de formulario */}
             {showModal && (
-                <PQRModal 
+                <PQRModal
                     pqr={selectedPqr}
                     onClose={cerrarModal}
                     onSave={() => {
@@ -496,7 +498,7 @@ const PQRManagement = () => {
 
             {/* Modal de detalle */}
             {showDetailModal && selectedPqr && (
-                <PQRDetailModal 
+                <PQRDetailModal
                     pqr={selectedPqr}
                     onClose={cerrarDetalle}
                 />
@@ -515,12 +517,18 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
         asunto: '',
         descripcion: '',
         prioridad: 'media',
-        servicio_afectado: 'internet'
+        servicio_afectado: 'internet',
+        firma_cliente: null 
     });
     const [loading, setLoading] = useState(false);
     const [clientes, setClientes] = useState([]);
     const [usuarios, setUsuarios] = useState([]);
     const [clienteSearch, setClienteSearch] = useState('');
+    
+    // ✅ ESTADOS PARA FIRMA DEL CLIENTE
+    const sigCanvas = useRef(null);
+    const [firmaCompleta, setFirmaCompleta] = useState(false);
+    const [firmaExistente, setFirmaExistente] = useState(null);
 
     useEffect(() => {
         cargarClientes();
@@ -538,8 +546,15 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                 estado: pqr.estado || 'abierto',
                 respuesta: pqr.respuesta || '',
                 usuario_asignado: pqr.usuario_asignado || '',
-                notas_internas: pqr.notas_internas || ''
+                notas_internas: pqr.notas_internas || '',
+                firma_cliente: pqr.firma_cliente || null 
             });
+            
+            // Si hay firma guardada, mostrarla
+            if (pqr.firma_cliente) {
+                setFirmaExistente(pqr.firma_cliente);
+                setFirmaCompleta(true);
+            }
         }
     }, [pqr]);
 
@@ -572,48 +587,85 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
         }));
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-
-        try {
-            // Validar datos
-            const validation = pqrService.validatePQRData(formData);
-            if (!validation.isValid) {
-                alert('Errores en el formulario:\n' + validation.errors.join('\n'));
-                return;
-            }
-
-            if (pqr) {
-                await pqrService.updatePQR(pqr.id, formData);
-            } else {
-                await pqrService.createPQR(formData);
-            }
-            
-            onSave();
-        } catch (error) {
-            alert('Error guardando PQR: ' + error.message);
-        } finally {
-            setLoading(false);
+    // ✅ FUNCIÓN PARA LIMPIAR LA FIRMA
+    const limpiarFirma = () => {
+        if (sigCanvas.current) {
+            sigCanvas.current.clear();
+            setFirmaCompleta(false);
+            setFirmaExistente(null);
         }
     };
 
+    // ✅ DETECTAR CUANDO EL USUARIO EMPIEZA A FIRMAR
+    const handleFirmaInicio = () => {
+        setFirmaCompleta(true);
+        setFirmaExistente(null); // Si firma de nuevo, eliminar la existente
+    };
+
+    const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+        // Validar datos básicos
+        if (!formData.cliente_id || !formData.asunto || !formData.descripcion) {
+            alert('Por favor complete todos los campos obligatorios');
+            setLoading(false);
+            return;
+        }
+
+        // ✅ PREPARAR DATOS CON FIRMA
+        let dataToSend = { ...formData };
+        
+        // Si hay nueva firma en el canvas
+        if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
+            dataToSend.firma_cliente = sigCanvas.current.toDataURL();
+        } 
+        // Si no hay nueva firma pero existe una previa, mantenerla
+        else if (firmaExistente) {
+            dataToSend.firma_cliente = firmaExistente;
+        }
+        // Si no hay ninguna firma, enviar null
+        else {
+            dataToSend.firma_cliente = null;
+        }
+
+        console.log('📝 Datos a enviar:', {
+            cliente_id: dataToSend.cliente_id,
+            tiene_firma: !!dataToSend.firma_cliente,
+            es_edicion: !!pqr
+        });
+
+        if (pqr) {
+            await pqrService.updatePQR(pqr.id, dataToSend);
+        } else {
+            await pqrService.createPQR(dataToSend);
+        }
+
+        onSave();
+    } catch (error) {
+        console.error('❌ Error guardando PQR:', error);
+        alert('Error guardando PQR: ' + error.message);
+    } finally {
+        setLoading(false);
+    }
+};
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                    <h3 className="text-lg font-medium text-gray-900">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-blue-600">
+                    <h3 className="text-lg font-medium text-white">
                         {pqr ? 'Editar PQR' : 'Nueva PQR'}
                     </h3>
-                    <button 
+                    <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-white hover:text-gray-200"
                     >
                         <X className="w-6 h-6" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Cliente */}
                         <div className="md:col-span-2">
@@ -641,16 +693,16 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                                 Tipo *
                             </label>
                             <select
-                                value={formData.tipo}
-                                onChange={(e) => handleChange('tipo', e.target.value)}
-                                required
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="peticion">Petición</option>
-                                <option value="queja">Queja</option>
-                                <option value="reclamo">Reclamo</option>
-                                <option value="sugerencia">Sugerencia</option>
-                            </select>
+    value={formData.tipo}
+    onChange={(e) => handleChange('tipo', e.target.value)}
+    required
+    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+>
+    <option value="peticion">Petición</option>
+    <option value="queja">Queja</option>
+    <option value="reclamo">Reclamo</option>
+    <option value="sugerencia">Sugerencia</option>
+</select>
                         </div>
 
                         {/* Categoría */}
@@ -695,11 +747,12 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                         {/* Prioridad */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Prioridad
+                                Prioridad *
                             </label>
                             <select
                                 value={formData.prioridad}
                                 onChange={(e) => handleChange('prioridad', e.target.value)}
+                                required
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
                                 <option value="baja">Baja</option>
@@ -709,9 +762,41 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                             </select>
                         </div>
 
-                        {/* Estado y Usuario Asignado (solo para edición) */}
+                        {/* Asunto */}
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Asunto *
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.asunto}
+                                onChange={(e) => handleChange('asunto', e.target.value)}
+                                required
+                                maxLength={200}
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Resumen breve de la PQR"
+                            />
+                        </div>
+
+                        {/* Descripción */}
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Descripción *
+                            </label>
+                            <textarea
+                                value={formData.descripcion}
+                                onChange={(e) => handleChange('descripcion', e.target.value)}
+                                required
+                                rows={4}
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Descripción detallada de la PQR"
+                            />
+                        </div>
+
+                        {/* Campos adicionales si es edición */}
                         {pqr && (
                             <>
+                                {/* Estado */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Estado
@@ -729,6 +814,7 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                                     </select>
                                 </div>
 
+                                {/* Usuario Asignado */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Usuario Asignado
@@ -741,92 +827,127 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                                         <option value="">Sin asignar</option>
                                         {usuarios.map(usuario => (
                                             <option key={usuario.id} value={usuario.id}>
-                                                {usuario.nombre} - {usuario.rol}
+                                                {usuario.nombre}
                                             </option>
                                         ))}
                                     </select>
                                 </div>
+
+                                {/* Respuesta */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Respuesta
+                                    </label>
+                                    <textarea
+                                        value={formData.respuesta}
+                                        onChange={(e) => handleChange('respuesta', e.target.value)}
+                                        rows={4}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Respuesta a la PQR"
+                                    />
+                                </div>
+
+                                {/* Notas Internas */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Notas Internas
+                                    </label>
+                                    <textarea
+                                        value={formData.notas_internas}
+                                        onChange={(e) => handleChange('notas_internas', e.target.value)}
+                                        rows={3}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Notas internas (no visibles para el cliente)"
+                                    />
+                                </div>
                             </>
                         )}
 
-                        {/* Asunto */}
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Asunto *
+{/* ✅ SECCIÓN DE FIRMA DEL CLIENTE - CORREGIDA */}
+                        <div className="md:col-span-2 border-t pt-6 mt-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-3">
+                                Firma del Cliente
                             </label>
-                            <input
-                                type="text"
-                                value={formData.asunto}
-                                onChange={(e) => handleChange('asunto', e.target.value)}
-                                required
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Resumen del caso..."
-                            />
-                        </div>
+                            
+                            {/* Mostrar preview de firma existente si la hay */}
+                            {firmaExistente && (
+                                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <p className="text-sm text-blue-700 mb-2 flex items-center">
+                                        <CheckCircle className="w-4 h-4 mr-2" />
+                                        Firma guardada anteriormente - Puede crear una nueva firma abajo
+                                    </p>
+                                    <img 
+                                        src={firmaExistente} 
+                                        alt="Firma guardada" 
+                                        className="border-2 border-blue-300 rounded-lg max-h-32 object-contain bg-white p-2"
+                                    />
+                                </div>
+                            )}
 
-                        {/* Descripción */}
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Descripción *
-                            </label>
-                            <textarea
-                                value={formData.descripcion}
-                                onChange={(e) => handleChange('descripcion', e.target.value)}
-                                required
-                                rows={4}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Describe detalladamente la situación..."
-                            />
-                        </div>
-
-                        {/* Respuesta (solo para edición) */}
-                        {pqr && (
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Respuesta
-                                </label>
-                                <textarea
-                                    value={formData.respuesta || ''}
-                                    onChange={(e) => handleChange('respuesta', e.target.value)}
-                                    rows={4}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Respuesta o solución proporcionada..."
+                            {/* Canvas de firma - SIEMPRE VISIBLE para permitir edición */}
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
+                                <SignatureCanvas
+                                    ref={sigCanvas}
+                                    canvasProps={{
+                                        className: 'signature-canvas w-full h-40 bg-white rounded cursor-crosshair',
+                                    }}
+                                    onBegin={handleFirmaInicio}
                                 />
                             </div>
-                        )}
-
-                        {/* Notas Internas (solo para edición) */}
-                        {pqr && (
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Notas Internas
-                                </label>
-                                <textarea
-                                    value={formData.notas_internas || ''}
-                                    onChange={(e) => handleChange('notas_internas', e.target.value)}
-                                    rows={3}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Notas para uso interno..."
-                                />
+                            
+                            <div className="flex items-center justify-between mt-3">
+                                <p className="text-xs text-gray-500">
+                                    {firmaCompleta ? (
+                                        <span className="text-green-600 flex items-center">
+                                            <CheckCircle className="w-4 h-4 mr-1" />
+                                            Nueva firma capturada (reemplazará la anterior)
+                                        </span>
+                                    ) : firmaExistente ? (
+                                        <span className="text-blue-600 flex items-center">
+                                            <CheckCircle className="w-4 h-4 mr-1" />
+                                            Se mantendrá la firma anterior si no firma de nuevo
+                                        </span>
+                                    ) : (
+                                        'Firme en el recuadro con el mouse o dedo'
+                                    )}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={limpiarFirma}
+                                    className="flex items-center px-3 py-1.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                    <RotateCcw className="w-4 h-4 mr-1" />
+                                    Limpiar
+                                </button>
                             </div>
-                        )}
+                        </div>
                     </div>
 
-                    {/* Botones */}
-                    <div className="flex justify-end space-x-4 mt-6 pt-6 border-t border-gray-200">
+                    {/* Botones de acción */}
+                    <div className="flex justify-end space-x-3 mt-6 pt-6 border-t">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                            className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            {loading ? 'Guardando...' : (pqr ? 'Actualizar' : 'Crear')}
+                            {loading ? (
+                                <>
+                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    Guardando...
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-4 h-4 mr-2" />
+                                    {pqr ? 'Actualizar' : 'Crear'} PQR
+                                </>
+                            )}
                         </button>
                     </div>
                 </form>
@@ -835,83 +956,149 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
     );
 };
 
-// Componente Modal de detalle
+// Componente Modal de Detalle
 const PQRDetailModal = ({ pqr, onClose }) => {
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                    <h3 className="text-lg font-medium text-gray-900">
-                        Detalle PQR - {pqr.numero_radicado}
-                    </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-blue-600">
+                    <div>
+                        <h3 className="text-lg font-medium text-white">
+                            Detalle de PQR
+                        </h3>
+                        <p className="text-sm text-blue-100 mt-1">
+                            Radicado: {pqr.numero_radicado}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="text-white hover:text-gray-200"
+                    >
                         <X className="w-6 h-6" />
                     </button>
                 </div>
 
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Información del Cliente</h4>
-                            <div className="space-y-2 text-sm">
-                                <p><span className="font-medium">Nombre:</span> {pqr.cliente_nombre}</p>
-                                <p><span className="font-medium">Identificación:</span> {pqr.cliente_identificacion}</p>
-                                <p><span className="font-medium">Teléfono:</span> {pqr.cliente_telefono}</p>
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                    <div className="space-y-6">
+                        {/* Información del Cliente */}
+                        <div className="bg-gray-50 rounded-lg p-5">
+                            <h4 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
+                                <User className="w-5 h-5 mr-2" />
+                                Información del Cliente
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-sm text-gray-600">Nombre</p>
+                                    <p className="font-medium text-gray-900">{pqr.cliente_nombre}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Identificación</p>
+                                    <p className="font-medium text-gray-900">{pqr.cliente_identificacion}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Teléfono</p>
+                                    <p className="font-medium text-gray-900">{pqr.cliente_telefono}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Email</p>
+                                    <p className="font-medium text-gray-900">{pqr.cliente_email}</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Información de la PQR</h4>
-                            <div className="space-y-2 text-sm">
-                                <p><span className="font-medium">Tipo:</span> {pqr.tipo}</p>
-                                <p><span className="font-medium">Categoría:</span> {pqr.categoria}</p>
-                                <p><span className="font-medium">Prioridad:</span> {pqr.prioridad}</p>
-                                <p><span className="font-medium">Estado:</span> {pqr.estado}</p>
+                        {/* Información de la PQR */}
+                        <div className="bg-gray-50 rounded-lg p-5">
+                            <h4 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
+                                <FileText className="w-5 h-5 mr-2" />
+                                Información de la PQR
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-sm text-gray-600">Tipo</p>
+                                    <p className="font-medium text-gray-900 capitalize">{pqr.tipo}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Categoría</p>
+                                    <p className="font-medium text-gray-900">{pqr.categoria}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Prioridad</p>
+                                    <p className="font-medium text-gray-900 capitalize">{pqr.prioridad}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Medio de Recepción</p>
+                                    <p className="font-medium text-gray-900 capitalize">{pqr.medio_recepcion}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Fecha de Recepción</p>
+                                    <p className="font-medium text-gray-900">
+                                        {pqrService.formatFecha(pqr.fecha_recepcion)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Estado</p>
+                                    <p className="font-medium text-gray-900 capitalize">{pqr.estado}</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="md:col-span-2">
-                            <h4 className="font-medium text-gray-900 mb-2">Asunto</h4>
-                            <p className="text-sm text-gray-700">{pqr.asunto}</p>
+                        {/* Asunto */}
+                        <div className="bg-gray-50 rounded-lg p-5">
+                            <h4 className="text-md font-semibold text-gray-800 mb-2">Asunto</h4>
+                            <p className="text-gray-900">{pqr.asunto}</p>
                         </div>
 
-                        <div className="md:col-span-2">
-                            <h4 className="font-medium text-gray-900 mb-2">Descripción</h4>
-                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{pqr.descripcion}</p>
+                        {/* Descripción */}
+                        <div className="bg-gray-50 rounded-lg p-5">
+                            <h4 className="text-md font-semibold text-gray-800 mb-2">Descripción</h4>
+                            <p className="text-gray-900 whitespace-pre-wrap">{pqr.descripcion}</p>
                         </div>
 
+                        {/* Respuesta */}
                         {pqr.respuesta && (
-                            <div className="md:col-span-2">
-                                <h4 className="font-medium text-gray-900 mb-2">Respuesta</h4>
-                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{pqr.respuesta}</p>
+                            <div className="bg-green-50 rounded-lg p-5 border-l-4 border-green-500">
+                                <h4 className="text-md font-semibold text-gray-800 mb-2 flex items-center">
+                                    <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
+                                    Respuesta
+                                </h4>
+                                <p className="text-gray-900 whitespace-pre-wrap">{pqr.respuesta}</p>
                             </div>
                         )}
 
-                        <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Fechas</h4>
-                            <div className="space-y-2 text-sm">
-                                <p><span className="font-medium">Recepción:</span> {pqrService.formatFecha(pqr.fecha_recepcion)}</p>
-                                {pqr.fecha_respuesta && (
-                                    <p><span className="font-medium">Respuesta:</span> {pqrService.formatFecha(pqr.fecha_respuesta)}</p>
-                                )}
-                                <p><span className="font-medium">Tiempo transcurrido:</span> {pqrService.calcularTiempoTranscurrido(pqr.fecha_recepcion)}</p>
+                        {/* Notas Internas */}
+                        {pqr.notas_internas && (
+                            <div className="bg-yellow-50 rounded-lg p-5 border-l-4 border-yellow-500">
+                                <h4 className="text-md font-semibold text-gray-800 mb-2 flex items-center">
+                                    <AlertTriangle className="w-5 h-5 mr-2 text-yellow-600" />
+                                    Notas Internas
+                                </h4>
+                                <p className="text-gray-900 whitespace-pre-wrap">{pqr.notas_internas}</p>
                             </div>
-                        </div>
+                        )}
 
-                        <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Asignación</h4>
-                            <div className="space-y-2 text-sm">
-                                <p><span className="font-medium">Usuario asignado:</span> {pqr.usuario_asignado_nombre || 'Sin asignar'}</p>
-                                <p><span className="font-medium">Medio de recepción:</span> {pqr.medio_recepcion}</p>
+                        {/* ✅ MOSTRAR FIRMA DEL CLIENTE SI EXISTE */}
+                        {pqr.firma_cliente && (
+                            <div className="bg-gray-50 rounded-lg p-5">
+                                <h4 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
+                                    <Pen className="w-5 h-5 mr-2" />
+                                    Firma del Cliente
+                                </h4>
+                                <div className="border-2 border-gray-300 rounded-lg p-4 bg-white inline-block">
+                                    <img 
+                                        src={pqr.firma_cliente} 
+                                        alt="Firma del cliente" 
+                                        className="max-h-40 object-contain"
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
 
-                <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+                <div className="px-6 py-4 border-t border-gray-200 flex justify-end bg-gray-50">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                         Cerrar
                     </button>

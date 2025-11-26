@@ -7,7 +7,7 @@ const pool = require('../config/database');
 
 class ClienteCompletoService {
 
-  
+
   /**
    * Crear cliente completo con servicio y documentos automáticos
    */
@@ -26,7 +26,7 @@ class ClienteCompletoService {
       // Si no hay servicio singular pero sí servicios array, usar el primero
       if (!servicioData && serviciosData.length > 0) {
         const primerServicio = serviciosData[0];
-        
+
         // Convertir estructura del frontend a lo que espera el backend
         servicioData = {
           plan_id: primerServicio.planInternetId || primerServicio.planTelevisionId || primerServicio.plan_id,
@@ -35,7 +35,7 @@ class ClienteCompletoService {
           fecha_activacion: primerServicio.fechaActivacion || primerServicio.fecha_activacion || new Date().toISOString().split('T')[0],
           observaciones: primerServicio.observaciones || ''
         };
-        
+
         console.log('🔄 Convertido servicios array a servicio singular:', servicioData);
       }
 
@@ -89,21 +89,12 @@ class ClienteCompletoService {
         console.log(`✅ Instalación programada`);
       }
 
-// 6. ENVIAR CORREO DE BIENVENIDA
+      // 6. ENVIAR NOTIFICACIONES (si se solicita)
       if (datosCompletos.opciones?.enviar_bienvenida) {
-        try {
-          console.log('📧 Enviando correo de bienvenida...');
-          const contratoId = documentos.contrato?.id;
-          if (contratoId) {
-            await this.enviarCorreoBienvenida(clienteId, contratoId, conexion);
-            console.log('✅ Correo de bienvenida enviado correctamente');
-          }
-        } catch (errorCorreo) {
-          console.error('❌ Error al enviar correo:', errorCorreo.message);
-        }
+        await this.enviarCorreoBienvenida(conexion, clienteId, datosCompletos.cliente);
+        console.log(`✅ Correo de bienvenida enviado`);
       }
 
-      // 7. RETORNAR RESULTADO
       const resultado = {
         cliente_id: clienteId,
         servicio_id: servicioId,
@@ -123,6 +114,8 @@ class ClienteCompletoService {
       return resultado;
     });
   }
+
+
   /**
    * Crear cliente en la base de datos con created_by
    */
@@ -187,7 +180,7 @@ class ClienteCompletoService {
     console.log('🔍 Valores cliente:', valores);
 
     // ✅ Verificar que NO hay undefined en los parámetros
-    const undefinedIndices = valores.map((param, index) => 
+    const undefinedIndices = valores.map((param, index) =>
       param === undefined ? index : null
     ).filter(index => index !== null);
 
@@ -205,7 +198,7 @@ class ClienteCompletoService {
   /**
    * Asignar servicio al cliente con created_by
    */
- static async asignarServicioCliente(conexion, clienteId, datosServicio, createdBy = null) {
+  static async asignarServicioCliente(conexion, clienteId, datosServicio, createdBy = null) {
     console.log('🔌 Asignando servicio al cliente:', datosServicio);
 
     if (!datosServicio) {
@@ -234,10 +227,10 @@ class ClienteCompletoService {
     }
 
     const plan = planes[0];
-    
+
     // Calcular precio final
-    const precioFinal = datosServicio.precio_personalizado ? 
-      parseFloat(datosServicio.precio_personalizado) : 
+    const precioFinal = datosServicio.precio_personalizado ?
+      parseFloat(datosServicio.precio_personalizado) :
       plan.precio;
 
     // Preparar datos del servicio
@@ -266,14 +259,14 @@ class ClienteCompletoService {
       datosLimpios.fecha_activacion,
       datosLimpios.estado,
       datosLimpios.observaciones,
-      
+
     ];
 
     console.log('🔍 Query servicio:', query);
     console.log('🔍 Valores servicio:', valores);
 
     // ✅ Verificar que NO hay undefined en los parámetros
-    const undefinedIndices = valores.map((param, index) => 
+    const undefinedIndices = valores.map((param, index) =>
       param === undefined ? index : null
     ).filter(index => index !== null);
 
@@ -292,7 +285,7 @@ class ClienteCompletoService {
   /**
    * Generar primera factura interna COMPLETA con todos los campos
    */
-static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioId, datosCliente, datosServicio, createdBy = null) {
+  static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioId, datosCliente, datosServicio, createdBy = null) {
     console.log('🧾 Generando primera factura COMPLETA...');
 
     try {
@@ -334,24 +327,17 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
         return valor;
       };
 
-// 5. Insertar factura
-// 5. Insertar factura
-      const periodoActual = new Date().toISOString().slice(0, 7); // "2025-11"
-      
+      // 5. Insertar factura
       const queryFactura = `
         INSERT INTO facturas (
-          numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
-          periodo_facturacion, fecha_emision, fecha_vencimiento,
+          numero_factura, cliente_id, fecha_emision, fecha_vencimiento,
           subtotal, iva, total, estado, resolucion, observaciones, created_by
-        ) VALUES (?, ?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), ?, ?, ?, 'pendiente', ?, ?, ?)
+        ) VALUES (?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), ?, ?, ?, 'pendiente', ?, ?, ?)
       `;
-      
+
       const valoresFactura = [
         numeroFactura,
         clienteId,
-        datosCliente.identificacion,
-        datosCliente.nombre,
-        periodoActual,
         subtotal,
         iva,
         total,
@@ -359,55 +345,64 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
         limpiarValor(datosServicio?.observaciones),
         createdBy || null
       ];
-      
+
       console.log('🔍 Query factura:', queryFactura);
       console.log('🔍 Valores factura:', valoresFactura);
-      
+
+      // ✅ Verificar que NO hay undefined en los parámetros
+      const undefinedIndices = valoresFactura.map((param, index) =>
+        param === undefined ? index : null
+      ).filter(index => index !== null);
+
+      if (undefinedIndices.length > 0) {
+        console.error('❌ Parámetros undefined en factura:', undefinedIndices);
+        throw new Error(`Parámetros undefined en facturas en posiciones: ${undefinedIndices.join(', ')}`);
+      }
+
       const [resultadoFactura] = await conexion.execute(queryFactura, valoresFactura);
       const facturaId = resultadoFactura.insertId;
 
-// 6. Insertar detalle de factura
+      // 6. Insertar detalle de factura
       const queryDetalle = `
         INSERT INTO detalle_facturas (
-          factura_id, servicio_cliente_id, concepto_nombre, cantidad,
-          precio_unitario, descuento, subtotal, iva, total
-        ) VALUES (?, ?, ?, 1, ?, 0.00, ?, ?, ?)
+          factura_id, servicio_cliente_id, concepto_nombre, cantidad, 
+          precio_unitario, subtotal
+        ) VALUES (?, ?, ?, 1, ?, ?)
       `;
-      
+
       const valoresDetalle = [
         facturaId,
         servicioId,
         `${servicio.plan_nombre} - ${servicio.tipo}`,
-        subtotal,      // precio_unitario
-        subtotal,      // subtotal
-        iva,           // iva
-        total          // total
+        subtotal,
+        subtotal,
+
       ];
-      
-      console.log('🔍 Query detalle:', queryDetalle);
-      console.log('🔍 Valores detalle:', valoresDetalle);
-      
+
       await conexion.execute(queryDetalle, valoresDetalle);
+
       // 7. Actualizar consecutivo
       await conexion.execute(`
-        UPDATE configuracion_empresa
-        SET consecutivo_factura = consecutivo_factura + 1
+        UPDATE configuracion_empresa 
+        SET consecutivo_factura = consecutivo_factura + 1 
         WHERE id = 1
       `);
 
       console.log(`✅ Primera factura ${numeroFactura} generada con ID: ${facturaId}`);
-      
+
       return {
         id: facturaId,
         numero_factura: numeroFactura,
         total: total,
         estado: 'pendiente'
       };
+
     } catch (error) {
       console.error('❌ Error generando primera factura:', error);
       throw error;
     }
   }
+
 
   /**
    * Crear detalle de factura
@@ -438,57 +433,54 @@ static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioI
   }
 
 
- static async generarOrdenInstalacionParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, contratoId, createdBy) {
-  try {
-    console.log('🔧 Generando orden de instalación para múltiples servicios con trazabilidad completa...');
+  static async generarOrdenInstalacionParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, contratoId, createdBy) {
+    try {
+      console.log('🔧 Generando orden de instalación para múltiples servicios con trazabilidad completa...');
 
-    //const numeroOrden = await this.generarNumeroOrden(conexion);
+      //const numeroOrden = await this.generarNumeroOrden(conexion);
 
-    // ✅ CORRECCIÓN 1: Calcular costo CORRECTO según tipo de contrato
-    const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
-    let costoInstalacionTotal = 0;
+      // ✅ CORRECCIÓN 1: Calcular costo CORRECTO según tipo de contrato
+      const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
+      let costoInstalacionTotal = 0;
 
-    // ✅ COSTO CORREGIDO: UNA sola instalación independiente de cantidad de servicios
-    if (tipoPermanencia === 'sin_permanencia') {
-      costoInstalacionTotal = 150000; // ✅ Una sola instalación de 150,000
-    } else {
-      costoInstalacionTotal = 50000;  // ✅ Una sola instalación de 50,000
-    }
+      // ✅ COSTO CORREGIDO: UNA sola instalación independiente de cantidad de servicios
+      if (tipoPermanencia === 'sin_permanencia') {
+        costoInstalacionTotal = 150000; // ✅ Una sola instalación de 150,000
+      } else {
+        costoInstalacionTotal = 50000;  // ✅ Una sola instalación de 50,000
+      }
 
-    // ✅ CORRECCIÓN 2: Crear JSON con IDs de servicios para servicio_cliente_id
-    const serviciosIds = serviciosDeLaSede.map(s => s.id);
-    const serviciosDescripcion = serviciosDeLaSede.map(s =>
-      `${s.tipo.toUpperCase()}: ${s.plan_nombre} - $${s.precio.toLocaleString()}`
-    ).join(' + ');
-// ✅ CORRECCIÓN: Calcular precio TOTAL del contrato (suma de todos los servicios)
-const precioTotalContrato = serviciosDeLaSede.reduce((sum, s) => sum + parseFloat(s.precio || 0), 0);
+      // ✅ CORRECCIÓN 2: Crear JSON con IDs de servicios para servicio_cliente_id
+      const serviciosIds = serviciosDeLaSede.map(s => s.id);
+      const serviciosDescripcion = serviciosDeLaSede.map(s =>
+        `${s.tipo.toUpperCase()}: ${s.plan_nombre} - $${s.precio.toLocaleString()}`
+      ).join(' + ');
 
-console.log(`💰 Precio total del contrato: $${precioTotalContrato.toLocaleString()} (${serviciosDeLaSede.length} servicios)`);
-    // Preparar observaciones
-    const observacionesInstalacion = JSON.stringify({
-      servicios_a_instalar: serviciosDeLaSede.map(s => ({
-        id: s.id,
-        tipo: s.tipo,
-        plan: s.plan_nombre,
-        precio: s.precio
-      })),
-      sede: sedeData.nombre_sede || 'Sede Principal',
-      direccion: sedeData.direccion_servicio,
-      tipo_contrato: tipoPermanencia,
-      cantidad_servicios: serviciosDeLaSede.length,
-      servicios_descripcion: serviciosDescripcion,
-      notas_adicionales: sedeData.observaciones || ''
-    });
+      // Preparar observaciones
+      const observacionesInstalacion = JSON.stringify({
+        servicios_a_instalar: serviciosDeLaSede.map(s => ({
+          id: s.id,
+          tipo: s.tipo,
+          plan: s.plan_nombre,
+          precio: s.precio
+        })),
+        sede: sedeData.nombre_sede || 'Sede Principal',
+        direccion: sedeData.direccion_servicio,
+        tipo_contrato: tipoPermanencia,
+        cantidad_servicios: serviciosDeLaSede.length,
+        servicios_descripcion: serviciosDescripcion,
+        notas_adicionales: sedeData.observaciones || ''
+      });
 
-    // Obtener datos del cliente para completar campos
-    const [clienteData] = await conexion.execute(
-      'SELECT nombre, direccion, barrio, telefono FROM clientes WHERE id = ?',
-      [clienteId]
-    );
+      // Obtener datos del cliente para completar campos
+      const [clienteData] = await conexion.execute(
+        'SELECT nombre, direccion, barrio, telefono FROM clientes WHERE id = ?',
+        [clienteId]
+      );
 
-    const cliente = clienteData[0] || {};
+      const cliente = clienteData[0] || {};
 
-    const query = `
+      const query = `
       INSERT INTO instalaciones (
         cliente_id, servicio_cliente_id, contrato_id,
         direccion_instalacion, barrio, telefono_contacto, persona_recibe,
@@ -497,56 +489,56 @@ console.log(`💰 Precio total del contrato: $${precioTotalContrato.toLocaleStri
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'programada', ?)
     `;
 
-    // Programar para mañana
-    const fechaProgramada = new Date();
-    fechaProgramada.setDate(fechaProgramada.getDate() + 1);
+      // Programar para mañana
+      const fechaProgramada = new Date();
+      fechaProgramada.setDate(fechaProgramada.getDate() + 1);
 
-    const parametros = [
-      clienteId,
-      JSON.stringify(serviciosIds), // ✅ CORRECCIÓN 2: JSON con todos los servicios
-      contratoId, // ✅ CORRECCIÓN 3: ID del contrato guardado correctamente
-      sedeData.direccion_servicio || cliente.direccion,
-      cliente.barrio || sedeData.barrio || 'No especificado',
-      sedeData.telefono_sede || cliente.telefono,
-      sedeData.contacto_sede || cliente.nombre,
-      fechaProgramada.toISOString().split('T')[0],
-      '09:00:00',
-      'nueva',
-      costoInstalacionTotal, // ✅ CORRECCIÓN 1: Costo correcto
-      observacionesInstalacion,
-      
-    ];
+      const parametros = [
+        clienteId,
+        JSON.stringify(serviciosIds), // ✅ CORRECCIÓN 2: JSON con todos los servicios
+        contratoId, // ✅ CORRECCIÓN 3: ID del contrato guardado correctamente
+        sedeData.direccion_servicio || cliente.direccion,
+        cliente.barrio || sedeData.barrio || 'No especificado',
+        sedeData.telefono_sede || cliente.telefono,
+        sedeData.contacto_sede || cliente.nombre,
+        fechaProgramada.toISOString().split('T')[0],
+        '09:00:00',
+        'nueva',
+        costoInstalacionTotal, // ✅ CORRECCIÓN 1: Costo correcto
+        observacionesInstalacion,
 
-    const [resultado] = await conexion.execute(query, parametros);
-    const instalacionId = resultado.insertId;
+      ];
 
-    console.log(`✅ Orden de instalación creada CORREGIDA:`, {
-      instalacion_id: instalacionId,
-      contrato_id: contratoId, // ✅ Confirmado que se guarda
-      servicios_ids: serviciosIds, // ✅ Confirmado JSON con todos los servicios
-      costo_correcto: costoInstalacionTotal, // ✅ Confirmado costo correcto
-      servicios_incluidos: serviciosDeLaSede.length,
-      tipo_permanencia: tipoPermanencia
-    });
+      const [resultado] = await conexion.execute(query, parametros);
+      const instalacionId = resultado.insertId;
 
-    return {
-      id: instalacionId,
-      numero: '0',
-      contrato_id: contratoId,
-      servicios_cliente_ids: serviciosIds,
-      estado: 'programada',
-      servicios_incluidos: serviciosDeLaSede.length,
-      costo_total: costoInstalacionTotal
-    };
+      console.log(`✅ Orden de instalación creada CORREGIDA:`, {
+        instalacion_id: instalacionId,
+        contrato_id: contratoId, // ✅ Confirmado que se guarda
+        servicios_ids: serviciosIds, // ✅ Confirmado JSON con todos los servicios
+        costo_correcto: costoInstalacionTotal, // ✅ Confirmado costo correcto
+        servicios_incluidos: serviciosDeLaSede.length,
+        tipo_permanencia: tipoPermanencia
+      });
 
-  } catch (error) {
-    console.error('❌ Error generando orden de instalación:', error);
-    throw error;
+      return {
+        id: instalacionId,
+        numero: '0',
+        contrato_id: contratoId,
+        servicios_cliente_ids: serviciosIds,
+        estado: 'programada',
+        servicios_incluidos: serviciosDeLaSede.length,
+        costo_total: costoInstalacionTotal
+      };
+
+    } catch (error) {
+      console.error('❌ Error generando orden de instalación:', error);
+      throw error;
+    }
   }
-}
- /**
-   * Generar orden de instalación interna COMPLETA con DIRECCIÓN
-   */
+  /**
+    * Generar orden de instalación interna COMPLETA con DIRECCIÓN
+    */
   static async generarOrdenInstalacionInterno(conexion, clienteId, serviciosDeLaSede, createdBy = null) {
     console.log('🔧 Generando orden de instalación CON DIRECCIÓN...');
 
@@ -599,7 +591,7 @@ console.log(`💰 Precio total del contrato: $${precioTotalContrato.toLocaleStri
   /**
    * Generar contrato interno
    */
-   static async generarContratoInterno(conexion, clienteId, servicioId, datosServicio, createdBy = null) {
+  static async generarContratoInterno(conexion, clienteId, servicioId, datosServicio, createdBy = null) {
     console.log('📄 Generando contrato...');
 
     const numeroContrato = await this.generarNumeroContrato(conexion);
@@ -621,9 +613,9 @@ console.log(`💰 Precio total del contrato: $${precioTotalContrato.toLocaleStri
 
     const planData = planes[0] || {};
     const tipoPermanencia = datosServicio?.tipo_permanencia || 'sin_permanencia';
-    const permanenciaMeses = tipoPermanencia === 'con_permanencia' ? 
+    const permanenciaMeses = tipoPermanencia === 'con_permanencia' ?
       (planData.permanencia_minima_meses || 6) : 0;
-    
+
     const costoInstalacion = tipoPermanencia === 'con_permanencia' ?
       (planData.costo_instalacion_permanencia || 0) :
       (planData.costo_instalacion_sin_permanencia || 150000);
@@ -658,7 +650,7 @@ console.log(`💰 Precio total del contrato: $${precioTotalContrato.toLocaleStri
     console.log('🔍 Valores contrato:', valores);
 
     // ✅ Verificar que NO hay undefined en los parámetros
-    const undefinedIndices = valores.map((param, index) => 
+    const undefinedIndices = valores.map((param, index) =>
       param === undefined ? index : null
     ).filter(index => index !== null);
 
@@ -852,45 +844,36 @@ console.log(`💰 Precio total del contrato: $${precioTotalContrato.toLocaleStri
     return true;
   }
 
-/**
- * Enviar correo de bienvenida con factura y contrato adjuntos
- */
-static async enviarCorreoBienvenida(clienteId, contratoId, conexion) {
-  console.log(`📧 Enviando correo de bienvenida para cliente ${clienteId}, contrato ${contratoId}...`);
+  /**
+   * Enviar correo de bienvenida con factura y contrato adjuntos
+   */
+  static async enviarCorreoBienvenida(conexion, clienteId, datosCliente) {
+    console.log('📧 Enviando correo de bienvenida...');
 
-  const EmailService = require('./EmailService');
+    // Importar EmailService dinámicamente para evitar dependencias circulares
+    const EmailService = require('./EmailService');
 
-  try {
-    // Obtener datos del cliente
-    const [clientes] = await conexion.execute(
-      'SELECT * FROM clientes WHERE id = ?',
-      [clienteId]
-    );
-    
-    if (clientes.length === 0) {
-      throw new Error('Cliente no encontrado');
-    }
-    
-    const datosCliente = clientes[0];
+    try {
+      const resultado = await EmailService.enviarCorreoBienvenida(clienteId, datosCliente, {
+        conexion: conexion
+      });
 
-    const resultado = await EmailService.enviarCorreoBienvenida(clienteId, datosCliente, {
-      conexion: conexion,
-      contratoId: contratoId
-    });
-
-    if (resultado.enviado) {
-      console.log(`✅ Correo enviado a: ${resultado.destinatario}`);
-      console.log(`📎 Adjuntos: ${resultado.adjuntos}`);
-      return true;
-    } else {
-      console.warn(`⚠️ No se pudo enviar correo: ${resultado.motivo}`);
+      if (resultado.enviado) {
+        console.log(`✅ Correo de bienvenida enviado exitosamente a: ${resultado.destinatario}`);
+        console.log(`📎 Adjuntos incluidos: ${resultado.adjuntos}`);
+        return true;
+      } else {
+        console.warn(`⚠️ No se pudo enviar correo: ${resultado.motivo}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error enviando correo de bienvenida:', error);
+      // No lanzar error para evitar que falle toda la transacción
+      // El cliente se creó exitosamente, solo falló el envío del correo
       return false;
     }
-  } catch (error) {
-    console.error('❌ Error enviando correo de bienvenida:', error);
-    return false;
   }
-}
+
   /**
    * Previsualizar primera factura antes de crear cliente
    */
@@ -1074,13 +1057,13 @@ static async enviarCorreoBienvenida(clienteId, contratoId, conexion) {
       }
 
       // Consulta principal
-     // Calcular paginación
-const pageNum = Math.max(1, parseInt(page) || 1);
-const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
-const offsetNum = (pageNum - 1) * limitNum;
+      // Calcular paginación
+      const pageNum = Math.max(1, parseInt(page) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+      const offsetNum = (pageNum - 1) * limitNum;
 
-// Query corregida
-const query = `
+      // Query corregida
+      const query = `
   SELECT 
     f.*,
     c.nombre AS cliente_nombre,
@@ -1094,10 +1077,10 @@ const query = `
   LIMIT ${limitNum} OFFSET ${offsetNum}
 `;
 
-// Ejecutar con los parámetros del WHERE (limit/offset ya están interpolados)
+      // Ejecutar con los parámetros del WHERE (limit/offset ya están interpolados)
 
 
-     
+
 
       console.log('🔍 Query facturas generadas:', query);
       console.log('🔍 Parámetros:', params);
@@ -1302,13 +1285,13 @@ const query = `
         params.push(sector_id);
       }
 
-   // Validar y calcular paginación (nombres únicos para evitar redeclare)
-const pageNum = Math.max(1, parseInt(page) || 1);
-const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
-const offsetNum = (pageNum - 1) * limitNum;
+      // Validar y calcular paginación (nombres únicos para evitar redeclare)
+      const pageNum = Math.max(1, parseInt(page) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+      const offsetNum = (pageNum - 1) * limitNum;
 
-// Query sin placeholders en LIMIT/OFFSET
-const query = `
+      // Query sin placeholders en LIMIT/OFFSET
+      const query = `
   SELECT 
     c.*,
     ci.nombre AS ciudad_nombre,
@@ -1326,11 +1309,11 @@ const query = `
   LIMIT ${limitNum} OFFSET ${offsetNum}
 `;
 
-// Ejecutar pasando solo los params de WHERE (limit/offset ya están interpolados)
+      // Ejecutar pasando solo los params de WHERE (limit/offset ya están interpolados)
 
 
 
-      
+
 
       const [clientes] = await conexion.execute(query, params);
       const totalRegistros = clientes.length > 0 ? clientes[0].total_registros : 0;
@@ -1538,7 +1521,7 @@ const query = `
           contratoId,
           createdBy
         );
-        
+
         const instalacionid = await this.generarOrdenInstalacionInterno(
           conexion,
           clienteId,
@@ -1546,10 +1529,10 @@ const query = `
           createdBy
         );
 
-          if (datosCompletos.opciones?.enviar_bienvenida) {
-        await this.enviarCorreoBienvenida(conexion, clienteId, datosCompletos.cliente);
-        console.log(`✅ Correo de bienvenida enviado`);
-      }
+        if (datosCompletos.opciones?.enviar_bienvenida) {
+          await this.enviarCorreoBienvenida(conexion, clienteId, datosCompletos.cliente);
+          console.log(`✅ Correo de bienvenida enviado`);
+        }
 
 
         sedesCreadas.push({
@@ -1583,93 +1566,93 @@ const query = `
    * Crear todos los servicios de UNA sede específica
    */
   static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
-  const serviciosCreados = [];
-  
-  // ✅ CORRECCIÓN: Procesar TODOS los servicios seleccionados
-  const serviciosParaCrear = [];
-  
-  // Verificar si hay servicio de internet
-  if (sedeData.planInternetId) {
-    serviciosParaCrear.push({
-      tipo: 'internet',
-      plan_id: sedeData.planInternetId,
-      precio: sedeData.precioInternetCustom || null
-    });
-  }
-  
-  // Verificar si hay servicio de televisión
-  if (sedeData.planTelevisionId) {
-    serviciosParaCrear.push({
-      tipo: 'television',
-      plan_id: sedeData.planTelevisionId,
-      precio: sedeData.precioTelevisionCustom || null
-    });
-  }
-  
-  // Si no hay servicios separados, usar plan único
-  if (serviciosParaCrear.length === 0 && sedeData.plan_id) {
-    serviciosParaCrear.push({
-      tipo: 'combo',
-      plan_id: sedeData.plan_id,
-      precio: sedeData.precio_personalizado || null
-    });
-  }
+    const serviciosCreados = [];
 
-  // ✅ CORRECCIÓN: Crear CADA servicio por separado
-  for (const servicioData of serviciosParaCrear) {
-    // Obtener información del plan
-    const [planInfo] = await conexion.execute(
-      'SELECT nombre, precio, tipo FROM planes_servicio WHERE id = ?',
-      [servicioData.plan_id]
-    );
+    // ✅ CORRECCIÓN: Procesar TODOS los servicios seleccionados
+    const serviciosParaCrear = [];
 
-    if (planInfo.length === 0) {
-      throw new Error(`Plan ${servicioData.plan_id} no encontrado`);
+    // Verificar si hay servicio de internet
+    if (sedeData.planInternetId) {
+      serviciosParaCrear.push({
+        tipo: 'internet',
+        plan_id: sedeData.planInternetId,
+        precio: sedeData.precioInternetCustom || null
+      });
     }
 
-    const plan = planInfo[0];
-    const precioFinal = servicioData.precio || plan.precio;
+    // Verificar si hay servicio de televisión
+    if (sedeData.planTelevisionId) {
+      serviciosParaCrear.push({
+        tipo: 'television',
+        plan_id: sedeData.planTelevisionId,
+        precio: sedeData.precioTelevisionCustom || null
+      });
+    }
 
-    // ✅ CORRECCIÓN: Incluir observaciones en cada servicio
-    const observacionesServicio = JSON.stringify({
-      sede_nombre: sedeData.nombre_sede || 'Sede Principal',
-      direccion_sede: sedeData.direccion_servicio || '',
-      tipo_contrato: sedeData.tipoContrato || 'sin_permanencia',
-      observaciones_adicionales: sedeData.observaciones || '', // ✅ OBSERVACIONES guardadas
-      fecha_creacion: new Date().toISOString(),
-      creado_desde_sede: true
-    });
+    // Si no hay servicios separados, usar plan único
+    if (serviciosParaCrear.length === 0 && sedeData.plan_id) {
+      serviciosParaCrear.push({
+        tipo: 'combo',
+        plan_id: sedeData.plan_id,
+        precio: sedeData.precio_personalizado || null
+      });
+    }
 
-    const queryServicio = `
+    // ✅ CORRECCIÓN: Crear CADA servicio por separado
+    for (const servicioData of serviciosParaCrear) {
+      // Obtener información del plan
+      const [planInfo] = await conexion.execute(
+        'SELECT nombre, precio, tipo FROM planes_servicio WHERE id = ?',
+        [servicioData.plan_id]
+      );
+
+      if (planInfo.length === 0) {
+        throw new Error(`Plan ${servicioData.plan_id} no encontrado`);
+      }
+
+      const plan = planInfo[0];
+      const precioFinal = servicioData.precio || plan.precio;
+
+      // ✅ CORRECCIÓN: Incluir observaciones en cada servicio
+      const observacionesServicio = JSON.stringify({
+        sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+        direccion_sede: sedeData.direccion_servicio || '',
+        tipo_contrato: sedeData.tipoContrato || 'sin_permanencia',
+        observaciones_adicionales: sedeData.observaciones || '', // ✅ OBSERVACIONES guardadas
+        fecha_creacion: new Date().toISOString(),
+        creado_desde_sede: true
+      });
+
+      const queryServicio = `
       INSERT INTO servicios_cliente (
         cliente_id, plan_id, precio_personalizado, fecha_activacion,
         estado, observaciones
       ) VALUES (?, ?, ?, ?, 'activo', ?)
     `;
 
-    const [resultado] = await conexion.execute(queryServicio, [
-      clienteId,
-      servicioData.plan_id,
-      precioFinal,
-      sedeData.fecha_activacion || new Date().toISOString().split('T')[0],
-      observacionesServicio, // ✅ OBSERVACIONES incluidas
-     
-    ]);
+      const [resultado] = await conexion.execute(queryServicio, [
+        clienteId,
+        servicioData.plan_id,
+        precioFinal,
+        sedeData.fecha_activacion || new Date().toISOString().split('T')[0],
+        observacionesServicio, // ✅ OBSERVACIONES incluidas
 
-    serviciosCreados.push({
-      id: resultado.insertId,
-      plan_id: servicioData.plan_id,
-      plan_nombre: plan.nombre,
-      tipo: plan.tipo,
-      precio: precioFinal,
-      observaciones: observacionesServicio
-    });
+      ]);
 
-    console.log(`✅ Servicio ${plan.tipo} creado: ${plan.nombre} - $${precioFinal}`);
+      serviciosCreados.push({
+        id: resultado.insertId,
+        plan_id: servicioData.plan_id,
+        plan_nombre: plan.nombre,
+        tipo: plan.tipo,
+        precio: precioFinal,
+        observaciones: observacionesServicio
+      });
+
+      console.log(`✅ Servicio ${plan.tipo} creado: ${plan.nombre} - $${precioFinal}`);
+    }
+
+    return serviciosCreados;
   }
-
-  return serviciosCreados;
-}
 
   /**
    * Crear un servicio individual
@@ -1769,9 +1752,8 @@ const query = `
       sede_nombre: sedeData.nombre_sede || 'Sede Principal',
       direccion_sede: sedeData.direccion_servicio,
       contacto_sede: sedeData.contacto_sede,
-       telefono_sede: sedeData.telefono_sede,
+      telefono_sede: sedeData.telefono_sede,
       servicios_incluidos: serviciosDescripcion,
-      precio_mensual_total: precioTotalContrato,
       cantidad_servicios: serviciosDeLaSede.length,
       observaciones_adicionales: sedeData.observaciones,
       tipo_permanencia: tipoPermanencia,
@@ -1889,55 +1871,32 @@ const query = `
       // 4. CALCULAR FECHAS DEL PERÍODO SEGÚN REGLAS DE FACTURACIÓN
       const fechasFacturacion = this.calcularFechasFacturacion();
 
-	// 5. CALCULAR TOTALES UNIFICADOS DE TODOS LOS SERVICIOS DE LA SEDE
-let valorInternet = 0;
-let valorTelevision = 0;
-let valorIvaInternet = 0;
-let valorIvaTelevision = 0;
+      // 5. CALCULAR TOTALES UNIFICADOS DE TODOS LOS SERVICIOS DE LA SEDE
+      let valorInternet = 0;
+      let valorTelevision = 0;
+      let valorIvaInternet = 0;
+      let valorIvaTelevision = 0;
 
-for (const servicio of serviciosDeLaSede) {
-  const precio = parseFloat(servicio.precio || 0);
-  
-  // ✅ CORRECCIÓN: Detectar tipo desde plan_nombre si 'tipo' no está disponible
-  let tipoServicio = servicio.tipo;
-  
-  // Si no tiene tipo, inferir desde plan_nombre
-  if (!tipoServicio && servicio.plan_nombre) {
-    const nombreLower = servicio.plan_nombre.toLowerCase();
-    if (nombreLower.includes('internet') && nombreLower.includes('tv')) {
-      tipoServicio = 'combo';
-    } else if (nombreLower.includes('internet')) {
-      tipoServicio = 'internet';
-    } else if (nombreLower.includes('tv') || nombreLower.includes('televisión')) {
-      tipoServicio = 'television';
-    }
-  }
+      for (const servicio of serviciosDeLaSede) {
+        const precio = parseFloat(servicio.precio || 0);
 
-  console.log(`📊 Servicio: ${servicio.plan_nombre}, Tipo: ${tipoServicio}, Precio: $${precio}`);
+        if (servicio.tipo === 'internet') {
+          valorInternet += precio;
+          // IVA para internet: solo estratos 4, 5, 6
+          if (estrato >= 4) {
+            valorIvaInternet += precio * (parseFloat(config.porcentaje_iva) / 100);
+          }
+        } else if (servicio.tipo === 'television') {
+          valorTelevision += precio;
+          // IVA para televisión: todos los estratos
+          valorIvaTelevision += precio * (parseFloat(config.porcentaje_iva) / 100);
+        }
+      }
 
-  // Calcular según tipo
-// Calcular según tipo
-if (tipoServicio === 'internet' || tipoServicio === 'combo') {
-  valorInternet += precio;
-  // IVA para internet: solo estratos 4, 5, 6
-  if (estrato >= 4) {
-    valorIvaInternet += precio * (parseFloat(config.porcentaje_iva) / 100);
-  }
-}
+      const subtotal = valorInternet + valorTelevision;
+      const totalIva = valorIvaInternet + valorIvaTelevision;
+      const total = subtotal + totalIva;
 
-if (tipoServicio === 'television' || tipoServicio === 'combo') {
-  valorTelevision += precio;
-  // ✅ CORRECCIÓN: IVA para TV también solo estratos 4, 5, 6 (según legislación colombiana)
-  if (estrato >= 4) {
-    valorIvaTelevision += precio * (parseFloat(config.porcentaje_iva) / 100);
-  }
-}
-
-const subtotal = valorInternet + valorTelevision;
-const totalIva = valorIvaInternet + valorIvaTelevision;
-const total = subtotal + totalIva;
-
-console.log(`💰 TOTALES: Internet=$${valorInternet}, TV=$${valorTelevision}, IVA=$${totalIva}, Total=$${total}`);
       // 6. CREAR DESCRIPCIÓN DE SERVICIOS PARA OBSERVACIONES
       const sedeNombre = sedeData.nombre_sede || 'Sede Principal';
       const serviciosFacturados = serviciosDeLaSede.map(s =>
@@ -2051,7 +2010,7 @@ console.log(`💰 TOTALES: Internet=$${valorInternet}, TV=$${valorTelevision}, I
   }
 
 
-  /**
+  /*
    * AGREGAR NUEVA SEDE a cliente existente
    * (esto es para cuando el cliente regresa meses después)
    */
@@ -2438,5 +2397,6 @@ console.log(`💰 TOTALES: Internet=$${valorInternet}, TV=$${valorTelevision}, I
     }
   }
 }
+
 
 module.exports = ClienteCompletoService;

@@ -829,6 +829,110 @@ router.use((error, req, res, next) => {
   });
 });
 
+
+/**
+ * @route GET /api/v1/facturacion/estadisticas-pagos
+ * @desc Obtener estadísticas detalladas de pagos en un período
+ */
+router.get('/estadisticas-pagos', async (req, res) => {
+  try {
+    const { fecha_inicio, fecha_fin, banco_id, metodo_pago } = req.query;
+
+    if (!fecha_inicio || !fecha_fin) {
+      return res.status(400).json({
+        success: false,
+        message: 'Las fechas de inicio y fin son requeridas'
+      });
+    }
+
+    const { Database } = require('../models/Database'); // ✅ AGREGADO
+
+    let whereConditions = [
+      'f.estado = "pagada"',
+      'f.activo = 1',
+      'f.fecha_pago IS NOT NULL',
+      'f.fecha_pago BETWEEN ? AND ?'
+    ];
+    let params = [fecha_inicio, fecha_fin];
+
+    if (banco_id && banco_id !== 'null' && banco_id !== '') {
+      whereConditions.push('f.banco_id = ?');
+      params.push(banco_id);
+    }
+
+    if (metodo_pago) {
+      whereConditions.push('f.metodo_pago = ?');
+      params.push(metodo_pago);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    const estadisticasGenerales = await Database.query(`
+      SELECT
+        COUNT(DISTINCT f.id) as total_pagos,
+        COUNT(DISTINCT f.numero_factura) as facturas_pagadas,
+        COALESCE(SUM(f.total), 0) as total_recaudado,
+        COALESCE(AVG(f.total), 0) as promedio_pago
+      FROM facturas f
+      WHERE ${whereClause}
+    `, params);
+
+    const porMetodoPago = await Database.query(`
+      SELECT
+        COALESCE(f.metodo_pago, 'No especificado') as metodo_pago,
+        COUNT(f.id) as cantidad,
+        COALESCE(SUM(f.total), 0) as total
+      FROM facturas f
+      WHERE ${whereClause}
+      GROUP BY f.metodo_pago
+      ORDER BY total DESC
+    `, params);
+
+    const porBanco = await Database.query(`
+      SELECT
+        f.banco_id,
+        COALESCE(b.nombre, 'Sin banco') as banco_nombre,
+        COUNT(f.id) as cantidad,
+        COALESCE(SUM(f.total), 0) as total
+      FROM facturas f
+      LEFT JOIN bancos b ON f.banco_id = b.id
+      WHERE ${whereClause}
+      GROUP BY f.banco_id, b.nombre
+      ORDER BY total DESC
+    `, params);
+
+    const estadisticas = {
+      total_pagos: estadisticasGenerales[0]?.total_pagos || 0,
+      facturas_pagadas: estadisticasGenerales[0]?.facturas_pagadas || 0,
+      total_recaudado: parseFloat(estadisticasGenerales[0]?.total_recaudado || 0),
+      promedio_pago: parseFloat(estadisticasGenerales[0]?.promedio_pago || 0),
+      por_metodo_pago: porMetodoPago.map(m => ({
+        metodo_pago: m.metodo_pago,
+        cantidad: parseInt(m.cantidad),
+        total: parseFloat(m.total)
+      })),
+      por_banco: porBanco.map(b => ({
+        banco_id: b.banco_id,
+        banco_nombre: b.banco_nombre,
+        cantidad: parseInt(b.cantidad),
+        total: parseFloat(b.total)
+      }))
+    };
+
+    res.json({
+      success: true,
+      data: estadisticas
+    });
+
+  } catch (error) {
+    console.error('❌ Error calculando estadísticas de pagos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error calculando estadísticas de pagos',
+      error: error.message
+    });
+  }
+});
 console.log('🧾 Rutas de facturación configuradas correctamente con Database.query');
 
 module.exports = router;
