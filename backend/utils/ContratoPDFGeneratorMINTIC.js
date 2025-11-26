@@ -150,8 +150,13 @@ class ContratoPDFGeneratorMINTIC {
         .two-columns {
             column-count: 2;
             column-gap: 6mm;
-            column-rule: 1px solid #000;
             min-height: 500px;
+        }
+
+        .two-columns-page2 {
+            column-count: 2;
+            column-gap: 6mm;
+            min-height: 350px;
         }
 
         .column-content {
@@ -245,13 +250,13 @@ class ContratoPDFGeneratorMINTIC {
         }
 
         .legal-text {
-            font-size: 9.5pt;
+            font-size: 7.5pt;
             text-align: justify;
-            line-height: 1.25;
+            line-height: 1.15;
         }
 
         .legal-text p {
-            margin-bottom: 4mm;
+            margin-bottom: 2mm;
         }
 
         .legal-text strong {
@@ -261,75 +266,77 @@ class ContratoPDFGeneratorMINTIC {
         /* CAJA DE CONTACTO */
         .contact-box {
             border: 1px solid #000;
-            padding: 5mm;
-            margin: 5mm 0;
+            padding: 3mm;
+            margin: 3mm 0;
         }
 
         .contact-title {
             text-align: center;
             font-weight: bold;
-            font-size: 10pt;
-            margin-bottom: 4mm;
+            font-size: 9pt;
+            margin-bottom: 2mm;
         }
 
         .contact-item {
             display: flex;
-            margin-bottom: 4mm;
+            margin-bottom: 2mm;
             align-items: flex-start;
         }
 
         .contact-number {
-            min-width: 25px;
-            height: 25px;
+            min-width: 20px;
+            height: 20px;
             border: 1.5px solid #000;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            margin-right: 5px;
+            margin-right: 4px;
             flex-shrink: 0;
+            font-size: 8pt;
         }
 
         .contact-text {
             flex: 1;
-            font-size: 9.5pt;
-            line-height: 1.2;
+            font-size: 7.5pt;
+            line-height: 1.15;
             text-align: justify;
         }
 
         /* FIRMA */
         .signature-section {
-            margin-top: 8mm;
+            margin-top: 4mm;
             text-align: center;
         }
 
         .signature-note {
-            font-size: 9pt;
-            margin-bottom: 3mm;
+            font-size: 8pt;
+            margin-bottom: 2mm;
         }
 
         .signature-title {
             font-weight: bold;
-            font-size: 10pt;
-            margin-bottom: 3mm;
+            font-size: 9pt;
+            margin-bottom: 2mm;
         }
 
         .signature-data {
             border: 1px solid #000;
             display: inline-block;
-            padding: 3px 10px;
-            margin-bottom: 4mm;
+            padding: 2px 8px;
+            margin-bottom: 2mm;
+            font-size: 8pt;
         }
 
         .signature-line {
-            width: 300px;
-            height: 30px;
+            width: 250px;
+            height: 25px;
             border-bottom: 2px solid #000;
-            margin: 0 auto 3mm auto;
+            margin: 0 auto 2mm auto;
         }
 
         .footer-text {
-            font-size: 8.5pt;
+            font-size: 7.5pt;
             text-align: center;
         }
 
@@ -533,7 +540,7 @@ class ContratoPDFGeneratorMINTIC {
         ${this.generarEncabezado(logoPath, fecha)}
         
         <!-- PÁGINA 2 EN DOS COLUMNAS -->
-        <div class="two-columns">
+        <div class="two-columns-page2">
             <!-- COLUMNA IZQUIERDA -->
             <div class="column-content">
                 <div class="legal-text">
@@ -590,8 +597,8 @@ class ContratoPDFGeneratorMINTIC {
                 <div class="contact-number">4</div>
                 <div class="contact-text">Cuando su queja o petición sea por el servicio de televisión, puede enviar la misma a la Autoridad Nacional de Televisión, para que esta Entidad resuelva su solicitud.</div>
             </div>
-            <p style="margin-top: 4mm; font-size: 9.5pt;">Si no respondemos es porque aceptamos su petición o reclamo. Esto se llama silencio administrativo positivo y aplica para internet.</p>
-            <p style="text-align: center; font-weight: bold; margin-top: 4mm; font-size: 9.5pt;">Si no está de acuerdo con nuestra respuesta</p>
+            <p style="margin-top: 2mm; font-size: 7.5pt;">Si no respondemos es porque aceptamos su petición o reclamo. Esto se llama silencio administrativo positivo y aplica para internet.</p>
+            <p style="text-align: center; font-weight: bold; margin-top: 2mm; font-size: 8pt;">Si no está de acuerdo con nuestra respuesta</p>
         </div>
 
         <div class="signature-section">
