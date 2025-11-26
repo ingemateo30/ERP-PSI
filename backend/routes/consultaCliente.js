@@ -101,7 +101,8 @@ router.get('/instalaciones',
 // Descargar PDF de contrato
 router.get('/contratos/:contratoId/pdf', verificarTokenCliente, consultaClienteController.descargarPDF);
 
-
+// ✅ NUEVA: Descargar PDF de factura
+router.get('/facturas/:facturaId/pdf', consultaClienteController.descargarFacturaPDF);
 // Obtener detalles de una factura
 router.get('/facturas/:facturaId/detalle', verificarTokenCliente, consultaClienteController.obtenerDetalleFactura);
 module.exports = router;

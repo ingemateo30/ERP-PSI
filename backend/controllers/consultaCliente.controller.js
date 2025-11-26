@@ -226,7 +226,6 @@ const consultaClienteController = {
   },
 
 // 📄 Descargar PDF del contrato
-// 📄 Descargar PDF del contrato
 descargarPDF: async (req, res) => {
   try {
     const { contratoId } = req.params;
@@ -257,70 +256,15 @@ descargarPDF: async (req, res) => {
     const contrato = contratos[0];
     console.log('✅ Contrato encontrado:', contrato.numero_contrato);
 
-    // Verificar si existe PDF guardado
-    if (contrato.documento_pdf_path) {
-      const path = require('path');
-      const fs = require('fs');
-      
-      // La ruta en BD es absoluta, usarla directamente
-      const fullPath = contrato.documento_pdf_path;
-      
-      console.log('📁 Verificando PDF en:', fullPath);
-
-      if (fs.existsSync(fullPath)) {
-        console.log('✅ PDF encontrado, enviando archivo...');
-        
-        connection.release();
-        
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="contrato_${contrato.numero_contrato}.pdf"`);
-        
-        const fileStream = fs.createReadStream(fullPath);
-        
-        fileStream.on('error', (error) => {
-          console.error('❌ Error leyendo archivo:', error);
-          if (!res.headersSent) {
-            res.status(500).json({
-              success: false,
-              message: 'Error al leer el archivo PDF'
-            });
-          }
-        });
-        
-        return fileStream.pipe(res);
-      } else {
-        console.warn('⚠️ Archivo PDF no encontrado en disco:', fullPath);
-      }
-    } else {
-      console.warn('⚠️ No hay ruta de PDF en la base de datos');
-    }
-
-    // Si llegamos aquí, el PDF no existe, intentar generarlo
+    // ✅ SIEMPRE GENERAR PDF EN TIEMPO REAL (más confiable)
     console.log('🔄 Generando PDF en tiempo real...');
 
-    // Usar EmailService que tiene el método de generación de PDFs
     const EmailService = require('../services/EmailService');
     
-    // Obtener servicios del contrato
-    const [servicios] = await connection.query(
-      `SELECT sc.*, ps.nombre as plan_nombre, ps.precio as plan_precio
-       FROM servicios_cliente sc
-       JOIN planes_servicio ps ON sc.plan_id = ps.id
-       WHERE JSON_CONTAINS(?, CAST(sc.id AS JSON))`,
-      [contrato.servicio_id || '[]']
-    );
+    // Generar PDF pasando el ID del contrato y la conexión
+    const pdfBuffer = await EmailService.generarPDFContrato(contratoId, connection);
 
     connection.release();
-
-    // Generar PDF usando el mismo método que usa el sistema principal
-    const pdfBuffer = await EmailService.generarPDFContrato({
-      contrato: contrato,
-      servicios: servicios,
-      cliente: {
-        nombre: contrato.nombre,
-        identificacion: contrato.identificacion
-      }
-    });
 
     if (!pdfBuffer || pdfBuffer.length === 0) {
       throw new Error('Buffer de PDF vacío');
@@ -330,7 +274,7 @@ descargarPDF: async (req, res) => {
 
     // Enviar el PDF generado
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="contrato_${contrato.numero_contrato}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Contrato-${contrato.numero_contrato}.pdf"`);
     res.setHeader('Content-Length', pdfBuffer.length);
     res.send(pdfBuffer);
 
@@ -347,6 +291,7 @@ descargarPDF: async (req, res) => {
     }
   }
 },
+
 // 🧾 Obtener detalle de factura
 obtenerDetalleFactura: async (req, res) => {
   try {
@@ -428,6 +373,61 @@ obtenerDetalleFactura: async (req, res) => {
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
+  }
+},
+
+// 📄 Descargar PDF de factura
+descargarFacturaPDF: async (req, res) => {
+  try {
+    const { facturaId } = req.params;
+    const clienteId = req.clientePublico.clienteId;
+
+    console.log(`📄 Generando PDF de factura ${facturaId} para cliente ${clienteId}`);
+
+    const connection = await db.getConnection();
+
+    // Verificar que la factura pertenece al cliente
+    const [facturas] = await connection.query(
+      'SELECT * FROM facturas WHERE id = ? AND cliente_id = ?',
+      [facturaId, clienteId]
+    );
+
+    if (facturas.length === 0) {
+      connection.release();
+      return res.status(404).json({ 
+        success: false,
+        message: 'Factura no encontrada' 
+      });
+    }
+
+    const factura = facturas[0];
+
+    // Generar PDF usando PDFGenerator
+    const PDFGenerator = require('../services/PDFGenerator');
+    const pdfBuffer = await PDFGenerator.generarFacturaPDF(facturaId);
+
+    connection.release();
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error('Buffer de PDF vacío');
+    }
+
+    console.log('✅ PDF de factura generado - Tamaño:', pdfBuffer.length, 'bytes');
+
+    // Configurar headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Factura-${factura.numero_factura}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+
+    return res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('❌ Error generando PDF de factura:', error);
+    return res.status(500).json({ 
+      success: false,
+      message: 'Error al generar el PDF de la factura',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 }
 };
