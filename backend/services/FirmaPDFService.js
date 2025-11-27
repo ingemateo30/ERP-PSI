@@ -213,13 +213,13 @@ static async abrirContratoParaFirma(contratoId) {
       const pdfBytes = fs.readFileSync(rutaPDFOriginal);
       const pdfDoc = await PDFDocument.load(pdfBytes);
 
-      // Agregar firma al PDF
+      // Agregar firma al PDF (considerando si tiene permanencia)
       await this.agregarFirmaAlPDF(pdfDoc, signature_base64, {
         firmado_por,
         cedula_firmante,
         fecha_firma: new Date().toLocaleDateString('es-CO'),
         observaciones
-      });
+      }, contrato);
 
       // Guardar PDF firmado con nuevo nombre
       const nombreArchivoFirmado = `contrato_${contrato.numero_contrato}_firmado_${Date.now()}.pdf`;
@@ -230,19 +230,23 @@ static async abrirContratoParaFirma(contratoId) {
 
       console.log('💾 PDF firmado guardado en:', rutaPDFFirmado);
 
-      // Actualizar base de datos
+      // Actualizar base de datos - Usar fecha actual sin problemas de zona horaria
+      const fechaActual = new Date();
+      const fechaFirmaMySQL = fechaActual.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+
       const observacionesActualizadas = `${contrato.observaciones || ''}\n[FIRMA DIGITAL] Firmado por: ${firmado_por} - Cédula: ${cedula_firmante} - Fecha: ${new Date().toLocaleString('es-CO')} - Tipo: ${tipo_firma}${observaciones ? ` - Obs: ${observaciones}` : ''}`;
 
       await conexion.execute(`
         UPDATE contratos SET
           documento_pdf_path = ?,
           firmado_cliente = 1,
-          fecha_firma = CURDATE(),
+          fecha_firma = ?,
           observaciones = ?,
           updated_at = NOW()
         WHERE id = ?
       `, [
         rutaPDFFirmado,
+        fechaFirmaMySQL,
         observacionesActualizadas,
         contratoId
       ]);
@@ -274,20 +278,25 @@ static async abrirContratoParaFirma(contratoId) {
   /**
    * Agregar firma visual al PDF
    */
-  static async agregarFirmaAlPDF(pdfDoc, signatureBase64, datosSignature) {
+  static async agregarFirmaAlPDF(pdfDoc, signatureBase64, datosSignature, contrato = null) {
     try {
       console.log('🖊️ Agregando firma visual al PDF...');
-      
+
       const pages = pdfDoc.getPages();
-      const lastPage = pages[pages.length - 1];
-      const { width, height } = lastPage.getSize();
+      const totalPages = pages.length;
+
+      // Determinar si tiene permanencia
+      const tienePermanencia = contrato && contrato.tipo_permanencia === 'con_permanencia' &&
+                              contrato.permanencia_meses && parseInt(contrato.permanencia_meses) > 1;
+
+      console.log(`📄 Total de páginas: ${totalPages}, Tiene permanencia: ${tienePermanencia}`);
 
       // Convertir base64 a imagen
       const signatureImageBytes = Buffer.from(
-        signatureBase64.replace(/^data:image\/\w+;base64,/, ''), 
+        signatureBase64.replace(/^data:image\/\w+;base64,/, ''),
         'base64'
       );
-      
+
       let signatureImage;
       try {
         signatureImage = await pdfDoc.embedPng(signatureImageBytes);
@@ -303,59 +312,126 @@ static async abrirContratoParaFirma(contratoId) {
       // Dimensiones de la firma
       const signatureWidth = 120;
       const signatureHeight = 60;
-      const x = width - signatureWidth - 60;
-      const y = 100;
 
-      // Dibujar imagen de firma
-      lastPage.drawImage(signatureImage, {
-        x: x,
-        y: y,
-        width: signatureWidth,
-        height: signatureHeight,
-      });
+      // SIEMPRE agregar firma en página 2 (índice 1) - Contrato principal
+      if (totalPages >= 2) {
+        const page2 = pages[1];
+        const { width, height } = page2.getSize();
+        const x = width - signatureWidth - 60;
+        const y = 100;
 
-      // Agregar texto informativo
-      const fontSize = 8;
-      const lineHeight = 12;
-      
-      lastPage.drawText(`Firmado digitalmente por:`, {
-        x: x,
-        y: y - 15,
-        size: fontSize,
-        color: rgb(0, 0, 0),
-      });
+        console.log('✍️ Colocando firma en página 2 (contrato principal)');
 
-      lastPage.drawText(`${datosSignature.firmado_por}`, {
-        x: x,
-        y: y - 15 - lineHeight,
-        size: fontSize,
-        color: rgb(0, 0, 0),
-      });
-
-      lastPage.drawText(`Cédula: ${datosSignature.cedula_firmante}`, {
-        x: x,
-        y: y - 15 - (lineHeight * 2),
-        size: fontSize,
-        color: rgb(0, 0, 0),
-      });
-
-      lastPage.drawText(`Fecha: ${datosSignature.fecha_firma}`, {
-        x: x,
-        y: y - 15 - (lineHeight * 3),
-        size: fontSize,
-        color: rgb(0, 0, 0),
-      });
-
-      if (datosSignature.observaciones) {
-        lastPage.drawText(`Obs: ${datosSignature.observaciones.substring(0, 30)}`, {
+        // Dibujar imagen de firma
+        page2.drawImage(signatureImage, {
           x: x,
-          y: y - 15 - (lineHeight * 4),
-          size: fontSize - 1,
-          color: rgb(0.3, 0.3, 0.3),
+          y: y,
+          width: signatureWidth,
+          height: signatureHeight,
         });
+
+        // Agregar texto informativo
+        const fontSize = 8;
+        const lineHeight = 12;
+
+        page2.drawText(`Firmado digitalmente por:`, {
+          x: x,
+          y: y - 15,
+          size: fontSize,
+          color: rgb(0, 0, 0),
+        });
+
+        page2.drawText(`${datosSignature.firmado_por}`, {
+          x: x,
+          y: y - 15 - lineHeight,
+          size: fontSize,
+          color: rgb(0, 0, 0),
+        });
+
+        page2.drawText(`Cédula: ${datosSignature.cedula_firmante}`, {
+          x: x,
+          y: y - 15 - (lineHeight * 2),
+          size: fontSize,
+          color: rgb(0, 0, 0),
+        });
+
+        page2.drawText(`Fecha: ${datosSignature.fecha_firma}`, {
+          x: x,
+          y: y - 15 - (lineHeight * 3),
+          size: fontSize,
+          color: rgb(0, 0, 0),
+        });
+
+        if (datosSignature.observaciones) {
+          page2.drawText(`Obs: ${datosSignature.observaciones.substring(0, 30)}`, {
+            x: x,
+            y: y - 15 - (lineHeight * 4),
+            size: fontSize - 1,
+            color: rgb(0.3, 0.3, 0.3),
+          });
+        }
       }
 
-      console.log('✅ Firma agregada al PDF exitosamente');
+      // Si tiene permanencia, también agregar firma en página 3 (índice 2) - Anexo de permanencia
+      if (tienePermanencia && totalPages >= 3) {
+        const page3 = pages[2];
+        const { width, height } = page3.getSize();
+        const x = width - signatureWidth - 60;
+        const y = 100;
+
+        console.log('✍️ Colocando firma en página 3 (anexo de permanencia)');
+
+        // Dibujar imagen de firma
+        page3.drawImage(signatureImage, {
+          x: x,
+          y: y,
+          width: signatureWidth,
+          height: signatureHeight,
+        });
+
+        // Agregar texto informativo
+        const fontSize = 8;
+        const lineHeight = 12;
+
+        page3.drawText(`Firmado digitalmente por:`, {
+          x: x,
+          y: y - 15,
+          size: fontSize,
+          color: rgb(0, 0, 0),
+        });
+
+        page3.drawText(`${datosSignature.firmado_por}`, {
+          x: x,
+          y: y - 15 - lineHeight,
+          size: fontSize,
+          color: rgb(0, 0, 0),
+        });
+
+        page3.drawText(`Cédula: ${datosSignature.cedula_firmante}`, {
+          x: x,
+          y: y - 15 - (lineHeight * 2),
+          size: fontSize,
+          color: rgb(0, 0, 0),
+        });
+
+        page3.drawText(`Fecha: ${datosSignature.fecha_firma}`, {
+          x: x,
+          y: y - 15 - (lineHeight * 3),
+          size: fontSize,
+          color: rgb(0, 0, 0),
+        });
+
+        if (datosSignature.observaciones) {
+          page3.drawText(`Obs: ${datosSignature.observaciones.substring(0, 30)}`, {
+            x: x,
+            y: y - 15 - (lineHeight * 4),
+            size: fontSize - 1,
+            color: rgb(0.3, 0.3, 0.3),
+          });
+        }
+      }
+
+      console.log('✅ Firma(s) agregada(s) al PDF exitosamente');
 
     } catch (error) {
       console.error('❌ Error agregando firma al PDF:', error);
