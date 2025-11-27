@@ -324,7 +324,7 @@ class ContratoPDFGeneratorMINTIC {
 
         /* FIRMA - COMPACTA */
         .signature-section {
-            margin-top: 2mm;
+            margin-top: 6mm;
             text-align: center;
         }
 
@@ -349,7 +349,7 @@ class ContratoPDFGeneratorMINTIC {
 
         .signature-line {
             width: 250px;
-            height: 25px;
+            height: 35px;
             border-bottom: 2px solid #000;
             margin: 0 auto 1.5mm auto;
         }
