@@ -412,7 +412,7 @@ descargarFacturaPDF: async (req, res) => {
     const factura = facturas[0];
 
     // Generar PDF usando PDFGenerator
-    const PDFGenerator = require('../services/PDFGenerator');
+    const PDFGenerator = require('../utils/pdfGenerator');
     const pdfBuffer = await PDFGenerator.generarFacturaPDF(facturaId);
 
     connection.release();
