@@ -420,13 +420,25 @@ const pdfBuffer = await ContratoPDFGeneratorMINTIC.generarPDFCompleto(datosPDF);
       throw new Error('Buffer de PDF vacío');
     }
 
-    console.log('✅ PDF de contrato generado - Tamaño:', pdfBuffer.length, 'bytes');
+console.log('✅ PDF de contrato generado - Tamaño:', pdfBuffer.length, 'bytes');
 
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Contrato-${contratoData.numero_contrato}.pdf"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
+// ✅ VERIFICAR QUE SEA UN BUFFER VÁLIDO
+if (!Buffer.isBuffer(pdfBuffer)) {
+  throw new Error('El PDF generado no es un Buffer válido');
+}
 
-    return res.send(pdfBuffer);
+// ✅ CONFIGURAR HEADERS CORRECTAMENTE
+res.set({
+  'Content-Type': 'application/pdf',
+  'Content-Disposition': `attachment; filename="Contrato-${contratoData.numero_contrato}.pdf"`,
+  'Content-Length': pdfBuffer.length,
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0'
+});
+
+// ✅ ENVIAR BUFFER COMO BINARIO
+return res.end(pdfBuffer, 'binary');
 
   } catch (error) {
     console.error('❌ Error generando PDF de contrato:', error);
