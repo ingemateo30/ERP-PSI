@@ -10,9 +10,20 @@ const path = require('path');
 class ContratoPDFGeneratorMINTIC {
 
   static generarHTML(contratoData, empresaData, logoPath = '') {
-    const fechaHoy = new Date().toLocaleDateString('es-CO', {
+    // Usar fecha de generación del contrato, no la fecha actual
+    const fechaGeneracion = contratoData.created_at || contratoData.fecha_generacion || new Date();
+    const fechaHoy = new Date(fechaGeneracion).toLocaleDateString('es-CO', {
       day: '2-digit',
       month: 'short',
+      year: 'numeric'
+    });
+
+    // Calcular fecha de activación: 15 días después de la generación
+    const fechaActivacion = new Date(fechaGeneracion);
+    fechaActivacion.setDate(fechaActivacion.getDate() + 15);
+    const fechaActivacionTexto = fechaActivacion.toLocaleDateString('es-CO', {
+      day: 'numeric',
+      month: 'long',
       year: 'numeric'
     });
 
@@ -349,9 +360,10 @@ class ContratoPDFGeneratorMINTIC {
 
         .signature-line {
             width: 250px;
-            height: 35px;
+            height: 45px;
             border-bottom: 2px solid #000;
             margin: 0 auto 1.5mm auto;
+            position: relative;
         }
 
         .footer-text {
@@ -459,7 +471,7 @@ class ContratoPDFGeneratorMINTIC {
                             <span class="checkbox" style="margin-left: 10px;"></span> Publicidad
                         </div>
                         <p>Servicios adicionales_____________________________</p>
-                        <p>Usted se compromete a pagar oportunamente el precio acordado. El servicio se activará a más tardar el día 24 noviembre 2024</p>
+                        <p>Usted se compromete a pagar oportunamente el precio acordado. El servicio se activará a más tardar el día ${fechaActivacionTexto}</p>
                     </div>
                 </div>
 

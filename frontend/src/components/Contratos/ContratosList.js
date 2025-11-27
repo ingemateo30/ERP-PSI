@@ -1,19 +1,20 @@
 // frontend/src/components/Contratos/ContratosList.js
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { 
-  FileText, 
-  Download, 
-  Eye, 
-  Edit, 
-  Search, 
+import {
+  FileText,
+  Download,
+  Eye,
+  Edit,
+  Search,
   Filter,
   Calendar,
   User,
   CheckCircle,
   XCircle,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  PenTool
 } from 'lucide-react';
 import contratosService from '../../services/contratosService';
 
@@ -114,12 +115,17 @@ const { hasPermission } = useAuth();
 
       await cargarContratos();
       await cargarEstadisticas();
-      
+
       alert('Estado del contrato actualizado exitosamente');
     } catch (err) {
       console.error('Error cambiando estado:', err);
       alert('Error al cambiar el estado del contrato');
     }
+  };
+
+  const handleIrAFirmar = (contratoId) => {
+    // Redirigir a la página de firma con el ID del contrato
+    window.location.href = `/firma-contratos?contratoId=${contratoId}`;
   };
 
   const obtenerIconoEstado = (estado) => {
@@ -407,6 +413,16 @@ const { hasPermission } = useAuth();
 
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
+                      {!contrato.firmado_cliente && contrato.estado !== 'anulado' && (
+                        <button
+                          onClick={() => handleIrAFirmar(contrato.id)}
+                          className="text-green-600 hover:text-green-900 p-1 rounded transition-colors"
+                          title="Firmar contrato"
+                        >
+                          <PenTool className="w-4 h-4" />
+                        </button>
+                      )}
+
                       <button
                         onClick={() => handleDescargarPDF(contrato.id)}
                         className="text-blue-600 hover:text-blue-900 p-1 rounded transition-colors"

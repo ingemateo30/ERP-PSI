@@ -42,6 +42,32 @@ const FirmaContratosWrapper = () => {
         cargarContratos();
     }, [filtroEstado]);
 
+    // Verificar si se recibió un contratoId en la URL para abrir directamente
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const contratoId = params.get('contratoId');
+
+        if (contratoId) {
+            // Buscar el contrato en la lista o hacer una petición específica
+            const buscarYAbrirContrato = async () => {
+                try {
+                    const response = await apiService.get(`/contratos/${contratoId}`);
+                    if (response && response.success && response.data) {
+                        console.log('📝 Abriendo contrato desde URL:', contratoId);
+                        iniciarFirmaContrato(response.data);
+                        // Limpiar el parámetro de la URL sin recargar la página
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                } catch (error) {
+                    console.error('Error cargando contrato desde URL:', error);
+                    alert('No se pudo cargar el contrato especificado');
+                }
+            };
+
+            buscarYAbrirContrato();
+        }
+    }, []);
+
     const cargarContratos = async () => {
         try {
             setLoading(true);
