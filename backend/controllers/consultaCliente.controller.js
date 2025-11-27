@@ -226,147 +226,207 @@ const consultaClienteController = {
   },
 
 // 📄 Descargar PDF del contrato
-// 📄 Descargar PDF del contrato
 descargarPDF: async (req, res) => {
-    try {
-      const { contratoId } = req.params;
-      
-      if (!req.clientePublico || !req.clientePublico.clienteId) {
-        return res.status(401).json({
-          success: false,
-          message: 'Token de autenticación requerido'
-        });
-      }
-      
-      const clienteId = req.clientePublico.clienteId;
-      console.log(`📄 Generando PDF de contrato ${contratoId} para cliente ${clienteId}`);
-
-      const connection = await db.getConnection();
-
-      // Verificar que el contrato pertenece al cliente
-      const [contratos] = await connection.query(
-        'SELECT * FROM contratos WHERE id = ? AND cliente_id = ?',
-        [contratoId, clienteId]
-      );
-
-      if (contratos.length === 0) {
-        connection.release();
-        return res.status(404).json({ 
-          success: false,
-          message: 'Contrato no encontrado' 
-        });
-      }
-
-      const contrato = contratos[0];
-
-      // ✅ SI YA TIENE PDF GUARDADO, INTENTAR DEVOLVERLO
-      if (contrato.documento_pdf_path && contrato.documento_pdf_path.trim() !== '') {
-        const fs = require('fs').promises;
-        const path = require('path');
-        
-        const pdfPath = path.join(__dirname, '..', contrato.documento_pdf_path);
-        
-        try {
-          const pdfBuffer = await fs.readFile(pdfPath);
-          connection.release();
-
-          res.setHeader('Content-Type', 'application/pdf');
-          res.setHeader('Content-Disposition', `attachment; filename="Contrato-${contrato.numero_contrato}.pdf"`);
-          res.setHeader('Content-Length', pdfBuffer.length);
-
-          console.log('✅ PDF de contrato enviado desde archivo guardado');
-          return res.send(pdfBuffer);
-        } catch (fileError) {
-          console.log('⚠️ No se pudo leer PDF guardado, generando nuevo...');
-        }
-      }
-
-      // ✅ OBTENER DATOS COMPLETOS DEL CONTRATO PARA GENERAR PDF
-      const [datosCompletos] = await connection.query(`
-        SELECT 
-          c.*,
-          cl.nombre as cliente_nombre,
-          cl.identificacion as cliente_identificacion,
-          cl.tipo_documento as cliente_tipo_identificacion,
-          cl.telefono as cliente_telefono,
-          cl.correo as cliente_email,
-          cl.direccion as cliente_direccion
-        FROM contratos c
-        JOIN clientes cl ON c.cliente_id = cl.id
-        WHERE c.id = ?
-      `, [contratoId]);
-
-      if (datosCompletos.length === 0) {
-        connection.release();
-        return res.status(404).json({ 
-          success: false,
-          message: 'Datos del contrato no encontrados' 
-        });
-      }
-
-      const contratoData = datosCompletos[0];
-
-      // Obtener observaciones como objeto
-      let observaciones = {};
-      try {
-        observaciones = JSON.parse(contratoData.observaciones || '{}');
-      } catch (e) {
-        console.warn('⚠️ No se pudo parsear observaciones del contrato');
-      }
-
-      connection.release();
-
-    // ✅ PREPARAR DATOS PARA EL GENERADOR DE PDF
-const ContratoPDFGeneratorMINTIC = require('../utils/ContratoPDFGeneratorMINTIC');
-
-// 🔧 MAPEAR datos del contrato al formato que espera el generador
-const datosPDF = {
-  numero_contrato: contratoData.numero_contrato,
-  cliente_nombre: contratoData.cliente_nombre,
-  cliente_identificacion: contratoData.cliente_identificacion,
-  cliente_tipo_identificacion: contratoData.cliente_tipo_identificacion,
-  cliente_telefono: contratoData.cliente_telefono,
-  cliente_email: contratoData.cliente_email,
-  cliente_direccion: observaciones.direccion_sede || contratoData.cliente_direccion,
-  fecha_generacion: contratoData.fecha_generacion || contratoData.fecha_inicio,
-  fecha_inicio: contratoData.fecha_inicio,
-  tipo_permanencia: contratoData.tipo_permanencia || 'sin_permanencia',
-  permanencia_meses: contratoData.permanencia_meses || 1,
-  ciudad_nombre: 'San Gil', // Ajustar según tu lógica
-  departamento_nombre: 'Santander',
-  cliente_estrato: observaciones.cliente_estrato || 1,
-  precio_internet: observaciones.precio_mensual_total || 0,
-  precio_television: 0,
-  servicio_nombre: observaciones.servicios_incluidos || 'SERVICIO CONTRATADO',
-  observaciones: contratoData.observaciones
-};
-
-console.log('📄 Generando PDF con datos:', JSON.stringify(datosPDF, null, 2));
-
-// ✅ USAR EL MÉTODO ESTÁTICO CORRECTO
-const pdfBuffer = await ContratoPDFGeneratorMINTIC.generarPDFCompleto(datosPDF);
-      if (!pdfBuffer || pdfBuffer.length === 0) {
-        throw new Error('Buffer de PDF vacío');
-      }
-
-      console.log('✅ PDF de contrato generado - Tamaño:', pdfBuffer.length, 'bytes');
-
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="Contrato-${contratoData.numero_contrato}.pdf"`);
-      res.setHeader('Content-Length', pdfBuffer.length);
-
-      return res.send(pdfBuffer);
-
-    } catch (error) {
-      console.error('❌ Error generando PDF de contrato:', error);
-      return res.status(500).json({ 
+  try {
+    const { contratoId } = req.params;
+    
+    if (!req.clientePublico || !req.clientePublico.clienteId) {
+      return res.status(401).json({
         success: false,
-        message: 'Error al generar el PDF del contrato',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: 'Token de autenticación requerido'
       });
     }
-  },
+    
+    const clienteId = req.clientePublico.clienteId;
+    console.log(`📄 Generando PDF de contrato ${contratoId} para cliente ${clienteId}`);
 
+    const connection = await db.getConnection();
+
+    // Verificar que el contrato pertenece al cliente
+    const [contratos] = await connection.query(
+      'SELECT * FROM contratos WHERE id = ? AND cliente_id = ?',
+      [contratoId, clienteId]
+    );
+
+    if (contratos.length === 0) {
+      connection.release();
+      return res.status(404).json({ 
+        success: false,
+        message: 'Contrato no encontrado' 
+      });
+    }
+
+    const contrato = contratos[0];
+
+    // ✅ SI YA TIENE PDF GUARDADO, INTENTAR DEVOLVERLO
+    if (contrato.documento_pdf_path && contrato.documento_pdf_path.trim() !== '') {
+      const fs = require('fs').promises;
+      const path = require('path');
+      
+      const pdfPath = path.join(__dirname, '..', contrato.documento_pdf_path);
+      
+      try {
+        const pdfBuffer = await fs.readFile(pdfPath);
+        connection.release();
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Contrato-${contrato.numero_contrato}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+
+        console.log('✅ PDF de contrato enviado desde archivo guardado');
+        return res.send(pdfBuffer);
+      } catch (fileError) {
+        console.log('⚠️ No se pudo leer PDF guardado, generando nuevo...');
+      }
+    }
+
+    // ✅ OBTENER DATOS COMPLETOS DEL CONTRATO PARA GENERAR PDF
+    const [datosCompletos] = await connection.query(`
+      SELECT 
+        c.*,
+        cl.nombre as cliente_nombre,
+        cl.identificacion as cliente_identificacion,
+        cl.tipo_documento as cliente_tipo_identificacion,
+        cl.telefono as cliente_telefono,
+        cl.correo as cliente_email,
+        cl.direccion as cliente_direccion,
+        cl.estrato as cliente_estrato,
+        ci.nombre as ciudad_nombre,
+        d.nombre as departamento_nombre
+      FROM contratos c
+      JOIN clientes cl ON c.cliente_id = cl.id
+      LEFT JOIN ciudades ci ON cl.ciudad_id = ci.id
+      LEFT JOIN departamentos d ON ci.departamento_id = d.id
+      WHERE c.id = ?
+    `, [contratoId]);
+
+    if (datosCompletos.length === 0) {
+      connection.release();
+      return res.status(404).json({ 
+        success: false,
+        message: 'Datos del contrato no encontrados' 
+      });
+    }
+
+    const contratoData = datosCompletos[0];
+
+    // Obtener observaciones como objeto
+    let observaciones = {};
+    try {
+      observaciones = JSON.parse(contratoData.observaciones || '{}');
+    } catch (e) {
+      console.warn('⚠️ No se pudo parsear observaciones del contrato');
+    }
+
+    // ✅ OBTENER INFORMACIÓN DE SERVICIOS DEL CONTRATO
+    let servicioId = contratoData.servicio_id;
+    let serviciosInfo = [];
+    
+    // Verificar si servicio_id es un JSON array o un ID simple
+    try {
+      const serviciosIds = JSON.parse(servicioId);
+      if (Array.isArray(serviciosIds)) {
+        // Múltiples servicios
+        const [servicios] = await connection.query(`
+          SELECT sc.*, ps.nombre as plan_nombre, ps.precio, ps.tipo
+          FROM servicios_cliente sc
+          JOIN planes_servicio ps ON sc.plan_id = ps.id
+          WHERE sc.id IN (?)
+        `, [serviciosIds]);
+        serviciosInfo = servicios;
+      }
+    } catch (parseError) {
+      // Es un ID simple, no JSON
+      const [servicios] = await connection.query(`
+        SELECT sc.*, ps.nombre as plan_nombre, ps.precio, ps.tipo
+        FROM servicios_cliente sc
+        JOIN planes_servicio ps ON sc.plan_id = ps.id
+        WHERE sc.id = ?
+      `, [servicioId]);
+      serviciosInfo = servicios;
+    }
+
+    connection.release();
+
+    // ✅ CALCULAR PRECIOS DE SERVICIOS
+    let precioInternet = 0;
+    let precioTelevision = 0;
+    let servicioNombre = '';
+
+    for (const servicio of serviciosInfo) {
+      const precio = parseFloat(servicio.precio_personalizado || servicio.precio || 0);
+      const tipo = (servicio.tipo || '').toLowerCase();
+      
+      if (tipo.includes('internet')) {
+        precioInternet += precio;
+        servicioNombre += `Internet ${servicio.plan_nombre} `;
+      } else if (tipo.includes('tv') || tipo.includes('television')) {
+        precioTelevision += precio;
+        servicioNombre += `TV ${servicio.plan_nombre} `;
+      } else {
+        // Si no se identifica el tipo, sumarlo a internet por defecto
+        precioInternet += precio;
+        servicioNombre += `${servicio.plan_nombre} `;
+      }
+    }
+
+    // Si no hay servicios encontrados, usar observaciones
+    if (serviciosInfo.length === 0) {
+      precioInternet = parseFloat(observaciones.precio_mensual_total) || 0;
+      servicioNombre = observaciones.servicios_incluidos || 'SERVICIO CONTRATADO';
+    }
+
+    // ✅ PREPARAR DATOS PARA EL GENERADOR DE PDF (FORMATO CORRECTO)
+    const ContratoPDFGeneratorMINTIC = require('../utils/ContratoPDFGeneratorMINTIC');
+
+    const datosPDF = {
+      numero_contrato: contratoData.numero_contrato,
+      cliente_nombre: contratoData.cliente_nombre,
+      cliente_identificacion: contratoData.cliente_identificacion,
+      cliente_tipo_identificacion: contratoData.cliente_tipo_identificacion || 'CC',
+      cliente_telefono: contratoData.cliente_telefono || '',
+      cliente_email: contratoData.cliente_email || '',
+      cliente_direccion: observaciones.direccion_sede || contratoData.cliente_direccion || '',
+      cliente_estrato: parseInt(contratoData.cliente_estrato) || 1,
+      fecha_generacion: contratoData.fecha_generacion || contratoData.fecha_inicio,
+      created_at: contratoData.fecha_generacion || contratoData.fecha_inicio,
+      fecha_inicio: contratoData.fecha_inicio,
+      tipo_permanencia: contratoData.tipo_permanencia || 'sin_permanencia',
+      permanencia_meses: parseInt(contratoData.permanencia_meses) || 1,
+      ciudad_nombre: contratoData.ciudad_nombre || 'San Gil',
+      departamento_nombre: contratoData.departamento_nombre || 'Santander',
+      precio_internet: precioInternet,
+      precio_television: precioTelevision,
+      servicio_nombre: servicioNombre.trim()
+    };
+
+    console.log('📄 Generando PDF con datos completos:', JSON.stringify(datosPDF, null, 2));
+
+    // ✅ GENERAR PDF USANDO MÉTODO ESTÁTICO
+    const pdfBuffer = await ContratoPDFGeneratorMINTIC.generarPDFCompleto(datosPDF);
+    
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error('Buffer de PDF vacío');
+    }
+
+    console.log('✅ PDF de contrato generado - Tamaño:', pdfBuffer.length, 'bytes');
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Contrato-${contratoData.numero_contrato}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+
+    return res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('❌ Error generando PDF de contrato:', error);
+    console.error('Stack:', error.stack);
+    return res.status(500).json({ 
+      success: false,
+      message: 'Error al generar el PDF del contrato',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+},
 // 🧾 Obtener detalle de factura
 obtenerDetalleFactura: async (req, res) => {
   try {
