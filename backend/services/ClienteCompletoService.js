@@ -450,7 +450,7 @@ class ClienteCompletoService {
         costoInstalacionTotal = 50000;  // ✅ Una sola instalación de 50,000
       }
 
-      // ✅ CALCULAR PRECIO TOTAL SUMANDO TODOS LOS SERVICIOS
+     // ✅ CALCULAR PRECIO TOTAL SUMANDO TODOS LOS SERVICIOS
 const precioTotalContrato = serviciosDeLaSede.reduce((sum, s) => {
   return sum + parseFloat(s.precio || 0);
 }, 0);
@@ -461,21 +461,24 @@ const serviciosDescripcion = serviciosDeLaSede.map(s =>
   `${s.tipo?.toUpperCase() || 'SERVICIO'}: ${s.plan_nombre} ($${parseFloat(s.precio || 0).toLocaleString()})`
 ).join(' + ');
 
-      // Preparar observaciones
-      const observacionesInstalacion = JSON.stringify({
-        servicios_a_instalar: serviciosDeLaSede.map(s => ({
-          id: s.id,
-          tipo: s.tipo,
-          plan: s.plan_nombre,
-          precio: s.precio
-        })),
-        sede: sedeData.nombre_sede || 'Sede Principal',
-        direccion: sedeData.direccion_servicio,
-        tipo_contrato: tipoPermanencia,
-        cantidad_servicios: serviciosDeLaSede.length,
-        servicios_descripcion: serviciosDescripcion,
-        notas_adicionales: sedeData.observaciones || ''
-      });
+const observacionesContrato = JSON.stringify({
+  sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+  direccion_sede: sedeData.direccion_servicio,
+  contacto_sede: sedeData.contacto_sede,
+  telefono_sede: sedeData.telefono_sede,
+  servicios_incluidos: serviciosDescripcion,
+  precio_mensual_total: precioTotalContrato, // ✅ AGREGADO: precio total
+  cantidad_servicios: serviciosDeLaSede.length,
+  observaciones_adicionales: sedeData.observaciones,
+  tipo_permanencia: tipoPermanencia,
+  meses_permanencia: mesesPermanencia,
+  costo_instalacion_calculado: costoInstalacionTotal,
+  detalle_calculo: {
+    servicios_count: serviciosDeLaSede.length,
+    costo_instalacion_unica: costoInstalacionTotal,
+    formula: `Una instalación única de $${costoInstalacionTotal.toLocaleString()} para todos los servicios`
+  }
+});
 
       // Obtener datos del cliente para completar campos
       const [clienteData] = await conexion.execute(
