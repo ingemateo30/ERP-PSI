@@ -316,35 +316,33 @@ descargarPDF: async (req, res) => {
 
       connection.release();
 
-      // ✅ PREPARAR DATOS PARA EL GENERADOR DE PDF (formato que espera ContratoPDFGeneratorMINTIC)
-      const ContratoPDFGeneratorMINTIC = require('../utils/ContratoPDFGeneratorMINTIC');
-      const generator = new ContratoPDFGeneratorMINTIC();
+     // ✅ PREPARAR DATOS PARA EL GENERADOR DE PDF
+const ContratoPDFGeneratorMINTIC = require('../utils/ContratoPDFGeneratorMINTIC');
 
-      const datosPDF = {
-        numeroContrato: contratoData.numero_contrato,
-        fechaCreacion: contratoData.fecha_generacion || contratoData.fecha_inicio,
-        fechaActivacion: contratoData.fecha_inicio,
-        tipoContrato: contratoData.tipo_permanencia || 'sin_permanencia',
-        cliente: {
-          nombre: contratoData.cliente_nombre,
-          identificacion: contratoData.cliente_identificacion,
-          tipoIdentificacion: contratoData.cliente_tipo_identificacion || 'CC',
-          telefono: contratoData.cliente_telefono,
-          email: contratoData.cliente_email,
-          direccion: observaciones.direccion_sede || contratoData.cliente_direccion
-        },
-        servicios: [{
-          tipo: 'SERVICIO',
-          plan: observaciones.servicios_incluidos || 'Plan contratado',
-          precio: observaciones.precio_mensual_total || 0
-        }]
-      };
+const datosPDF = {
+  numeroContrato: contratoData.numero_contrato,
+  fechaCreacion: contratoData.fecha_generacion || contratoData.fecha_inicio,
+  fechaActivacion: contratoData.fecha_inicio,
+  tipoContrato: contratoData.tipo_permanencia || 'sin_permanencia',
+  cliente: {
+    nombre: contratoData.cliente_nombre,
+    identificacion: contratoData.cliente_identificacion,
+    tipoIdentificacion: contratoData.cliente_tipo_identificacion || 'CC',
+    telefono: contratoData.cliente_telefono,
+    email: contratoData.cliente_email,
+    direccion: observaciones.direccion_sede || contratoData.cliente_direccion
+  },
+  servicios: [{
+    tipo: 'SERVICIO',
+    plan: observaciones.servicios_incluidos || 'Plan contratado',
+    precio: observaciones.precio_mensual_total || 0
+  }]
+};
 
-      console.log('📄 Generando PDF con datos:', JSON.stringify(datosPDF, null, 2));
+console.log('📄 Generando PDF con datos:', JSON.stringify(datosPDF, null, 2));
 
-      // ✅ GENERAR PDF
-      const pdfBuffer = await generator.generarPDFCompleto(datosPDF);
-
+// ✅ GENERAR PDF - USAR MÉTODO ESTÁTICO (sin new)
+const pdfBuffer = await ContratoPDFGeneratorMINTIC.generarPDFCompleto(datosPDF);
       if (!pdfBuffer || pdfBuffer.length === 0) {
         throw new Error('Buffer de PDF vacío');
       }
