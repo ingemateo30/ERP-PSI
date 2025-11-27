@@ -376,35 +376,46 @@ descargarPDF: async (req, res) => {
       servicioNombre = observaciones.servicios_incluidos || 'SERVICIO CONTRATADO';
     }
 
-    // ✅ PREPARAR DATOS PARA EL GENERADOR DE PDF (FORMATO CORRECTO)
-    const ContratoPDFGeneratorMINTIC = require('../utils/ContratoPDFGeneratorMINTIC');
+// ✅ PREPARAR DATOS EN EL FORMATO EXACTO QUE ESPERA generarHTML
+const ContratoPDFGeneratorMINTIC = require('../utils/ContratoPDFGeneratorMINTIC');
 
-    const datosPDF = {
-      numero_contrato: contratoData.numero_contrato,
-      cliente_nombre: contratoData.cliente_nombre,
-      cliente_identificacion: contratoData.cliente_identificacion,
-      cliente_tipo_identificacion: contratoData.cliente_tipo_identificacion || 'CC',
-      cliente_telefono: contratoData.cliente_telefono || '',
-      cliente_email: contratoData.cliente_email || '',
-      cliente_direccion: observaciones.direccion_sede || contratoData.cliente_direccion || '',
-      cliente_estrato: parseInt(contratoData.cliente_estrato) || 1,
-      fecha_generacion: contratoData.fecha_generacion || contratoData.fecha_inicio,
-      created_at: contratoData.fecha_generacion || contratoData.fecha_inicio,
-      fecha_inicio: contratoData.fecha_inicio,
-      tipo_permanencia: contratoData.tipo_permanencia || 'sin_permanencia',
-      permanencia_meses: parseInt(contratoData.permanencia_meses) || 1,
-      ciudad_nombre: contratoData.ciudad_nombre || 'San Gil',
-      departamento_nombre: contratoData.departamento_nombre || 'Santander',
-      precio_internet: precioInternet,
-      precio_television: precioTelevision,
-      servicio_nombre: servicioNombre.trim()
-    };
+const datosPDF = {
+  // Campos que generarHTML busca directamente
+  numero_contrato: contratoData.numero_contrato,
+  cliente_nombre: contratoData.cliente_nombre,
+  cliente_identificacion: contratoData.cliente_identificacion,
+  cliente_tipo_identificacion: contratoData.cliente_tipo_identificacion || 'CC',
+  cliente_telefono: contratoData.cliente_telefono || '',
+  cliente_email: contratoData.cliente_email || '',
+  cliente_direccion: observaciones.direccion_sede || contratoData.cliente_direccion || '',
+  cliente_estrato: parseInt(contratoData.cliente_estrato) || 1,
+  
+  // Fechas
+  fecha_generacion: contratoData.fecha_generacion || contratoData.fecha_inicio,
+  created_at: contratoData.fecha_generacion || contratoData.fecha_inicio,
+  fecha_inicio: contratoData.fecha_inicio,
+  
+  // Tipo de contrato
+  tipo_permanencia: contratoData.tipo_permanencia || 'sin_permanencia',
+  permanencia_meses: parseInt(contratoData.permanencia_meses) || 1,
+  
+  // Ubicación
+  ciudad_nombre: contratoData.ciudad_nombre || 'San Gil',
+  departamento_nombre: contratoData.departamento_nombre || 'Santander',
+  
+  // Precios (nombres que busca el generador)
+  precio_internet: precioInternet,
+  precio_television: precioTelevision,
+  servicio_nombre: servicioNombre.trim() || 'SERVICIO CONTRATADO',
+  
+  // Empresa (objeto vacío si no existe)
+  empresa: {}
+};
 
-    console.log('📄 Generando PDF con datos completos:', JSON.stringify(datosPDF, null, 2));
+console.log('📄 Datos mapeados para generarHTML:', JSON.stringify(datosPDF, null, 2));
 
-    // ✅ GENERAR PDF USANDO MÉTODO ESTÁTICO
-    const pdfBuffer = await ContratoPDFGeneratorMINTIC.generarPDFCompleto(datosPDF);
-    
+// ✅ GENERAR PDF
+const pdfBuffer = await ContratoPDFGeneratorMINTIC.generarPDFCompleto(datosPDF);
     if (!pdfBuffer || pdfBuffer.length === 0) {
       throw new Error('Buffer de PDF vacío');
     }
