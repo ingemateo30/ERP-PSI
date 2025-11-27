@@ -430,7 +430,7 @@ class ContratoPDFGeneratorMINTIC {
 
         <!-- DOS COLUMNAS -->
         <div class="two-columns">
-            ${this.generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, permanenciaMeses)}
+            ${this.generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, permanenciaMeses, fechaActivacionTexto)}
         </div>
     </div>
 
@@ -457,7 +457,7 @@ class ContratoPDFGeneratorMINTIC {
         </div>`;
   }
 
-  static generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, meses) {
+  static generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, meses, fechaActivacionTexto) {
     return `
             <!-- COLUMNA IZQUIERDA -->
             <div class="column-content">
