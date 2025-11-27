@@ -380,6 +380,15 @@ obtenerDetalleFactura: async (req, res) => {
 descargarFacturaPDF: async (req, res) => {
   try {
     const { facturaId } = req.params;
+    
+    // ✅ VERIFICAR QUE EL MIDDLEWARE PASÓ EL clienteId
+    if (!req.clientePublico || !req.clientePublico.clienteId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token de autenticación requerido'
+      });
+    }
+    
     const clienteId = req.clientePublico.clienteId;
 
     console.log(`📄 Generando PDF de factura ${facturaId} para cliente ${clienteId}`);
