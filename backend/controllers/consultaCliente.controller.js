@@ -415,30 +415,48 @@ const datosPDF = {
 console.log('📄 Datos mapeados para generarHTML:', JSON.stringify(datosPDF, null, 2));
 
 // ✅ GENERAR PDF
+console.log('🔄 Iniciando generación de PDF...');
 const pdfBuffer = await ContratoPDFGeneratorMINTIC.generarPDFCompleto(datosPDF);
-    if (!pdfBuffer || pdfBuffer.length === 0) {
-      throw new Error('Buffer de PDF vacío');
-    }
 
-console.log('✅ PDF de contrato generado - Tamaño:', pdfBuffer.length, 'bytes');
+console.log('📊 Tipo de dato recibido:', typeof pdfBuffer);
+console.log('📊 Es Buffer?', Buffer.isBuffer(pdfBuffer));
+console.log('📊 Tiene length?', pdfBuffer?.length);
 
-// ✅ VERIFICAR QUE SEA UN BUFFER VÁLIDO
-if (!Buffer.isBuffer(pdfBuffer)) {
-  throw new Error('El PDF generado no es un Buffer válido');
+if (!pdfBuffer || pdfBuffer.length === 0) {
+  throw new Error('Buffer de PDF vacío');
 }
+
+// ✅ CONVERTIR A BUFFER SI ES NECESARIO
+let bufferFinal = pdfBuffer;
+if (!Buffer.isBuffer(pdfBuffer)) {
+  console.log('⚠️ Convirtiendo a Buffer...');
+  if (typeof pdfBuffer === 'string') {
+    // Si es string base64
+    bufferFinal = Buffer.from(pdfBuffer, 'base64');
+  } else if (pdfBuffer.type === 'Buffer' && Array.isArray(pdfBuffer.data)) {
+    // Si es objeto Buffer serializado
+    bufferFinal = Buffer.from(pdfBuffer.data);
+  } else {
+    // Intentar conversión directa
+    bufferFinal = Buffer.from(pdfBuffer);
+  }
+}
+
+console.log('✅ PDF de contrato listo - Tamaño:', bufferFinal.length, 'bytes');
+console.log('✅ Es Buffer ahora?', Buffer.isBuffer(bufferFinal));
 
 // ✅ CONFIGURAR HEADERS CORRECTAMENTE
 res.set({
   'Content-Type': 'application/pdf',
   'Content-Disposition': `attachment; filename="Contrato-${contratoData.numero_contrato}.pdf"`,
-  'Content-Length': pdfBuffer.length,
+  'Content-Length': bufferFinal.length,
   'Cache-Control': 'no-cache, no-store, must-revalidate',
   'Pragma': 'no-cache',
   'Expires': '0'
 });
 
 // ✅ ENVIAR BUFFER COMO BINARIO
-return res.end(pdfBuffer, 'binary');
+return res.end(bufferFinal, 'binary');
 
   } catch (error) {
     console.error('❌ Error generando PDF de contrato:', error);
