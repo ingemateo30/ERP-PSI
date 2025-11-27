@@ -1713,73 +1713,80 @@ const observacionesContrato = JSON.stringify({
     };
   }
 
-  /**
-   * Generar UN contrato para TODA la sede (Internet + TV)
-   */
-  static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, createdBy) {
-    console.log('📄 Generando contrato para sede - Corrección instalación única:', {
-      cantidad_servicios: serviciosDeLaSede.length,
-      tipo_contrato: sedeData.tipoContrato,
-      servicios: serviciosDeLaSede.map(s => ({ id: s.id, tipo: s.tipo, plan: s.plan_nombre }))
-    });
+ /**
+ * Generar UN contrato para TODA la sede (Internet + TV)
+ */
+static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sedeData, createdBy) {
+  console.log('📄 Generando contrato para sede - Corrección instalación única:', {
+    cantidad_servicios: serviciosDeLaSede.length,
+    tipo_contrato: sedeData.tipoContrato,
+    servicios: serviciosDeLaSede.map(s => ({ id: s.id, tipo: s.tipo, plan: s.plan_nombre }))
+  });
 
-    const numeroContrato = await this.generarNumeroContrato(conexion);
+  const numeroContrato = await this.generarNumeroContrato(conexion);
 
-    // ✅ CORRECCIÓN CRÍTICA: UNA SOLA INSTALACIÓN independientemente de la cantidad de servicios
-    const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
-    let costoInstalacionTotal = 0;
+  // ✅ CORRECCIÓN CRÍTICA: UNA SOLA INSTALACIÓN independientemente de la cantidad de servicios
+  const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
+  let costoInstalacionTotal = 0;
 
-    // ✅ CÁLCULO CORRECTO: UNA SOLA INSTALACIÓN POR CLIENTE (no por servicio)
-    if (tipoPermanencia === 'sin_permanencia') {
-      // Sin permanencia: 150,000 IVA incluido - UNA SOLA VEZ
-      costoInstalacionTotal = 150000;
-    } else {
-      // Con permanencia: 50,000 - UNA SOLA VEZ
-      costoInstalacionTotal = 50000;
+  // ✅ CÁLCULO CORRECTO: UNA SOLA INSTALACIÓN POR CLIENTE (no por servicio)
+  if (tipoPermanencia === 'sin_permanencia') {
+    // Sin permanencia: 150,000 IVA incluido - UNA SOLA VEZ
+    costoInstalacionTotal = 150000;
+  } else {
+    // Con permanencia: 50,000 - UNA SOLA VEZ
+    costoInstalacionTotal = 50000;
+  }
+
+  console.log(`💰 Cálculo CORREGIDO de instalación: UNA sola instalación de $${costoInstalacionTotal.toLocaleString()} para ${serviciosDeLaSede.length} servicio(s)`);
+
+  let mesesPermanencia = 0;
+  if (tipoPermanencia === 'con_permanencia') {
+    mesesPermanencia = parseInt(sedeData.mesesPermanencia) || 6;
+  }
+
+  let fechaVencimientoPermanencia = null;
+  if (tipoPermanencia === 'con_permanencia' && mesesPermanencia > 0) {
+    const fechaInicio = new Date();
+    fechaVencimientoPermanencia = new Date(fechaInicio.setMonth(fechaInicio.getMonth() + mesesPermanencia))
+      .toISOString().split('T')[0];
+  }
+
+  // ✅ CALCULAR PRECIO TOTAL SUMANDO TODOS LOS SERVICIOS
+  const precioTotalContrato = serviciosDeLaSede.reduce((sum, s) => {
+    return sum + parseFloat(s.precio || 0);
+  }, 0);
+
+  console.log(`💰 Precio total contrato: $${precioTotalContrato} (${serviciosDeLaSede.length} servicios)`);
+
+  const serviciosDescripcion = serviciosDeLaSede.map(s =>
+    `${s.tipo?.toUpperCase() || 'SERVICIO'}: ${s.plan_nombre} ($${parseFloat(s.precio || 0).toLocaleString()})`
+  ).join(' + ');
+
+  const observacionesContrato = JSON.stringify({
+    sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+    direccion_sede: sedeData.direccion_servicio,
+    contacto_sede: sedeData.contacto_sede,
+    telefono_sede: sedeData.telefono_sede,
+    servicios_incluidos: serviciosDescripcion,
+    precio_mensual_total: precioTotalContrato,
+    cantidad_servicios: serviciosDeLaSede.length,
+    observaciones_adicionales: sedeData.observaciones,
+    tipo_permanencia: tipoPermanencia,
+    meses_permanencia: mesesPermanencia,
+    costo_instalacion_calculado: costoInstalacionTotal,
+    detalle_calculo: {
+      servicios_count: serviciosDeLaSede.length,
+      costo_instalacion_unica: costoInstalacionTotal,
+      formula: `Una instalación única de $${costoInstalacionTotal.toLocaleString()} para todos los servicios`
     }
+  });
 
-    console.log(`💰 Cálculo CORREGIDO de instalación: UNA sola instalación de $${costoInstalacionTotal.toLocaleString()} para ${serviciosDeLaSede.length} servicio(s)`);
+  // ✅ CORRECCIÓN: Usar JSON array para múltiples servicios en servicio_id
+  const serviciosIds = serviciosDeLaSede.map(s => s.id);
+  const servicioIdValue = JSON.stringify(serviciosIds);
 
-    let mesesPermanencia = 0;
-    if (tipoPermanencia === 'con_permanencia') {
-      mesesPermanencia = parseInt(sedeData.mesesPermanencia) || 6;
-    }
-
-    let fechaVencimientoPermanencia = null;
-    if (tipoPermanencia === 'con_permanencia' && mesesPermanencia > 0) {
-      const fechaInicio = new Date();
-      fechaVencimientoPermanencia = new Date(fechaInicio.setMonth(fechaInicio.getMonth() + mesesPermanencia))
-        .toISOString().split('T')[0];
-    }
-
-    const serviciosDescripcion = serviciosDeLaSede.map(s =>
-      `${s.tipo.toUpperCase()}: ${s.plan_nombre} ($${s.precio.toLocaleString()})`
-    ).join(' + ');
-
-    const observacionesContrato = JSON.stringify({
-      sede_nombre: sedeData.nombre_sede || 'Sede Principal',
-      direccion_sede: sedeData.direccion_servicio,
-      contacto_sede: sedeData.contacto_sede,
-      telefono_sede: sedeData.telefono_sede,
-      servicios_incluidos: serviciosDescripcion,
-      precio_mensual_total: precioTotalContrato,
-      cantidad_servicios: serviciosDeLaSede.length,
-      observaciones_adicionales: sedeData.observaciones,
-      tipo_permanencia: tipoPermanencia,
-      meses_permanencia: mesesPermanencia,
-      costo_instalacion_calculado: costoInstalacionTotal,
-      detalle_calculo: {
-        servicios_count: serviciosDeLaSede.length,
-        costo_instalacion_unica: costoInstalacionTotal,
-        formula: `Una instalación única de $${costoInstalacionTotal.toLocaleString()} para todos los servicios`
-      }
-    });
-
-    // ✅ CORRECCIÓN: Usar JSON array para múltiples servicios en servicio_id
-    const serviciosIds = serviciosDeLaSede.map(s => s.id);
-    const servicioIdValue = JSON.stringify(serviciosIds);
-
-    const query = `
+  const query = `
     INSERT INTO contratos (
       numero_contrato, cliente_id, servicio_id, tipo_contrato, tipo_permanencia, 
       permanencia_meses, costo_instalacion, fecha_generacion, 
@@ -1788,53 +1795,53 @@ const observacionesContrato = JSON.stringify({
     ) VALUES (?, ?, ?, 'servicio', ?, ?, ?, NOW(), NOW(), ?, 'activo', 1, ?, ?)
   `;
 
-    const [resultado] = await conexion.execute(query, [
-      numeroContrato,
-      clienteId,
-      servicioIdValue,
-      tipoPermanencia,
-      mesesPermanencia,
-      costoInstalacionTotal, // ✅ UNA SOLA INSTALACIÓN
-      fechaVencimientoPermanencia,
-      observacionesContrato,
-      createdBy || 1
-    ]);
+  const [resultado] = await conexion.execute(query, [
+    numeroContrato,
+    clienteId,
+    servicioIdValue,
+    tipoPermanencia,
+    mesesPermanencia,
+    costoInstalacionTotal, // ✅ UNA SOLA INSTALACIÓN
+    fechaVencimientoPermanencia,
+    observacionesContrato,
+    createdBy || 1
+  ]);
 
-    const contratoId = resultado.insertId;
+  const contratoId = resultado.insertId;
 
-    // Actualizar servicios con información del contrato
-    for (const servicio of serviciosDeLaSede) {
-      try {
-        const observacionesServicio = servicio.observaciones
-          ? JSON.parse(servicio.observaciones)
-          : {};
+  // Actualizar servicios con información del contrato
+  for (const servicio of serviciosDeLaSede) {
+    try {
+      const observacionesServicio = servicio.observaciones
+        ? JSON.parse(servicio.observaciones)
+        : {};
 
-        const observacionesActualizadas = JSON.stringify({
-          ...observacionesServicio,
-          numero_contrato: numeroContrato,
-          contrato_id: contratoId,
-          costo_instalacion_compartido: costoInstalacionTotal, // ✅ Mismo costo para todos
-          parte_instalacion: `Instalación única de $${costoInstalacionTotal.toLocaleString()} compartida entre ${serviciosDeLaSede.length} servicio(s)`
-        });
+      const observacionesActualizadas = JSON.stringify({
+        ...observacionesServicio,
+        numero_contrato: numeroContrato,
+        contrato_id: contratoId,
+        costo_instalacion_compartido: costoInstalacionTotal, // ✅ Mismo costo para todos
+        parte_instalacion: `Instalación única de $${costoInstalacionTotal.toLocaleString()} compartida entre ${serviciosDeLaSede.length} servicio(s)`
+      });
 
-        await conexion.execute(
-          'UPDATE servicios_cliente SET observaciones = ? WHERE id = ?',
-          [observacionesActualizadas, servicio.id]
-        );
-      } catch (updateError) {
-        console.error(`❌ Error actualizando servicio ${servicio.id}:`, updateError);
-      }
+      await conexion.execute(
+        'UPDATE servicios_cliente SET observaciones = ? WHERE id = ?',
+        [observacionesActualizadas, servicio.id]
+      );
+    } catch (updateError) {
+      console.error(`❌ Error actualizando servicio ${servicio.id}:`, updateError);
     }
-
-    console.log(`✅ Contrato ${numeroContrato} creado con instalación ÚNICA:`, {
-      servicios_ids: serviciosIds,
-      costo_instalacion_unica: costoInstalacionTotal,
-      tipo_permanencia: tipoPermanencia,
-      meses: mesesPermanencia
-    });
-
-    return contratoId;
   }
+
+  console.log(`✅ Contrato ${numeroContrato} creado con instalación ÚNICA:`, {
+    servicios_ids: serviciosIds,
+    costo_instalacion_unica: costoInstalacionTotal,
+    tipo_permanencia: tipoPermanencia,
+    meses: mesesPermanencia
+  });
+
+  return contratoId;
+}
   /**
    * Generar UNA factura para TODA la sede (Internet + TV)
    */
