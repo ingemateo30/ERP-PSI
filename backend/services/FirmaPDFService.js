@@ -230,19 +230,23 @@ static async abrirContratoParaFirma(contratoId) {
 
       console.log('💾 PDF firmado guardado en:', rutaPDFFirmado);
 
-      // Actualizar base de datos
+      // Actualizar base de datos - Usar fecha actual sin problemas de zona horaria
+      const fechaActual = new Date();
+      const fechaFirmaMySQL = fechaActual.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+
       const observacionesActualizadas = `${contrato.observaciones || ''}\n[FIRMA DIGITAL] Firmado por: ${firmado_por} - Cédula: ${cedula_firmante} - Fecha: ${new Date().toLocaleString('es-CO')} - Tipo: ${tipo_firma}${observaciones ? ` - Obs: ${observaciones}` : ''}`;
 
       await conexion.execute(`
         UPDATE contratos SET
           documento_pdf_path = ?,
           firmado_cliente = 1,
-          fecha_firma = CURDATE(),
+          fecha_firma = ?,
           observaciones = ?,
           updated_at = NOW()
         WHERE id = ?
       `, [
         rutaPDFFirmado,
+        fechaFirmaMySQL,
         observacionesActualizadas,
         contratoId
       ]);
