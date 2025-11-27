@@ -146,32 +146,41 @@ class ContratosController {
                 }
 
                 // ✅ Si no hay datos, extraer de observaciones JSON
-                if (plan_nombre === 'N/A' && contrato.observaciones) {
-                    try {
-                        const obs = JSON.parse(contrato.observaciones);
-                        if (obs.servicios_incluidos) {
-                            // Extraer nombres limpiando prefijos
-                            plan_nombre = obs.servicios_incluidos
-                                .replace(/INTERNET: /g, '')
-                                .replace(/TELEVISION: /g, '')
-                                .replace(/\(\$\d+(\.\d+)?\)/g, '') // Quitar precios entre paréntesis
-                                .trim();
+if (plan_nombre === 'N/A' && contrato.observaciones) {
+    try {
+        const obs = JSON.parse(contrato.observaciones);
+        
+        // ✅ PRIMERO: Intentar usar precio_mensual_total (más confiable)
+        if (obs.precio_mensual_total) {
+            plan_precio = parseFloat(obs.precio_mensual_total);
+        }
+        
+        if (obs.servicios_incluidos) {
+            // Extraer nombres limpiando prefijos
+            plan_nombre = obs.servicios_incluidos
+                .replace(/INTERNET: /g, '')
+                .replace(/TELEVISION: /g, '')
+                .replace(/SERVICIO: /g, '')
+                .replace(/\(\$\d+(\.\d+)?\)/g, '') // Quitar precios entre paréntesis
+                .trim();
 
-                            // Extraer y sumar precios
-                            const matches = obs.servicios_incluidos.match(/\(?\$(\d+)/g);
-                            if (matches) {
-                                plan_precio = matches.reduce((sum, precio) => {
-                                    const num = parseInt(precio.replace(/\(?\$/, ''));
-                                    return sum + (isNaN(num) ? 0 : num);
-                                }, 0);
-                            }
-                            plan_tipo = obs.cantidad_servicios > 1 ? 'combo' : 'servicio';
-                        }
-                    } catch (e) {
-                        // Si falla el parse, mantener N/A
-                        console.log(`⚠️ No se pudo parsear observaciones del contrato ${contrato.numero_contrato}`);
-                    }
+            // ✅ Si no hay precio_mensual_total, extraer y sumar de servicios_incluidos
+            if (!obs.precio_mensual_total) {
+                const matches = obs.servicios_incluidos.match(/\(?\$(\d+)/g);
+                if (matches) {
+                    plan_precio = matches.reduce((sum, precio) => {
+                        const num = parseInt(precio.replace(/\(?\$/, ''));
+                        return sum + (isNaN(num) ? 0 : num);
+                    }, 0);
                 }
+            }
+            
+            plan_tipo = obs.cantidad_servicios > 1 ? 'combo' : 'servicio';
+        }
+    } catch (e) {
+        console.log(`⚠️ No se pudo parsear observaciones del contrato ${contrato.numero_contrato}`);
+    }
+}
 
                 // ✅ Último fallback - Mensaje más descriptivo si sigue siendo N/A
                 if (plan_nombre === 'N/A') {

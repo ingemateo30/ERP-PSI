@@ -450,11 +450,16 @@ class ClienteCompletoService {
         costoInstalacionTotal = 50000;  // ✅ Una sola instalación de 50,000
       }
 
-      // ✅ CORRECCIÓN 2: Crear JSON con IDs de servicios para servicio_cliente_id
-      const serviciosIds = serviciosDeLaSede.map(s => s.id);
-      const serviciosDescripcion = serviciosDeLaSede.map(s =>
-        `${s.tipo.toUpperCase()}: ${s.plan_nombre} - $${s.precio.toLocaleString()}`
-      ).join(' + ');
+      // ✅ CALCULAR PRECIO TOTAL SUMANDO TODOS LOS SERVICIOS
+const precioTotalContrato = serviciosDeLaSede.reduce((sum, s) => {
+  return sum + parseFloat(s.precio || 0);
+}, 0);
+
+console.log(`💰 Precio total contrato: $${precioTotalContrato} (${serviciosDeLaSede.length} servicios)`);
+
+const serviciosDescripcion = serviciosDeLaSede.map(s =>
+  `${s.tipo?.toUpperCase() || 'SERVICIO'}: ${s.plan_nombre} ($${parseFloat(s.precio || 0).toLocaleString()})`
+).join(' + ');
 
       // Preparar observaciones
       const observacionesInstalacion = JSON.stringify({
@@ -1754,6 +1759,7 @@ class ClienteCompletoService {
       contacto_sede: sedeData.contacto_sede,
       telefono_sede: sedeData.telefono_sede,
       servicios_incluidos: serviciosDescripcion,
+      precio_mensual_total: precioTotalContrato,
       cantidad_servicios: serviciosDeLaSede.length,
       observaciones_adicionales: sedeData.observaciones,
       tipo_permanencia: tipoPermanencia,
