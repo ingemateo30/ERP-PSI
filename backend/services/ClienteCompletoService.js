@@ -1887,11 +1887,13 @@ static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sed
       // 4. CALCULAR FECHAS DEL PERÍODO SEGÚN REGLAS DE FACTURACIÓN
       const fechasFacturacion = this.calcularFechasFacturacion();
 
-      // 5. CALCULAR TOTALES UNIFICADOS DE TODOS LOS SERVICIOS DE LA SEDE
+// 5. ✅ CALCULAR TOTALES CORRECTAMENTE - SUMA TODOS LOS SERVICIOS
 let valorInternet = 0;
 let valorTelevision = 0;
 let valorIvaInternet = 0;
 let valorIvaTelevision = 0;
+
+console.log(`📊 Calculando totales para ${serviciosDeLaSede.length} servicio(s):`);
 
 for (const servicio of serviciosDeLaSede) {
   const precio = parseFloat(servicio.precio || 0);
@@ -1910,20 +1912,46 @@ for (const servicio of serviciosDeLaSede) {
     }
   }
 
-  console.log(`📊 Factura - Servicio: ${servicio.plan_nombre}, Tipo: ${tipoServicio}, Precio: $${precio}`);
+  console.log(`  📌 ${servicio.plan_nombre} - Tipo: ${tipoServicio} - Precio: $${precio.toLocaleString()}`);
 
-  // Sumar TODOS los servicios como internet (simplificado)
-  valorInternet += precio;
-  
-  // IVA solo para estratos 4, 5, 6
-  if (estrato >= 4) {
-    valorIvaInternet += precio * (parseFloat(config.porcentaje_iva) / 100);
+  // ✅ SEPARAR POR TIPO DE SERVICIO
+  if (tipoServicio === 'internet' || tipoServicio === 'combo') {
+    valorInternet += precio;
+    // IVA solo para estratos 4, 5, 6
+    if (estrato >= 4) {
+      const ivaServicio = precio * (parseFloat(config.porcentaje_iva) / 100);
+      valorIvaInternet += ivaServicio;
+      console.log(`    💰 IVA Internet: $${ivaServicio.toLocaleString()}`);
+    }
+  } else if (tipoServicio === 'television') {
+    valorTelevision += precio;
+    // IVA solo para estratos 4, 5, 6
+    if (estrato >= 4) {
+      const ivaServicio = precio * (parseFloat(config.porcentaje_iva) / 100);
+      valorIvaTelevision += ivaServicio;
+      console.log(`    💰 IVA TV: $${ivaServicio.toLocaleString()}`);
+    }
+  } else {
+    // Si no se detecta tipo, sumar a internet por defecto
+    console.log(`    ⚠️ Tipo no detectado, sumando a internet por defecto`);
+    valorInternet += precio;
+    if (estrato >= 4) {
+      valorIvaInternet += precio * (parseFloat(config.porcentaje_iva) / 100);
+    }
   }
 }
 
+// ✅ CALCULAR TOTALES FINALES
 const subtotal = valorInternet + valorTelevision;
 const totalIva = valorIvaInternet + valorIvaTelevision;
 const total = subtotal + totalIva;
+
+console.log(`💰 TOTALES CALCULADOS:`);
+console.log(`   Internet: $${valorInternet.toLocaleString()}`);
+console.log(`   Televisión: $${valorTelevision.toLocaleString()}`);
+console.log(`   Subtotal: $${subtotal.toLocaleString()}`);
+console.log(`   IVA: $${totalIva.toLocaleString()}`);
+console.log(`   TOTAL FACTURA: $${total.toLocaleString()}`);
 
 console.log(`💰 TOTALES FACTURA: Internet=$${valorInternet}, TV=$${valorTelevision}, IVA=$${totalIva}, Total=$${total}`);
       // 6. CREAR DESCRIPCIÓN DE SERVICIOS PARA OBSERVACIONES
