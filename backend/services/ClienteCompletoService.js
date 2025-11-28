@@ -2290,19 +2290,82 @@ console.log(`💰 TOTALES FACTURA: Internet=$${valorInternet}, TV=$${valorTelevi
     }
   }
 
-  static async generarNumeroFactura(conexion) {
-    const [ultimaFactura] = await conexion.execute(
-      'SELECT numero_factura FROM facturas ORDER BY id DESC LIMIT 1'
-    );
+/**
+ * Generar número de factura (MÉTODO CORREGIDO - Sin duplicados)
+ */
+static async generarNumeroFactura(conexion) {
+  try {
+    console.log('🔢 Generando número de factura (MÉTODO CORREGIDO)...');
 
-    if (ultimaFactura.length > 0) {
-      const ultimoNumero = ultimaFactura[0].numero_factura;
-      const numeroActual = parseInt(ultimoNumero.replace(/\D/g, '')) + 1;
-      return `FAC${numeroActual.toString().padStart(6, '0')}`;
-    } else {
-      return 'FAC000001';
+    // PASO 1: Obtener configuración actual DIRECTAMENTE
+    const [configActual] = await conexion.execute(`
+      SELECT 
+        prefijo_factura,
+        consecutivo_factura
+      FROM configuracion_empresa 
+      WHERE id = 1
+    `);
+
+    if (!configActual[0]) {
+      throw new Error('Configuración de empresa no encontrada');
     }
+
+    const { prefijo_factura, consecutivo_factura } = configActual[0];
+
+    console.log('📊 Configuración factura actual:', {
+      prefijo: prefijo_factura,
+      consecutivo: consecutivo_factura
+    });
+
+    // PASO 2: Generar número usando los valores actuales
+    const numeroFactura = `${prefijo_factura || 'FAC'}${String(consecutivo_factura).padStart(6, '0')}`;
+
+    console.log(`📋 Número de factura generado: ${numeroFactura}`);
+
+    // PASO 3: Verificar que no existe (seguridad adicional)
+    const [existe] = await conexion.execute(`
+      SELECT COUNT(*) as count 
+      FROM facturas 
+      WHERE numero_factura = ?
+    `, [numeroFactura]);
+
+    if (existe[0].count > 0) {
+      console.warn(`⚠️ La factura ${numeroFactura} YA EXISTE. Forzando incremento...`);
+
+      // Si existe, incrementar el consecutivo y generar nuevamente
+      await conexion.execute(`
+        UPDATE configuracion_empresa 
+        SET consecutivo_factura = consecutivo_factura + 1 
+        WHERE id = 1
+      `);
+
+      // Llamada recursiva para generar el siguiente
+      return await this.generarNumeroFactura(conexion);
+    }
+
+    // PASO 4: Incrementar consecutivo DESPUÉS de verificar disponibilidad
+    await conexion.execute(`
+      UPDATE configuracion_empresa 
+      SET consecutivo_factura = consecutivo_factura + 1 
+      WHERE id = 1
+    `);
+
+    console.log(`✅ Consecutivo factura actualizado de ${consecutivo_factura} a ${consecutivo_factura + 1}`);
+    console.log(`✅ Número de factura FINAL: ${numeroFactura}`);
+
+    return numeroFactura;
+
+  } catch (error) {
+    console.error('❌ Error generando número de factura:', error);
+
+    // FALLBACK: Usar timestamp único si todo falla
+    const timestamp = Date.now().toString().slice(-6);
+    const numeroFallback = `FAC${timestamp}`;
+
+    console.log(`🔄 Usando número de emergencia: ${numeroFallback}`);
+    return numeroFallback;
   }
+}
   /**
    * ✅ NUEVO: Agregar servicio a cliente existente
    * Este método permite agregar un nuevo servicio a un cliente que ya existe en el sistema
