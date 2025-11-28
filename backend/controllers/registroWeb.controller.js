@@ -135,9 +135,9 @@ const registroWebController = {
         'SELECT id, nombre FROM clientes WHERE identificacion = ?',
         [numeroDocumento]
       );
-      connection.release();
 
       if (existe.length > 0) {
+        connection.release();
         console.warn('⚠️ Cliente ya existe:', existe[0].nombre);
         return res.status(400).json({
           success: false,
@@ -154,36 +154,79 @@ const registroWebController = {
         'PASAPORTE': 'pasaporte'
       };
 
-      // USAR EL MISMO SERVICE QUE USA EL ADMIN
-      const ClienteCompletoService = require('../services/ClienteCompletoService');
+      // ✅ CORRECCIÓN: Crear MÚLTIPLES SEDES para soportar 3+ servicios
+      console.log(`📦 Procesando ${planesSeleccionados.length} plan(es) seleccionado(s)`);
 
-      // ✅ CORRECCIÓN: Crear UNA SOLA SEDE con MÚLTIPLES SERVICIOS
-      const sedeConfig = {
-        id: Date.now(),
-        nombre_sede: 'Sede Principal',
-        direccion_servicio: direccion,
-        contacto_sede: `${nombres} ${apellidos}`.trim(),
-        telefono_sede: celular,
-        precioPersonalizado: false,
-        tipoContrato: tipoPermanencia || 'sin_permanencia',
-        mesesPermanencia: tipoPermanencia === 'con_permanencia' ? 6 : 0,
-        fechaActivacion: new Date().toISOString().split('T')[0],
-        observaciones: `Registro web - Planes: ${planesSeleccionados.join(', ')}`
-      };
+      const servicios = [];
+      
+      // Crear una sede por cada par de servicios (máximo 2 por sede)
+      for (let i = 0; i < planesSeleccionados.length; i += 2) {
+        const planId1 = parseInt(planesSeleccionados[i]);
+        const planId2 = planesSeleccionados[i + 1] ? parseInt(planesSeleccionados[i + 1]) : null;
 
-      // Asignar planes
-      if (planesSeleccionados.length === 1) {
-        sedeConfig.planInternetId = parseInt(planesSeleccionados[0]);
-      } else if (planesSeleccionados.length === 2) {
-        sedeConfig.planInternetId = parseInt(planesSeleccionados[0]);
-        sedeConfig.planTelevisionId = parseInt(planesSeleccionados[1]);
-      } else if (planesSeleccionados.length >= 3) {
-        sedeConfig.planInternetId = parseInt(planesSeleccionados[0]);
-        sedeConfig.planTelevisionId = parseInt(planesSeleccionados[1]);
-        console.warn(`⚠️ Se seleccionaron ${planesSeleccionados.length} planes, solo se usarán los primeros 2`);
+        // Obtener información de los planes
+        const [plan1Info] = await connection.query(
+          'SELECT id, nombre, tipo FROM planes_servicio WHERE id = ?',
+          [planId1]
+        );
+
+        let plan2Info = null;
+        if (planId2) {
+          [plan2Info] = await connection.query(
+            'SELECT id, nombre, tipo FROM planes_servicio WHERE id = ?',
+            [planId2]
+          );
+        }
+
+        const sedeConfig = {
+          id: Date.now() + i,
+          nombre_sede: i === 0 ? 'Sede Principal' : `Servicio Adicional ${Math.floor(i / 2) + 1}`,
+          direccion_servicio: direccion,
+          contacto_sede: `${nombres} ${apellidos}`.trim(),
+          telefono_sede: celular,
+          precioPersonalizado: false,
+          tipoContrato: tipoPermanencia || 'sin_permanencia',
+          mesesPermanencia: tipoPermanencia === 'con_permanencia' ? 6 : 0,
+          fechaActivacion: new Date().toISOString().split('T')[0],
+          observaciones: `Registro web`
+        };
+
+        // Asignar primer plan
+        if (plan1Info && plan1Info.length > 0) {
+          const tipo1 = (plan1Info[0].tipo || '').toLowerCase();
+          if (tipo1.includes('internet') || tipo1.includes('combo')) {
+            sedeConfig.planInternetId = planId1;
+          } else if (tipo1.includes('tv') || tipo1.includes('television')) {
+            sedeConfig.planTelevisionId = planId1;
+          } else {
+            sedeConfig.planInternetId = planId1; // Por defecto a internet
+          }
+          console.log(`  ✅ Plan ${plan1Info[0].id}: ${plan1Info[0].nombre} (${plan1Info[0].tipo})`);
+        }
+
+        // Asignar segundo plan si existe
+        if (plan2Info && plan2Info.length > 0) {
+          const tipo2 = (plan2Info[0].tipo || '').toLowerCase();
+          if (tipo2.includes('tv') || tipo2.includes('television')) {
+            sedeConfig.planTelevisionId = planId2;
+          } else if (!sedeConfig.planInternetId) {
+            sedeConfig.planInternetId = planId2;
+          } else {
+            sedeConfig.planTelevisionId = planId2;
+          }
+          console.log(`  ✅ Plan ${plan2Info[0].id}: ${plan2Info[0].nombre} (${plan2Info[0].tipo})`);
+        }
+
+        servicios.push(sedeConfig);
+        console.log(`📍 Sede ${servicios.length}: Internet=${sedeConfig.planInternetId || 'N/A'}, TV=${sedeConfig.planTelevisionId || 'N/A'}`);
       }
 
-      console.log(`📦 Creando 1 sede con ${Math.min(planesSeleccionados.length, 2)} servicio(s)`);
+      connection.release();
+
+      console.log(`📦 Total de sedes/servicios a crear: ${servicios.length}`);
+
+      // USAR EL MISMO SERVICE QUE USA EL ADMIN
+      const ClienteCompletoService = require('../services/ClienteCompletoService');
 
       // FORMATO para el servicio
       const datosCompletos = {
@@ -207,7 +250,7 @@ const registroWebController = {
 📅 Fecha: ${new Date().toLocaleString('es-CO')}`,
           fecha_inicio_contrato: new Date().toISOString().split('T')[0]
         },
-        servicios: [sedeConfig],
+        servicios: servicios,
         opciones: {
           generar_documentos: true,
           enviar_bienvenida: true,
@@ -220,6 +263,7 @@ const registroWebController = {
 
       console.log('✅ Cliente creado:', {
         clienteId: resultado?.cliente_id,
+        sedes: servicios.length,
         servicios: resultado?.resumen?.total_servicios || 0,
         contratos: resultado?.resumen?.total_contratos || 0
       });
