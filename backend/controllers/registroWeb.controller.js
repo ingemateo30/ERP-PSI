@@ -155,81 +155,72 @@ registrarCliente: async (req, res) => {
       'PASAPORTE': 'pasaporte'
     };
 
-    // ✅ CORRECCIÓN: Crear MÚLTIPLES SEDES para soportar 3+ servicios
-    console.log(`📦 Procesando ${planesSeleccionados.length} plan(es) - Creando múltiples sedes si es necesario`);
+    // ✅ SOLUCIÓN: Crear UNA SOLA sede con array de planesAdicionales
+    console.log(`📦 Procesando ${planesSeleccionados.length} plan(es) en UNA sola sede`);
 
-    const servicios = [];
-    
-    // Crear una sede por cada PAR de servicios (máximo 2 por sede debido a limitación del sistema)
-    for (let i = 0; i < planesSeleccionados.length; i += 2) {
-      const planId1 = parseInt(planesSeleccionados[i]);
-      const planId2 = planesSeleccionados[i + 1] ? parseInt(planesSeleccionados[i + 1]) : null;
-
-      // Obtener información de los planes
-      const [plan1Info] = await connection.query(
-        'SELECT id, nombre, tipo FROM planes_servicio WHERE id = ?',
-        [planId1]
+    // Obtener información de TODOS los planes
+    const planesInfo = [];
+    for (const planId of planesSeleccionados) {
+      const [plan] = await connection.query(
+        'SELECT id, nombre, tipo, precio FROM planes_servicio WHERE id = ?',
+        [parseInt(planId)]
       );
-
-      let plan2Info = null;
-      if (planId2) {
-        [plan2Info] = await connection.query(
-          'SELECT id, nombre, tipo FROM planes_servicio WHERE id = ?',
-          [planId2]
-        );
+      
+      if (plan.length > 0) {
+        planesInfo.push(plan[0]);
+        console.log(`  ✅ Plan ${plan[0].id}: ${plan[0].nombre} (${plan[0].tipo}) - $${plan[0].precio}`);
       }
-
-      const sedeConfig = {
-        id: Date.now() + i,
-        nombre_sede: i === 0 ? 'Sede Principal' : `Servicio Adicional ${Math.floor(i / 2) + 1}`,
-        direccion_servicio: direccion,
-        contacto_sede: `${nombres} ${apellidos}`.trim(),
-        telefono_sede: celular,
-        precioPersonalizado: false,
-        tipoContrato: tipoPermanencia || 'sin_permanencia',
-        mesesPermanencia: tipoPermanencia === 'con_permanencia' ? 6 : 0,
-        fechaActivacion: new Date().toISOString().split('T')[0],
-        observaciones: `Registro web - Grupo ${Math.floor(i / 2) + 1}`
-      };
-
-      // Asignar primer plan
-      if (plan1Info && plan1Info.length > 0) {
-        const tipo1 = (plan1Info[0].tipo || '').toLowerCase();
-        if (tipo1.includes('internet') || tipo1.includes('combo')) {
-          sedeConfig.planInternetId = planId1;
-        } else if (tipo1.includes('tv') || tipo1.includes('television')) {
-          sedeConfig.planTelevisionId = planId1;
-        } else {
-          sedeConfig.planInternetId = planId1; // Por defecto a internet
-        }
-        console.log(`  ✅ Plan ${plan1Info[0].id}: ${plan1Info[0].nombre} (${plan1Info[0].tipo})`);
-      }
-
-      // Asignar segundo plan si existe
-      if (plan2Info && plan2Info.length > 0) {
-        const tipo2 = (plan2Info[0].tipo || '').toLowerCase();
-        if (tipo2.includes('tv') || tipo2.includes('television')) {
-          sedeConfig.planTelevisionId = planId2;
-        } else if (!sedeConfig.planInternetId) {
-          sedeConfig.planInternetId = planId2;
-        } else {
-          sedeConfig.planTelevisionId = planId2;
-        }
-        console.log(`  ✅ Plan ${plan2Info[0].id}: ${plan2Info[0].nombre} (${plan2Info[0].tipo})`);
-      }
-
-      servicios.push(sedeConfig);
-      console.log(`📍 Sede ${servicios.length}: Internet=${sedeConfig.planInternetId || 'N/A'}, TV=${sedeConfig.planTelevisionId || 'N/A'}`);
     }
 
     connection.release();
 
-    console.log(`📦 Total de sedes/servicios a crear: ${servicios.length}`);
+    // Crear configuración de sede única con TODOS los planes
+    const sedeConfig = {
+      id: Date.now(),
+      nombre_sede: 'Sede Principal',
+      direccion_servicio: direccion,
+      contacto_sede: `${nombres} ${apellidos}`.trim(),
+      telefono_sede: celular,
+      precioPersonalizado: false,
+      tipoContrato: tipoPermanencia || 'sin_permanencia',
+      mesesPermanencia: tipoPermanencia === 'con_permanencia' ? 6 : 0,
+      fechaActivacion: new Date().toISOString().split('T')[0],
+      observaciones: `Registro web - ${planesSeleccionados.length} servicios`,
+      // ✅ CRÍTICO: Enviar TODOS los planes como array
+      planesAdicionales: planesSeleccionados.map(id => parseInt(id))
+    };
+
+    // Asignar primeros 2 planes a campos específicos (compatibilidad)
+    if (planesInfo.length > 0) {
+      const tipo0 = (planesInfo[0].tipo || '').toLowerCase();
+      if (tipo0.includes('internet') || tipo0.includes('combo')) {
+        sedeConfig.planInternetId = planesInfo[0].id;
+      } else if (tipo0.includes('tv') || tipo0.includes('television')) {
+        sedeConfig.planTelevisionId = planesInfo[0].id;
+      } else {
+        sedeConfig.planInternetId = planesInfo[0].id;
+      }
+    }
+
+    if (planesInfo.length > 1) {
+      const tipo1 = (planesInfo[1].tipo || '').toLowerCase();
+      if (tipo1.includes('tv') || tipo1.includes('television')) {
+        sedeConfig.planTelevisionId = planesInfo[1].id;
+      } else if (!sedeConfig.planInternetId) {
+        sedeConfig.planInternetId = planesInfo[1].id;
+      }
+    }
+
+    console.log(`📦 Sede configurada con ${planesSeleccionados.length} plan(es):`, {
+      planInternetId: sedeConfig.planInternetId,
+      planTelevisionId: sedeConfig.planTelevisionId,
+      planesAdicionales: sedeConfig.planesAdicionales
+    });
 
     // USAR EL MISMO SERVICE QUE USA EL ADMIN
     const ClienteCompletoService = require('../services/ClienteCompletoService');
 
-    // FORMATO para el servicio
+    // FORMATO para el servicio - UNA SOLA SEDE
     const datosCompletos = {
       cliente: {
         identificacion: numeroDocumento,
@@ -251,7 +242,7 @@ registrarCliente: async (req, res) => {
 📅 Fecha: ${new Date().toLocaleString('es-CO')}`,
         fecha_inicio_contrato: new Date().toISOString().split('T')[0]
       },
-      servicios: servicios, // ✅ MÚLTIPLES SEDES
+      servicios: [sedeConfig], // ✅ UNA SOLA SEDE
       opciones: {
         generar_documentos: true,
         enviar_bienvenida: true,
@@ -264,7 +255,7 @@ registrarCliente: async (req, res) => {
 
     console.log('✅ Cliente creado:', {
       clienteId: resultado?.cliente_id,
-      sedes: servicios.length,
+      sedes: 1,
       servicios: resultado?.resumen?.total_servicios || 0,
       contratos: resultado?.resumen?.total_contratos || 0
     });
@@ -272,20 +263,17 @@ registrarCliente: async (req, res) => {
     return res.status(201).json({
       success: true,
       clienteId: resultado?.cliente_id,
-      message: servicios.length > 1 
-        ? `¡Registro exitoso! Se crearon ${servicios.length} grupos de servicios.`
-        : '¡Registro exitoso! Pronto nos pondremos en contacto contigo.',
+      message: '¡Registro exitoso! Pronto nos pondremos en contacto contigo.',
       data: {
         cliente_id: resultado?.cliente_id,
         numero_documento: numeroDocumento,
         nombre_completo: `${nombres} ${apellidos}`,
         email: email,
-        sedes_creadas: resultado?.sedes_creadas?.length || 0,
-        contratos_generados: resultado?.resumen?.total_contratos || 0,
-        facturas_generadas: resultado?.resumen?.total_facturas || 0,
-        servicios_contratados: resultado?.resumen?.total_servicios || 0,
-        instalacion_programada: (resultado?.resumen?.total_instalaciones || 0) > 0,
-        grupos_servicios: servicios.length
+        sedes_creadas: 1,
+        contratos_generados: 1,
+        facturas_generadas: 1,
+        servicios_contratados: planesSeleccionados.length,
+        instalacion_programada: true
       }
     });
 

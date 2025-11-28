@@ -1571,96 +1571,93 @@ const observacionesContrato = JSON.stringify({
   }
 
   /**
-   * Crear todos los servicios de UNA sede específica
-   */
-  static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
-    const serviciosCreados = [];
+ * Crear todos los servicios de UNA sede específica
+ */
+static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
+  const serviciosCreados = [];
 
-    // ✅ CORRECCIÓN: Procesar TODOS los servicios seleccionados
-    const serviciosParaCrear = [];
+  console.log('🔧 Procesando servicios de la sede:', {
+    planInternetId: sedeData.planInternetId,
+    planTelevisionId: sedeData.planTelevisionId,
+    planesAdicionales: sedeData.planesAdicionales
+  });
 
-    // Verificar si hay servicio de internet
-    if (sedeData.planInternetId) {
-      serviciosParaCrear.push({
-        tipo: 'internet',
-        plan_id: sedeData.planInternetId,
-        precio: sedeData.precioInternetCustom || null
-      });
-    }
+  // ✅ CORRECCIÓN: Crear array con TODOS los planes
+  const todosLosPlanesIds = [];
 
-    // Verificar si hay servicio de televisión
-    if (sedeData.planTelevisionId) {
-      serviciosParaCrear.push({
-        tipo: 'television',
-        plan_id: sedeData.planTelevisionId,
-        precio: sedeData.precioTelevisionCustom || null
-      });
-    }
+  if (sedeData.planInternetId) {
+    todosLosPlanesIds.push(parseInt(sedeData.planInternetId));
+  }
+  
+  if (sedeData.planTelevisionId) {
+    todosLosPlanesIds.push(parseInt(sedeData.planTelevisionId));
+  }
 
-    // Si no hay servicios separados, usar plan único
-    if (serviciosParaCrear.length === 0 && sedeData.plan_id) {
-      serviciosParaCrear.push({
-        tipo: 'combo',
-        plan_id: sedeData.plan_id,
-        precio: sedeData.precio_personalizado || null
-      });
-    }
-
-    // ✅ CORRECCIÓN: Crear CADA servicio por separado
-    for (const servicioData of serviciosParaCrear) {
-      // Obtener información del plan
-      const [planInfo] = await conexion.execute(
-        'SELECT nombre, precio, tipo FROM planes_servicio WHERE id = ?',
-        [servicioData.plan_id]
-      );
-
-      if (planInfo.length === 0) {
-        throw new Error(`Plan ${servicioData.plan_id} no encontrado`);
+  // ✅ AGREGAR PLANES ADICIONALES (el 3ro, 4to, etc.)
+  if (sedeData.planesAdicionales && Array.isArray(sedeData.planesAdicionales)) {
+    for (const planId of sedeData.planesAdicionales) {
+      const planIdNum = parseInt(planId);
+      if (!todosLosPlanesIds.includes(planIdNum)) {
+        todosLosPlanesIds.push(planIdNum);
       }
+    }
+  }
 
-      const plan = planInfo[0];
-      const precioFinal = servicioData.precio || plan.precio;
+  console.log(`📦 Total de planes a crear: ${todosLosPlanesIds.length}`, todosLosPlanesIds);
 
-      // ✅ CORRECCIÓN: Incluir observaciones en cada servicio
-      const observacionesServicio = JSON.stringify({
-        sede_nombre: sedeData.nombre_sede || 'Sede Principal',
-        direccion_sede: sedeData.direccion_servicio || '',
-        tipo_contrato: sedeData.tipoContrato || 'sin_permanencia',
-        observaciones_adicionales: sedeData.observaciones || '', // ✅ OBSERVACIONES guardadas
-        fecha_creacion: new Date().toISOString(),
-        creado_desde_sede: true
-      });
+  // ✅ CREAR UN SERVICIO POR CADA PLAN
+  for (const planId of todosLosPlanesIds) {
+    const [planInfo] = await conexion.execute(
+      'SELECT id, nombre, precio, tipo FROM planes_servicio WHERE id = ?',
+      [planId]
+    );
 
-      const queryServicio = `
+    if (planInfo.length === 0) {
+      console.warn(`⚠️ Plan ${planId} no encontrado`);
+      continue;
+    }
+
+    const plan = planInfo[0];
+    const precioFinal = plan.precio; // Usar precio del plan
+
+    const observacionesServicio = JSON.stringify({
+      sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+      direccion_sede: sedeData.direccion_servicio || '',
+      tipo_contrato: sedeData.tipoContrato || 'sin_permanencia',
+      observaciones_adicionales: sedeData.observaciones || '',
+      fecha_creacion: new Date().toISOString(),
+      creado_desde_sede: true
+    });
+
+    const queryServicio = `
       INSERT INTO servicios_cliente (
         cliente_id, plan_id, precio_personalizado, fecha_activacion,
         estado, observaciones
       ) VALUES (?, ?, ?, ?, 'activo', ?)
     `;
 
-      const [resultado] = await conexion.execute(queryServicio, [
-        clienteId,
-        servicioData.plan_id,
-        precioFinal,
-        sedeData.fecha_activacion || new Date().toISOString().split('T')[0],
-        observacionesServicio, // ✅ OBSERVACIONES incluidas
+    const [resultado] = await conexion.execute(queryServicio, [
+      clienteId,
+      planId,
+      precioFinal,
+      sedeData.fechaActivacion || new Date().toISOString().split('T')[0],
+      observacionesServicio
+    ]);
 
-      ]);
+    serviciosCreados.push({
+      id: resultado.insertId,
+      plan_id: planId,
+      plan_nombre: plan.nombre,
+      tipo: plan.tipo,
+      precio: precioFinal
+    });
 
-      serviciosCreados.push({
-        id: resultado.insertId,
-        plan_id: servicioData.plan_id,
-        plan_nombre: plan.nombre,
-        tipo: plan.tipo,
-        precio: precioFinal,
-        observaciones: observacionesServicio
-      });
-
-      console.log(`✅ Servicio ${plan.tipo} creado: ${plan.nombre} - $${precioFinal}`);
-    }
-
-    return serviciosCreados;
+    console.log(`  ✅ Servicio creado: ${plan.nombre} - $${precioFinal}`);
   }
+
+  console.log(`✅ Total servicios creados: ${serviciosCreados.length}`);
+  return serviciosCreados;
+}
 
   /**
    * Crear un servicio individual
