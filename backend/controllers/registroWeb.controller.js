@@ -101,199 +101,198 @@ const registroWebController = {
     }
   },
 
-  // 📝 Registrar cliente
-  registrarCliente: async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        console.error('❌ Errores de validación:', errors.array());
-        return res.status(400).json({
-          success: false,
-          message: 'Datos inválidos',
-          errors: errors.array()
-        });
-      }
-
-      const {
-        tipoDocumento, numeroDocumento, nombres, apellidos,
-        email, celular, direccion, barrio,
-        planesSeleccionados, aceptaTerminos, aceptaTratamientoDatos,
-        ciudadId, sectorId, tipoPermanencia, estrato
-      } = req.body;
-
-      console.log('📋 Registro web iniciado:', {
-        documento: numeroDocumento,
-        nombre: `${nombres} ${apellidos}`,
-        email: email,
-        planes: planesSeleccionados,
-        cantidad_planes: planesSeleccionados.length
+// 📝 Registrar cliente
+registrarCliente: async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      console.error('❌ Errores de validación:', errors.array());
+      return res.status(400).json({
+        success: false,
+        message: 'Datos inválidos',
+        errors: errors.array()
       });
+    }
 
-      // Verificar duplicado
-      const connection = await db.getConnection();
-      const [existe] = await connection.query(
-        'SELECT id, nombre FROM clientes WHERE identificacion = ?',
-        [numeroDocumento]
-      );
+    const {
+      tipoDocumento, numeroDocumento, nombres, apellidos,
+      email, celular, direccion, barrio,
+      planesSeleccionados, aceptaTerminos, aceptaTratamientoDatos,
+      ciudadId, sectorId, tipoPermanencia, estrato
+    } = req.body;
 
-      if (existe.length > 0) {
-        connection.release();
-        console.warn('⚠️ Cliente ya existe:', existe[0].nombre);
-        return res.status(400).json({
-          success: false,
-          message: 'Ya existe un cliente registrado con este número de documento'
-        });
-      }
+    console.log('📋 Registro web iniciado:', {
+      documento: numeroDocumento,
+      nombre: `${nombres} ${apellidos}`,
+      email: email,
+      planes: planesSeleccionados,
+      cantidad_planes: planesSeleccionados.length
+    });
 
-      // MAPEO DE TIPOS DE DOCUMENTO
-      const tipoDocumentoMap = {
-        'CC': 'cedula',
-        'NIT': 'nit',
-        'CE': 'extranjeria',
-        'TI': 'tarjeta_identidad',
-        'PASAPORTE': 'pasaporte'
-      };
+    // Verificar duplicado
+    const connection = await db.getConnection();
+    const [existe] = await connection.query(
+      'SELECT id, nombre FROM clientes WHERE identificacion = ?',
+      [numeroDocumento]
+    );
 
-      // ✅ CORRECCIÓN: Crear MÚLTIPLES SEDES para soportar 3+ servicios
-      console.log(`📦 Procesando ${planesSeleccionados.length} plan(es) seleccionado(s)`);
-
-      const servicios = [];
-      
-      // Crear una sede por cada par de servicios (máximo 2 por sede)
-      for (let i = 0; i < planesSeleccionados.length; i += 2) {
-        const planId1 = parseInt(planesSeleccionados[i]);
-        const planId2 = planesSeleccionados[i + 1] ? parseInt(planesSeleccionados[i + 1]) : null;
-
-        // Obtener información de los planes
-        const [plan1Info] = await connection.query(
-          'SELECT id, nombre, tipo FROM planes_servicio WHERE id = ?',
-          [planId1]
-        );
-
-        let plan2Info = null;
-        if (planId2) {
-          [plan2Info] = await connection.query(
-            'SELECT id, nombre, tipo FROM planes_servicio WHERE id = ?',
-            [planId2]
-          );
-        }
-
-        const sedeConfig = {
-          id: Date.now() + i,
-          nombre_sede: i === 0 ? 'Sede Principal' : `Servicio Adicional ${Math.floor(i / 2) + 1}`,
-          direccion_servicio: direccion,
-          contacto_sede: `${nombres} ${apellidos}`.trim(),
-          telefono_sede: celular,
-          precioPersonalizado: false,
-          tipoContrato: tipoPermanencia || 'sin_permanencia',
-          mesesPermanencia: tipoPermanencia === 'con_permanencia' ? 6 : 0,
-          fechaActivacion: new Date().toISOString().split('T')[0],
-          observaciones: `Registro web`
-        };
-
-        // Asignar primer plan
-        if (plan1Info && plan1Info.length > 0) {
-          const tipo1 = (plan1Info[0].tipo || '').toLowerCase();
-          if (tipo1.includes('internet') || tipo1.includes('combo')) {
-            sedeConfig.planInternetId = planId1;
-          } else if (tipo1.includes('tv') || tipo1.includes('television')) {
-            sedeConfig.planTelevisionId = planId1;
-          } else {
-            sedeConfig.planInternetId = planId1; // Por defecto a internet
-          }
-          console.log(`  ✅ Plan ${plan1Info[0].id}: ${plan1Info[0].nombre} (${plan1Info[0].tipo})`);
-        }
-
-        // Asignar segundo plan si existe
-        if (plan2Info && plan2Info.length > 0) {
-          const tipo2 = (plan2Info[0].tipo || '').toLowerCase();
-          if (tipo2.includes('tv') || tipo2.includes('television')) {
-            sedeConfig.planTelevisionId = planId2;
-          } else if (!sedeConfig.planInternetId) {
-            sedeConfig.planInternetId = planId2;
-          } else {
-            sedeConfig.planTelevisionId = planId2;
-          }
-          console.log(`  ✅ Plan ${plan2Info[0].id}: ${plan2Info[0].nombre} (${plan2Info[0].tipo})`);
-        }
-
-        servicios.push(sedeConfig);
-        console.log(`📍 Sede ${servicios.length}: Internet=${sedeConfig.planInternetId || 'N/A'}, TV=${sedeConfig.planTelevisionId || 'N/A'}`);
-      }
-
+    if (existe.length > 0) {
       connection.release();
+      console.warn('⚠️ Cliente ya existe:', existe[0].nombre);
+      return res.status(400).json({
+        success: false,
+        message: 'Ya existe un cliente registrado con este número de documento'
+      });
+    }
 
-      console.log(`📦 Total de sedes/servicios a crear: ${servicios.length}`);
+    // MAPEO DE TIPOS DE DOCUMENTO
+    const tipoDocumentoMap = {
+      'CC': 'cedula',
+      'NIT': 'nit',
+      'CE': 'extranjeria',
+      'TI': 'tarjeta_identidad',
+      'PASAPORTE': 'pasaporte'
+    };
 
-      // USAR EL MISMO SERVICE QUE USA EL ADMIN
-      const ClienteCompletoService = require('../services/ClienteCompletoService');
+    // ✅ CORRECCIÓN: Crear UNA SOLA SEDE con TODOS los planes
+    console.log(`📦 Procesando ${planesSeleccionados.length} plan(es) en UNA sola sede`);
 
-      // FORMATO para el servicio
-      const datosCompletos = {
-        cliente: {
-          identificacion: numeroDocumento,
-          tipo_documento: tipoDocumentoMap[tipoDocumento.toUpperCase()] || 'cedula',
-          nombre: `${nombres} ${apellidos}`.trim(),
-          correo: email,
-          telefono: celular,
-          telefono_2: '',
-          direccion: direccion,
-          barrio: barrio,
-          estrato: estrato ? parseInt(estrato) : 3,
-          ciudad_id: ciudadId ? parseInt(ciudadId) : null,
-          sector_id: sectorId ? parseInt(sectorId) : null,
-          observaciones: `🌐 REGISTRO WEB
+    // Crear configuración de sede única
+    const sedeConfig = {
+      id: Date.now(),
+      nombre_sede: 'Sede Principal',
+      direccion_servicio: direccion,
+      contacto_sede: `${nombres} ${apellidos}`.trim(),
+      telefono_sede: celular,
+      precioPersonalizado: false,
+      tipoContrato: tipoPermanencia || 'sin_permanencia',
+      mesesPermanencia: tipoPermanencia === 'con_permanencia' ? 6 : 0,
+      fechaActivacion: new Date().toISOString().split('T')[0],
+      observaciones: `Registro web - ${planesSeleccionados.length} servicios`
+    };
+
+    // ✅ ASIGNAR TODOS LOS PLANES DETECTANDO SU TIPO
+    const planesInfo = [];
+    for (const planId of planesSeleccionados) {
+      const [plan] = await connection.query(
+        'SELECT id, nombre, tipo FROM planes_servicio WHERE id = ?',
+        [parseInt(planId)]
+      );
+      
+      if (plan.length > 0) {
+        planesInfo.push(plan[0]);
+        console.log(`  ✅ Plan ${plan[0].id}: ${plan[0].nombre} (${plan[0].tipo})`);
+      }
+    }
+
+    // Separar por tipo
+    let planInternetId = null;
+    let planTelevisionId = null;
+    const planesAdicionales = [];
+
+    for (const plan of planesInfo) {
+      const tipo = (plan.tipo || '').toLowerCase();
+      
+      if ((tipo.includes('internet') || tipo.includes('combo')) && !planInternetId) {
+        planInternetId = plan.id;
+      } else if ((tipo.includes('tv') || tipo.includes('television')) && !planTelevisionId) {
+        planTelevisionId = plan.id;
+      } else {
+        // Si ya hay Internet y TV, guardar como adicional
+        planesAdicionales.push(plan.id);
+      }
+    }
+
+    // Asignar al menos los 2 primeros
+    if (planInternetId) sedeConfig.planInternetId = planInternetId;
+    if (planTelevisionId) sedeConfig.planTelevisionId = planTelevisionId;
+
+    // ⚠️ Si hay más de 2 planes, guardarlos en observaciones para procesamiento manual
+    if (planesAdicionales.length > 0) {
+      sedeConfig.observaciones += ` - PLANES ADICIONALES: ${planesAdicionales.join(', ')}`;
+      console.warn(`⚠️ Hay ${planesAdicionales.length} plan(es) adicional(es) que requieren procesamiento manual`);
+    }
+
+    connection.release();
+
+    console.log(`📦 Sede configurada:`, {
+      internet: sedeConfig.planInternetId,
+      tv: sedeConfig.planTelevisionId,
+      adicionales: planesAdicionales.length
+    });
+
+    // USAR EL MISMO SERVICE QUE USA EL ADMIN
+    const ClienteCompletoService = require('../services/ClienteCompletoService');
+
+    // FORMATO para el servicio - UNA SOLA SEDE
+    const datosCompletos = {
+      cliente: {
+        identificacion: numeroDocumento,
+        tipo_documento: tipoDocumentoMap[tipoDocumento.toUpperCase()] || 'cedula',
+        nombre: `${nombres} ${apellidos}`.trim(),
+        correo: email,
+        telefono: celular,
+        telefono_2: '',
+        direccion: direccion,
+        barrio: barrio,
+        estrato: estrato ? parseInt(estrato) : 3,
+        ciudad_id: ciudadId ? parseInt(ciudadId) : null,
+        sector_id: sectorId ? parseInt(sectorId) : null,
+        observaciones: `🌐 REGISTRO WEB
 ✅ Términos: Sí
 ✅ Datos: Sí
 💳 ${tipoPermanencia === 'con_permanencia' ? 'Con permanencia (6 meses)' : 'Sin permanencia'}
 📦 Planes: ${planesSeleccionados.join(', ')}
 📅 Fecha: ${new Date().toLocaleString('es-CO')}`,
-          fecha_inicio_contrato: new Date().toISOString().split('T')[0]
-        },
-        servicios: servicios,
-        opciones: {
-          generar_documentos: true,
-          enviar_bienvenida: true,
-          programar_instalacion: true
-        }
-      };
+        fecha_inicio_contrato: new Date().toISOString().split('T')[0]
+      },
+      servicios: [sedeConfig], // ✅ UNA SOLA SEDE
+      opciones: {
+        generar_documentos: true,
+        enviar_bienvenida: true,
+        programar_instalacion: true
+      }
+    };
 
-      // Llamar al servicio
-      const resultado = await ClienteCompletoService.crearClienteConServicios(datosCompletos, 1);
+    // Llamar al servicio
+    const resultado = await ClienteCompletoService.crearClienteConServicios(datosCompletos, 1);
 
-      console.log('✅ Cliente creado:', {
-        clienteId: resultado?.cliente_id,
-        sedes: servicios.length,
-        servicios: resultado?.resumen?.total_servicios || 0,
-        contratos: resultado?.resumen?.total_contratos || 0
-      });
+    console.log('✅ Cliente creado:', {
+      clienteId: resultado?.cliente_id,
+      sedes: 1,
+      servicios: resultado?.resumen?.total_servicios || 0,
+      contratos: resultado?.resumen?.total_contratos || 0
+    });
 
-      return res.status(201).json({
-        success: true,
-        clienteId: resultado?.cliente_id,
-        message: '¡Registro exitoso! Pronto nos pondremos en contacto contigo.',
-        data: {
-          cliente_id: resultado?.cliente_id,
-          numero_documento: numeroDocumento,
-          nombre_completo: `${nombres} ${apellidos}`,
-          email: email,
-          sedes_creadas: resultado?.sedes_creadas?.length || 0,
-          contratos_generados: resultado?.resumen?.total_contratos || 0,
-          facturas_generadas: resultado?.resumen?.total_facturas || 0,
-          servicios_contratados: resultado?.resumen?.total_servicios || 0,
-          instalacion_programada: (resultado?.resumen?.total_instalaciones || 0) > 0
-        }
-      });
+    return res.status(201).json({
+      success: true,
+      clienteId: resultado?.cliente_id,
+      message: planesAdicionales.length > 0 
+        ? `¡Registro exitoso! Nota: ${planesAdicionales.length} servicio(s) adicional(es) serán activados por el equipo de soporte.`
+        : '¡Registro exitoso! Pronto nos pondremos en contacto contigo.',
+      data: {
+        cliente_id: resultado?.cliente_id,
+        numero_documento: numeroDocumento,
+        nombre_completo: `${nombres} ${apellidos}`,
+        email: email,
+        sedes_creadas: 1,
+        contratos_generados: resultado?.resumen?.total_contratos || 0,
+        facturas_generadas: resultado?.resumen?.total_facturas || 0,
+        servicios_contratados: resultado?.resumen?.total_servicios || 0,
+        instalacion_programada: (resultado?.resumen?.total_instalaciones || 0) > 0,
+        planes_adicionales: planesAdicionales.length
+      }
+    });
 
-    } catch (error) {
-      console.error('❌ Error en registro web:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Error al procesar el registro',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
+  } catch (error) {
+    console.error('❌ Error en registro web:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al procesar el registro',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
+}
 };
 
 module.exports = registroWebController;
