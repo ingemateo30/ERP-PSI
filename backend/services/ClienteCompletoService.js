@@ -1571,96 +1571,93 @@ const observacionesContrato = JSON.stringify({
   }
 
   /**
-   * Crear todos los servicios de UNA sede específica
-   */
-  static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
-    const serviciosCreados = [];
+ * Crear todos los servicios de UNA sede específica
+ */
+static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
+  const serviciosCreados = [];
 
-    // ✅ CORRECCIÓN: Procesar TODOS los servicios seleccionados
-    const serviciosParaCrear = [];
+  console.log('🔧 Procesando servicios de la sede:', {
+    planInternetId: sedeData.planInternetId,
+    planTelevisionId: sedeData.planTelevisionId,
+    planesAdicionales: sedeData.planesAdicionales
+  });
 
-    // Verificar si hay servicio de internet
-    if (sedeData.planInternetId) {
-      serviciosParaCrear.push({
-        tipo: 'internet',
-        plan_id: sedeData.planInternetId,
-        precio: sedeData.precioInternetCustom || null
-      });
-    }
+  // ✅ CORRECCIÓN: Crear array con TODOS los planes
+  const todosLosPlanesIds = [];
 
-    // Verificar si hay servicio de televisión
-    if (sedeData.planTelevisionId) {
-      serviciosParaCrear.push({
-        tipo: 'television',
-        plan_id: sedeData.planTelevisionId,
-        precio: sedeData.precioTelevisionCustom || null
-      });
-    }
+  if (sedeData.planInternetId) {
+    todosLosPlanesIds.push(parseInt(sedeData.planInternetId));
+  }
+  
+  if (sedeData.planTelevisionId) {
+    todosLosPlanesIds.push(parseInt(sedeData.planTelevisionId));
+  }
 
-    // Si no hay servicios separados, usar plan único
-    if (serviciosParaCrear.length === 0 && sedeData.plan_id) {
-      serviciosParaCrear.push({
-        tipo: 'combo',
-        plan_id: sedeData.plan_id,
-        precio: sedeData.precio_personalizado || null
-      });
-    }
-
-    // ✅ CORRECCIÓN: Crear CADA servicio por separado
-    for (const servicioData of serviciosParaCrear) {
-      // Obtener información del plan
-      const [planInfo] = await conexion.execute(
-        'SELECT nombre, precio, tipo FROM planes_servicio WHERE id = ?',
-        [servicioData.plan_id]
-      );
-
-      if (planInfo.length === 0) {
-        throw new Error(`Plan ${servicioData.plan_id} no encontrado`);
+  // ✅ AGREGAR PLANES ADICIONALES (el 3ro, 4to, etc.)
+  if (sedeData.planesAdicionales && Array.isArray(sedeData.planesAdicionales)) {
+    for (const planId of sedeData.planesAdicionales) {
+      const planIdNum = parseInt(planId);
+      if (!todosLosPlanesIds.includes(planIdNum)) {
+        todosLosPlanesIds.push(planIdNum);
       }
+    }
+  }
 
-      const plan = planInfo[0];
-      const precioFinal = servicioData.precio || plan.precio;
+  console.log(`📦 Total de planes a crear: ${todosLosPlanesIds.length}`, todosLosPlanesIds);
 
-      // ✅ CORRECCIÓN: Incluir observaciones en cada servicio
-      const observacionesServicio = JSON.stringify({
-        sede_nombre: sedeData.nombre_sede || 'Sede Principal',
-        direccion_sede: sedeData.direccion_servicio || '',
-        tipo_contrato: sedeData.tipoContrato || 'sin_permanencia',
-        observaciones_adicionales: sedeData.observaciones || '', // ✅ OBSERVACIONES guardadas
-        fecha_creacion: new Date().toISOString(),
-        creado_desde_sede: true
-      });
+  // ✅ CREAR UN SERVICIO POR CADA PLAN
+  for (const planId of todosLosPlanesIds) {
+    const [planInfo] = await conexion.execute(
+      'SELECT id, nombre, precio, tipo FROM planes_servicio WHERE id = ?',
+      [planId]
+    );
 
-      const queryServicio = `
+    if (planInfo.length === 0) {
+      console.warn(`⚠️ Plan ${planId} no encontrado`);
+      continue;
+    }
+
+    const plan = planInfo[0];
+    const precioFinal = plan.precio; // Usar precio del plan
+
+    const observacionesServicio = JSON.stringify({
+      sede_nombre: sedeData.nombre_sede || 'Sede Principal',
+      direccion_sede: sedeData.direccion_servicio || '',
+      tipo_contrato: sedeData.tipoContrato || 'sin_permanencia',
+      observaciones_adicionales: sedeData.observaciones || '',
+      fecha_creacion: new Date().toISOString(),
+      creado_desde_sede: true
+    });
+
+    const queryServicio = `
       INSERT INTO servicios_cliente (
         cliente_id, plan_id, precio_personalizado, fecha_activacion,
         estado, observaciones
       ) VALUES (?, ?, ?, ?, 'activo', ?)
     `;
 
-      const [resultado] = await conexion.execute(queryServicio, [
-        clienteId,
-        servicioData.plan_id,
-        precioFinal,
-        sedeData.fecha_activacion || new Date().toISOString().split('T')[0],
-        observacionesServicio, // ✅ OBSERVACIONES incluidas
+    const [resultado] = await conexion.execute(queryServicio, [
+      clienteId,
+      planId,
+      precioFinal,
+      sedeData.fechaActivacion || new Date().toISOString().split('T')[0],
+      observacionesServicio
+    ]);
 
-      ]);
+    serviciosCreados.push({
+      id: resultado.insertId,
+      plan_id: planId,
+      plan_nombre: plan.nombre,
+      tipo: plan.tipo,
+      precio: precioFinal
+    });
 
-      serviciosCreados.push({
-        id: resultado.insertId,
-        plan_id: servicioData.plan_id,
-        plan_nombre: plan.nombre,
-        tipo: plan.tipo,
-        precio: precioFinal,
-        observaciones: observacionesServicio
-      });
-
-      console.log(`✅ Servicio ${plan.tipo} creado: ${plan.nombre} - $${precioFinal}`);
-    }
-
-    return serviciosCreados;
+    console.log(`  ✅ Servicio creado: ${plan.nombre} - $${precioFinal}`);
   }
+
+  console.log(`✅ Total servicios creados: ${serviciosCreados.length}`);
+  return serviciosCreados;
+}
 
   /**
    * Crear un servicio individual
@@ -1887,11 +1884,13 @@ static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sed
       // 4. CALCULAR FECHAS DEL PERÍODO SEGÚN REGLAS DE FACTURACIÓN
       const fechasFacturacion = this.calcularFechasFacturacion();
 
-      // 5. CALCULAR TOTALES UNIFICADOS DE TODOS LOS SERVICIOS DE LA SEDE
+// 5. ✅ CALCULAR TOTALES CORRECTAMENTE - SUMA TODOS LOS SERVICIOS
 let valorInternet = 0;
 let valorTelevision = 0;
 let valorIvaInternet = 0;
 let valorIvaTelevision = 0;
+
+console.log(`📊 Calculando totales para ${serviciosDeLaSede.length} servicio(s):`);
 
 for (const servicio of serviciosDeLaSede) {
   const precio = parseFloat(servicio.precio || 0);
@@ -1910,20 +1909,46 @@ for (const servicio of serviciosDeLaSede) {
     }
   }
 
-  console.log(`📊 Factura - Servicio: ${servicio.plan_nombre}, Tipo: ${tipoServicio}, Precio: $${precio}`);
+  console.log(`  📌 ${servicio.plan_nombre} - Tipo: ${tipoServicio} - Precio: $${precio.toLocaleString()}`);
 
-  // Sumar TODOS los servicios como internet (simplificado)
-  valorInternet += precio;
-  
-  // IVA solo para estratos 4, 5, 6
-  if (estrato >= 4) {
-    valorIvaInternet += precio * (parseFloat(config.porcentaje_iva) / 100);
+  // ✅ SEPARAR POR TIPO DE SERVICIO
+  if (tipoServicio === 'internet' || tipoServicio === 'combo') {
+    valorInternet += precio;
+    // IVA solo para estratos 4, 5, 6
+    if (estrato >= 4) {
+      const ivaServicio = precio * (parseFloat(config.porcentaje_iva) / 100);
+      valorIvaInternet += ivaServicio;
+      console.log(`    💰 IVA Internet: $${ivaServicio.toLocaleString()}`);
+    }
+  } else if (tipoServicio === 'television') {
+    valorTelevision += precio;
+    // IVA solo para estratos 4, 5, 6
+    if (estrato >= 4) {
+      const ivaServicio = precio * (parseFloat(config.porcentaje_iva) / 100);
+      valorIvaTelevision += ivaServicio;
+      console.log(`    💰 IVA TV: $${ivaServicio.toLocaleString()}`);
+    }
+  } else {
+    // Si no se detecta tipo, sumar a internet por defecto
+    console.log(`    ⚠️ Tipo no detectado, sumando a internet por defecto`);
+    valorInternet += precio;
+    if (estrato >= 4) {
+      valorIvaInternet += precio * (parseFloat(config.porcentaje_iva) / 100);
+    }
   }
 }
 
+// ✅ CALCULAR TOTALES FINALES
 const subtotal = valorInternet + valorTelevision;
 const totalIva = valorIvaInternet + valorIvaTelevision;
 const total = subtotal + totalIva;
+
+console.log(`💰 TOTALES CALCULADOS:`);
+console.log(`   Internet: $${valorInternet.toLocaleString()}`);
+console.log(`   Televisión: $${valorTelevision.toLocaleString()}`);
+console.log(`   Subtotal: $${subtotal.toLocaleString()}`);
+console.log(`   IVA: $${totalIva.toLocaleString()}`);
+console.log(`   TOTAL FACTURA: $${total.toLocaleString()}`);
 
 console.log(`💰 TOTALES FACTURA: Internet=$${valorInternet}, TV=$${valorTelevision}, IVA=$${totalIva}, Total=$${total}`);
       // 6. CREAR DESCRIPCIÓN DE SERVICIOS PARA OBSERVACIONES
@@ -2262,19 +2287,82 @@ console.log(`💰 TOTALES FACTURA: Internet=$${valorInternet}, TV=$${valorTelevi
     }
   }
 
-  static async generarNumeroFactura(conexion) {
-    const [ultimaFactura] = await conexion.execute(
-      'SELECT numero_factura FROM facturas ORDER BY id DESC LIMIT 1'
-    );
+/**
+ * Generar número de factura (MÉTODO CORREGIDO - Sin duplicados)
+ */
+static async generarNumeroFactura(conexion) {
+  try {
+    console.log('🔢 Generando número de factura (MÉTODO CORREGIDO)...');
 
-    if (ultimaFactura.length > 0) {
-      const ultimoNumero = ultimaFactura[0].numero_factura;
-      const numeroActual = parseInt(ultimoNumero.replace(/\D/g, '')) + 1;
-      return `FAC${numeroActual.toString().padStart(6, '0')}`;
-    } else {
-      return 'FAC000001';
+    // PASO 1: Obtener configuración actual DIRECTAMENTE
+    const [configActual] = await conexion.execute(`
+      SELECT 
+        prefijo_factura,
+        consecutivo_factura
+      FROM configuracion_empresa 
+      WHERE id = 1
+    `);
+
+    if (!configActual[0]) {
+      throw new Error('Configuración de empresa no encontrada');
     }
+
+    const { prefijo_factura, consecutivo_factura } = configActual[0];
+
+    console.log('📊 Configuración factura actual:', {
+      prefijo: prefijo_factura,
+      consecutivo: consecutivo_factura
+    });
+
+    // PASO 2: Generar número usando los valores actuales
+    const numeroFactura = `${prefijo_factura || 'FAC'}${String(consecutivo_factura).padStart(6, '0')}`;
+
+    console.log(`📋 Número de factura generado: ${numeroFactura}`);
+
+    // PASO 3: Verificar que no existe (seguridad adicional)
+    const [existe] = await conexion.execute(`
+      SELECT COUNT(*) as count 
+      FROM facturas 
+      WHERE numero_factura = ?
+    `, [numeroFactura]);
+
+    if (existe[0].count > 0) {
+      console.warn(`⚠️ La factura ${numeroFactura} YA EXISTE. Forzando incremento...`);
+
+      // Si existe, incrementar el consecutivo y generar nuevamente
+      await conexion.execute(`
+        UPDATE configuracion_empresa 
+        SET consecutivo_factura = consecutivo_factura + 1 
+        WHERE id = 1
+      `);
+
+      // Llamada recursiva para generar el siguiente
+      return await this.generarNumeroFactura(conexion);
+    }
+
+    // PASO 4: Incrementar consecutivo DESPUÉS de verificar disponibilidad
+    await conexion.execute(`
+      UPDATE configuracion_empresa 
+      SET consecutivo_factura = consecutivo_factura + 1 
+      WHERE id = 1
+    `);
+
+    console.log(`✅ Consecutivo factura actualizado de ${consecutivo_factura} a ${consecutivo_factura + 1}`);
+    console.log(`✅ Número de factura FINAL: ${numeroFactura}`);
+
+    return numeroFactura;
+
+  } catch (error) {
+    console.error('❌ Error generando número de factura:', error);
+
+    // FALLBACK: Usar timestamp único si todo falla
+    const timestamp = Date.now().toString().slice(-6);
+    const numeroFallback = `FAC${timestamp}`;
+
+    console.log(`🔄 Usando número de emergencia: ${numeroFallback}`);
+    return numeroFallback;
   }
+}
   /**
    * ✅ NUEVO: Agregar servicio a cliente existente
    * Este método permite agregar un nuevo servicio a un cliente que ya existe en el sistema
