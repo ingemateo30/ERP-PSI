@@ -814,8 +814,8 @@ class ReportesRegulatoriosController {
             }
 
             // Obtener NIT de la empresa desde configuración
-            const [configEmpresa] = await this.db.query('SELECT nit FROM configuracion_empresa LIMIT 1');
-            const nitEmpresa = configEmpresa[0]?.nit || '';
+            const [configEmpresa] = await this.db.query('SELECT empresa_nit FROM configuracion_empresa LIMIT 1');
+            const nitEmpresa = configEmpresa[0]?.empresa_nit || '';
 
             const query = `
                 SELECT
