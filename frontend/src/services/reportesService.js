@@ -165,6 +165,13 @@ class ReportesService {
             descripcion: 'Reporte para importación contable',
             periodicidad: 'Según rango de fechas',
             parametros: ['fechaInicio', 'fechaFin']
+          },
+          {
+            id: 'siigo_facturacion',
+            nombre: 'Facturación Siigo (Modelo de importación)',
+            descripcion: 'Reporte para importación de facturas en Siigo',
+            periodicidad: 'Según rango de fechas',
+            parametros: ['fechaInicio', 'fechaFin']
           }
         ]
       };
@@ -257,6 +264,11 @@ class ReportesService {
     return this.generarReporte('facturas_ventas', params);
   }
 
+  // Generar reporte de facturación Siigo
+  async generarReporteSiigoFacturacion(params) {
+    return this.generarReporte('siigo_facturacion', params);
+  }
+
   // Método para mapear IDs a endpoints
   getEndpointForReport(reportId) {
     const mapping = {
@@ -266,9 +278,10 @@ class ReportesService {
       'disponibilidad_qos': 'disponibilidad-qos',
       'monitoreo_quejas': 'monitoreo-quejas',
       'indicadores_quejas': 'indicadores-quejas',
-      'facturas_ventas': 'facturas-ventas'
+      'facturas_ventas': 'facturas-ventas',
+      'siigo_facturacion': 'siigo-facturacion'
     };
-    
+
     return mapping[reportId] || reportId;
   }
 
@@ -352,6 +365,7 @@ class ReportesService {
         break;
         
       case 'facturas_ventas':
+      case 'siigo_facturacion':
         if (!parametros.fechaInicio) errors.fechaInicio = 'Fecha inicio es requerida';
         if (!parametros.fechaFin) errors.fechaFin = 'Fecha fin es requerida';
         break;

@@ -22,5 +22,6 @@ router.get('/indicadores-quejas', requireRole('administrador', 'supervisor'), re
 
 // Reportes contables - Solo administrador
 router.get('/facturas-ventas', requireRole('administrador'), reportesController.generarReporteFacturasVentas.bind(reportesController));
+router.get('/siigo-facturacion', requireRole('administrador'), reportesController.generarReporteSiigoFacturacion.bind(reportesController));
 
 module.exports = router;
