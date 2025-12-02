@@ -819,7 +819,7 @@ class ReportesRegulatoriosController {
 
             const query = `
                 SELECT
-                    f.numero_factura as 'Tipo de comprobante',
+                    'FV' as 'Tipo de comprobante',
                     f.numero_factura as 'Consecutivo',
                     c.identificacion as 'Identificación tercero',
                     CASE
@@ -838,17 +838,17 @@ class ReportesRegulatoriosController {
                     '' as 'Orden de compra',
                     '' as 'Orden de entrega',
                     '' as 'Fecha orden de entrega',
-                    COALESCE(cf.codigo, '') as 'Código producto',
-                    COALESCE(df.concepto_nombre, cf.nombre, '') as 'Descripción producto',
+                    COALESCE(cf.codigo, 'SERV001') as 'Código producto',
+                    COALESCE(df.concepto_nombre, cf.nombre, 'Servicio de Internet/TV') as 'Descripción producto',
                     ? as 'Identificación vendedor',
                     '' as 'Código de Bodega',
-                    df.cantidad as 'Cantidad producto',
-                    df.precio_unitario as 'Valor unitario',
+                    COALESCE(df.cantidad, 1) as 'Cantidad producto',
+                    COALESCE(df.precio_unitario, f.total) as 'Valor unitario',
                     COALESCE(df.descuento, 0) as 'Valor Descuento',
                     0 as 'Base AIU',
                     '' as 'Identificación ingreso para terceros',
                     CASE
-                        WHEN df.iva > 0 THEN '1'
+                        WHEN COALESCE(df.iva, 0) > 0 THEN '1'
                         ELSE ''
                     END as 'Código impuesto cargo',
                     '' as 'Código impuesto cargo dos',
@@ -856,7 +856,7 @@ class ReportesRegulatoriosController {
                     '' as 'Código ReteICA',
                     '' as 'Código ReteIVA',
                     '2' as 'Código forma de pago',
-                    (df.precio_unitario - COALESCE(df.descuento, 0) + COALESCE(df.iva, 0)) as 'Valor Forma de Pago',
+                    COALESCE(df.total, f.total) as 'Valor Forma de Pago',
                     DATE_FORMAT(f.fecha_vencimiento, '%Y-%m-%d') as 'Fecha Vencimiento',
                     CONCAT(
                         'Periodo facturado del ',
@@ -886,7 +886,7 @@ class ReportesRegulatoriosController {
                 FROM facturas f
                 JOIN clientes c ON f.cliente_id = c.id
                 LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
-                JOIN detalle_facturas df ON f.id = df.factura_id
+                LEFT JOIN detalle_facturas df ON f.id = df.factura_id
                 LEFT JOIN conceptos_facturacion cf ON df.concepto_id = cf.id
                 WHERE f.fecha_emision BETWEEN ? AND ?
                     AND f.estado IN ('pagada', 'pendiente', 'vencida')
