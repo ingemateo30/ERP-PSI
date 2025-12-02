@@ -745,9 +745,9 @@ class ReportesRegulatoriosController {
     async generarReporteFacturasVentas(req, res) {
         try {
             const { fechaInicio, fechaFin } = req.query;
-            
+
             const query = `
-                SELECT 
+                SELECT
                     3 as 'Tipo de comprobante',
                     f.numero_factura as 'Consecutivo',
                     f.identificacion_cliente as 'Identificación tercero',
@@ -785,22 +785,173 @@ class ReportesRegulatoriosController {
                     AND f.estado IN ('pagada', 'pendiente')
                 ORDER BY f.fecha_emision, f.numero_factura
             `;
-            
+
             const datos = await this.db.query(query, [fechaInicio, fechaFin]);
-            
+
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.json_to_sheet(datos);
             XLSX.utils.book_append_sheet(wb, ws, "Hoja1");
-            
+
             const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-            
+
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             res.setHeader('Content-Disposition', `attachment; filename="Facturas_Ventas_${fechaInicio}_${fechaFin}.xlsx"`);
             res.send(buffer);
-            
+
         } catch (error) {
             console.error('Error generando reporte facturas ventas:', error);
             res.status(500).json({ error: 'Error generando reporte de facturas de ventas' });
+        }
+    }
+
+    // Reporte de Facturación para Siigo (Modelo de importación)
+    async generarReporteSiigoFacturacion(req, res) {
+        try {
+            const { fechaInicio, fechaFin } = req.query;
+
+            if (!fechaInicio || !fechaFin) {
+                return res.status(400).json({ error: 'Fecha inicio y fecha fin son requeridas' });
+            }
+
+            // Obtener NIT de la empresa desde configuración
+            const [configEmpresa] = await this.db.query('SELECT nit FROM configuracion_empresa LIMIT 1');
+            const nitEmpresa = configEmpresa[0]?.nit || '';
+
+            const query = `
+                SELECT
+                    f.numero_factura as 'Tipo de comprobante',
+                    f.numero_factura as 'Consecutivo',
+                    c.identificacion as 'Identificación tercero',
+                    CASE
+                        WHEN ci.nombre LIKE '%Campoalegre%' THEN '3'
+                        WHEN ci.nombre LIKE '%Piedecuesta%' THEN '4'
+                        WHEN ci.nombre LIKE '%San Gil%' THEN '1'
+                        WHEN ci.nombre LIKE '%Socorro%' THEN '2'
+                        ELSE ''
+                    END as 'Sucursal',
+                    '' as 'Código centro/subcentro de costos',
+                    DATE_FORMAT(f.fecha_emision, '%Y-%m-%d') as 'Fecha de elaboración',
+                    'COP' as 'Sigla Moneda',
+                    1 as 'Tasa de cambio',
+                    c.nombre as 'Nombre contacto',
+                    c.correo as 'Email Contacto',
+                    '' as 'Orden de compra',
+                    '' as 'Orden de entrega',
+                    '' as 'Fecha orden de entrega',
+                    COALESCE(ps.codigo, cf.codigo, '') as 'Código producto',
+                    COALESCE(df.descripcion, cf.nombre, ps.nombre, '') as 'Descripción producto',
+                    ? as 'Identificación vendedor',
+                    '' as 'Código de Bodega',
+                    1 as 'Cantidad producto',
+                    df.precio_unitario as 'Valor unitario',
+                    COALESCE(df.descuento, 0) as 'Valor Descuento',
+                    0 as 'Base AIU',
+                    '' as 'Identificación ingreso para terceros',
+                    CASE
+                        WHEN df.iva > 0 THEN '1'
+                        ELSE ''
+                    END as 'Código impuesto cargo',
+                    '' as 'Código impuesto cargo dos',
+                    '' as 'Código impuesto retención',
+                    '' as 'Código ReteICA',
+                    '' as 'Código ReteIVA',
+                    '2' as 'Código forma de pago',
+                    (df.precio_unitario - COALESCE(df.descuento, 0) + COALESCE(df.iva, 0)) as 'Valor Forma de Pago',
+                    DATE_FORMAT(f.fecha_vencimiento, '%Y-%m-%d') as 'Fecha Vencimiento',
+                    CONCAT(
+                        'Periodo facturado del ',
+                        DATE_FORMAT(f.fecha_emision, '%d-%m-%Y'),
+                        ' al ',
+                        DATE_FORMAT(LAST_DAY(f.fecha_emision), '%d-%m-%Y'),
+                        '. Pague antes del ',
+                        DATE_FORMAT(f.fecha_vencimiento, '%d de %M de %Y'),
+                        ' y Evite Suspensión del Servicio'
+                    ) as 'Observaciones'
+                FROM facturas f
+                JOIN clientes c ON f.cliente_id = c.id
+                LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+                JOIN detalle_facturas df ON f.id = df.factura_id
+                LEFT JOIN conceptos_facturacion cf ON df.concepto_id = cf.id
+                LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id AND sc.estado = 'activo'
+                LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+                WHERE f.fecha_emision BETWEEN ? AND ?
+                    AND f.estado IN ('pagada', 'pendiente', 'vencida')
+                ORDER BY f.fecha_emision, f.numero_factura, df.id
+            `;
+
+            const datos = await this.db.query(query, [nitEmpresa, fechaInicio, fechaFin]);
+
+            if (datos.length === 0) {
+                return res.status(404).json({
+                    error: 'No se encontraron facturas en el rango de fechas especificado'
+                });
+            }
+
+            // Crear workbook
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(datos);
+
+            // Configurar ancho de columnas
+            const colWidths = [
+                { wch: 20 }, // Tipo de comprobante
+                { wch: 15 }, // Consecutivo
+                { wch: 20 }, // Identificación tercero
+                { wch: 10 }, // Sucursal
+                { wch: 30 }, // Código centro/subcentro de costos
+                { wch: 18 }, // Fecha de elaboración
+                { wch: 12 }, // Sigla Moneda
+                { wch: 15 }, // Tasa de cambio
+                { wch: 25 }, // Nombre contacto
+                { wch: 30 }, // Email Contacto
+                { wch: 18 }, // Orden de compra
+                { wch: 18 }, // Orden de entrega
+                { wch: 20 }, // Fecha orden de entrega
+                { wch: 18 }, // Código producto
+                { wch: 40 }, // Descripción producto
+                { wch: 20 }, // Identificación vendedor
+                { wch: 18 }, // Código de Bodega
+                { wch: 18 }, // Cantidad producto
+                { wch: 15 }, // Valor unitario
+                { wch: 18 }, // Valor Descuento
+                { wch: 12 }, // Base AIU
+                { wch: 30 }, // Identificación ingreso para terceros
+                { wch: 25 }, // Código impuesto cargo
+                { wch: 25 }, // Código impuesto cargo dos
+                { wch: 25 }, // Código impuesto retención
+                { wch: 18 }, // Código ReteICA
+                { wch: 18 }, // Código ReteIVA
+                { wch: 20 }, // Código forma de pago
+                { wch: 20 }, // Valor Forma de Pago
+                { wch: 18 }, // Fecha Vencimiento
+                { wch: 80 }  // Observaciones
+            ];
+            ws['!cols'] = colWidths;
+
+            XLSX.utils.book_append_sheet(wb, ws, "Facturas_Siigo");
+
+            // Generar buffer del archivo
+            const buffer = XLSX.write(wb, {
+                type: 'buffer',
+                bookType: 'xlsx',
+                compression: true
+            });
+
+            // Configurar headers de respuesta
+            const filename = `Facturacion_Siigo_${fechaInicio}_${fechaFin}.xlsx`;
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Length', buffer.length);
+            res.setHeader('Cache-Control', 'no-cache');
+
+            // Enviar archivo
+            res.send(buffer);
+
+        } catch (error) {
+            console.error('Error generando reporte Siigo facturación:', error);
+            res.status(500).json({
+                error: 'Error generando reporte de facturación Siigo',
+                details: error.message
+            });
         }
     }
 
@@ -856,9 +1007,16 @@ class ReportesRegulatoriosController {
                     descripcion: 'Reporte para importación contable',
                     periodicidad: 'Según rango de fechas',
                     parametros: ['fechaInicio', 'fechaFin']
+                },
+                {
+                    id: 'siigo_facturacion',
+                    nombre: 'Facturación Siigo (Modelo de importación)',
+                    descripcion: 'Reporte para importación de facturas en Siigo',
+                    periodicidad: 'Según rango de fechas',
+                    parametros: ['fechaInicio', 'fechaFin']
                 }
             ];
-            
+
             res.json({ reportes });
         } catch (error) {
             console.error('Error obteniendo reportes disponibles:', error);
