@@ -838,8 +838,8 @@ class ReportesRegulatoriosController {
                     '' as 'Orden de compra',
                     '' as 'Orden de entrega',
                     '' as 'Fecha orden de entrega',
-                    COALESCE(ps.codigo, cf.codigo, '') as 'Código producto',
-                    COALESCE(df.concepto_nombre, cf.nombre, ps.nombre, '') as 'Descripción producto',
+                    COALESCE(cf.codigo, '') as 'Código producto',
+                    COALESCE(df.concepto_nombre, cf.nombre, '') as 'Descripción producto',
                     ? as 'Identificación vendedor',
                     '' as 'Código de Bodega',
                     df.cantidad as 'Cantidad producto',
@@ -864,7 +864,23 @@ class ReportesRegulatoriosController {
                         ' al ',
                         DATE_FORMAT(LAST_DAY(f.fecha_emision), '%d-%m-%Y'),
                         '. Pague antes del ',
-                        DATE_FORMAT(f.fecha_vencimiento, '%d de %M de %Y'),
+                        DATE_FORMAT(f.fecha_vencimiento, '%d de '),
+                        CASE MONTH(f.fecha_vencimiento)
+                            WHEN 1 THEN 'Enero'
+                            WHEN 2 THEN 'Febrero'
+                            WHEN 3 THEN 'Marzo'
+                            WHEN 4 THEN 'Abril'
+                            WHEN 5 THEN 'Mayo'
+                            WHEN 6 THEN 'Junio'
+                            WHEN 7 THEN 'Julio'
+                            WHEN 8 THEN 'Agosto'
+                            WHEN 9 THEN 'Septiembre'
+                            WHEN 10 THEN 'Octubre'
+                            WHEN 11 THEN 'Noviembre'
+                            WHEN 12 THEN 'Diciembre'
+                        END,
+                        ' de ',
+                        YEAR(f.fecha_vencimiento),
                         ' y Evite Suspensión del Servicio'
                     ) as 'Observaciones'
                 FROM facturas f
@@ -872,8 +888,6 @@ class ReportesRegulatoriosController {
                 LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
                 JOIN detalle_facturas df ON f.id = df.factura_id
                 LEFT JOIN conceptos_facturacion cf ON df.concepto_id = cf.id
-                LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id AND sc.estado = 'activo'
-                LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
                 WHERE f.fecha_emision BETWEEN ? AND ?
                     AND f.estado IN ('pagada', 'pendiente', 'vencida')
                 ORDER BY f.fecha_emision, f.numero_factura, df.id
