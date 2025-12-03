@@ -27,13 +27,25 @@ class ContratoPDFGeneratorMINTIC {
       year: 'numeric'
     });
 
-    // Determinar servicios contratados
-    const servicios = this.determinarServicios(contratoData);
-    const precioInternet = parseFloat(contratoData.precio_internet || 0);
-    const precioTelevision = parseFloat(contratoData.precio_television || 0);
-    const valorTotal = precioInternet + precioTelevision;
-    const permanenciaMeses = parseInt(contratoData.permanencia_meses || 1);
-    const tienePermanencia = permanenciaMeses > 1;
+    // ✅ CORRECCIÓN: Calcular el total sumando TODOS los servicios
+const servicios = this.determinarServicios(contratoData);
+
+// Calcular valor total sumando TODOS los servicios
+let valorTotal = 0;
+if (contratoData.servicios && Array.isArray(contratoData.servicios)) {
+  contratoData.servicios.forEach(servicio => {
+    valorTotal += parseFloat(servicio.precio_plan || servicio.precio || 0);
+  });
+}
+
+console.log('💰 Valor total calculado para contrato:', {
+  numero_contrato: contratoData.numero_contrato,
+  cantidad_servicios: contratoData.servicios?.length || 0,
+  valor_total: valorTotal
+});
+
+const permanenciaMeses = parseInt(contratoData.permanencia_meses || 1);
+const tienePermanencia = permanenciaMeses > 1;
 
     return `
 <!DOCTYPE html>
@@ -550,17 +562,51 @@ class ContratoPDFGeneratorMINTIC {
             </div>`;
   }
 
-  static generarDetallesServicios(contratoData, servicios) {
-    let detalles = '';
-    if (servicios.internet) {
-      const nombreServicio = contratoData.servicio_nombre || 'INTERNET FIBRA 300';
-      detalles += `<p><strong>INTERNET FIBRA $ ${this.formatearPrecio(contratoData.precio_internet)}</strong> ${nombreServicio} MEGAS ESTRATO ${contratoData.cliente_estrato || '1,2,3'}</p>`;
-    }
-    if (servicios.television) {
-      detalles += `<p><strong>TELEVISION $ ${this.formatearPrecio(contratoData.precio_television)}</strong> TELEVISION $${this.formatearPrecio(contratoData.precio_television)} ESTRATO ${contratoData.cliente_estrato || '1,2,3'} + IVA</p>`;
-    }
-    return detalles;
+static generarDetallesServicios(contratoData, servicios) {
+  // ✅ CORRECCIÓN: Usar el array de servicios con datos completos
+  const listaServicios = contratoData.servicios || [];
+  let detalles = '';
+
+  if (listaServicios.length === 0) {
+    return '<p>Sin servicios configurados</p>';
   }
+
+  listaServicios.forEach(servicio => {
+    const nombrePlan = servicio.plan_nombre || servicio.nombre || 'Servicio';
+    const tipoPlan = servicio.tipo_servicio || servicio.tipo || '';
+    const precioPlan = parseFloat(servicio.precio_plan || servicio.precio || 0);
+    const velocidadBajada = servicio.velocidad_bajada || '';
+    const velocidadSubida = servicio.velocidad_subida || '';
+    const canalesTV = servicio.canales_tv || '';
+    const tecnologia = servicio.tecnologia || '';
+    const aplicaIVA = servicio.aplica_iva === 1 || servicio.aplica_iva === true;
+    const estrato = contratoData.estrato || contratoData.cliente_estrato || '3';
+
+    const tipo = tipoPlan.toLowerCase();
+
+    if (tipo.includes('internet') || tipo.includes('combo')) {
+      let caracteristicas = [];
+      if (velocidadBajada) caracteristicas.push(`${velocidadBajada}MB`);
+      if (tecnologia) caracteristicas.push(tecnologia);
+      
+      const detalleVelocidad = caracteristicas.length > 0 ? caracteristicas.join(' ') : 'Internet';
+      
+      detalles += `<p><strong>INTERNET FIBRA $ ${this.formatearPrecio(precioPlan)}</strong> ${nombrePlan} ${detalleVelocidad} ESTRATO ${estrato}</p>`;
+    }
+    
+    if (tipo.includes('tv') || tipo.includes('television')) {
+      let caracteristicas = [];
+      if (canalesTV) caracteristicas.push(`${canalesTV} canales`);
+      
+      const detalleCanales = caracteristicas.length > 0 ? caracteristicas.join(' ') : '';
+      const textoIVA = aplicaIVA ? ' + IVA' : '';
+      
+      detalles += `<p><strong>TELEVISION $ ${this.formatearPrecio(precioPlan)}</strong> ${nombrePlan} ${detalleCanales} ESTRATO ${estrato}${textoIVA}</p>`;
+    }
+  });
+
+  return detalles || '<p>Sin detalles de servicio</p>';
+}
 
   static generarPagina2(logoPath, fecha, contratoData) {
     return `
@@ -722,12 +768,28 @@ class ContratoPDFGeneratorMINTIC {
     </div>`;
   }
 
-  static determinarServicios(contratoData) {
-    return {
-      internet: parseFloat(contratoData.precio_internet || 0) > 0,
-      television: parseFloat(contratoData.precio_television || 0) > 0
-    };
-  }
+static determinarServicios(contratoData) {
+  // ✅ CORRECCIÓN: Usar el array de servicios que viene del contrato
+  const servicios = contratoData.servicios || [];
+  
+  let tieneInternet = false;
+  let tieneTelevision = false;
+
+  servicios.forEach(servicio => {
+    const tipo = (servicio.tipo_servicio || servicio.tipo || '').toLowerCase();
+    if (tipo.includes('internet') || tipo.includes('combo')) {
+      tieneInternet = true;
+    }
+    if (tipo.includes('tv') || tipo.includes('television')) {
+      tieneTelevision = true;
+    }
+  });
+
+  return {
+    internet: tieneInternet,
+    television: tieneTelevision
+  };
+}
 
   static formatearPrecio(precio) {
     return new Intl.NumberFormat('es-CO').format(Math.round(precio || 0));
