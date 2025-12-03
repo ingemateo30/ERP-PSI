@@ -153,86 +153,113 @@ class EmailService {
   }
 
   /**
-   * Generar PDF de contrato como buffer
-   */
- static async generarPDFContrato(contratoId, conexionExistente = null) {
+ * Generar PDF de contrato como buffer
+ */
+static async generarPDFContrato(contratoId, conexionExistente = null) {
+  const conexion = conexionExistente || await pool.getConnection();
 
-    const conexion = conexionExistente || await pool.getConnection();
+  try {
+    // ✅ CORRECCIÓN: Query completa con JOINs para ciudad, departamento, sector
+    const [contratos] = await conexion.execute(`
+      SELECT
+        co.*,
+        c.nombre as cliente_nombre,
+        c.identificacion as cliente_identificacion,
+        c.direccion as cliente_direccion,
+        c.telefono as cliente_telefono,
+        c.correo as cliente_email,
+        c.estrato as cliente_estrato,
+        c.barrio as cliente_barrio,
+        ciu.nombre as ciudad_nombre,
+        dep.nombre as departamento_nombre,
+        sec.nombre as sector_nombre
+      FROM contratos co
+      JOIN clientes c ON co.cliente_id = c.id
+      LEFT JOIN ciudades ciu ON c.ciudad_id = ciu.id
+      LEFT JOIN departamentos dep ON ciu.departamento_id = dep.id
+      LEFT JOIN sectores sec ON c.sector_id = sec.id
+      WHERE co.id = ?
+    `, [contratoId]);
 
+    if (contratos.length === 0) {
+      throw new Error('Contrato no encontrado');
+    }
+
+    const contrato = contratos[0];
+
+    // Obtener servicios del contrato
+    let servicios = [];
     try {
-      // Obtener datos completos del contrato
-      const [contratos] = await conexion.execute(`
-        SELECT
-          co.*,
-          c.nombre as cliente_nombre,
-          c.identificacion as cliente_identificacion,
-          c.direccion as cliente_direccion,
-          c.telefono as cliente_telefono,
-          c.correo as cliente_email
-        FROM contratos co
-        JOIN clientes c ON co.cliente_id = c.id
-        WHERE co.id = ?
-      `, [contratoId]);
+      const servicioId = contrato.servicio_id;
 
-      if (contratos.length === 0) {
-        throw new Error('Contrato no encontrado');
+      // Verificar si es un array JSON o un ID simple
+      let servicioIds = [];
+      if (servicioId.startsWith('[')) {
+        servicioIds = JSON.parse(servicioId);
+      } else {
+        servicioIds = [parseInt(servicioId)];
       }
 
-      const contrato = contratos[0];
-
-      // Obtener servicios del contrato
-      let servicios = [];
-      try {
-        const servicioId = contrato.servicio_id;
-
-        // Verificar si es un array JSON o un ID simple
-        let servicioIds = [];
-        if (servicioId.startsWith('[')) {
-          servicioIds = JSON.parse(servicioId);
-        } else {
-          servicioIds = [parseInt(servicioId)];
-        }
-
-        // Obtener datos de cada servicio
+      // ✅ CORRECCIÓN: Obtener TODOS los datos de los planes
+      if (servicioIds.length > 0) {
+        const placeholders = servicioIds.map(() => '?').join(',');
         const [serviciosData] = await conexion.execute(`
           SELECT
             sc.*,
             ps.nombre as plan_nombre,
             ps.tipo as tipo_servicio,
-            ps.precio as precio_plan
+            ps.precio as precio_plan,
+            ps.velocidad_bajada,
+            ps.velocidad_subida,
+            ps.canales_tv,
+            ps.tecnologia,
+            ps.aplica_iva
           FROM servicios_cliente sc
           JOIN planes_servicio ps ON sc.plan_id = ps.id
-          WHERE sc.id IN (${servicioIds.join(',')})
-        `);
+          WHERE sc.id IN (${placeholders})
+        `, servicioIds);
 
         servicios = serviciosData;
-      } catch (error) {
-        console.error('Error obteniendo servicios del contrato:', error);
       }
+    } catch (error) {
+      console.error('❌ Error obteniendo servicios del contrato:', error);
+    }
 
-      // Obtener configuración de empresa
-      const empresa = await this.obtenerConfiguracionEmpresa();
+    // Obtener configuración de empresa
+    const empresa = await this.obtenerConfiguracionEmpresa();
 
-      // Preparar datos para el generador de PDF
-      const datosContrato = {
-        ...contrato,
-        servicios: servicios,
-        empresa: empresa
-      };
+    // ✅ CORRECCIÓN: Preparar datos COMPLETOS para el generador de PDF
+    const datosContrato = {
+      ...contrato,
+      servicios: servicios,
+      empresa: empresa,
+      // ✅ CRÍTICO: Incluir explícitamente estos campos
+      departamento: contrato.departamento_nombre || '',
+      ciudad: contrato.ciudad_nombre || '',
+      sector: contrato.sector_nombre || '',
+      estrato: contrato.cliente_estrato || 3,
+      barrio: contrato.cliente_barrio || ''
+    };
 
-      // Generar PDF usando ContratoPDFGenerator
-      const pdfBuffer = await ContratoPDFGeneratorMINTIC.generarPDFCompleto(datosContrato);
+    console.log('📄 Generando PDF del contrato con datos completos:', {
+      numero_contrato: contrato.numero_contrato,
+      cliente: contrato.cliente_nombre,
+      ciudad: datosContrato.ciudad,
+      departamento: datosContrato.departamento,
+      estrato: datosContrato.estrato,
+      servicios: servicios.length
+    });
 
-      return pdfBuffer;
-    } finally {
-       if (!conexionExistente) {
+    // Generar PDF usando ContratoPDFGenerator
+    const pdfBuffer = await ContratoPDFGeneratorMINTIC.generarPDFCompleto(datosContrato);
 
-        conexion.release();
-
-      }
+    return pdfBuffer;
+  } finally {
+    if (!conexionExistente) {
+      conexion.release();
     }
   }
-
+}
   /**
    * Enviar correo de bienvenida con primera factura y contrato adjuntos
    */

@@ -165,7 +165,7 @@ registrarCliente: async (req, res) => {
         'SELECT id, nombre, tipo, precio FROM planes_servicio WHERE id = ?',
         [parseInt(planId)]
       );
-      
+
       if (plan.length > 0) {
         planesInfo.push(plan[0]);
         console.log(`  ✅ Plan ${plan[0].id}: ${plan[0].nombre} (${plan[0].tipo}) - $${plan[0].precio}`);
@@ -289,3 +289,23 @@ registrarCliente: async (req, res) => {
 };
 
 module.exports = registroWebController;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
