@@ -291,7 +291,6 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
           </div>
         )}
         </div>
-      </div>
     );
   };
   useEffect(() => {
