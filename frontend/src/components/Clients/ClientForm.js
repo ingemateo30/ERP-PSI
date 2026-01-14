@@ -56,9 +56,11 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     precioTelevisionCustom: '',
     usarServiciosSeparados: false,
 
-    // ✅ CORRECCIÓN PROBLEMA 3: Campos de permanencia
+    // ✅ Campos de permanencia e instalación (separados)
     tipo_permanencia: 'sin_permanencia', // REQUERIDO
     meses_permanencia: 6, // REQUERIDO
+    cobrar_instalacion: true, // Independiente de permanencia
+    valor_instalacion: 150000, // Valor personalizable
     mostrar_detalle_costos: true, // MOSTRAR CALCULADORA
 
     // Configuración adicional
@@ -67,7 +69,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     programar_instalacion: true
   });
 
-  // ✅ FUNCIÓN PARA CALCULAR COSTO EN TIEMPO REAL - CORREGIDA
+  // ✅ FUNCIÓN PARA CALCULAR COSTO EN TIEMPO REAL - SEPARADA DE PERMANENCIA
   const calcularCostoInstalacion = useCallback(() => {
     let serviciosCount = 0;
 
@@ -80,31 +82,45 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
     if (serviciosCount === 0) return { costo: 0, servicios: 0 };
 
-    // ✅ CORRECCIÓN: UNA SOLA INSTALACIÓN independientemente de la cantidad de servicios
-    const costoInstalacion = formData.tipo_permanencia === 'sin_permanencia' ? 150000 : 50000;
+    // ✅ Si no se cobra instalación, el costo es 0
+    if (!formData.cobrar_instalacion) {
+      return {
+        costo: 0,
+        servicios: serviciosCount,
+        costo_por_instalacion: 0,
+        incluye_iva: false,
+        es_instalacion_unica: true,
+        cobrar: false
+      };
+    }
+
+    // ✅ Usar valor de instalación personalizado o valores por defecto
+    const costoInstalacion = formData.valor_instalacion ||
+      (formData.tipo_permanencia === 'sin_permanencia' ? 150000 : 50000);
 
     return {
-      costo: costoInstalacion, // ✅ Siempre el mismo costo
+      costo: costoInstalacion,
       servicios: serviciosCount,
-      costo_por_instalacion: costoInstalacion, // ✅ Cambio de nombre
-      incluye_iva: formData.tipo_permanencia === 'sin_permanencia',
-      es_instalacion_unica: true // ✅ Flag para mostrar en UI
+      costo_por_instalacion: costoInstalacion,
+      incluye_iva: true,
+      es_instalacion_unica: true,
+      cobrar: true
     };
-  }, [formData.tipo_permanencia, formData.planInternetId, formData.planTelevisionId, formData.plan_id, formData.usarServiciosSeparados]);
+  }, [formData.cobrar_instalacion, formData.valor_instalacion, formData.tipo_permanencia, formData.planInternetId, formData.planTelevisionId, formData.plan_id, formData.usarServiciosSeparados]);
 
-  // ✅ COMPONENTE SELECTOR DE PERMANENCIA CORREGIDO
+  // ✅ COMPONENTE SELECTOR DE PERMANENCIA E INSTALACIÓN - SEPARADOS
   const SelectorPermanenciaCompleto = () => {
     const calculoCostos = calcularCostoInstalacion();
 
     return (
-      <div className="border-t-2 border-[#0e6493]/10 pt-6">
-        <h4 className="text-md font-semibold text-[#0e6493] mb-4 flex items-center gap-2">
-          <FileText className="w-5 h-5" />
-          Tipo de Permanencia
-        </h4>
-
-        <div className="space-y-4">
-          <div>
+      <div className="border-t-2 border-[#0e6493]/10 pt-6 space-y-6">
+        {/* SECCIÓN 1: TIPO DE PERMANENCIA */}
+        <div>
+          <h4 className="text-md font-semibold text-[#0e6493] mb-4 flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            Tipo de Permanencia
+          </h4>
+          <div className="space-y-3">
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Seleccione el tipo de permanencia <span className="text-red-500">*</span>
             </label>
@@ -119,19 +135,19 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   name="tipo_permanencia"
                   value="sin_permanencia"
                   checked={formData.tipo_permanencia === 'sin_permanencia'}
-                  onChange={(e) => handleInputChange('tipo_permanencia', e.target.value)}
+                  onChange={(e) => {
+                    handleInputChange('tipo_permanencia', e.target.value);
+                    // Sugerir valor de instalación según tipo
+                    if (!formData.cobrar_instalacion) return;
+                    handleInputChange('valor_instalacion', 150000);
+                  }}
                   className="mt-1 mr-3 text-[#0e6493]"
                 />
                 <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold text-[#0e6493]">Sin Permanencia</div>
-                    <div className="text-lg font-bold text-[#0e6493]">$150,000</div>
-                  </div>
-                  <div className="text-sm text-[#0e6493]/80 mb-1">Una sola instalación - IVA incluido</div>
-                  <div className="text-xs text-gray-600">
+                  <div className="font-semibold text-[#0e6493]">Sin Permanencia</div>
+                  <div className="text-xs text-gray-600 mt-1">
                     ✓ Sin compromisos de tiempo<br />
-                    ✓ Puede cancelar cuando desee<br />
-                    ✓ Una instalación para todos los servicios
+                    ✓ Puede cancelar cuando desee
                   </div>
                 </div>
               </label>
@@ -146,19 +162,19 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   name="tipo_permanencia"
                   value="con_permanencia"
                   checked={formData.tipo_permanencia === 'con_permanencia'}
-                  onChange={(e) => handleInputChange('tipo_permanencia', e.target.value)}
+                  onChange={(e) => {
+                    handleInputChange('tipo_permanencia', e.target.value);
+                    // Sugerir valor de instalación según tipo
+                    if (!formData.cobrar_instalacion) return;
+                    handleInputChange('valor_instalacion', 50000);
+                  }}
                   className="mt-1 mr-3 text-green-600"
                 />
                 <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold text-green-700">Con Permanencia (6 meses)</div>
-                    <div className="text-lg font-bold text-green-700">$50,000</div>
-                  </div>
-                  <div className="text-sm text-green-600 mb-1">Una sola instalación - Ahorra $100,000</div>
-                  <div className="text-xs text-gray-600">
+                  <div className="font-semibold text-green-700">Con Permanencia (6 meses)</div>
+                  <div className="text-xs text-gray-600 mt-1">
                     ✓ Compromiso mínimo de 6 meses<br />
-                    ✓ Precio de instalación reducido<br />
-                    ✓ Una instalación para todos los servicios
+                    ✓ Beneficios por contrato de permanencia
                   </div>
                 </div>
               </label>
@@ -167,13 +183,64 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
               <p className="mt-2 text-sm text-red-600">{errors.tipo_permanencia}</p>
             )}
           </div>
+        </div>
 
-          {/* Calculadora de costo CORREGIDA */}
-          {calculoCostos.servicios > 0 && (
+        {/* SECCIÓN 2: COBRO DE INSTALACIÓN */}
+        <div className="border-t border-gray-200 pt-4">
+          <h4 className="text-md font-semibold text-[#0e6493] mb-4 flex items-center gap-2">
+            <DollarSign className="w-5 h-5" />
+            Valor de Instalación
+          </h4>
+          <div className="space-y-4">
+            {/* Toggle para cobrar instalación */}
+            <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <input
+                type="checkbox"
+                checked={formData.cobrar_instalacion}
+                onChange={(e) => handleInputChange('cobrar_instalacion', e.target.checked)}
+                className="w-5 h-5 text-[#0e6493] border-gray-300 rounded focus:ring-[#0e6493]"
+              />
+              <div>
+                <span className="font-medium text-gray-700">Cobrar instalación</span>
+                <p className="text-xs text-gray-500 mt-1">
+                  Si desmarca esta opción, no se cobrará instalación al cliente
+                </p>
+              </div>
+            </label>
+
+            {/* Campo de valor de instalación */}
+            {formData.cobrar_instalacion && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Valor de instalación
+                </label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                  <input
+                    type="number"
+                    value={formData.valor_instalacion}
+                    onChange={(e) => handleInputChange('valor_instalacion', parseFloat(e.target.value) || 0)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                    placeholder="0"
+                    min="0"
+                    step="1000"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Valor sugerido: {formData.tipo_permanencia === 'sin_permanencia' ? '$150,000' : '$50,000'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* SECCIÓN 3: Resumen de costos */}
+        {calculoCostos.servicios > 0 && (
+          <div className="border-t border-gray-200 pt-4">
             <div className="bg-gradient-to-br from-[#0e6493]/5 to-green-50/50 p-4 rounded-lg border-2 border-[#0e6493]/20">
               <h5 className="font-semibold text-[#0e6493] mb-3 flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
-                Resumen de Costos de Instalación
+                <FileText className="w-5 h-5" />
+                Resumen del Contrato
               </h5>
 
               <div className="space-y-2 text-sm">
@@ -182,45 +249,47 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   <span className="font-medium">{calculoCostos.servicios}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Tipo de instalación:</span>
-                  <span className="font-medium text-green-600">✓ Instalación única</span>
+                  <span className="text-gray-600">Tipo de permanencia:</span>
+                  <span className="font-medium text-[#0e6493]">
+                    {formData.tipo_permanencia === 'con_permanencia' ? 'Con permanencia (6 meses)' : 'Sin permanencia'}
+                  </span>
                 </div>
-                <div className="border-t border-gray-300 pt-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-gray-800">COSTO TOTAL INSTALACIÓN:</span>
-                    <span className="text-xl font-bold text-green-600">
-                      ${calculoCostos.costo.toLocaleString()}
-                    </span>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Cobro de instalación:</span>
+                  <span className={`font-medium ${calculoCostos.cobrar ? 'text-green-600' : 'text-gray-500'}`}>
+                    {calculoCostos.cobrar ? `Sí - $${calculoCostos.costo.toLocaleString()}` : 'No se cobra'}
+                  </span>
+                </div>
+
+                {calculoCostos.cobrar && (
+                  <>
+                    <div className="border-t border-gray-300 pt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-gray-800">COSTO TOTAL INSTALACIÓN:</span>
+                        <span className="text-xl font-bold text-green-600">
+                          ${calculoCostos.costo.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-2">
+                      ✓ IVA incluido<br />
+                      ✓ Una sola visita de instalación<br />
+                      {calculoCostos.servicios > 1 && '✓ Incluye todos los servicios seleccionados'}
+                    </div>
+                  </>
+                )}
+
+                {!calculoCostos.cobrar && (
+                  <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                    <div className="text-xs text-blue-700 font-medium">
+                      ℹ️ Este cliente no pagará costo de instalación
+                    </div>
                   </div>
-                </div>
-
-                <div className="text-xs text-gray-500 mt-2">
-                  ✓ {calculoCostos.incluye_iva && 'IVA incluido'}<br />
-                  ✓ Una sola visita de instalación<br />
-                  {formData.tipo_permanencia === 'con_permanencia' && '✓ Permanencia mínima de 6 meses'}
-                </div>
+                )}
               </div>
-
-              {/* Info adicional */}
-              <div className="mt-3 p-2 bg-[#0e6493]/10 rounded border border-[#0e6493]/30">
-                <div className="text-xs text-[#0e6493] font-medium">
-                  💡 {calculoCostos.servicios > 1
-                    ? `Internet y TV se instalan en la misma visita por $${calculoCostos.costo.toLocaleString()}`
-                    : `Una instalación de $${calculoCostos.costo.toLocaleString()}`
-                  }
-                </div>
-              </div>
-
-              {/* Comparación de ahorro */}
-              {formData.tipo_permanencia === 'con_permanencia' && (
-                <div className="mt-2 p-2 bg-green-100 rounded border border-green-400">
-                  <div className="text-xs text-green-700 font-medium">
-                    💰 Ahorro total: $100,000 vs sin permanencia
-                  </div>
-                </div>
-              )}
             </div>
-          )}
+          </div>
+        )}
         </div>
       </div>
     );
@@ -328,6 +397,10 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
         fecha_activacion: formData.fecha_activacion,
         tipo_permanencia: formData.tipo_permanencia,
         meses_permanencia: formData.tipo_permanencia === 'con_permanencia' ? (formData.meses_permanencia || 6) : 0,
+
+        // ✅ NUEVO: Cobro de instalación separado
+        cobrar_instalacion: formData.cobrar_instalacion,
+        valor_instalacion: formData.cobrar_instalacion ? formData.valor_instalacion : 0,
 
         // ✅ Dirección del servicio (puede ser diferente a la del cliente)
         direccion_servicio: formData.direccion,
@@ -558,6 +631,17 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   const validarFormulario = () => {
     const nuevosErrores = {};
 
+    // ✅ Validar fecha de activación (común para todos los modos)
+    if (formData.fecha_activacion) {
+      const fechaActivacion = new Date(formData.fecha_activacion);
+      const hoy = new Date();
+      const unMesDespues = new Date(hoy.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+      if (fechaActivacion > unMesDespues) {
+        nuevosErrores.fecha_activacion = 'La fecha de activación no puede superar un mes desde hoy';
+      }
+    }
+
     // ✅ Si está en modo agregar servicio, solo validar campos de servicio
     if (modoAgregarServicio && clienteSeleccionado) {
       // Validar solo los servicios
@@ -712,6 +796,8 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       precioTelevisionCustom: '',
       tipoContrato: formData.tipo_permanencia || 'sin_permanencia',
       mesesPermanencia: formData.tipo_permanencia === 'con_permanencia' ? 6 : 0,
+      cobrar_instalacion: formData.cobrar_instalacion, // ✅ NUEVO: Cobro de instalación separado
+      valor_instalacion: formData.cobrar_instalacion ? formData.valor_instalacion : 0, // ✅ NUEVO: Valor personalizado
       fechaActivacion: formData.fecha_activacion,
       observaciones: formData.observaciones_servicio || ''
     };
@@ -1298,10 +1384,19 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                     type="date"
                     value={formData.fecha_activacion}
                     onChange={(e) => handleInputChange('fecha_activacion', e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                    className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
+                      errors.fecha_activacion ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     min={new Date().toISOString().split('T')[0]}
+                    max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
                   />
                 </div>
+                {errors.fecha_activacion && (
+                  <p className="mt-1 text-sm text-red-600">{errors.fecha_activacion}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  La fecha no puede superar un mes desde hoy
+                </p>
               </div>
 
               {/* Observaciones del servicio */}
