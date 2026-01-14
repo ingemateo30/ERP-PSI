@@ -357,7 +357,24 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
 
             console.log('📦 Servicios encontrados:', serviciosDetalles.length);
 
-            // 🔥 PROCESAR SERVICIOS: Separar Internet y TV
+            // ✅ CORRECCIÓN: Preparar array de servicios para el PDF con TODAS las características
+            contratoData.servicios = serviciosDetalles.map(servicio => ({
+                plan_nombre: servicio.plan_nombre,
+                tipo: servicio.plan_tipo, // internet, television, combo
+                tipo_servicio: servicio.plan_tipo,
+                precio_plan: parseFloat(servicio.precio || servicio.precio_personalizado || 0),
+                precio: parseFloat(servicio.precio || servicio.precio_personalizado || 0),
+                velocidad_bajada: servicio.velocidad_bajada,
+                velocidad_subida: servicio.velocidad_subida,
+                canales_tv: servicio.canales_tv,
+                tecnologia: servicio.tecnologia,
+                descripcion: servicio.descripcion,
+                aplica_iva: true
+            }));
+
+            console.log('✅ Array de servicios preparado para PDF:', contratoData.servicios);
+
+            // 🔥 PROCESAR SERVICIOS: Separar Internet y TV (para compatibilidad)
             let internetData = null;
             let televisionData = null;
 

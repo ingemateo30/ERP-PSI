@@ -317,10 +317,11 @@ static async abrirContratoParaFirma(contratoId) {
       if (totalPages >= 2) {
         const page2 = pages[1];
         const { width, height } = page2.getSize();
-        const x = width - signatureWidth - 60;
-        const y = 100;
+        // ✅ CORRECCIÓN: Centrar la firma horizontalmente en la línea de "acepto"
+        const x = (width - signatureWidth) / 2; // Centrada horizontalmente
+        const y = 145; // Ajustada para quedar en la línea de "acepto" (aumentada de 100 a 145)
 
-        console.log('✍️ Colocando firma en página 2 (contrato principal)');
+        console.log('✍️ Colocando firma en página 2 (contrato principal) - Centrada en línea de acepto');
 
         // Dibujar imagen de firma
         page2.drawImage(signatureImage, {
@@ -330,42 +331,45 @@ static async abrirContratoParaFirma(contratoId) {
           height: signatureHeight,
         });
 
-        // Agregar texto informativo
+        // Agregar texto informativo debajo de la firma
         const fontSize = 8;
         const lineHeight = 12;
 
+        // ✅ AJUSTE: Texto informativo centrado y más abajo de la firma
+        const textoX = x - 20; // Ajustar un poco a la izquierda para centrar mejor
+
         page2.drawText(`Firmado digitalmente por:`, {
-          x: x,
-          y: y - 15,
+          x: textoX,
+          y: y - 20,
           size: fontSize,
           color: rgb(0, 0, 0),
         });
 
         page2.drawText(`${datosSignature.firmado_por}`, {
-          x: x,
-          y: y - 15 - lineHeight,
+          x: textoX,
+          y: y - 20 - lineHeight,
           size: fontSize,
           color: rgb(0, 0, 0),
         });
 
         page2.drawText(`Cédula: ${datosSignature.cedula_firmante}`, {
-          x: x,
-          y: y - 15 - (lineHeight * 2),
+          x: textoX,
+          y: y - 20 - (lineHeight * 2),
           size: fontSize,
           color: rgb(0, 0, 0),
         });
 
         page2.drawText(`Fecha: ${datosSignature.fecha_firma}`, {
-          x: x,
-          y: y - 15 - (lineHeight * 3),
+          x: textoX,
+          y: y - 20 - (lineHeight * 3),
           size: fontSize,
           color: rgb(0, 0, 0),
         });
 
         if (datosSignature.observaciones) {
           page2.drawText(`Obs: ${datosSignature.observaciones.substring(0, 30)}`, {
-            x: x,
-            y: y - 15 - (lineHeight * 4),
+            x: textoX,
+            y: y - 20 - (lineHeight * 4),
             size: fontSize - 1,
             color: rgb(0.3, 0.3, 0.3),
           });
@@ -376,10 +380,11 @@ static async abrirContratoParaFirma(contratoId) {
       if (tienePermanencia && totalPages >= 3) {
         const page3 = pages[2];
         const { width, height } = page3.getSize();
-        const x = width - signatureWidth - 60;
-        const y = 100;
+        // ✅ CORRECCIÓN: También centrar firma en página 3 de permanencia
+        const x = (width - signatureWidth) / 2; // Centrada horizontalmente
+        const y = 145; // Misma altura que en página 2
 
-        console.log('✍️ Colocando firma en página 3 (anexo de permanencia)');
+        console.log('✍️ Colocando firma en página 3 (anexo de permanencia) - Centrada');
 
         // Dibujar imagen de firma
         page3.drawImage(signatureImage, {
@@ -389,42 +394,43 @@ static async abrirContratoParaFirma(contratoId) {
           height: signatureHeight,
         });
 
-        // Agregar texto informativo
+        // Agregar texto informativo debajo de la firma
         const fontSize = 8;
         const lineHeight = 12;
+        const textoX = x - 20; // Ajustar un poco a la izquierda para centrar mejor
 
         page3.drawText(`Firmado digitalmente por:`, {
-          x: x,
-          y: y - 15,
+          x: textoX,
+          y: y - 20,
           size: fontSize,
           color: rgb(0, 0, 0),
         });
 
         page3.drawText(`${datosSignature.firmado_por}`, {
-          x: x,
-          y: y - 15 - lineHeight,
+          x: textoX,
+          y: y - 20 - lineHeight,
           size: fontSize,
           color: rgb(0, 0, 0),
         });
 
         page3.drawText(`Cédula: ${datosSignature.cedula_firmante}`, {
-          x: x,
-          y: y - 15 - (lineHeight * 2),
+          x: textoX,
+          y: y - 20 - (lineHeight * 2),
           size: fontSize,
           color: rgb(0, 0, 0),
         });
 
         page3.drawText(`Fecha: ${datosSignature.fecha_firma}`, {
-          x: x,
-          y: y - 15 - (lineHeight * 3),
+          x: textoX,
+          y: y - 20 - (lineHeight * 3),
           size: fontSize,
           color: rgb(0, 0, 0),
         });
 
         if (datosSignature.observaciones) {
           page3.drawText(`Obs: ${datosSignature.observaciones.substring(0, 30)}`, {
-            x: x,
-            y: y - 15 - (lineHeight * 4),
+            x: textoX,
+            y: y - 20 - (lineHeight * 4),
             size: fontSize - 1,
             color: rgb(0.3, 0.3, 0.3),
           });

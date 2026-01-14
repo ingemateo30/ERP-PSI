@@ -885,16 +885,37 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       console.log('✅ Cliente creado exitosamente:', response.data);
 
       const resumen = response.data.resumen || response.data;
-      const mensaje = `Cliente creado exitosamente:
+      const documentos = response.data.documentos_generados || {};
+
+      let mensaje = `Cliente creado exitosamente:
 • ${resumen.total_sedes || 1} sede(s)
 • ${resumen.total_contratos || 1} contrato(s)
 • ${resumen.total_facturas || 1} factura(s)
 • ${resumen.total_servicios || 1} servicio(s)`;
 
-      if (window.showNotification) {
-        window.showNotification('success', mensaje);
+      // ✅ Si se generó un contrato, agregar información y botón para firmar
+      if (documentos.contrato && documentos.contrato.id) {
+        mensaje += `\n\n✓ Contrato ${documentos.contrato.numero} generado`;
+
+        if (window.showNotification) {
+          window.showNotification('success', mensaje);
+
+          // Mostrar botón para ir a firmar el contrato
+          setTimeout(() => {
+            if (window.confirm('¿Desea abrir el contrato para firma ahora?')) {
+              // Redirigir a la página de firma de contratos con el ID del contrato
+              window.location.href = `/contratos/firma?contratoId=${documentos.contrato.id}`;
+            }
+          }, 500);
+        } else {
+          alert(mensaje);
+        }
       } else {
-        alert(mensaje);
+        if (window.showNotification) {
+          window.showNotification('success', mensaje);
+        } else {
+          alert(mensaje);
+        }
       }
 
       onSave(response.data);
