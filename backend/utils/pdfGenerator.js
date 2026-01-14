@@ -112,7 +112,7 @@ class PDFGenerator {
         doc.fontSize(10).font('Helvetica-Bold')
             .text(factura.nombre_cliente || 'MATEO SALAZAR ORTIZ', xOffset, y)
             .fontSize(10).font('Helvetica')
-            .text(`ID Cliente ${factura.identificacion_cliente || '1005450340'} / ${factura.codigo_cliente || '200'}`, xOffset, y + 14)
+            .text(`${factura.identificacion_cliente || '1005450340'}`, xOffset, y + 14)
             .text(`Dirección: ${factura.cliente_direccion || 'CR 15A 21-01 APT 601 COLINAS DE SAN MARTIN'}`, xOffset, y + 26);
 
         y += 45;
@@ -588,6 +588,7 @@ class PDFGenerator {
             { campo: 'internet', nombre: 'INTERNET' },
             { campo: 'television', nombre: 'TELEVISION' },
             { campo: 'telefonia', nombre: 'TELEFONIA' },
+            { campo: 'instalacion', nombre: 'INSTALACION' },
             { campo: 'saldo_anterior', nombre: 'SALDO ANTERIOR' },
             { campo: 'interes', nombre: 'INTERES' },
             { campo: 'reconexion', nombre: 'RECONEXION' },
@@ -621,6 +622,15 @@ class PDFGenerator {
                     valor: interes
                 });
             }
+        }
+
+        // ✅ AGREGAR IVA COMO CONCEPTO SEPARADO
+        const iva = parseFloat(factura.iva) || 0;
+        if (iva > 0) {
+            conceptos.push({
+                nombre: 'IVA (19%)',
+                valor: iva
+            });
         }
 
         return conceptos;

@@ -315,8 +315,25 @@ class ClienteCompletoService {
       // 3. Generar número de factura
       const numeroFactura = `${config.prefijo_factura || 'FAC'}${String(config.consecutivo_factura || 1).padStart(6, '0')}`;
 
-      // 4. Calcular totales
-      const subtotal = servicio.precio_personalizado || servicio.precio_plan;
+      // 4. Calcular totales del servicio
+      const subtotalServicio = servicio.precio_personalizado || servicio.precio_plan;
+
+      // ✅ Agregar costo de instalación si corresponde
+      let costoInstalacion = 0;
+      if (datosServicio?.cobrar_instalacion !== false) {
+        if (datosServicio?.valor_instalacion !== undefined && datosServicio?.valor_instalacion !== null) {
+          costoInstalacion = parseFloat(datosServicio.valor_instalacion);
+        } else {
+          // Valores por defecto si no se especifica
+          const tipoPermanencia = datosServicio?.tipo_permanencia || 'sin_permanencia';
+          costoInstalacion = tipoPermanencia === 'con_permanencia' ? 50000 : 150000;
+        }
+      }
+
+      // Calcular subtotal total (servicio + instalación)
+      const subtotal = subtotalServicio + costoInstalacion;
+
+      // Calcular IVA sobre el total
       const iva = datosCliente.estrato >= 4 ? (subtotal * (config.porcentaje_iva || 19) / 100) : 0;
       const total = subtotal + iva;
 
@@ -362,24 +379,44 @@ class ClienteCompletoService {
       const [resultadoFactura] = await conexion.execute(queryFactura, valoresFactura);
       const facturaId = resultadoFactura.insertId;
 
-      // 6. Insertar detalle de factura
-      const queryDetalle = `
+      // 6. Insertar detalle de factura - SERVICIO
+      const queryDetalleServicio = `
         INSERT INTO detalle_facturas (
-          factura_id, servicio_cliente_id, concepto_nombre, cantidad, 
+          factura_id, servicio_cliente_id, concepto_nombre, cantidad,
           precio_unitario, subtotal
         ) VALUES (?, ?, ?, 1, ?, ?)
       `;
 
-      const valoresDetalle = [
+      const valoresDetalleServicio = [
         facturaId,
         servicioId,
         `${servicio.plan_nombre} - ${servicio.tipo}`,
-        subtotal,
-        subtotal,
-
+        subtotalServicio,
+        subtotalServicio
       ];
 
-      await conexion.execute(queryDetalle, valoresDetalle);
+      await conexion.execute(queryDetalleServicio, valoresDetalleServicio);
+
+      // ✅ 6b. Insertar detalle de instalación si corresponde
+      if (costoInstalacion > 0) {
+        const queryDetalleInstalacion = `
+          INSERT INTO detalle_facturas (
+            factura_id, servicio_cliente_id, concepto_nombre, cantidad,
+            precio_unitario, subtotal
+          ) VALUES (?, ?, ?, 1, ?, ?)
+        `;
+
+        const valoresDetalleInstalacion = [
+          facturaId,
+          servicioId,
+          'INSTALACION',
+          costoInstalacion,
+          costoInstalacion
+        ];
+
+        await conexion.execute(queryDetalleInstalacion, valoresDetalleInstalacion);
+        console.log(`✅ Detalle de instalación agregado: $${costoInstalacion}`);
+      }
 
       // 7. Actualizar consecutivo
       await conexion.execute(`
@@ -611,7 +648,7 @@ const observacionesContrato = JSON.stringify({
       return valor;
     };
 
-    // Obtener datos del plan para calcular permanencia y costo
+    // Obtener datos del plan para calcular permanencia
     const [planes] = await conexion.execute(`
       SELECT permanencia_minima_meses, costo_instalacion_permanencia, costo_instalacion_sin_permanencia
       FROM planes_servicio ps
@@ -624,9 +661,19 @@ const observacionesContrato = JSON.stringify({
     const permanenciaMeses = tipoPermanencia === 'con_permanencia' ?
       (planData.permanencia_minima_meses || 6) : 0;
 
-    const costoInstalacion = tipoPermanencia === 'con_permanencia' ?
-      (planData.costo_instalacion_permanencia || 0) :
-      (planData.costo_instalacion_sin_permanencia || 150000);
+    // ✅ CORRECCIÓN: Usar valores de cobro de instalación separados de permanencia
+    let costoInstalacion = 0;
+    if (datosServicio?.cobrar_instalacion !== false) {
+      // Si se debe cobrar instalación, usar el valor personalizado o el valor por defecto
+      if (datosServicio?.valor_instalacion !== undefined && datosServicio?.valor_instalacion !== null) {
+        costoInstalacion = parseFloat(datosServicio.valor_instalacion);
+      } else {
+        // Valores por defecto basados en tipo de permanencia
+        costoInstalacion = tipoPermanencia === 'con_permanencia' ?
+          (planData.costo_instalacion_permanencia || 50000) :
+          (planData.costo_instalacion_sin_permanencia || 150000);
+      }
+    }
 
     // Fecha de vencimiento de permanencia
     const fechaVencimientoPermanencia = permanenciaMeses > 0 ?
@@ -729,21 +776,32 @@ const observacionesContrato = JSON.stringify({
       console.warn('⚠️ No se pudo usar procedimiento almacenado para orden');
     }
 
-    // Fallback manual
+    // Fallback manual - INCLUIR FECHA como en el contrato
+    const [configActual] = await conexion.execute(`
+      SELECT prefijo_orden, consecutivo_orden
+      FROM configuracion_empresa
+      WHERE id = 1
+    `);
+
+    if (!configActual[0]) {
+      throw new Error('Configuración de empresa no encontrada');
+    }
+
+    const { prefijo_orden, consecutivo_orden } = configActual[0];
+
+    // ✅ CORRECCIÓN: Incluir año en el formato del número de orden (igual que contrato)
+    const numeroOrden = `${prefijo_orden || 'ORD'}-${new Date().getFullYear()}-${String(consecutivo_orden).padStart(6, '0')}`;
+
+    // Incrementar consecutivo
     await conexion.execute(`
-      UPDATE configuracion_empresa 
-      SET consecutivo_orden = consecutivo_orden + 1 
+      UPDATE configuracion_empresa
+      SET consecutivo_orden = consecutivo_orden + 1
       WHERE id = 1
     `);
 
-    const [resultado] = await conexion.execute(`
-      SELECT 
-        CONCAT(COALESCE(prefijo_orden, 'ORD'), LPAD(consecutivo_orden, 6, '0')) as numero
-      FROM configuracion_empresa 
-      WHERE id = 1
-    `);
+    console.log(`✅ Número de orden generado: ${numeroOrden}`);
 
-    return resultado[0]?.numero || `ORD${Date.now()}`;
+    return numeroOrden;
   }
 
   /**

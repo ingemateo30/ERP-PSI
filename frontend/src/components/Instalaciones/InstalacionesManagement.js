@@ -627,7 +627,8 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
       case 'ver':
         return true; // Todos pueden ver
       case 'generar_pdf':
-        return true; // Todos pueden generar PDF
+        // ✅ CORRECCIÓN: Operarios/instaladores NO pueden descargar orden de servicio
+        return (user.rol === 'administrador' || user.rol === 'supervisor');
       default:
         return false;
     }
