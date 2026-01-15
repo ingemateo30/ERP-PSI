@@ -4,6 +4,7 @@
 
 const { Database } = require('../models/Database');
 const pool = require('../config/database');
+const IVACalculatorService = require('./IVACalculatorService');
 
 class ClienteCompletoService {
 
@@ -315,11 +316,19 @@ class ClienteCompletoService {
       // 3. Generar número de factura
       const numeroFactura = `${config.prefijo_factura || 'FAC'}${String(config.consecutivo_factura || 1).padStart(6, '0')}`;
 
-      // 4. Calcular totales del servicio
-      const subtotalServicio = servicio.precio_personalizado || servicio.precio_plan;
+      // 4. Calcular totales del servicio con IVA correcto
+      const precioBaseServicio = parseFloat(servicio.precio_personalizado || servicio.precio_plan);
+
+      // ✅ CALCULAR IVA DEL SERVICIO usando IVACalculatorService
+      const calculoServicio = IVACalculatorService.calcularPrecioConIVA(
+        precioBaseServicio,
+        servicio.tipo,
+        datosCliente.estrato
+      );
 
       // ✅ Agregar costo de instalación si corresponde
       let costoInstalacion = 0;
+      let ivaInstalacion = 0;
       if (datosServicio?.cobrar_instalacion !== false) {
         if (datosServicio?.valor_instalacion !== undefined && datosServicio?.valor_instalacion !== null) {
           costoInstalacion = parseFloat(datosServicio.valor_instalacion);
@@ -328,14 +337,38 @@ class ClienteCompletoService {
           const tipoPermanencia = datosServicio?.tipo_permanencia || 'sin_permanencia';
           costoInstalacion = tipoPermanencia === 'con_permanencia' ? 50000 : 150000;
         }
+
+        // ✅ CALCULAR IVA DE INSTALACIÓN (instalación siempre lleva IVA)
+        const calculoInstalacion = IVACalculatorService.calcularPrecioConIVA(
+          costoInstalacion,
+          'reconexion', // La instalación se trata como reconexión (siempre IVA)
+          datosCliente.estrato
+        );
+        ivaInstalacion = calculoInstalacion.valor_iva;
       }
 
-      // Calcular subtotal total (servicio + instalación)
-      const subtotal = subtotalServicio + costoInstalacion;
-
-      // Calcular IVA sobre el total
-      const iva = datosCliente.estrato >= 4 ? (subtotal * (config.porcentaje_iva || 19) / 100) : 0;
+      // ✅ Calcular totales correctamente
+      const subtotal = calculoServicio.precio_sin_iva + costoInstalacion;
+      const iva = calculoServicio.valor_iva + ivaInstalacion;
       const total = subtotal + iva;
+
+      console.log('💰 Desglose de factura:', {
+        servicio: {
+          base: precioBaseServicio,
+          iva: calculoServicio.valor_iva,
+          total: calculoServicio.precio_con_iva
+        },
+        instalacion: {
+          base: costoInstalacion,
+          iva: ivaInstalacion,
+          total: costoInstalacion + ivaInstalacion
+        },
+        factura: {
+          subtotal,
+          iva,
+          total
+        }
+      });
 
       // ✅ Función auxiliar para manejar undefined/null/empty
       const limpiarValor = (valor) => {
@@ -379,31 +412,34 @@ class ClienteCompletoService {
       const [resultadoFactura] = await conexion.execute(queryFactura, valoresFactura);
       const facturaId = resultadoFactura.insertId;
 
-      // 6. Insertar detalle de factura - SERVICIO
+      // 6. Insertar detalle de factura - SERVICIO con IVA
       const queryDetalleServicio = `
         INSERT INTO detalle_facturas (
           factura_id, servicio_cliente_id, concepto_nombre, cantidad,
-          precio_unitario, subtotal
-        ) VALUES (?, ?, ?, 1, ?, ?)
+          precio_unitario, subtotal, iva, total
+        ) VALUES (?, ?, ?, 1, ?, ?, ?, ?)
       `;
 
       const valoresDetalleServicio = [
         facturaId,
         servicioId,
         `${servicio.plan_nombre} - ${servicio.tipo}`,
-        subtotalServicio,
-        subtotalServicio
+        calculoServicio.precio_sin_iva,
+        calculoServicio.precio_sin_iva,
+        calculoServicio.valor_iva,
+        calculoServicio.precio_con_iva
       ];
 
       await conexion.execute(queryDetalleServicio, valoresDetalleServicio);
+      console.log(`✅ Detalle de servicio: Base=$${calculoServicio.precio_sin_iva}, IVA=$${calculoServicio.valor_iva}, Total=$${calculoServicio.precio_con_iva}`);
 
       // ✅ 6b. Insertar detalle de instalación si corresponde
       if (costoInstalacion > 0) {
         const queryDetalleInstalacion = `
           INSERT INTO detalle_facturas (
             factura_id, servicio_cliente_id, concepto_nombre, cantidad,
-            precio_unitario, subtotal
-          ) VALUES (?, ?, ?, 1, ?, ?)
+            precio_unitario, subtotal, iva, total
+          ) VALUES (?, ?, ?, 1, ?, ?, ?, ?)
         `;
 
         const valoresDetalleInstalacion = [
@@ -411,11 +447,13 @@ class ClienteCompletoService {
           servicioId,
           'INSTALACION',
           costoInstalacion,
-          costoInstalacion
+          costoInstalacion,
+          ivaInstalacion,
+          costoInstalacion + ivaInstalacion
         ];
 
         await conexion.execute(queryDetalleInstalacion, valoresDetalleInstalacion);
-        console.log(`✅ Detalle de instalación agregado: $${costoInstalacion}`);
+        console.log(`✅ Detalle de instalación: Base=$${costoInstalacion}, IVA=$${ivaInstalacion}, Total=$${costoInstalacion + ivaInstalacion}`);
       }
 
       // 7. Actualizar consecutivo
@@ -599,19 +637,20 @@ const observacionesContrato = JSON.stringify({
 
     const cliente = clientes[0];
 
-    // Generar número de orden único
-    const numeroOrden = `INS-${Date.now()}`;
+    // ✅ Generar número de orden usando la función correcta (con formato y fecha del contrato)
+    const numeroOrden = await this.generarNumeroOrden(conexion);
 
     const query = `
       INSERT INTO instalaciones (
-        cliente_id, fecha_programada, hora_programada, 
+        cliente_id, numero_orden, fecha_programada, hora_programada,
         direccion_instalacion, barrio, telefono_contacto,
         estado, observaciones, created_at
-      ) VALUES (?, DATE_ADD(NOW(), INTERVAL 1 DAY), '09:00:00', ?, ?, ?, 'programada', 'Instalación generada automáticamente', NOW())
+      ) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 DAY), '09:00:00', ?, ?, ?, 'programada', 'Instalación generada automáticamente', NOW())
     `;
 
     const valores = [
       clienteId,
+      numeroOrden,
       cliente.direccion,
       cliente.barrio || '',
       cliente.telefono || ''

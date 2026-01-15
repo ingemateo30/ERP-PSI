@@ -54,7 +54,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     planTelevisionId: '',
     precioInternetCustom: '',
     precioTelevisionCustom: '',
-    usarServiciosSeparados: false,
+    usarServiciosSeparados: true, // SIEMPRE TRUE - servicios separados
 
     // ✅ Campos de permanencia e instalación (separados)
     tipo_permanencia: 'sin_permanencia', // REQUERIDO
@@ -73,12 +73,9 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   const calcularCostoInstalacion = useCallback(() => {
     let serviciosCount = 0;
 
-    if (formData.usarServiciosSeparados) {
-      if (formData.planInternetId) serviciosCount++;
-      if (formData.planTelevisionId) serviciosCount++;
-    } else if (formData.plan_id) {
-      serviciosCount = 1;
-    }
+    // SIEMPRE usar servicios separados
+    if (formData.planInternetId) serviciosCount++;
+    if (formData.planTelevisionId) serviciosCount++;
 
     if (serviciosCount === 0) return { costo: 0, servicios: 0 };
 
@@ -106,7 +103,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       es_instalacion_unica: true,
       cobrar: true
     };
-  }, [formData.cobrar_instalacion, formData.valor_instalacion, formData.tipo_permanencia, formData.planInternetId, formData.planTelevisionId, formData.plan_id, formData.usarServiciosSeparados]);
+  }, [formData.cobrar_instalacion, formData.valor_instalacion, formData.tipo_permanencia, formData.planInternetId, formData.planTelevisionId]);
 
   // ✅ COMPONENTE SELECTOR DE PERMANENCIA E INSTALACIÓN - SEPARADOS
   const SelectorPermanenciaCompleto = () => {
@@ -349,7 +346,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       planTelevisionId: '',
       precioInternetCustom: '',
       precioTelevisionCustom: '',
-      usarServiciosSeparados: false,
+      usarServiciosSeparados: true, // SIEMPRE TRUE - servicios separados
       observaciones_servicio: '',
 
       // Restablecer tipo de permanencia a valor predeterminado
@@ -380,17 +377,15 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
   const agregarServicioAClienteExistente = async () => {
     try {
-      // ✅ CORRECCIÓN: Preparar datos del nuevo servicio con todos los campos necesarios
+      // ✅ PREPARAR datos del nuevo servicio (SIEMPRE servicios separados)
       const nuevoServicio = {
-        // Servicios separados o plan único
-        planInternetId: formData.usarServiciosSeparados ? formData.planInternetId : null,
-        planTelevisionId: formData.usarServiciosSeparados ? formData.planTelevisionId : null,
-        plan_id: !formData.usarServiciosSeparados ? formData.plan_id : null,
+        // Servicios separados (siempre)
+        planInternetId: formData.planInternetId || null,
+        planTelevisionId: formData.planTelevisionId || null,
 
         // Precios personalizados
         precioInternetCustom: formData.precioInternetCustom || null,
         precioTelevisionCustom: formData.precioTelevisionCustom || null,
-        precio_personalizado: formData.precio_personalizado || null,
 
         // Datos de activación y permanencia
         fecha_activacion: formData.fecha_activacion,
@@ -643,15 +638,9 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
     // ✅ Si está en modo agregar servicio, solo validar campos de servicio
     if (modoAgregarServicio && clienteSeleccionado) {
-      // Validar solo los servicios
-      if (formData.usarServiciosSeparados) {
-        if (!formData.planInternetId && !formData.planTelevisionId) {
-          nuevosErrores.servicios_separados = 'Debe seleccionar al menos un servicio (Internet o Televisión)';
-        }
-      } else {
-        if (!formData.plan_id) {
-          nuevosErrores.plan_id = 'Debe seleccionar un plan de servicio';
-        }
+      // Validar solo los servicios (siempre separados)
+      if (!formData.planInternetId && !formData.planTelevisionId) {
+        nuevosErrores.servicios_separados = 'Debe seleccionar al menos un servicio (Internet o Televisión)';
       }
 
       // Validar tipo de permanencia
@@ -694,16 +683,9 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
 
     // ✅ VALIDACIÓN DE SERVICIOS Y PERMANENCIA (para clientes nuevos)
     if (!client && !modoAgregarServicio) {
-      if (formData.usarServiciosSeparados) {
-        // Si usa servicios separados, debe tener al menos uno seleccionado
-        if (!formData.planInternetId && !formData.planTelevisionId) {
-          nuevosErrores.servicios_separados = 'Debe seleccionar al menos un servicio (Internet o Televisión)';
-        }
-      } else {
-        // Si usa plan único, debe seleccionar un plan
-        if (!formData.plan_id) {
-          nuevosErrores.plan_id = 'Debe seleccionar un plan de servicio';
-        }
+      // SIEMPRE servicios separados - debe tener al menos uno seleccionado
+      if (!formData.planInternetId && !formData.planTelevisionId) {
+        nuevosErrores.servicios_separados = 'Debe seleccionar al menos un servicio (Internet o Televisión)';
       }
 
       // ✅ SIEMPRE VALIDAR TIPO DE PERMANENCIA
@@ -801,55 +783,22 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       observaciones: formData.observaciones_servicio || ''
     };
 
-    // ✅ ASIGNAR SERVICIOS SEGÚN EL MODO SELECCIONADO
-    if (formData.usarServiciosSeparados) {
-      // MODO SERVICIOS SEPARADOS
-      if (formData.planInternetId) {
-        sedeInicial.planInternetId = parseInt(formData.planInternetId);
-        if (formData.precioInternetCustom) {
-          sedeInicial.precioPersonalizado = true;
-          sedeInicial.precioInternetCustom = formData.precioInternetCustom;
-        }
+    // ✅ ASIGNAR SERVICIOS SEPARADOS (SIEMPRE)
+    // Internet
+    if (formData.planInternetId) {
+      sedeInicial.planInternetId = parseInt(formData.planInternetId);
+      if (formData.precioInternetCustom) {
+        sedeInicial.precioPersonalizado = true;
+        sedeInicial.precioInternetCustom = formData.precioInternetCustom;
       }
+    }
 
-      if (formData.planTelevisionId) {
-        sedeInicial.planTelevisionId = parseInt(formData.planTelevisionId);
-        if (formData.precioTelevisionCustom) {
-          sedeInicial.precioPersonalizado = true;
-          sedeInicial.precioTelevisionCustom = formData.precioTelevisionCustom;
-        }
-      }
-    } else {
-      // MODO PLAN ÚNICO
-      const planSeleccionado = planesDisponibles.find(p => p.id === parseInt(formData.plan_id));
-      if (!planSeleccionado) {
-        throw new Error('Plan seleccionado no encontrado');
-      }
-
-      const calculos = recalcularPreciosEnTiempoReal();
-
-      if (planSeleccionado.tipo === 'internet') {
-        sedeInicial.planInternetId = parseInt(formData.plan_id);
-        if (formData.precio_personalizado) {
-          sedeInicial.precioPersonalizado = true;
-          sedeInicial.precioInternetCustom = calculos?.precio_base?.toString() || formData.precio_personalizado;
-        }
-      } else if (planSeleccionado.tipo === 'television') {
-        sedeInicial.planTelevisionId = parseInt(formData.plan_id);
-        if (formData.precio_personalizado) {
-          sedeInicial.precioPersonalizado = true;
-          sedeInicial.precioTelevisionCustom = calculos?.precio_base?.toString() || formData.precio_personalizado;
-        }
-      } else if (planSeleccionado.tipo === 'combo') {
-        sedeInicial.planInternetId = parseInt(formData.plan_id);
-        sedeInicial.planTelevisionId = parseInt(formData.plan_id);
-
-        if (formData.precio_personalizado) {
-          sedeInicial.precioPersonalizado = true;
-          const precioBase = calculos?.precio_base || parseFloat(formData.precio_personalizado);
-          sedeInicial.precioInternetCustom = (precioBase * 0.6).toString(); // 60% Internet
-          sedeInicial.precioTelevisionCustom = (precioBase * 0.4).toString(); // 40% TV
-        }
+    // Televisión
+    if (formData.planTelevisionId) {
+      sedeInicial.planTelevisionId = parseInt(formData.planTelevisionId);
+      if (formData.precioTelevisionCustom) {
+        sedeInicial.precioPersonalizado = true;
+        sedeInicial.precioTelevisionCustom = formData.precioTelevisionCustom;
       }
     }
 
@@ -1278,47 +1227,8 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                 )}
               </div>
 
+              {/* Selección separada (Internet + TV) - SIEMPRE VISIBLE */}
               {!client && (
-                <div className="mb-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.usarServiciosSeparados}
-                      onChange={(e) => handleInputChange('usarServiciosSeparados', e.target.checked)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700">Seleccionar Internet y TV por separado</span>
-                  </label>
-                </div>
-              )}
-
-              {/* Selección tradicional (un solo plan) */}
-              {!formData.usarServiciosSeparados && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Plan de Servicio {!client && <span className="text-red-500">*</span>}
-                  </label>
-                  <select
-                    value={formData.plan_id}
-                    onChange={(e) => handleInputChange('plan_id', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${errors.plan_id ? 'border-red-300' : 'border-gray-300'}`}
-                    disabled={client && !permissions?.canEdit}
-                  >
-                    <option value="">Seleccionar plan</option>
-                    {planesDisponibles.map(plan => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.nombre} - ${plan.precio.toLocaleString()}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.plan_id && (
-                    <p className="mt-1 text-sm text-red-600">{errors.plan_id}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Selección separada (Internet + TV) */}
-              {formData.usarServiciosSeparados && (
                 <div className="space-y-4">
                   {/* Internet */}
                   <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
