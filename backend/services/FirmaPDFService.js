@@ -337,7 +337,7 @@ static async abrirContratoParaFirma(contratoId) {
         const fontSize = 9;
         const lineHeight = 12;
         const infoX = width - 160; // Esquina derecha con margen
-        const infoY = height - 60; // Cerca del borde superior (60 puntos desde arriba)
+        const infoY = height - 100; // Cerca del borde superior (60 puntos desde arriba)
 
         console.log(`📍 Info firma digital PÁGINA 2: x=${infoX}, y=${infoY}, height=${height}`);
 
@@ -377,7 +377,7 @@ static async abrirContratoParaFirma(contratoId) {
 
         // ✅ Imagen de firma centrada sobre la línea de firma EN PERMANENCIA
         const firmaX3 = (width - signatureWidth) / 2; // Centrada horizontalmente
-        const firmaY3 = 110; // Más arriba (reducido desde 140 a 110)
+        const firmaY3 = 130; // Más arriba (reducido desde 140 a 110)
 
         console.log('✍️ Colocando firma en página 3 (anexo de permanencia)');
         console.log(`📐 Dimensiones página 3: width=${width}, height=${height}`);
@@ -395,7 +395,7 @@ static async abrirContratoParaFirma(contratoId) {
         const fontSize3 = 9;
         const lineHeight3 = 12;
         const infoX3 = width - 160; // Esquina derecha con margen
-        const infoY3 = height - 60; // Cerca del borde superior (60 puntos desde arriba)
+        const infoY3 = height - 100; // Cerca del borde superior (60 puntos desde arriba)
 
         console.log(`📍 Info firma digital PÁGINA 3: x=${infoX3}, y=${infoY3}, height=${height}`);
 
