@@ -34,10 +34,17 @@ class ClienteCompletoService {
           tipo_permanencia: primerServicio.tipoContrato || 'sin_permanencia',
           precio_personalizado: primerServicio.precioInternetCustom || primerServicio.precioTelevisionCustom || primerServicio.precio_personalizado,
           fecha_activacion: primerServicio.fechaActivacion || primerServicio.fecha_activacion || new Date().toISOString().split('T')[0],
-          observaciones: primerServicio.observaciones || ''
+          observaciones: primerServicio.observaciones || '',
+          // ✅ CORRECCIÓN: Incluir campos de instalación que vienen del frontend
+          cobrar_instalacion: primerServicio.cobrar_instalacion,
+          valor_instalacion: primerServicio.valor_instalacion
         };
 
         console.log('🔄 Convertido servicios array a servicio singular:', servicioData);
+        console.log('💰 Datos de instalación recibidos:', {
+          cobrar_instalacion: servicioData.cobrar_instalacion,
+          valor_instalacion: servicioData.valor_instalacion
+        });
       }
 
       // 2. ✅ CORRECCIÓN 2: IMPLEMENTAR método asignarServicioCliente que estaba vacío
@@ -288,6 +295,8 @@ class ClienteCompletoService {
    */
   static async generarPrimeraFacturaInternoCompleta(conexion, clienteId, servicioId, datosCliente, datosServicio, createdBy = null) {
     console.log('🧾 Generando primera factura COMPLETA...');
+    console.log('📋 datosServicio recibidos:', JSON.stringify(datosServicio, null, 2));
+    console.log('💰 Instalación - cobrar:', datosServicio?.cobrar_instalacion, 'valor:', datosServicio?.valor_instalacion);
 
     try {
       // 1. Obtener configuración de empresa para resolución
@@ -329,13 +338,28 @@ class ClienteCompletoService {
       // ✅ Agregar costo de instalación si corresponde
       let costoInstalacion = 0;
       let ivaInstalacion = 0;
-      if (datosServicio?.cobrar_instalacion !== false) {
+
+      // Convertir cobrar_instalacion a boolean explícitamente
+      const debeCobraInstalacion = datosServicio?.cobrar_instalacion === true ||
+                                     datosServicio?.cobrar_instalacion === 'true' ||
+                                     datosServicio?.cobrar_instalacion === 1;
+
+      console.log('🔍 Verificando cobro de instalación:', {
+        valor_recibido: datosServicio?.cobrar_instalacion,
+        tipo: typeof datosServicio?.cobrar_instalacion,
+        debe_cobrar: debeCobraInstalacion,
+        valor_instalacion: datosServicio?.valor_instalacion
+      });
+
+      if (debeCobraInstalacion) {
         if (datosServicio?.valor_instalacion !== undefined && datosServicio?.valor_instalacion !== null) {
           costoInstalacion = parseFloat(datosServicio.valor_instalacion);
+          console.log('✅ Usando valor de instalación personalizado:', costoInstalacion);
         } else {
           // Valores por defecto si no se especifica
           const tipoPermanencia = datosServicio?.tipo_permanencia || 'sin_permanencia';
           costoInstalacion = tipoPermanencia === 'con_permanencia' ? 50000 : 150000;
+          console.log('✅ Usando valor de instalación por defecto:', costoInstalacion, 'para', tipoPermanencia);
         }
 
         // ✅ CALCULAR IVA DE INSTALACIÓN (instalación siempre lleva IVA)
@@ -345,6 +369,9 @@ class ClienteCompletoService {
           datosCliente.estrato
         );
         ivaInstalacion = calculoInstalacion.valor_iva;
+        console.log('✅ IVA de instalación calculado:', ivaInstalacion);
+      } else {
+        console.log('⚠️ NO se cobrará instalación (cobrar_instalacion = false)');
       }
 
       // ✅ Calcular totales correctamente
