@@ -375,56 +375,60 @@ static async abrirContratoParaFirma(contratoId) {
         const page3 = pages[2];
         const { width, height } = page3.getSize();
 
-        // ✅ Imagen de firma centrada sobre la línea de firma
-        const firmaX = (width - signatureWidth) / 2; // Centrada horizontalmente
-        const firmaY = 95; // Bajada para quedar justo sobre la línea de firma
+        // ✅ Imagen de firma centrada sobre la línea de firma EN PERMANENCIA
+        // La línea de firma en permanencia suele estar más abajo que en la página principal
+        const firmaX3 = (width - signatureWidth) / 2; // Centrada horizontalmente
+        const firmaY3 = 140; // Ajustada para página de permanencia (diferente a página 2)
 
-        console.log('✍️ Colocando firma en página 3 (anexo de permanencia) - Centrada sobre línea');
+        console.log('✍️ Colocando firma en página 3 (anexo de permanencia)');
         console.log(`📐 Dimensiones página 3: width=${width}, height=${height}`);
+        console.log(`📍 Posición firma página 3: x=${firmaX3}, y=${firmaY3}`);
 
         // Dibujar imagen de firma centrada
         page3.drawImage(signatureImage, {
-          x: firmaX,
-          y: firmaY,
+          x: firmaX3,
+          y: firmaY3,
           width: signatureWidth,
           height: signatureHeight,
         });
 
-        // ✅ Información de firma digital en esquina superior derecha
-        const fontSize = 8;
-        const lineHeight = 11;
-        const infoX = width - 180; // Ajustado más cerca del borde
-        const infoY = height - 80; // Ajustado más abajo desde el borde superior
+        // ✅ Información de firma digital en esquina superior derecha DE PÁGINA 3
+        const fontSize3 = 8;
+        const lineHeight3 = 11;
+        const infoX3 = width - 180; // Esquina derecha
+        const infoY3 = height - 80; // Desde arriba
 
-        console.log(`📍 Info firma digital página 3: x=${infoX}, y=${infoY}`);
+        console.log(`📍 Info firma digital página 3: x=${infoX3}, y=${infoY3}`);
 
         page3.drawText(`Firmado digitalmente por:`, {
-          x: infoX,
-          y: infoY,
-          size: fontSize,
+          x: infoX3,
+          y: infoY3,
+          size: fontSize3,
           color: rgb(0, 0, 0),
         });
 
         page3.drawText(`${datosSignature.firmado_por}`, {
-          x: infoX,
-          y: infoY - lineHeight,
-          size: fontSize,
+          x: infoX3,
+          y: infoY3 - lineHeight3,
+          size: fontSize3,
           color: rgb(0, 0, 0),
         });
 
         page3.drawText(`Cédula: ${datosSignature.cedula_firmante}`, {
-          x: infoX,
-          y: infoY - (lineHeight * 2),
-          size: fontSize,
+          x: infoX3,
+          y: infoY3 - (lineHeight3 * 2),
+          size: fontSize3,
           color: rgb(0, 0, 0),
         });
 
         page3.drawText(`Fecha: ${datosSignature.fecha_firma}`, {
-          x: infoX,
-          y: infoY - (lineHeight * 3),
-          size: fontSize,
+          x: infoX3,
+          y: infoY3 - (lineHeight3 * 3),
+          size: fontSize3,
           color: rgb(0, 0, 0),
         });
+
+        console.log('✅ Firma e información agregadas a página 3 (permanencia)');
       }
 
       console.log('✅ Firma(s) agregada(s) al PDF exitosamente');
