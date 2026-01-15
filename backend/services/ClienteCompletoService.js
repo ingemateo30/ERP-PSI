@@ -640,23 +640,55 @@ const observacionesContrato = JSON.stringify({
     // ✅ Generar número de orden usando la función correcta (con formato y fecha del contrato)
     const numeroOrden = await this.generarNumeroOrden(conexion);
 
-    const query = `
-      INSERT INTO instalaciones (
-        cliente_id, numero_orden, fecha_programada, hora_programada,
-        direccion_instalacion, barrio, telefono_contacto,
-        estado, observaciones, created_at
-      ) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 DAY), '09:00:00', ?, ?, ?, 'programada', 'Instalación generada automáticamente', NOW())
-    `;
+    // ✅ VERIFICAR si la columna numero_orden existe en la tabla
+    const [columnas] = await conexion.execute(`
+      SELECT COUNT(*) as existe
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'instalaciones'
+        AND COLUMN_NAME = 'numero_orden'
+    `);
 
-    const valores = [
-      clienteId,
-      numeroOrden,
-      cliente.direccion,
-      cliente.barrio || '',
-      cliente.telefono || ''
-    ];
+    const tieneNumeroOrden = columnas[0].existe > 0;
 
-    console.log('🔍 Query instalación CON DIRECCIÓN:', query);
+    // Construir query dinámicamente según si existe la columna
+    let query, valores;
+
+    if (tieneNumeroOrden) {
+      query = `
+        INSERT INTO instalaciones (
+          cliente_id, numero_orden, fecha_programada, hora_programada,
+          direccion_instalacion, barrio, telefono_contacto,
+          estado, observaciones, created_at
+        ) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 DAY), '09:00:00', ?, ?, ?, 'programada', 'Instalación generada automáticamente', NOW())
+      `;
+
+      valores = [
+        clienteId,
+        numeroOrden,
+        cliente.direccion,
+        cliente.barrio || '',
+        cliente.telefono || ''
+      ];
+    } else {
+      console.warn('⚠️ Columna numero_orden no existe, usando query sin ella');
+      query = `
+        INSERT INTO instalaciones (
+          cliente_id, fecha_programada, hora_programada,
+          direccion_instalacion, barrio, telefono_contacto,
+          estado, observaciones, created_at
+        ) VALUES (?, DATE_ADD(NOW(), INTERVAL 1 DAY), '09:00:00', ?, ?, ?, 'programada', 'Instalación generada automáticamente', NOW())
+      `;
+
+      valores = [
+        clienteId,
+        cliente.direccion,
+        cliente.barrio || '',
+        cliente.telefono || ''
+      ];
+    }
+
+    console.log('🔍 Query instalación:', query);
     console.log('🔍 Valores:', valores);
 
     const [resultado] = await conexion.execute(query, valores);
