@@ -2223,7 +2223,61 @@ console.log(`💰 TOTALES FACTURA: Internet=$${valorInternet}, TV=$${valorTelevi
       const [resultado] = await conexion.execute(queryFactura, valoresFactura);
       const facturaId = resultado.insertId;
 
-      // 8. ACTUALIZAR CONSECUTIVO DE FACTURA EN CONFIGURACIÓN
+      // 8. INSERTAR DETALLES DE FACTURA (detalle_facturas)
+      // 8a. Insertar detalle por cada servicio
+      for (const servicio of serviciosDeLaSede) {
+        const precioServicio = parseFloat(servicio.precio || 0);
+        const tipoServicio = servicio.tipo;
+
+        // Calcular IVA del servicio según su tipo
+        let ivaServicio = 0;
+        if (tipoServicio === 'television' || tipoServicio === 'combo') {
+          // TV y combos SIEMPRE con IVA
+          ivaServicio = precioServicio * (parseFloat(config.porcentaje_iva) / 100);
+        } else if (tipoServicio === 'internet' && estrato >= 4) {
+          // Internet solo con IVA en estratos 4, 5, 6
+          ivaServicio = precioServicio * (parseFloat(config.porcentaje_iva) / 100);
+        }
+
+        await conexion.execute(`
+          INSERT INTO detalle_facturas (
+            factura_id, servicio_cliente_id, concepto_nombre, cantidad,
+            precio_unitario, subtotal, iva, total
+          ) VALUES (?, ?, ?, 1, ?, ?, ?, ?)
+        `, [
+          facturaId,
+          servicio.id,
+          servicio.plan_nombre,
+          precioServicio,
+          precioServicio,
+          ivaServicio,
+          precioServicio + ivaServicio
+        ]);
+
+        console.log(`✅ Detalle agregado: ${servicio.plan_nombre} - $${precioServicio.toLocaleString()} + IVA $${ivaServicio.toLocaleString()}`);
+      }
+
+      // 8b. Insertar detalle de INSTALACION si corresponde
+      if (costoInstalacion > 0) {
+        await conexion.execute(`
+          INSERT INTO detalle_facturas (
+            factura_id, servicio_cliente_id, concepto_nombre, cantidad,
+            precio_unitario, subtotal, iva, total
+          ) VALUES (?, ?, ?, 1, ?, ?, ?, ?)
+        `, [
+          facturaId,
+          serviciosDeLaSede[0].id, // Usar el primer servicio como referencia
+          'INSTALACION',
+          costoInstalacion,
+          costoInstalacion,
+          ivaInstalacion,
+          costoInstalacion + ivaInstalacion
+        ]);
+
+        console.log(`✅ Detalle de INSTALACION agregado: $${costoInstalacion.toLocaleString()} + IVA $${ivaInstalacion.toLocaleString()}`);
+      }
+
+      // 9. ACTUALIZAR CONSECUTIVO DE FACTURA EN CONFIGURACIÓN
       await conexion.execute(
         'UPDATE configuracion_empresa SET consecutivo_factura = consecutivo_factura + 1 WHERE id = 1'
       );
