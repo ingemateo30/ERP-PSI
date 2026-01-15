@@ -583,7 +583,32 @@ class PDFGenerator {
     static obtenerConceptosSimples(factura) {
         const conceptos = [];
 
-        // Mapear servicios con orden específico
+        // ✅ NUEVA LÓGICA: Usar detalles de factura si existen
+        if (factura.detalles && factura.detalles.length > 0) {
+            // Usar los detalles de la tabla detalle_facturas
+            factura.detalles.forEach(detalle => {
+                const subtotal = parseFloat(detalle.subtotal) || 0;
+                if (subtotal > 0) {
+                    conceptos.push({
+                        nombre: detalle.concepto_nombre ? detalle.concepto_nombre.toUpperCase() : 'SERVICIO',
+                        valor: subtotal
+                    });
+                }
+            });
+
+            // Agregar IVA si existe
+            const iva = parseFloat(factura.iva) || 0;
+            if (iva > 0) {
+                conceptos.push({
+                    nombre: 'IVA (19%)',
+                    valor: iva
+                });
+            }
+
+            return conceptos;
+        }
+
+        // ⚠️ FALLBACK: Si no hay detalles, usar campos antiguos de la tabla facturas
         const serviciosOrdenados = [
             { campo: 'internet', nombre: 'INTERNET' },
             { campo: 'television', nombre: 'TELEVISION' },
@@ -591,7 +616,7 @@ class PDFGenerator {
             { campo: 'instalacion', nombre: 'INSTALACION' },
             { campo: 'saldo_anterior', nombre: 'SALDO ANTERIOR' },
             { campo: 'interes', nombre: 'INTERES' },
-            { campo: 'reconexion', nombre: 'RECONEXION' },
+            { campo: 'reconexion', nombre: 'INSTALACION' }, // ✅ Cambiar de RECONEXION a INSTALACION
             { campo: 'varios', nombre: 'VARIOS' }
         ];
 
