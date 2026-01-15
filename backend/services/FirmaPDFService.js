@@ -335,9 +335,16 @@ static async abrirContratoParaFirma(contratoId) {
 
         // ✅ Información de firma digital en esquina superior derecha PÁGINA 2
         const fontSize = 9;
-        const lineHeight = 12;
-        const infoX = width - 160; // Esquina derecha con margen
-        const infoY = height - 100; // Cerca del borde superior (60 puntos desde arriba)
+const lineHeight = 12;
+
+const margin = 20;          // margen desde el borde
+const blockWidth = 160;     // ancho del bloque de texto
+const lines = 4;            // número de líneas
+
+const blockHeight = lines * lineHeight;
+
+const infoX = width - blockWidth - margin; // esquina inferior derecha
+const infoY = margin + blockHeight;       // Cerca del borde superior (60 puntos desde arriba)
 
         console.log(`📍 Info firma digital PÁGINA 2: x=${infoX}, y=${infoY}, height=${height}`);
 
@@ -392,10 +399,17 @@ static async abrirContratoParaFirma(contratoId) {
         });
 
         // ✅ Información de firma digital en esquina superior derecha PÁGINA 3
-        const fontSize3 = 9;
-        const lineHeight3 = 12;
-        const infoX3 = width - 160; // Esquina derecha con margen
-        const infoY3 = height - 100; // Cerca del borde superior (60 puntos desde arriba)
+      const fontSize3 = 9;
+const lineHeight3 = 12;
+
+const margin = 20;          // margen desde el borde
+const blockWidth = 160;     // ancho del bloque de texto
+const lines = 4;            // número de líneas
+
+const blockHeight3 = lines * lineHeight3;
+
+const infoX3 = width - blockWidth - margin; // esquina inferior derecha
+const infoY3 = margin + blockHeight3;       // Cerca del borde superior (60 puntos desde arriba)
 
         console.log(`📍 Info firma digital PÁGINA 3: x=${infoX3}, y=${infoY3}, height=${height}`);
 
