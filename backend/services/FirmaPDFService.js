@@ -334,12 +334,12 @@ static async abrirContratoParaFirma(contratoId) {
         });
 
         // ✅ Información de firma digital en esquina superior derecha PÁGINA 2
-        const fontSize = 8;
-        const lineHeight = 11;
-        const infoX = width - 180; // Esquina derecha
-        const infoY = height - 150; // Más arriba (aumentado desde -80 a -150)
+        const fontSize = 9;
+        const lineHeight = 12;
+        const infoX = width - 160; // Esquina derecha con margen
+        const infoY = height - 60; // Cerca del borde superior (60 puntos desde arriba)
 
-        console.log(`📍 Info firma digital PÁGINA 2: x=${infoX}, y=${infoY}`);
+        console.log(`📍 Info firma digital PÁGINA 2: x=${infoX}, y=${infoY}, height=${height}`);
 
         page2.drawText(`Firmado digitalmente por:`, {
           x: infoX,
@@ -392,12 +392,12 @@ static async abrirContratoParaFirma(contratoId) {
         });
 
         // ✅ Información de firma digital en esquina superior derecha PÁGINA 3
-        const fontSize3 = 8;
-        const lineHeight3 = 11;
-        const infoX3 = width - 180; // Esquina derecha
-        const infoY3 = height - 150; // Más arriba (aumentado desde -80 a -150, igual que página 2)
+        const fontSize3 = 9;
+        const lineHeight3 = 12;
+        const infoX3 = width - 160; // Esquina derecha con margen
+        const infoY3 = height - 60; // Cerca del borde superior (60 puntos desde arriba)
 
-        console.log(`📍 Info firma digital PÁGINA 3: x=${infoX3}, y=${infoY3}`);
+        console.log(`📍 Info firma digital PÁGINA 3: x=${infoX3}, y=${infoY3}, height=${height}`);
 
         page3.drawText(`Firmado digitalmente por:`, {
           x: infoX3,
