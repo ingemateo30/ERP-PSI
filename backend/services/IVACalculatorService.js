@@ -55,9 +55,13 @@ class IVACalculatorService {
 
             case 'combo':
             case 'empaquetado':
+                // ⚠️ IMPORTANTE: Los combos SIEMPRE llevan IVA porque incluyen TV
+                // TV siempre lleva IVA del 19%, independientemente del estrato
+                // Incluso si solo Internet en estrato 1-3 no llevaría IVA,
+                // la parte de TV SIEMPRE debe llevar IVA
                 return {
-                    aplica: estratoNumerico >= 4,   // ✅ CORREGIDO: >= 4
-                    porcentaje: estratoNumerico >= 4 ? 19 : 0
+                    aplica: true,  // Siempre aplica porque incluye TV
+                    porcentaje: 19
                 };
 
             default:

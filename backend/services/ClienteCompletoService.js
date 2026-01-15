@@ -22,6 +22,18 @@ class ClienteCompletoService {
 
       // ✅ CORRECCIÓN 1: Manejar estructura del frontend (servicios array vs servicio singular)
       const serviciosData = datosCompletos.servicios || datosCompletos.sedes || [];
+
+      // ✅ NUEVA LÓGICA: Detectar si hay servicios separados (Internet Y TV)
+      if (serviciosData.length > 0) {
+        const primerServicio = serviciosData[0];
+
+        // Si hay tanto planInternetId como planTelevisionId, usar crearClienteConServicios
+        if (primerServicio.planInternetId && primerServicio.planTelevisionId) {
+          console.log('🔀 Detectados servicios separados (Internet + TV), usando método de servicios múltiples');
+          return await this.crearClienteConServicios(datosCompletos, createdBy);
+        }
+      }
+
       let servicioData = datosCompletos.servicio;
 
       // Si no hay servicio singular pero sí servicios array, usar el primero
@@ -2068,22 +2080,26 @@ for (const servicio of serviciosDeLaSede) {
   console.log(`  📌 ${servicio.plan_nombre} - Tipo: ${tipoServicio} - Precio: $${precio.toLocaleString()}`);
 
   // ✅ SEPARAR POR TIPO DE SERVICIO
-  if (tipoServicio === 'internet' || tipoServicio === 'combo') {
+  if (tipoServicio === 'internet') {
     valorInternet += precio;
     // IVA solo para estratos 4, 5, 6
     if (estrato >= 4) {
       const ivaServicio = precio * (parseFloat(config.porcentaje_iva) / 100);
       valorIvaInternet += ivaServicio;
-      console.log(`    💰 IVA Internet: $${ivaServicio.toLocaleString()}`);
+      console.log(`    💰 IVA Internet (estrato ${estrato}): $${ivaServicio.toLocaleString()}`);
     }
   } else if (tipoServicio === 'television') {
     valorTelevision += precio;
-    // IVA solo para estratos 4, 5, 6
-    if (estrato >= 4) {
-      const ivaServicio = precio * (parseFloat(config.porcentaje_iva) / 100);
-      valorIvaTelevision += ivaServicio;
-      console.log(`    💰 IVA TV: $${ivaServicio.toLocaleString()}`);
-    }
+    // ⚠️ TV SIEMPRE LLEVA IVA, sin importar el estrato
+    const ivaServicio = precio * (parseFloat(config.porcentaje_iva) / 100);
+    valorIvaTelevision += ivaServicio;
+    console.log(`    💰 IVA TV (SIEMPRE aplica): $${ivaServicio.toLocaleString()}`);
+  } else if (tipoServicio === 'combo') {
+    // Para combos, aplicar SIEMPRE IVA porque incluyen TV
+    valorInternet += precio; // Guardamos en internet pero el combo incluye TV
+    const ivaServicio = precio * (parseFloat(config.porcentaje_iva) / 100);
+    valorIvaInternet += ivaServicio;
+    console.log(`    💰 IVA Combo (incluye TV, siempre aplica): $${ivaServicio.toLocaleString()}`);
   } else {
     // Si no se detecta tipo, sumar a internet por defecto
     console.log(`    ⚠️ Tipo no detectado, sumando a internet por defecto`);
@@ -2094,19 +2110,54 @@ for (const servicio of serviciosDeLaSede) {
   }
 }
 
-// ✅ CALCULAR TOTALES FINALES
-const subtotal = valorInternet + valorTelevision;
-const totalIva = valorIvaInternet + valorIvaTelevision;
+// ✅ AGREGAR COSTO DE INSTALACIÓN SI CORRESPONDE
+let costoInstalacion = 0;
+let ivaInstalacion = 0;
+
+// Verificar si se debe cobrar instalación
+const debeCobraInstalacion = sedeData?.cobrar_instalacion === true ||
+                               sedeData?.cobrar_instalacion === 'true' ||
+                               sedeData?.cobrar_instalacion === 1;
+
+console.log('🔍 Verificando cobro de instalación:', {
+  valor_recibido: sedeData?.cobrar_instalacion,
+  tipo: typeof sedeData?.cobrar_instalacion,
+  debe_cobrar: debeCobraInstalacion,
+  valor_instalacion: sedeData?.valor_instalacion
+});
+
+if (debeCobraInstalacion) {
+  if (sedeData?.valor_instalacion !== undefined && sedeData?.valor_instalacion !== null) {
+    costoInstalacion = parseFloat(sedeData.valor_instalacion);
+    console.log('✅ Usando valor de instalación personalizado:', costoInstalacion);
+  } else {
+    // Valores por defecto si no se especifica
+    const tipoPermanencia = sedeData?.tipoContrato || 'sin_permanencia';
+    costoInstalacion = tipoPermanencia === 'con_permanencia' ? 50000 : 150000;
+    console.log('✅ Usando valor de instalación por defecto:', costoInstalacion, 'para', tipoPermanencia);
+  }
+
+  // ✅ La instalación SIEMPRE lleva IVA del 19%
+  ivaInstalacion = costoInstalacion * (parseFloat(config.porcentaje_iva) / 100);
+  console.log('✅ IVA de instalación calculado:', ivaInstalacion);
+} else {
+  console.log('⚠️ NO se cobrará instalación (cobrar_instalacion = false)');
+}
+
+// ✅ CALCULAR TOTALES FINALES INCLUYENDO INSTALACIÓN
+const subtotal = valorInternet + valorTelevision + costoInstalacion;
+const totalIva = valorIvaInternet + valorIvaTelevision + ivaInstalacion;
 const total = subtotal + totalIva;
 
 console.log(`💰 TOTALES CALCULADOS:`);
 console.log(`   Internet: $${valorInternet.toLocaleString()}`);
 console.log(`   Televisión: $${valorTelevision.toLocaleString()}`);
+console.log(`   Instalación: $${costoInstalacion.toLocaleString()}`);
 console.log(`   Subtotal: $${subtotal.toLocaleString()}`);
 console.log(`   IVA: $${totalIva.toLocaleString()}`);
 console.log(`   TOTAL FACTURA: $${total.toLocaleString()}`);
 
-console.log(`💰 TOTALES FACTURA: Internet=$${valorInternet}, TV=$${valorTelevision}, IVA=$${totalIva}, Total=$${total}`);
+console.log(`💰 TOTALES FACTURA: Internet=$${valorInternet}, TV=$${valorTelevision}, Instalación=$${costoInstalacion}, IVA=$${totalIva}, Total=$${total}`);
       // 6. CREAR DESCRIPCIÓN DE SERVICIOS PARA OBSERVACIONES
       const sedeNombre = sedeData.nombre_sede || 'Sede Principal';
       const serviciosFacturados = serviciosDeLaSede.map(s =>
@@ -2144,14 +2195,14 @@ console.log(`💰 TOTALES FACTURA: Internet=$${valorInternet}, TV=$${valorTelevi
         valorTelevision,                            // television
         0,                                          // saldo_anterior
         0,                                          // interes
-        0,                                          // reconexion
+        costoInstalacion,                           // reconexion (incluye instalación)
         0,                                          // descuento
         0,                                          // varios
         0,                                          // publicidad
         valorInternet,                              // s_internet (subtotal internet)
         valorTelevision,                            // s_television (subtotal tv)
         0,                                          // s_interes
-        0,                                          // s_reconexion
+        costoInstalacion,                           // s_reconexion (subtotal instalación sin IVA)
         0,                                          // s_descuento
         0,                                          // s_varios
         0,                                          // s_publicidad
