@@ -333,13 +333,13 @@ static async abrirContratoParaFirma(contratoId) {
           height: signatureHeight,
         });
 
-        // ✅ Información de firma digital en esquina superior derecha
+        // ✅ Información de firma digital en esquina superior derecha PÁGINA 2
         const fontSize = 8;
         const lineHeight = 11;
-        const infoX = width - 180; // Ajustado más cerca del borde
-        const infoY = height - 80; // Ajustado más abajo desde el borde superior
+        const infoX = width - 180; // Esquina derecha
+        const infoY = height - 150; // Más arriba (aumentado desde -80 a -150)
 
-        console.log(`📍 Info firma digital: x=${infoX}, y=${infoY}`);
+        console.log(`📍 Info firma digital PÁGINA 2: x=${infoX}, y=${infoY}`);
 
         page2.drawText(`Firmado digitalmente por:`, {
           x: infoX,
@@ -376,9 +376,8 @@ static async abrirContratoParaFirma(contratoId) {
         const { width, height } = page3.getSize();
 
         // ✅ Imagen de firma centrada sobre la línea de firma EN PERMANENCIA
-        // La línea de firma en permanencia suele estar más abajo que en la página principal
         const firmaX3 = (width - signatureWidth) / 2; // Centrada horizontalmente
-        const firmaY3 = 140; // Ajustada para página de permanencia (diferente a página 2)
+        const firmaY3 = 110; // Más arriba (reducido desde 140 a 110)
 
         console.log('✍️ Colocando firma en página 3 (anexo de permanencia)');
         console.log(`📐 Dimensiones página 3: width=${width}, height=${height}`);
@@ -392,13 +391,13 @@ static async abrirContratoParaFirma(contratoId) {
           height: signatureHeight,
         });
 
-        // ✅ Información de firma digital en esquina superior derecha DE PÁGINA 3
+        // ✅ Información de firma digital en esquina superior derecha PÁGINA 3
         const fontSize3 = 8;
         const lineHeight3 = 11;
         const infoX3 = width - 180; // Esquina derecha
-        const infoY3 = height - 80; // Desde arriba
+        const infoY3 = height - 150; // Más arriba (aumentado desde -80 a -150, igual que página 2)
 
-        console.log(`📍 Info firma digital página 3: x=${infoX3}, y=${infoY3}`);
+        console.log(`📍 Info firma digital PÁGINA 3: x=${infoX3}, y=${infoY3}`);
 
         page3.drawText(`Firmado digitalmente por:`, {
           x: infoX3,
