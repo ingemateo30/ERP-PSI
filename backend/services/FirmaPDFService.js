@@ -384,7 +384,7 @@ const infoY = margin + blockHeight;       // Cerca del borde superior (60 puntos
 
         // ✅ Imagen de firma centrada sobre la línea de firma EN PERMANENCIA
         const firmaX3 = (width - signatureWidth) / 2; // Centrada horizontalmente
-        const firmaY3 = 160; // Más arriba (reducido desde 140 a 110)
+        const firmaY3 = 190; // Más arriba (reducido desde 140 a 110)
 
         console.log('✍️ Colocando firma en página 3 (anexo de permanencia)');
         console.log(`📐 Dimensiones página 3: width=${width}, height=${height}`);
