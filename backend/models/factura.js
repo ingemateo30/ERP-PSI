@@ -154,7 +154,7 @@ class Factura {
   static async obtenerPorId(id) {
     try {
       const query = `
-        SELECT 
+        SELECT
           f.*,
           c.nombre as cliente_nombre,
           c.direccion as cliente_direccion,
@@ -176,12 +176,36 @@ class Factura {
         LEFT JOIN sistema_usuarios u ON f.created_by = u.id
         WHERE f.id = ?
       `;
-      
+
       const connection = await pool.getConnection();
       const [filas] = await connection.execute(query, [id]);
+
+      if (filas.length === 0) {
+        connection.release();
+        return null;
+      }
+
+      const factura = filas[0];
+
+      // ✅ Obtener los detalles de la factura (detalle_facturas)
+      const queryDetalles = `
+        SELECT
+          df.*,
+          cf.nombre as concepto_nombre_completo,
+          cf.tipo as concepto_tipo
+        FROM detalle_facturas df
+        LEFT JOIN conceptos_facturacion cf ON df.concepto_id = cf.id
+        WHERE df.factura_id = ?
+        ORDER BY df.id
+      `;
+
+      const [detalles] = await connection.execute(queryDetalles, [id]);
       connection.release();
-      
-      return filas[0] || null;
+
+      // ✅ Agregar los detalles a la factura
+      factura.detalles = detalles;
+
+      return factura;
     } catch (error) {
       throw new Error(`Error al obtener factura: ${error.message}`);
     }
