@@ -320,9 +320,10 @@ static async abrirContratoParaFirma(contratoId) {
 
         // ✅ Imagen de firma centrada sobre la línea de firma
         const firmaX = (width - signatureWidth) / 2; // Centrada horizontalmente
-        const firmaY = 145; // Sobre la línea de "acepto"
+        const firmaY = 95; // Bajada para quedar justo sobre la línea de firma
 
-        console.log('✍️ Colocando firma en página 2 (contrato principal) - Centrada en línea de acepto');
+        console.log('✍️ Colocando firma en página 2 (contrato principal) - Centrada sobre línea');
+        console.log(`📐 Dimensiones página: width=${width}, height=${height}`);
 
         // Dibujar imagen de firma centrada
         page2.drawImage(signatureImage, {
@@ -333,11 +334,12 @@ static async abrirContratoParaFirma(contratoId) {
         });
 
         // ✅ Información de firma digital en esquina superior derecha
-        const fontSize = 9;
-        const lineHeight = 12;
-        const margenDerecho = 50; // Margen desde el borde derecho
-        const infoX = width - 200; // Posición X para el texto (esquina derecha)
-        const infoY = height - 100; // Posición Y desde arriba
+        const fontSize = 8;
+        const lineHeight = 11;
+        const infoX = width - 180; // Ajustado más cerca del borde
+        const infoY = height - 80; // Ajustado más abajo desde el borde superior
+
+        console.log(`📍 Info firma digital: x=${infoX}, y=${infoY}`);
 
         page2.drawText(`Firmado digitalmente por:`, {
           x: infoX,
@@ -366,15 +368,6 @@ static async abrirContratoParaFirma(contratoId) {
           size: fontSize,
           color: rgb(0, 0, 0),
         });
-
-        if (datosSignature.observaciones) {
-          page2.drawText(`Obs: ${datosSignature.observaciones.substring(0, 30)}`, {
-            x: infoX,
-            y: infoY - (lineHeight * 4),
-            size: fontSize - 1,
-            color: rgb(0.3, 0.3, 0.3),
-          });
-        }
       }
 
       // Si tiene permanencia, también agregar firma en página 3 (índice 2) - Anexo de permanencia
@@ -384,9 +377,10 @@ static async abrirContratoParaFirma(contratoId) {
 
         // ✅ Imagen de firma centrada sobre la línea de firma
         const firmaX = (width - signatureWidth) / 2; // Centrada horizontalmente
-        const firmaY = 145; // Sobre la línea de "acepto"
+        const firmaY = 95; // Bajada para quedar justo sobre la línea de firma
 
-        console.log('✍️ Colocando firma en página 3 (anexo de permanencia) - Centrada');
+        console.log('✍️ Colocando firma en página 3 (anexo de permanencia) - Centrada sobre línea');
+        console.log(`📐 Dimensiones página 3: width=${width}, height=${height}`);
 
         // Dibujar imagen de firma centrada
         page3.drawImage(signatureImage, {
@@ -397,10 +391,12 @@ static async abrirContratoParaFirma(contratoId) {
         });
 
         // ✅ Información de firma digital en esquina superior derecha
-        const fontSize = 9;
-        const lineHeight = 12;
-        const infoX = width - 200; // Posición X para el texto (esquina derecha)
-        const infoY = height - 100; // Posición Y desde arriba
+        const fontSize = 8;
+        const lineHeight = 11;
+        const infoX = width - 180; // Ajustado más cerca del borde
+        const infoY = height - 80; // Ajustado más abajo desde el borde superior
+
+        console.log(`📍 Info firma digital página 3: x=${infoX}, y=${infoY}`);
 
         page3.drawText(`Firmado digitalmente por:`, {
           x: infoX,
@@ -429,15 +425,6 @@ static async abrirContratoParaFirma(contratoId) {
           size: fontSize,
           color: rgb(0, 0, 0),
         });
-
-        if (datosSignature.observaciones) {
-          page3.drawText(`Obs: ${datosSignature.observaciones.substring(0, 30)}`, {
-            x: infoX,
-            y: infoY - (lineHeight * 4),
-            size: fontSize - 1,
-            color: rgb(0.3, 0.3, 0.3),
-          });
-        }
       }
 
       console.log('✅ Firma(s) agregada(s) al PDF exitosamente');
