@@ -372,10 +372,12 @@ const tienePermanencia = permanenciaMeses > 1;
 
         .signature-line {
             width: 250px;
-            height: 45px;
+            height: 60px;
             border-bottom: 2px solid #000;
-            margin: 0 auto 1.5mm auto;
+            margin: 8mm auto 1.5mm auto;
             position: relative;
+            display: flex;
+            align-items: flex-end;
         }
 
         .footer-text {
