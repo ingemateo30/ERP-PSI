@@ -320,7 +320,7 @@ class Cliente {
       const camposPermitidos = [
         'identificacion', 'tipo_documento', 'nombre', 'direccion', 'sector_id',
         'estrato', 'barrio', 'ciudad_id', 'telefono', 'telefono_2', 'correo',
-        'fecha_registro', 'fecha_inicio_servicio', 'fecha_fin_servicio', 'estado',
+        'fecha_registro', 'fecha_hasta', 'fecha_inicio_servicio', 'fecha_fin_servicio', 'estado',
         'mac_address', 'ip_asignada', 'tap', 'puerto', 'numero_contrato', 'ruta',
         'requiere_reconexion', 'codigo_usuario', 'observaciones', 'activo'
       ];

@@ -930,6 +930,19 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
     }
 
     if (contratoData.firmado) {
+        const verPDFFirmado = () => {
+            if (pdfUrl) {
+                abrirPDFEnNuevaVentana();
+            } else {
+                // Fallback: abrir directamente desde la API
+                const token = localStorage.getItem('token');
+                const apiUrl = process.env.NODE_ENV === 'development'
+                    ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1')
+                    : process.env.REACT_APP_API_URL;
+                window.open(`${apiUrl}/contratos/${contratoId}/pdf?token=${encodeURIComponent(token)}`, '_blank');
+            }
+        };
+
         return (
             <div className="bg-green-50 border border-green-200 rounded-lg p-6">
                 <div className="flex items-center gap-3 mb-4">
@@ -940,25 +953,28 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 </div>
                 <p className="text-green-700 mb-4">
                     Este contrato ya ha sido firmado digitalmente.
+                    {contratoData.fecha_firma && (
+                        <span className="block text-sm mt-1">
+                            Fecha de firma: {new Date(contratoData.fecha_firma).toLocaleDateString('es-CO')}
+                        </span>
+                    )}
                 </p>
-                {pdfUrl && (
-                    <div className="flex gap-3">
-                        <button
-                            onClick={abrirPDFEnNuevaVentana}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            <Eye className="h-4 w-4" />
-                            Ver PDF
-                        </button>
-                        <button
-                            onClick={descargarPDF}
-                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                            <Download className="h-4 w-4" />
-                            Descargar
-                        </button>
-                    </div>
-                )}
+                <div className="flex gap-3">
+                    <button
+                        onClick={verPDFFirmado}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        <Eye className="h-4 w-4" />
+                        Ver PDF Firmado
+                    </button>
+                    <button
+                        onClick={pdfUrl ? descargarPDF : verPDFFirmado}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        <Download className="h-4 w-4" />
+                        Descargar
+                    </button>
+                </div>
             </div>
         );
     }

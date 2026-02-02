@@ -582,6 +582,20 @@ const FirmaContratosWrapper = () => {
                                                     </button>
                                                 )}
 
+                                                {contrato.fecha_firma && (
+                                                    <button
+                                                        onClick={() => {
+                                                            const apiUrl = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
+                                                            const token = localStorage.getItem('token');
+                                                            window.open(`${apiUrl}/contratos/${contrato.id}/pdf?token=${encodeURIComponent(token)}`, '_blank');
+                                                        }}
+                                                        className="text-indigo-600 hover:text-indigo-800"
+                                                        title="Ver PDF firmado"
+                                                    >
+                                                        <FileCheck className="w-4 h-4" />
+                                                    </button>
+                                                )}
+
                                                 <button
                                                     onClick={() => descargarContrato(contrato.id)}
                                                     className="text-blue-600 hover:text-blue-800"

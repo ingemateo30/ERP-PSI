@@ -52,7 +52,7 @@ router.get('/equipment/:id',
 );
 
 router.post('/equipment',
-  requireRole(['supervisor', 'administrador']),
+  requireRole(['supervisor', 'administrador', 'instalador']),
   createEquipmentValidation,
   InventoryController.createEquipment
 );
