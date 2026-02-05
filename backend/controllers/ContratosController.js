@@ -338,7 +338,7 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
             if (servicios_ids.length > 0) {
                 const placeholders = servicios_ids.map(() => '?').join(',');
                 serviciosDetalles = await Database.query(`
-                SELECT 
+                SELECT
                     sc.*,
                     ps.nombre as plan_nombre,
                     ps.tipo as plan_tipo,
@@ -348,7 +348,8 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
                     ps.velocidad_bajada,
                     ps.velocidad_subida,
                     ps.canales_tv,
-                    ps.descripcion
+                    ps.descripcion,
+                    ps.aplica_iva
                 FROM servicios_cliente sc
                 INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
                 WHERE sc.id IN (${placeholders})
@@ -369,7 +370,7 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
                 canales_tv: servicio.canales_tv,
                 tecnologia: servicio.tecnologia,
                 descripcion: servicio.descripcion,
-                aplica_iva: true
+                aplica_iva: Boolean(servicio.aplica_iva)
             }));
 
             console.log('✅ Array de servicios preparado para PDF:', contratoData.servicios);
@@ -726,17 +727,34 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
                 });
             }
 
-            const datosDescarga = await FirmaPDFService.obtenerURLDescargaPDF(id);
-
-            if (!fs.existsSync(datosDescarga.ruta_archivo)) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Archivo PDF no encontrado'
-                });
+            let datosDescarga;
+            try {
+                datosDescarga = await FirmaPDFService.obtenerURLDescargaPDF(id);
+            } catch (descargaError) {
+                console.warn('PDF no encontrado en base de datos, regenerando...');
+                datosDescarga = null;
             }
 
-            const pdfBuffer = fs.readFileSync(datosDescarga.ruta_archivo);
-            const filename = `contrato_${datosDescarga.numero_contrato}${datosDescarga.firmado ? '_firmado' : ''}.pdf`;
+            let pdfBuffer;
+            let filename;
+
+            if (datosDescarga && datosDescarga.ruta_archivo && fs.existsSync(datosDescarga.ruta_archivo)) {
+                pdfBuffer = fs.readFileSync(datosDescarga.ruta_archivo);
+                filename = `contrato_${datosDescarga.numero_contrato}${datosDescarga.firmado ? '_firmado' : ''}.pdf`;
+            } else {
+                // Fallback: regenerar el PDF si el archivo no existe
+                console.log('Archivo PDF no encontrado en disco, regenerando...');
+                const contratos = await Database.query(`
+                    SELECT numero_contrato FROM contratos WHERE id = ?
+                `, [id]);
+
+                if (!contratos || contratos.length === 0) {
+                    return res.status(404).json({ success: false, message: 'Contrato no encontrado' });
+                }
+
+                // Redirigir a la generación del PDF
+                return res.redirect(`/api/v1/contratos/${id}/pdf`);
+            }
 
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

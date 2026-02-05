@@ -518,7 +518,9 @@ const verDetalleFactura = useCallback((factura) => {
     const formatearMoneda = (valor) => {
         return new Intl.NumberFormat('es-CO', {
             style: 'currency',
-            currency: 'COP'
+            currency: 'COP',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
         }).format(valor || 0);
     };
 

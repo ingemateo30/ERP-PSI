@@ -38,10 +38,20 @@ if (contratoData.servicios && Array.isArray(contratoData.servicios)) {
   });
 }
 
+// Verificar si algún servicio aplica IVA
+let algunServicioConIVA = false;
+if (contratoData.servicios && Array.isArray(contratoData.servicios)) {
+  algunServicioConIVA = contratoData.servicios.some(servicio =>
+    servicio.aplica_iva === 1 || servicio.aplica_iva === true
+  );
+}
+const textoIVATotal = algunServicioConIVA ? ' + IVA' : '';
+
 console.log('💰 Valor total calculado para contrato:', {
   numero_contrato: contratoData.numero_contrato,
   cantidad_servicios: contratoData.servicios?.length || 0,
-  valor_total: valorTotal
+  valor_total: valorTotal,
+  aplica_iva: algunServicioConIVA
 });
 
 const permanenciaMeses = parseInt(contratoData.permanencia_meses || 1);
@@ -436,7 +446,7 @@ const tienePermanencia = permanenciaMeses > 1;
 
         <div class="intro-box">
             <p class="intro-text">
-                Este contrato explica las condiciones para la prestación de los servicios entre usted y PROVEEDOR DE TELECOMUNICACIONES SAS, por el que pagará mínimo mensualmente $${this.formatearPrecio(valorTotal)}. Este contrato tendrá vigencia de ${permanenciaMeses} mes(es), contados a partir del día de la instalación. El plazo máximo de instalación es de 15 días hábiles. Acepto que mi contrato se renueve sucesiva y automáticamente por un plazo igual al inicial de ${permanenciaMeses} mes(es).
+                Este contrato explica las condiciones para la prestación de los servicios entre usted y PROVEEDOR DE TELECOMUNICACIONES SAS, por el que pagará mínimo mensualmente $${this.formatearPrecio(valorTotal)}${textoIVATotal}. Este contrato tendrá vigencia de ${permanenciaMeses} mes(es), contados a partir del día de la instalación. El plazo máximo de instalación es de 15 días hábiles. Acepto que mi contrato se renueve sucesiva y automáticamente por un plazo igual al inicial de ${permanenciaMeses} mes(es).
             </p>
         </div>
 
@@ -444,7 +454,7 @@ const tienePermanencia = permanenciaMeses > 1;
 
         <!-- DOS COLUMNAS -->
         <div class="two-columns">
-            ${this.generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, permanenciaMeses, fechaActivacionTexto)}
+            ${this.generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, permanenciaMeses, fechaActivacionTexto, textoIVATotal)}
         </div>
     </div>
 
@@ -471,7 +481,7 @@ const tienePermanencia = permanenciaMeses > 1;
         </div>`;
   }
 
-  static generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, meses, fechaActivacionTexto) {
+  static generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, meses, fechaActivacionTexto, textoIVATotal = '') {
     return `
             <!-- COLUMNA IZQUIERDA -->
             <div class="column-content">
@@ -505,7 +515,7 @@ const tienePermanencia = permanenciaMeses > 1;
                 </div>
 
                 <div class="valor-total">
-                    Valor Total $${this.formatearPrecio(valorTotal)}
+                    Valor Total $${this.formatearPrecio(valorTotal)}${textoIVATotal}
                 </div>
 
                 <div class="content-box">

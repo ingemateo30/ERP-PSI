@@ -37,12 +37,25 @@ const InstalacionesList = ({
     onChangeLimit
 }) => {
 
-    // Formatear fecha
+    // Formatear fecha - sin conversión de zona horaria
     const formatFecha = (fecha) => {
         if (!fecha) return 'No especificada';
 
         try {
-            return new Date(fecha).toLocaleString('es-CO', {
+            // Eliminar indicador de zona horaria para evitar conversión UTC
+            const fechaStr = String(fecha).replace('T', ' ').replace('Z', '').replace(/\.\d{3}$/, '');
+            const partes = fechaStr.match(/(\d{4})-(\d{2})-(\d{2})\s*(\d{2})?:?(\d{2})?/);
+            if (!partes) return fecha;
+
+            const fechaLocal = new Date(
+                parseInt(partes[1]),
+                parseInt(partes[2]) - 1,
+                parseInt(partes[3]),
+                parseInt(partes[4] || 0),
+                parseInt(partes[5] || 0)
+            );
+
+            return fechaLocal.toLocaleString('es-CO', {
                 year: 'numeric',
                 month: 'short',
                 day: '2-digit',
@@ -54,14 +67,27 @@ const InstalacionesList = ({
         }
     };
 
-    // Verificar si está vencida
+    // Verificar si está vencida - sin conversión de zona horaria
     const isVencida = (fechaProgramada, estado) => {
         if (estado === ESTADOS_INSTALACION.COMPLETADA || estado === ESTADOS_INSTALACION.CANCELADA) {
             return false;
         }
 
+        if (!fechaProgramada) return false;
+
         const ahora = new Date();
-        const fecha = new Date(fechaProgramada);
+        // Interpretar fecha sin conversión UTC
+        const fechaStr = String(fechaProgramada).replace('T', ' ').replace('Z', '').replace(/\.\d{3}$/, '');
+        const partes = fechaStr.match(/(\d{4})-(\d{2})-(\d{2})\s*(\d{2})?:?(\d{2})?/);
+        if (!partes) return false;
+
+        const fecha = new Date(
+            parseInt(partes[1]),
+            parseInt(partes[2]) - 1,
+            parseInt(partes[3]),
+            parseInt(partes[4] || 0),
+            parseInt(partes[5] || 0)
+        );
 
         return fecha < ahora;
     };

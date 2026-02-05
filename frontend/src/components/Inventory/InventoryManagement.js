@@ -295,7 +295,7 @@ const loadStats = async () => {
             <p className="text-lg opacity-90">Administra equipos, asignaciones e instalaciones</p>
           </div>
           
-          {user.rol !== 'instalador' && (
+          {(user.rol === 'administrador' || user.rol === 'supervisor' || user.rol === 'instalador') && (
             <button
               onClick={handleCreate}
               className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-4 md:px-6 backdrop-blur-sm flex items-center space-x-2 font-medium"

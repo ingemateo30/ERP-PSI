@@ -103,6 +103,16 @@ const { hasPermission } = useAuth();
     }
   };
 
+  const handleVerPDF = async (contratoId) => {
+    try {
+      const pdfUrl = await contratosService.obtenerUrlPDF(contratoId);
+      window.open(pdfUrl, '_blank');
+    } catch (err) {
+      console.error('Error abriendo PDF:', err);
+      alert('Error al abrir el PDF del contrato');
+    }
+  };
+
   const handleCambiarEstado = async (contratoId, nuevoEstado) => {
     try {
       const motivo = prompt(`Ingrese el motivo para cambiar a "${nuevoEstado}":`);
@@ -413,7 +423,12 @@ const { hasPermission } = useAuth();
 
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
-                      {!contrato.firmado_cliente && contrato.estado !== 'anulado' && (
+                      {contrato.firmado_cliente ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" title="Contrato firmado">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Firmado
+                        </span>
+                      ) : contrato.estado !== 'anulado' && (
                         <button
                           onClick={() => handleIrAFirmar(contrato.id)}
                           className="text-green-600 hover:text-green-900 p-1 rounded transition-colors"
@@ -422,6 +437,14 @@ const { hasPermission } = useAuth();
                           <PenTool className="w-4 h-4" />
                         </button>
                       )}
+
+                      <button
+                        onClick={() => handleVerPDF(contrato.id)}
+                        className="text-indigo-600 hover:text-indigo-900 p-1 rounded transition-colors"
+                        title="Ver PDF"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
 
                       <button
                         onClick={() => handleDescargarPDF(contrato.id)}

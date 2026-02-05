@@ -203,8 +203,8 @@ static async abrirContratoParaFirma(contratoId) {
         rutaPDFOriginal = await this.generarPDFContrato(contratoId);
       }
 
-      // Crear directorio para PDFs firmados
-      const uploadsDir = path.join(process.cwd(), 'uploads', 'contratos');
+      // Crear directorio para PDFs firmados (usar __dirname para consistencia con el controller)
+      const uploadsDir = path.join(__dirname, '..', 'uploads', 'contratos');
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
@@ -313,9 +313,11 @@ static async abrirContratoParaFirma(contratoId) {
       const signatureWidth = 120;
       const signatureHeight = 60;
 
-      // SIEMPRE agregar firma en página 2 (índice 1) - Contrato principal
-      if (totalPages >= 2) {
-        const page2 = pages[1];
+      // Agregar firma en página 2 (índice 1) o en la última página si hay menos de 2
+      if (totalPages >= 1) {
+        const pageIndex = totalPages >= 2 ? 1 : 0;
+        const page2 = pages[pageIndex];
+        console.log(`✍️ Colocando firma en página ${pageIndex + 1} de ${totalPages}`);
         const { width, height } = page2.getSize();
 
         // ✅ Imagen de firma centrada sobre la línea de firma

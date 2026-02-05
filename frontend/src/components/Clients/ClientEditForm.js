@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Save, Loader2, User, MapPin, Phone, Mail,
-  AlertCircle, Check
+  AlertCircle, Check, Clock
 } from 'lucide-react';
 import { clientService } from '../../services/clientService';
 
@@ -27,8 +27,10 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
     estrato: '3',
     ciudad_id: '',
     sector_id: '',
-    observaciones: ''
+    observaciones: '',
+    fecha_hasta: ''
   });
+  const [permanenciaMeses, setPermanenciaMeses] = useState('');
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -86,6 +88,8 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
   const cargarDatosCliente = () => {
     if (!client) return;
 
+    const fechaHasta = client.fecha_hasta ? client.fecha_hasta.split('T')[0] : '';
+
     setFormData({
       nombre: client.nombre || '',
       direccion: client.direccion || '',
@@ -96,8 +100,17 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
       estrato: client.estrato || '3',
       ciudad_id: client.ciudad_id || '',
       sector_id: client.sector_id || '',
-      observaciones: client.observaciones || ''
+      observaciones: client.observaciones || '',
+      fecha_hasta: fechaHasta
     });
+
+    // Calcular meses de permanencia desde hoy hasta fecha_hasta
+    if (fechaHasta) {
+      const hoy = new Date();
+      const hasta = new Date(fechaHasta);
+      const diffMeses = (hasta.getFullYear() - hoy.getFullYear()) * 12 + (hasta.getMonth() - hoy.getMonth());
+      setPermanenciaMeses(diffMeses > 0 ? String(diffMeses) : '0');
+    }
   };
 
   const handleInputChange = (field, value) => {
@@ -112,6 +125,19 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
         ...prev,
         [field]: null
       }));
+    }
+  };
+
+  // Manejar cambio de permanencia en meses
+  const handlePermanenciaChange = (meses) => {
+    setPermanenciaMeses(meses);
+    if (meses && parseInt(meses) > 0) {
+      const fechaDesde = new Date();
+      fechaDesde.setMonth(fechaDesde.getMonth() + parseInt(meses));
+      const fechaHasta = fechaDesde.toISOString().split('T')[0];
+      setFormData(prev => ({ ...prev, fecha_hasta: fechaHasta }));
+    } else {
+      setFormData(prev => ({ ...prev, fecha_hasta: '' }));
     }
   };
 
@@ -428,6 +454,59 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Permanencia */}
+            <div>
+              <h3 className="text-lg font-semibold text-[#0e6493] mb-4 flex items-center gap-2 border-b-2 border-[#0e6493]/20 pb-3">
+                <Clock className="w-5 h-5" />
+                Permanencia
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Permanencia (meses)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="60"
+                    value={permanenciaMeses}
+                    onChange={(e) => handlePermanenciaChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                    placeholder="Ej: 6, 12, 18"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Tiempo de permanencia del contrato en meses
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fecha fin permanencia
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.fecha_hasta}
+                    onChange={(e) => {
+                      handleInputChange('fecha_hasta', e.target.value);
+                      if (e.target.value) {
+                        const hoy = new Date();
+                        const hasta = new Date(e.target.value);
+                        const diff = (hasta.getFullYear() - hoy.getFullYear()) * 12 + (hasta.getMonth() - hoy.getMonth());
+                        setPermanenciaMeses(diff > 0 ? String(diff) : '0');
+                      } else {
+                        setPermanenciaMeses('');
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Se calcula a partir de la fecha actual
+                  </p>
                 </div>
               </div>
             </div>

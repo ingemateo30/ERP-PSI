@@ -5,11 +5,12 @@ const { Database } = require('../models/Database');
 const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    console.log('🔍 Auth Header completo:', authHeader);
-    console.log('🔍 Tipo de authHeader:', typeof authHeader);
-    
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-    console.log('🔑 Token extraído:', token ? `${token.substring(0, 30)}...` : 'NO HAY TOKEN');
+
+    // Soportar token desde header Authorization O desde query string (para abrir PDFs en nueva pestaña)
+    let token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    if (!token && req.query && req.query.token) {
+      token = req.query.token;
+    }
 
     if (!token) {
       return res.status(401).json({
