@@ -53,10 +53,14 @@ if (contratoData.servicios && Array.isArray(contratoData.servicios)) {
 }
 const textoIVATotal = algunServicioConIVA ? ` + IVA ($${this.formatearPrecio(valorTotalIVA)})` : '';
 
+// Valor total a mostrar: con IVA si aplica, sin IVA si no aplica
+const valorTotalDisplay = algunServicioConIVA ? valorTotalConIVA : valorTotal;
+
 console.log('💰 Valor total calculado para contrato:', {
   numero_contrato: contratoData.numero_contrato,
   cantidad_servicios: contratoData.servicios?.length || 0,
   valor_total: valorTotal,
+  valor_total_con_iva: valorTotalConIVA,
   aplica_iva: algunServicioConIVA
 });
 
@@ -460,7 +464,7 @@ const tienePermanencia = permanenciaMeses > 1;
 
         <!-- DOS COLUMNAS -->
         <div class="two-columns">
-            ${this.generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, permanenciaMeses, fechaActivacionTexto, textoIVATotal)}
+            ${this.generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, permanenciaMeses, fechaActivacionTexto, textoIVATotal, valorTotalDisplay)}
         </div>
     </div>
 
@@ -487,7 +491,8 @@ const tienePermanencia = permanenciaMeses > 1;
         </div>`;
   }
 
-  static generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, meses, fechaActivacionTexto, textoIVATotal = '') {
+  static generarColumnasContenido(contratoData, servicios, valorTotal, tienePermanencia, meses, fechaActivacionTexto, textoIVATotal = '', valorTotalDisplay = null) {
+    const valorMostrar = valorTotalDisplay !== null ? valorTotalDisplay : valorTotal;
     return `
             <!-- COLUMNA IZQUIERDA -->
             <div class="column-content">
@@ -521,7 +526,7 @@ const tienePermanencia = permanenciaMeses > 1;
                 </div>
 
                 <div class="valor-total">
-                    Valor Total $${this.formatearPrecio(algunServicioConIVA ? valorTotalConIVA : valorTotal)}${textoIVATotal}
+                    Valor Total $${this.formatearPrecio(valorMostrar)}${textoIVATotal}
                 </div>
 
                 <div class="content-box">
