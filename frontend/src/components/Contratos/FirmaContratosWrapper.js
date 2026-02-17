@@ -19,7 +19,7 @@ const FirmaContratosWrapper = () => {
     const [mostrarBuscador, setMostrarBuscador] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [filtroEstado, setFiltroEstado] = useState('pendiente');
+    const [filtroEstado, setFiltroEstado] = useState('todos');
     const [procesandoFirma, setProcesandoFirma] = useState(false);
     const [mostrarModalFirma, setMostrarModalFirma] = useState(false);
     const [datosForm, setDatosForm] = useState({

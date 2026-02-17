@@ -359,19 +359,35 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
             console.log('📦 Servicios encontrados:', serviciosDetalles.length);
 
             // ✅ CORRECCIÓN: Preparar array de servicios para el PDF con TODAS las características
-            contratoData.servicios = serviciosDetalles.map(servicio => ({
-                plan_nombre: servicio.plan_nombre,
-                tipo: servicio.plan_tipo, // internet, television, combo
-                tipo_servicio: servicio.plan_tipo,
-                precio_plan: parseFloat(servicio.precio || servicio.precio_personalizado || 0),
-                precio: parseFloat(servicio.precio || servicio.precio_personalizado || 0),
-                velocidad_bajada: servicio.velocidad_bajada,
-                velocidad_subida: servicio.velocidad_subida,
-                canales_tv: servicio.canales_tv,
-                tecnologia: servicio.tecnologia,
-                descripcion: servicio.descripcion,
-                aplica_iva: Boolean(servicio.aplica_iva)
-            }));
+            // Importar servicio de IVA para cálculo dinámico según estrato del cliente
+            const IVACalculatorService = require('../services/IVACalculatorService');
+            const clienteEstrato = parseInt(contratoData.cliente_estrato) || 3;
+
+            contratoData.servicios = serviciosDetalles.map(servicio => {
+                const precioBase = parseFloat(servicio.precio_personalizado || servicio.precio || 0);
+                const tipoServicio = servicio.plan_tipo || 'internet';
+                // Calcular IVA dinámicamente según estrato del cliente y tipo de servicio
+                const ivaInfo = IVACalculatorService.determinarIVA(tipoServicio, clienteEstrato);
+                const valorIVA = ivaInfo.aplica ? Math.round(precioBase * (ivaInfo.porcentaje / 100)) : 0;
+                const precioConIVA = precioBase + valorIVA;
+
+                return {
+                    plan_nombre: servicio.plan_nombre,
+                    tipo: tipoServicio,
+                    tipo_servicio: tipoServicio,
+                    precio_plan: precioBase,
+                    precio: precioBase,
+                    precio_con_iva: precioConIVA,
+                    valor_iva: valorIVA,
+                    velocidad_bajada: servicio.velocidad_bajada,
+                    velocidad_subida: servicio.velocidad_subida,
+                    canales_tv: servicio.canales_tv,
+                    tecnologia: servicio.tecnologia,
+                    descripcion: servicio.descripcion,
+                    aplica_iva: ivaInfo.aplica,
+                    porcentaje_iva: ivaInfo.porcentaje
+                };
+            });
 
             console.log('✅ Array de servicios preparado para PDF:', contratoData.servicios);
 
