@@ -663,14 +663,14 @@ class PDFGenerator {
 
     static formatearMoneda(valor) {
         if (!valor || isNaN(valor)) return '$0';
-        const numero = Math.abs(parseFloat(valor));
-        return `$${numero.toLocaleString('es-CO')}`;
+        const numero = Math.round(Math.abs(parseFloat(valor)));
+        return `$${numero.toLocaleString('es-CO', { maximumFractionDigits: 0 })}`;
     }
 
     static formatearPesos(valor) {
         if (!valor || isNaN(valor)) return '0';
-        const numero = Math.abs(parseFloat(valor));
-        return numero.toLocaleString('es-CO');
+        const numero = Math.round(Math.abs(parseFloat(valor)));
+        return numero.toLocaleString('es-CO', { maximumFractionDigits: 0 });
     }
 
     static formatearFecha(fecha) {

@@ -670,26 +670,6 @@ const InstalacionForm = ({
                             </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Costo de Instalación */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Costo de Instalación
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="1000"
-                                        placeholder="Ej: 50000"
-                                        value={formData.costo_instalacion}
-                                        onChange={(e) => handleInputChange('costo_instalacion', e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent ${errors.costo_instalacion ? 'border-red-500' : 'border-gray-300'
-                                            }`}
-                                    />
-                                    {errors.costo_instalacion && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.costo_instalacion}</p>
-                                    )}
-                                </div>
-
                                 {/* Observaciones */}
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">

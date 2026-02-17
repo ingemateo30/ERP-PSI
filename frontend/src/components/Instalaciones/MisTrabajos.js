@@ -316,7 +316,9 @@ const cerrarModal = () => {
                     <div>
                       <p className="text-sm font-medium text-gray-700">Fecha Programada</p>
                       <p className="text-sm text-gray-600">
-                        {new Date(instalacion.fecha_programada).toLocaleDateString('es-ES')}
+                        {instalacion.fecha_programada
+                          ? new Date(instalacion.fecha_programada.split('T')[0] + 'T12:00:00').toLocaleDateString('es-ES')
+                          : '-'}
                       </p>
                     </div>
                   </div>

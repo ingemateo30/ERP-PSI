@@ -507,6 +507,26 @@ router.get('/:id/pdf', async (req, res) => {
         const instalacion = instalacionData[0];
         console.log('✅ Instalación encontrada:', instalacion.id, instalacion.cliente_nombre);
 
+        // Parsear fotos_instalacion para extraer firma del usuario
+        let firmaUsuarioBase64 = '';
+        let fechaCompletada = '';
+        try {
+            if (instalacion.fotos_instalacion) {
+                const fotosArray = typeof instalacion.fotos_instalacion === 'string'
+                    ? JSON.parse(instalacion.fotos_instalacion)
+                    : instalacion.fotos_instalacion;
+                if (Array.isArray(fotosArray) && fotosArray.length > 1) {
+                    firmaUsuarioBase64 = fotosArray[1] || ''; // Index 1 = firma_usuario
+                }
+            }
+            if (instalacion.fecha_realizada) {
+                const d = new Date(instalacion.fecha_realizada);
+                fechaCompletada = d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            }
+        } catch (e) {
+            console.warn('⚠️ Error parseando fotos_instalacion:', e.message);
+        }
+
         // Obtener servicios - MEJORADO
         let servicios = [];
         try {
@@ -599,11 +619,13 @@ router.get('/:id/pdf', async (req, res) => {
             serviciosInternet.forEach(serv => {
                 const velocidad = serv.velocidad_bajada ? `${serv.velocidad_bajada} Mbps` : '';
                 const tecnologia = serv.tecnologia || 'Fibra Óptica';
+                const precio = parseFloat(serv.precio_personalizado || serv.precio || 0);
+                const precioTexto = precio > 0 ? ` - $${precio.toLocaleString('es-CO')}` : '';
                 serviciosHTML += `
                     <div class="service-item">
                         <span class="service-icon">🌐</span>
                         <div class="service-details">
-                            <strong>${serv.nombre}</strong>
+                            <strong>${serv.nombre}${precioTexto}</strong>
                             <span class="service-specs">${velocidad}${velocidad ? ' - ' : ''}${tecnologia}</span>
                         </div>
                     </div>
@@ -615,11 +637,13 @@ router.get('/:id/pdf', async (req, res) => {
         if (serviciosTV.length > 0) {
             serviciosTV.forEach(serv => {
                 const canales = serv.canales_tv ? `${serv.canales_tv} canales` : '';
+                const precio = parseFloat(serv.precio_personalizado || serv.precio || 0);
+                const precioTexto = precio > 0 ? ` - $${precio.toLocaleString('es-CO')}` : '';
                 serviciosHTML += `
                     <div class="service-item">
                         <span class="service-icon">📺</span>
                         <div class="service-details">
-                            <strong>${serv.nombre}</strong>
+                            <strong>${serv.nombre}${precioTexto}</strong>
                             ${canales ? `<span class="service-specs">${canales}</span>` : ''}
                         </div>
                     </div>
@@ -1060,8 +1084,11 @@ const htmlContent = `
         <!-- FIRMAS -->
         <div class="signatures">
             <div class="signature-block">
-                <div class="signature-line"></div>
-                <div class="signature-label">Firma Cliente</div>
+                ${firmaUsuarioBase64
+                    ? `<img src="${firmaUsuarioBase64}" style="max-width:100%;max-height:30mm;object-fit:contain;" alt="Firma Usuario" />`
+                    : '<div class="signature-line"></div>'
+                }
+                <div class="signature-label">Firma Usuario</div>
                 <div class="signature-sublabel">${instalacion.cliente_nombre || ''}</div>
             </div>
             <div class="signature-block">
@@ -1072,7 +1099,7 @@ const htmlContent = `
             <div class="signature-block">
                 <div class="signature-line"></div>
                 <div class="signature-label">Fecha Completado</div>
-                <div class="signature-sublabel">____/____/________</div>
+                <div class="signature-sublabel">${fechaCompletada || '____/____/________'}</div>
             </div>
         </div>
     </div>

@@ -30,11 +30,17 @@ class ContratoPDFGeneratorMINTIC {
     // ✅ CORRECCIÓN: Calcular el total sumando TODOS los servicios
 const servicios = this.determinarServicios(contratoData);
 
-// Calcular valor total sumando TODOS los servicios
+// Calcular valor total y valor IVA sumando TODOS los servicios
 let valorTotal = 0;
+let valorTotalIVA = 0;
+let valorTotalConIVA = 0;
 if (contratoData.servicios && Array.isArray(contratoData.servicios)) {
   contratoData.servicios.forEach(servicio => {
-    valorTotal += parseFloat(servicio.precio_plan || servicio.precio || 0);
+    const precioBase = parseFloat(servicio.precio_plan || servicio.precio || 0);
+    const valorIVA = parseFloat(servicio.valor_iva || 0);
+    valorTotal += precioBase;
+    valorTotalIVA += valorIVA;
+    valorTotalConIVA += servicio.precio_con_iva ? parseFloat(servicio.precio_con_iva) : (precioBase + valorIVA);
   });
 }
 
@@ -45,7 +51,7 @@ if (contratoData.servicios && Array.isArray(contratoData.servicios)) {
     servicio.aplica_iva === 1 || servicio.aplica_iva === true
   );
 }
-const textoIVATotal = algunServicioConIVA ? ' + IVA' : '';
+const textoIVATotal = algunServicioConIVA ? ` + IVA ($${this.formatearPrecio(valorTotalIVA)})` : '';
 
 console.log('💰 Valor total calculado para contrato:', {
   numero_contrato: contratoData.numero_contrato,
@@ -515,7 +521,7 @@ const tienePermanencia = permanenciaMeses > 1;
                 </div>
 
                 <div class="valor-total">
-                    Valor Total $${this.formatearPrecio(valorTotal)}${textoIVATotal}
+                    Valor Total $${this.formatearPrecio(algunServicioConIVA ? valorTotalConIVA : valorTotal)}${textoIVATotal}
                 </div>
 
                 <div class="content-box">
@@ -596,24 +602,27 @@ static generarDetallesServicios(contratoData, servicios) {
 
     const tipo = tipoPlan.toLowerCase();
 
+    const valorIVA = parseFloat(servicio.valor_iva || 0);
+    const precioConIVA = parseFloat(servicio.precio_con_iva || (precioPlan + valorIVA));
+    const textoIVA = aplicaIVA ? ` + IVA($${this.formatearPrecio(valorIVA)}) = $${this.formatearPrecio(precioConIVA)}` : '';
+
     if (tipo.includes('internet') || tipo.includes('combo')) {
       let caracteristicas = [];
       if (velocidadBajada) caracteristicas.push(`${velocidadBajada}MB`);
       if (tecnologia) caracteristicas.push(tecnologia);
-      
+
       const detalleVelocidad = caracteristicas.length > 0 ? caracteristicas.join(' ') : 'Internet';
-      
-      detalles += `<p><strong>INTERNET FIBRA $ ${this.formatearPrecio(precioPlan)}</strong> ${nombrePlan} ${detalleVelocidad} ESTRATO ${estrato}</p>`;
+
+      detalles += `<p><strong>INTERNET FIBRA $ ${this.formatearPrecio(precioPlan)}${textoIVA}</strong> ${nombrePlan} ${detalleVelocidad} ESTRATO ${estrato}</p>`;
     }
-    
+
     if (tipo.includes('tv') || tipo.includes('television')) {
       let caracteristicas = [];
       if (canalesTV) caracteristicas.push(`${canalesTV} canales`);
-      
+
       const detalleCanales = caracteristicas.length > 0 ? caracteristicas.join(' ') : '';
-      const textoIVA = aplicaIVA ? ' + IVA' : '';
-      
-      detalles += `<p><strong>TELEVISION $ ${this.formatearPrecio(precioPlan)}</strong> ${nombrePlan} ${detalleCanales} ESTRATO ${estrato}${textoIVA}</p>`;
+
+      detalles += `<p><strong>TELEVISION $ ${this.formatearPrecio(precioPlan)}${textoIVA}</strong> ${nombrePlan} ${detalleCanales} ESTRATO ${estrato}</p>`;
     }
   });
 

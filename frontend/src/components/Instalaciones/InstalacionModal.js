@@ -95,8 +95,13 @@ const InstalacionModal = ({
   useEffect(() => {
     if (instalacion) {
       console.log('🔍 Cargando datos de instalación:', instalacion);
+      // Strip the time portion from fecha_programada to ensure correct display in date input
+      const fechaProgramada = instalacion.fecha_programada
+        ? instalacion.fecha_programada.split('T')[0]
+        : '';
       setFormData({
         ...instalacion,
+        fecha_programada: fechaProgramada,
         equipos_instalados: instalacion.equipos_instalados || [],
         costo_instalacion: instalacion.costo_instalacion || 0
       });
@@ -288,7 +293,11 @@ const validarFormulario = () => {
 
   const formatearFecha = (fecha) => {
     if (!fecha) return '-';
-    return new Date(fecha).toLocaleDateString('es-CO', {
+    // Use noon to prevent off-by-one day due to timezone offset on date-only strings
+    const fechaStr = typeof fecha === 'string' && fecha.length === 10
+      ? fecha + 'T12:00:00'
+      : fecha;
+    return new Date(fechaStr).toLocaleDateString('es-CO', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -298,7 +307,10 @@ const validarFormulario = () => {
 
   const formatearFechaCorta = (fecha) => {
     if (!fecha) return '-';
-    return new Date(fecha).toLocaleDateString('es-CO');
+    const fechaStr = typeof fecha === 'string' && fecha.length === 10
+      ? fecha + 'T12:00:00'
+      : fecha;
+    return new Date(fechaStr).toLocaleDateString('es-CO');
   };
 
   const formatearHora = (hora) => {
@@ -604,21 +616,6 @@ const validarFormulario = () => {
   </div>
 </div>
 
-          {/* Costo */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-              <DollarSign className="w-4 h-4 mr-2" />
-              Información Económica
-            </h4>
-            <div className="space-y-2">
-              <div>
-                <span className="text-sm text-gray-600">Costo de instalación:</span>
-                <p className="font-medium text-lg text-green-600">
-                  ${(instalacion?.costo_instalacion || 0).toLocaleString('es-CO')}
-                </p>
-              </div>
-            </div>
-          </div>
 
           {/* Fechas importantes */}
           <div className="bg-gray-50 p-4 rounded-lg md:col-span-2">
@@ -678,21 +675,6 @@ const validarFormulario = () => {
             </div>
           </div>
 
-          {/* Costo */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Costo de instalación
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="1000"
-              value={formData.costo_instalacion}
-              onChange={(e) => handleChange('costo_instalacion', parseFloat(e.target.value) || 0)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="0"
-            />
-          </div>
         </div>
       )}
     </div>

@@ -149,12 +149,17 @@ router.get('/historial-cliente', async (req, res) => {
     console.log('🔍 [BACKEND] WHERE final:', whereClause);
     console.log('🔍 [BACKEND] Params finales:', params);
 
-    // Obtener facturas
+    // Obtener facturas - usar datos actuales del cliente para evitar datos incorrectos almacenados
     const facturas = await Database.query(`
-      SELECT 
+      SELECT
         f.*,
         c.nombre as cliente_nombre,
-        c.identificacion as cliente_identificacion
+        c.nombre as nombre_cliente,
+        c.identificacion as cliente_identificacion,
+        c.identificacion as identificacion_cliente,
+        c.telefono as cliente_telefono,
+        c.correo as cliente_email,
+        c.direccion as cliente_direccion
       FROM facturas f
       INNER JOIN clientes c ON f.cliente_id = c.id
       ${whereClause}

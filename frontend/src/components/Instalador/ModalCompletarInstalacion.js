@@ -348,11 +348,11 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
             <p className="text-xs text-gray-500 mt-1">Mínimo 8 caracteres</p>
           </div>
 
-          {/* ✅ FIRMA DEL INSTALADOR */}
+          {/* ✅ FIRMA DEL USUARIO */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Pen size={16} className="inline mr-1" />
-              Firma del Instalador *
+              Firma Usuario *
             </label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 bg-white">
               <SignatureCanvas
@@ -368,7 +368,7 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
             </div>
             <div className="flex justify-between items-center mt-2">
               <p className="text-xs text-gray-500">
-                ✍️ Firme con el mouse, dedo o stylus
+                ✍️ El usuario debe firmar con el mouse, dedo o stylus
               </p>
               <button
                 type="button"
@@ -381,7 +381,7 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
             </div>
             {!firmaCompleta && (
               <p className="text-xs text-red-500 mt-1">
-                ⚠️ Debe firmar antes de completar la instalación
+                ⚠️ El usuario debe firmar antes de completar la instalación
               </p>
             )}
           </div>
