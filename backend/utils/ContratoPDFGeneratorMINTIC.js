@@ -526,7 +526,7 @@ const tienePermanencia = permanenciaMeses > 1;
                 </div>
 
                 <div class="valor-total">
-                    Valor Total $${this.formatearPrecio(valorMostrar)}${textoIVATotal}
+                    Valor Total $${this.formatearPrecio(valorMostrar)}
                 </div>
 
                 <div class="content-box">
