@@ -293,11 +293,9 @@ const validarFormulario = () => {
 
   const formatearFecha = (fecha) => {
     if (!fecha) return '-';
-    // Use noon to prevent off-by-one day due to timezone offset on date-only strings
-    const fechaStr = typeof fecha === 'string' && fecha.length === 10
-      ? fecha + 'T12:00:00'
-      : fecha;
-    return new Date(fechaStr).toLocaleDateString('es-CO', {
+    const datePart = (typeof fecha === 'string' ? fecha : fecha.toISOString()).split('T')[0];
+    const [year, month, day] = datePart.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('es-CO', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -307,10 +305,9 @@ const validarFormulario = () => {
 
   const formatearFechaCorta = (fecha) => {
     if (!fecha) return '-';
-    const fechaStr = typeof fecha === 'string' && fecha.length === 10
-      ? fecha + 'T12:00:00'
-      : fecha;
-    return new Date(fechaStr).toLocaleDateString('es-CO');
+    const datePart = (typeof fecha === 'string' ? fecha : fecha.toISOString()).split('T')[0];
+    const [year, month, day] = datePart.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('es-CO');
   };
 
   const formatearHora = (hora) => {

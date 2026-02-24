@@ -189,8 +189,12 @@ useEffect(() => {
                         <div className="space-y-1 text-sm text-gray-600">
                             <div>
                                 <span className="font-medium">Fecha programada:</span>{' '}
-                                {instalacion?.fecha_programada 
-                                    ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO')
+                                {instalacion?.fecha_programada
+                                    ? (() => {
+                                        const dp = instalacion.fecha_programada.split('T')[0];
+                                        const [y, m, d] = dp.split('-').map(Number);
+                                        return new Date(y, m - 1, d).toLocaleDateString('es-CO');
+                                      })()
                                     : 'N/A'
                                 }
                             </div>

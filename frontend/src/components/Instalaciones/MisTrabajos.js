@@ -106,8 +106,9 @@ const MisTrabajos = () => {
 
   const esHoy = (fecha) => {
     if (!fecha) return false;
-    const hoy = new Date().toISOString().split('T')[0];
-    const fechaComparar = new Date(fecha).toISOString().split('T')[0];
+    const hoyDate = new Date();
+    const hoy = `${hoyDate.getFullYear()}-${String(hoyDate.getMonth() + 1).padStart(2, '0')}-${String(hoyDate.getDate()).padStart(2, '0')}`;
+    const fechaComparar = (typeof fecha === 'string' ? fecha : fecha.toISOString()).split('T')[0];
     return hoy === fechaComparar;
   };
 

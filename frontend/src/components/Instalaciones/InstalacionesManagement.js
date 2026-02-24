@@ -586,7 +586,10 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
 
   const formatearFecha = (fecha) => {
     if (!fecha) return '-';
-    return new Date(fecha).toLocaleDateString('es-CO', {
+    // Extraer solo la parte de fecha (YYYY-MM-DD) para evitar conversión de zona horaria UTC
+    const datePart = (typeof fecha === 'string' ? fecha : fecha.toISOString()).split('T')[0];
+    const [year, month, day] = datePart.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('es-CO', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'

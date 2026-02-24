@@ -261,12 +261,13 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
               <div>
                 <p className="text-sm text-gray-600">Fecha Programada</p>
                 <p className="font-medium text-gray-900">
-                  {new Date(instalacion.fecha_programada).toLocaleDateString('es-ES', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
+                  {(() => {
+                    const dp = (instalacion.fecha_programada || '').split('T')[0];
+                    const [y, m, d] = dp.split('-').map(Number);
+                    return new Date(y, m - 1, d).toLocaleDateString('es-ES', {
+                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                    });
+                  })()}
                 </p>
               </div>
               <div>

@@ -797,7 +797,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       precioInternetCustom: '',
       precioTelevisionCustom: '',
       tipoContrato: formData.tipo_permanencia || 'sin_permanencia',
-      mesesPermanencia: formData.tipo_permanencia === 'con_permanencia' ? 6 : 0,
+      mesesPermanencia: formData.tipo_permanencia === 'con_permanencia' ? (formData.meses_permanencia || 6) : 0,
       cobrar_instalacion: formData.cobrar_instalacion, // ✅ NUEVO: Cobro de instalación separado
       valor_instalacion: formData.cobrar_instalacion ? formData.valor_instalacion : 0, // ✅ NUEVO: Valor personalizado
       fechaActivacion: formData.fecha_activacion,

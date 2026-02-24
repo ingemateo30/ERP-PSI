@@ -553,6 +553,7 @@ router.get('/:id/pdf', async (req, res) => {
                     const placeholders = serviciosClienteIds.map(() => '?').join(',');
 
                     // JOIN correcto: servicios_cliente -> planes_servicio
+                    // Sin filtro de estado para mostrar todos los servicios a instalar
                     const serviciosResult = await Database.query(`
                         SELECT
                             ps.nombre,
@@ -566,7 +567,7 @@ router.get('/:id/pdf', async (req, res) => {
                         FROM servicios_cliente sc
                         INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
                         WHERE sc.id IN (${placeholders})
-                        AND sc.estado = 'activo'
+                        AND sc.estado != 'cancelado'
                     `, serviciosClienteIds);
 
                     // Extraer servicios según estructura de respuesta
@@ -580,6 +581,36 @@ router.get('/:id/pdf', async (req, res) => {
 
                     console.log('✅ Servicios encontrados:', servicios.length);
                 }
+            }
+
+            // Fallback: si no se encontraron servicios por servicio_cliente_id, buscar por cliente_id
+            if (servicios.length === 0 && instalacion.cliente_id) {
+                console.log('🔄 Buscando servicios por cliente_id:', instalacion.cliente_id);
+                const serviciosFallback = await Database.query(`
+                    SELECT
+                        ps.nombre,
+                        ps.tipo,
+                        ps.velocidad_subida,
+                        ps.velocidad_bajada,
+                        ps.canales_tv,
+                        ps.tecnologia,
+                        sc.precio_personalizado,
+                        ps.precio
+                    FROM servicios_cliente sc
+                    INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
+                    WHERE sc.cliente_id = ?
+                    AND sc.estado != 'cancelado'
+                    ORDER BY sc.created_at DESC
+                `, [instalacion.cliente_id]);
+
+                if (Array.isArray(serviciosFallback)) {
+                    if (serviciosFallback.length > 0 && Array.isArray(serviciosFallback[0])) {
+                        servicios = serviciosFallback[0] || [];
+                    } else {
+                        servicios = serviciosFallback || [];
+                    }
+                }
+                console.log('✅ Servicios encontrados por cliente_id:', servicios.length);
             }
         } catch (error) {
             console.warn('⚠️ Error obteniendo servicios:', error.message);
