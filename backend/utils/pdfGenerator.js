@@ -445,7 +445,7 @@ class PDFGenerator {
             }
 
             // Validar que valorPagar tenga número par de dígitos
-            let valorAjustado = Math.round(valorPagar).toString().padStart(2, '0');
+            let valorAjustado = Math.round(valorPagar).toString().padStart(10, '0');
             if (valorAjustado.length % 2 !== 0) {
                 valorAjustado = '0' + valorAjustado;
             }
