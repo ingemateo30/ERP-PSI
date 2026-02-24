@@ -538,8 +538,12 @@ class PDFGenerator {
                 height: 50
             });
 
+            let valorLegible = Math.round(valorPagar).toString().padStart(9, '0');
+if (valorLegible.length % 2 !== 0) {
+    valorLegible = '0' + valorLegible;
+}
             // Texto legible con paréntesis (según estándar)
-            const codigoLegible = `(415)${numeroLocalizacion}(8020)${referenciaPago}(3900)${valorPagar}(96)${fechaMaximaPago}`;
+            const codigoLegible = `(415)${numeroLocalizacion}(8020)${referenciaPago}(3900)${valorLegible}(96)${fechaMaximaPago}`;
             doc.fontSize(7).font('Helvetica')
                 .text(codigoLegible, x - 50, y + 55, {
                     width: 300,
