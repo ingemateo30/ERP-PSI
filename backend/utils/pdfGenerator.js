@@ -439,7 +439,7 @@ class PDFGenerator {
     static async generarCodigoBarrasEAN128(numeroLocalizacion, referenciaPago, valorPagar, fechaMaximaPago) {
         try {
             // Validar que referenciaPago tenga número par de dígitos
-            let referenciaAjustada = referenciaPago.toString().padStart(2, '0');
+            let referenciaAjustada = '301' + referenciaPago.toString().padStart(2, '0');
             if (referenciaAjustada.length % 2 !== 0) {
                 referenciaAjustada = '0' + referenciaAjustada;
             }
