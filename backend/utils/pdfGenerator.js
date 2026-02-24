@@ -520,7 +520,7 @@ class PDFGenerator {
             const numeroLocalizacion = '7709998284111';
             
             // Obtener datos de la factura
-            const referenciaPago = factura.identificacion_cliente || factura.codigo_cliente || '1005450340';
+            const referenciaPago = '301' + factura.identificacion_cliente || '301' + factura.codigo_cliente || '1005450340';
             const valorPagar = Math.round(parseFloat(factura.total) || 62097);
             const fechaMaximaPago = this.formatearFechaBarras(factura.fecha_vencimiento);
 
