@@ -110,7 +110,7 @@ class ContratosService {
                 } catch (pdfError) {
                     console.error('❌ Error generando PDF:', pdfError);
                     // CORRECCIÓN: Usar URL directa como fallback
-                    const token = localStorage.getItem('token');
+                    const token = authService.getToken();
                     const apiUrl = process.env.NODE_ENV === 'development'
                     ? (process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1')
                     : process.env.REACT_APP_API_URL;
@@ -144,7 +144,7 @@ class ContratosService {
             }
 
             // Obtener token de autenticación
-            const token = localStorage.getItem('token');
+            const token = authService.getToken();
             if (!token) {
                 throw new Error('Token de autenticación no encontrado');
             }

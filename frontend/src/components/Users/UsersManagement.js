@@ -761,10 +761,23 @@ const UserModal = ({ type, user, onClose, onSave }) => {
         nombre: '',
         telefono: '',
         rol: 'supervisor',
+        sede_id: '',
         activo: true
     });
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState({});
+    const [cities, setCities] = useState([]);
+
+    useEffect(() => {
+        // Cargar ciudades para el selector de sede
+        const token = localStorage.getItem('accessToken');
+        fetch('/api/v1/config/cities', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(r => r.json())
+        .then(data => { if (data.success) setCities(data.data || []); })
+        .catch(() => {});
+    }, []);
 
     useEffect(() => {
         if (user && type !== 'create') {
@@ -775,6 +788,7 @@ const UserModal = ({ type, user, onClose, onSave }) => {
                 nombre: user.nombre || '',
                 telefono: user.telefono || '',
                 rol: user.rol || 'supervisor',
+                sede_id: user.sede_id || '',
                 activo: Boolean(user.activo)
             });
         }
@@ -798,6 +812,7 @@ const UserModal = ({ type, user, onClose, onSave }) => {
                     nombre: formData.nombre,
                     telefono: formData.telefono,
                     rol: formData.rol,
+                    sede_id: formData.sede_id || null,
                     activo: formData.activo
                 };
                 await usersService.update(user.id, updateData);
@@ -811,7 +826,8 @@ const UserModal = ({ type, user, onClose, onSave }) => {
                     password: formData.password,
                     nombre: formData.nombre,
                     telefono: formData.telefono,
-                    rol: formData.rol
+                    rol: formData.rol,
+                    sede_id: formData.sede_id || null
                 });
             }
             onSave();
@@ -920,6 +936,7 @@ const UserModal = ({ type, user, onClose, onSave }) => {
                                         required
                                     >
                                         <option value="instalador">Instalador</option>
+                                        <option value="operador">Operador</option>
                                         <option value="supervisor">Supervisor</option>
                                         <option value="administrador">Administrador</option>
                                     </select>
@@ -927,6 +944,25 @@ const UserModal = ({ type, user, onClose, onSave }) => {
                                         <p className="text-red-600 text-sm mt-1">{errors.rol}</p>
                                     )}
                                 </div>
+                            </div>
+
+                            {/* Sede asignada */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Sede asignada
+                                </label>
+                                <select
+                                    value={formData.sede_id}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, sede_id: e.target.value }))}
+                                    disabled={isReadOnly}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent disabled:bg-gray-100"
+                                >
+                                    <option value="">Sin restricción (ve todas las sedes)</option>
+                                    {cities.map(city => (
+                                        <option key={city.id} value={city.id}>{city.nombre}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">Los administradores siempre ven toda la información</p>
                             </div>
 
                             {type === 'edit' && (

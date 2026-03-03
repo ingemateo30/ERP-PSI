@@ -56,6 +56,12 @@ class InstalacionesController {
                 console.log(`🔒 Filtro de instalador aplicado: solo instalaciones del usuario ${req.user.id}`);
             }
 
+            // Restricción de sede para usuarios no administradores con sede asignada
+            if (req.user && req.user.rol !== 'administrador' && req.user.rol !== 'instalador' && req.user.sede_id) {
+                whereClause += ' AND c.ciudad_id = ?';
+                params.push(req.user.sede_id);
+            }
+
             if (busqueda.trim()) {
                 whereClause += ` AND (
         c.nombre LIKE ? OR

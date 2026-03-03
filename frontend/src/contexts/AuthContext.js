@@ -541,7 +541,9 @@ const hasPermission = (requiredRole) => {
     // Estados derivados
     isAdmin: state.user?.role === 'administrador' || state.user?.rol === 'administrador',
     isSupervisor: state.user?.role === 'supervisor' || state.user?.rol === 'supervisor',
-    isInstaller: state.user?.role === 'instalador' || state.user?.rol === 'instalador'
+    isInstaller: state.user?.role === 'instalador' || state.user?.rol === 'instalador',
+    // Sede asignada al usuario (null = sin restricción / administrador)
+    sedeId: state.user?.sede_id || null
   };
 
   return (

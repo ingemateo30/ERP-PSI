@@ -13,7 +13,7 @@ console.log('📋 Cargando rutas de contratos...');
  */
 router.get('/',
   authenticateToken,
-  requireRole(['supervisor', 'administrador']),
+  requireRole(['supervisor', 'administrador', 'operador']),
   ContratosController.obtenerTodos
 );
 

@@ -47,6 +47,7 @@ const VisorFirmaPDF = lazy(() => import('./components/Contratos/VisorFirmaPDF'))
 const FirmaContratosWrapper = lazy(() => import('./components/Contratos/FirmaContratosWrapper'));
 const HistorialFacturacionWrapper = lazy(() => import('./components/Facturas/HistorialFacturacionWrapper'));
 const CrucePagosBancarios = lazy(() => import('./components/Facturas/CrucePagosBancarios'));
+const FormatosBancarios = lazy(() => import('./components/Facturas/FormatosBancarios'));
 const MapaInstalaciones = lazy(() => import('./components/Mapa/MapaInstalaciones'));
 
 <Route path="/calendar" element={<ProtectedRoute><CalendarioManagement /></ProtectedRoute>} />
@@ -392,6 +393,16 @@ function App() {
                 }
               />
               <Route
+                path="/formatos-bancos"
+                element={
+                  <ProtectedRoute requiredRole="supervisor,administrador">
+                    <MainLayout title="Formatos Bancos" subtitle="Archivos de recaudo para bancos y redes de pago">
+                      <FormatosBancarios />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/contratos"
                 element={
                   <ProtectedRoute requiredRole="supervisor,administrador">
@@ -404,7 +415,7 @@ function App() {
               <Route
                 path="/firma-contratos"
                 element={
-                  <ProtectedRoute requiredRole="administrador">
+                  <ProtectedRoute requiredRole="operador,supervisor,administrador">
                     <MainLayout title="Firma de Contratos" subtitle="Gestión de firma de contratos">
                       <FirmaContratosWrapper />
                     </MainLayout>

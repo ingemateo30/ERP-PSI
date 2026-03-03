@@ -671,7 +671,7 @@ class GeographyController {
 
   static async createSector(req, res) {
     try {
-      const { ciudad_id, codigo, nombre, activo = true } = req.body;
+      const { ciudad_id, codigo, nombre, activo = true, tipo_zona = 'urbano' } = req.body;
 
       if (!codigo || !nombre) {
         return res.status(400).json({
@@ -714,8 +714,8 @@ class GeographyController {
 
       // Crear sector
       const [result] = await connection.execute(
-        'INSERT INTO sectores (ciudad_id, codigo, nombre, activo) VALUES (?, ?, ?, ?)',
-        [ciudad_id || null, codigo.trim(), nombre.trim(), activo ? 1 : 0]
+        'INSERT INTO sectores (ciudad_id, codigo, nombre, tipo_zona, activo) VALUES (?, ?, ?, ?, ?)',
+        [ciudad_id || null, codigo.trim(), nombre.trim(), tipo_zona || 'urbano', activo ? 1 : 0]
       );
 
       // Obtener el sector creado con información relacionada
@@ -749,7 +749,7 @@ class GeographyController {
   static async actualizarSector(req, res) {
     try {
       const { id } = req.params;
-      const { ciudad_id, codigo, nombre, activo } = req.body;
+      const { ciudad_id, codigo, nombre, activo, tipo_zona } = req.body;
 
       if (!codigo || !nombre) {
         return res.status(400).json({
@@ -806,8 +806,8 @@ class GeographyController {
 
       // Actualizar
       await connection.execute(
-        'UPDATE sectores SET ciudad_id = ?, codigo = ?, nombre = ?, activo = ? WHERE id = ?',
-        [ciudad_id || null, codigo.trim(), nombre.trim(), activo ? 1 : 0, id]
+        'UPDATE sectores SET ciudad_id = ?, codigo = ?, nombre = ?, tipo_zona = ?, activo = ? WHERE id = ?',
+        [ciudad_id || null, codigo.trim(), nombre.trim(), tipo_zona || 'urbano', activo ? 1 : 0, id]
       );
 
       // Obtener el sector actualizado

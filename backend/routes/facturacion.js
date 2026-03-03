@@ -121,7 +121,13 @@ router.get('/facturas', async (req, res) => {
       queryParams.push(searchTerm, searchTerm, searchTerm);
     }
 
-    const whereClause = whereConditions.length > 0 ? 
+    // Restricción de sede: si el usuario no es administrador y tiene sede_id, filtrar por ciudad del cliente
+    if (req.user && req.user.rol !== 'administrador' && req.user.sede_id) {
+      whereConditions.push('EXISTS (SELECT 1 FROM clientes c WHERE c.id = f.cliente_id AND c.ciudad_id = ?)');
+      queryParams.push(req.user.sede_id);
+    }
+
+    const whereClause = whereConditions.length > 0 ?
       `WHERE ${whereConditions.join(' AND ')}` : '';
 
     // Contar total

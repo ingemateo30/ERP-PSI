@@ -20,7 +20,7 @@ class UsersController {
       try {
         let baseQuery = `
           SELECT 
-            id, email, nombre, telefono, rol, activo, ultimo_acceso, 
+            id, email, nombre, telefono, rol, sede_id, activo, ultimo_acceso, 
             created_at, updated_at
           FROM sistema_usuarios
         `;
@@ -126,7 +126,7 @@ class UsersController {
 
       const [users] = await connection.execute(`
         SELECT 
-          id, email, nombre, telefono, rol, activo, ultimo_acceso, 
+          id, email, nombre, telefono, rol, sede_id, activo, ultimo_acceso, 
           created_at, updated_at
         FROM sistema_usuarios 
         WHERE id = ?
@@ -154,7 +154,7 @@ class UsersController {
         return error(res, 'Datos de entrada inválidos', 400, errors.array());
       }
 
-      const { email, password, nombre, telefono, rol } = req.body;
+      const { email, password, nombre, telefono, rol, sede_id } = req.body;
 
       const connection = await pool.getConnection();
 
@@ -189,14 +189,14 @@ class UsersController {
       // Crear usuario
       const [result] = await connection.execute(`
         INSERT INTO sistema_usuarios (
-          email, password, nombre, telefono, rol, activo, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 1, NOW(), NOW())
-      `, [email, hashedPassword, nombre, telefono || null, rol]);
+          email, password, nombre, telefono, rol, sede_id, activo, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
+      `, [email, hashedPassword, nombre, telefono || null, rol, sede_id || null]);
 
       // Obtener usuario creado (sin password)
       const [newUser] = await connection.execute(`
         SELECT 
-          id, email, nombre, telefono, rol, activo, created_at, updated_at
+          id, email, nombre, telefono, rol, sede_id, activo, created_at, updated_at
         FROM sistema_usuarios 
         WHERE id = ?
       `, [result.insertId]);
@@ -249,7 +249,7 @@ class UsersController {
       }
 
       const { id } = req.params;
-      const { email, nombre, telefono, rol, activo } = req.body;
+      const { email, nombre, telefono, rol, activo, sede_id } = req.body;
 
       const connection = await pool.getConnection();
 
@@ -304,14 +304,15 @@ class UsersController {
 
       // Actualizar usuario
       await connection.execute(`
-        UPDATE sistema_usuarios 
-        SET email = ?, nombre = ?, telefono = ?, rol = ?, activo = ?, updated_at = NOW()
+        UPDATE sistema_usuarios
+        SET email = ?, nombre = ?, telefono = ?, rol = ?, sede_id = ?, activo = ?, updated_at = NOW()
         WHERE id = ?
       `, [
         email || existingUser.email,
         nombre || existingUser.nombre,
         telefono || existingUser.telefono,
         rol || existingUser.rol,
+        sede_id !== undefined ? (sede_id || null) : existingUser.sede_id,
         activo !== undefined ? (activo ? 1 : 0) : existingUser.activo,
         id
       ]);
@@ -319,7 +320,7 @@ class UsersController {
       // Obtener usuario actualizado
       const [updatedUser] = await connection.execute(`
         SELECT 
-          id, email, nombre, telefono, rol, activo, ultimo_acceso, 
+          id, email, nombre, telefono, rol, sede_id, activo, ultimo_acceso, 
           created_at, updated_at
         FROM sistema_usuarios 
         WHERE id = ?
@@ -530,7 +531,7 @@ class UsersController {
 
       const [users] = await connection.execute(`
         SELECT 
-          id, email, nombre, telefono, rol, activo, ultimo_acceso, 
+          id, email, nombre, telefono, rol, sede_id, activo, ultimo_acceso, 
           created_at, updated_at
         FROM sistema_usuarios 
         WHERE id = ?
@@ -601,7 +602,7 @@ class UsersController {
       // Obtener perfil actualizado
       const [updatedUser] = await connection.execute(`
         SELECT 
-          id, email, nombre, telefono, rol, activo, ultimo_acceso, 
+          id, email, nombre, telefono, rol, sede_id, activo, ultimo_acceso, 
           created_at, updated_at
         FROM sistema_usuarios 
         WHERE id = ?

@@ -52,6 +52,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <TrendingUp size={18} />, label: 'Facturas', path: '/facturas', keywords: ['facturas', 'invoices', 'cobros'], color: 'yellow', permission: 'supervisor,administrador' },
     { icon: <FileText size={18} />, label: 'Contratos', path: '/contratos', keywords: ['contratos', 'contracts', 'acuerdos'], color: 'orange', permission: 'supervisor,administrador' },
     { icon: <CreditCard size={18} />, label: 'Pagos', path: '/cruce-pagos', keywords: ['pagos', 'payments', 'cruce'], color: 'green', permission: 'supervisor,administrador' },
+    { icon: <Building2 size={18} />, label: 'Formatos Bancos', path: '/formatos-bancos', keywords: ['formatos', 'bancos', 'recaudo', 'caja social'], color: 'blue', permission: 'supervisor,administrador' },
     { icon: <FileText size={18} />, label: 'Historial Facturas', path: '/historial-facturas', keywords: ['historial', 'history'], color: 'gray', permission: 'supervisor,administrador' },
     { icon: <Wifi size={18} />, label: 'Planes de Servicio', path: '/config/service-plans', keywords: ['planes', 'servicios', 'plans'], color: 'blue', permission: 'administrador' },
     { icon: <Wrench size={18} />, label: 'Instalaciones', path: '/instalaciones', keywords: ['instalaciones', 'installation', 'instalar'], color: 'red', permission: 'instalador,supervisor,administrador' },
@@ -64,7 +65,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <BarChart3 size={18} />, label: 'Estadísticas', path: '/reports', keywords: ['estadisticas', 'stats', 'analytics'], color: 'green', permission: 'administrador' },
     { icon: <BarChart3 size={18} />, label: 'Mapa', path: '/mapa-instalaciones', keywords: ['mapa', 'map', 'ubicacion'], color: 'green', permission: 'instalador,administrador,supervisor' },
     { icon: <UserCheck size={18} />, label: 'Usuarios Sistema', path: '/admin/users', keywords: ['usuarios', 'admin', 'sistema'], color: 'blue', permission: 'administrador' },
-    { icon: <FileText size={18} />, label: 'Firma de Contratos', path: '/firma-contratos', keywords: ['firma', 'signature', 'contratos'], color: 'indigo', permission: 'administrador' },
+    { icon: <FileText size={18} />, label: 'Firma de Contratos', path: '/firma-contratos', keywords: ['firma', 'signature', 'contratos'], color: 'indigo', permission: 'operador,supervisor,administrador' },
     { icon: <Settings size={18} />, label: 'Configuración', path: '/config', keywords: ['configuracion', 'settings', 'config'], color: 'gray', permission: 'administrador' },
     { icon: <User size={18} />, label: 'Mi Perfil', path: '/profile', keywords: ['perfil', 'profile', 'cuenta'], color: 'blue', permission: null },
   ];
@@ -453,6 +454,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <TrendingUp size={22} />, label: 'Facturas', path: '/facturas', permission: 'supervisor,administrador' },
     { icon: <FileText size={22} />, label: 'Contratos', path: '/contratos', permission: 'supervisor,administrador' },
     { icon: <CreditCard size={22} />, label: 'Pagos', path: '/cruce-pagos', permission: 'supervisor,administrador' },
+    { icon: <Building2 size={22} />, label: 'Formatos Bancos', path: '/formatos-bancos', permission: 'supervisor,administrador' },
     { icon: <FileText size={22} />, label: 'Historial Facturas', path: '/historial-facturas', permission: 'supervisor,administrador' }
   ];
 
@@ -478,7 +480,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
   const administracion = [
     { icon: <UserCheck size={22} />, label: 'Usuarios Sistema', path: '/admin/users', permission: 'administrador' },
-    { icon: <FileText size={22} />, label: 'Firma de Contratos', path: '/firma-contratos', permission: 'administrador' },
+    { icon: <FileText size={22} />, label: 'Firma de Contratos', path: '/firma-contratos', permission: 'operador,supervisor,administrador' },
     { icon: <Settings size={22} />, label: 'Configuración', path: '/config', permission: 'administrador' }
   ];
 
