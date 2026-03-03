@@ -347,7 +347,7 @@ const cargarFacturasPagadasInicial = async () => {
                                         <td className="px-6 py-4"><div className="text-sm text-gray-900">{factura.nombre_cliente}</div><div className="text-xs text-gray-500">{factura.identificacion_cliente}</div></td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(factura.fecha_emision).toLocaleDateString()}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(factura.fecha_vencimiento).toLocaleDateString()}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${parseFloat(factura.total).toLocaleString()}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${Math.round(parseFloat(factura.total || 0)).toLocaleString('es-CO')}</td>
                                         <td className="px-6 py-4 whitespace-nowrap"><button onClick={() => abrirModalCruce(factura)} className="text-blue-600 hover:text-blue-900 flex items-center gap-1 font-medium"><CreditCard className="w-4 h-4" />Cruzar Pago</button></td>
                                     </tr>
                                 ))
@@ -490,7 +490,7 @@ const cargarFacturasPagadasInicial = async () => {
                                         <td className="px-6 py-4 text-sm text-gray-600">{factura.fecha_pago ? new Date(factura.fecha_pago).toLocaleDateString() : 'N/A'}</td>
                                         <td className="px-6 py-4 text-sm"><span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">{factura.metodo_pago || 'N/A'}</span></td>
                                         <td className="px-6 py-4 text-sm text-gray-600">{bancos.find(b => b.id === factura.banco_id)?.nombre || 'N/A'}</td>
-                                        <td className="px-6 py-4 text-sm font-semibold text-green-600">${parseFloat(factura.total).toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-sm font-semibold text-green-600">${Math.round(parseFloat(factura.total || 0)).toLocaleString('es-CO')}</td>
                                         <td className="px-6 py-4"><button onClick={() => abrirModalDetalle(factura)} className="text-blue-600 hover:text-blue-900 flex items-center gap-1"><Eye className="w-4 h-4" />Ver</button></td>
                                     </tr>
                                 ))
@@ -509,7 +509,7 @@ const cargarFacturasPagadasInicial = async () => {
                             <button onClick={() => setMostrarModalCruce(false)}><X className="w-6 h-6" /></button>
                         </div>
                         <div className="space-y-4">
-                            <div className="bg-gray-50 p-4 rounded"><p><strong>Factura:</strong> {facturaSeleccionada?.numero_factura}</p><p><strong>Cliente:</strong> {facturaSeleccionada?.nombre_cliente}</p><p><strong>Total:</strong> ${parseFloat(facturaSeleccionada?.total || 0).toLocaleString()}</p></div>
+                            <div className="bg-gray-50 p-4 rounded"><p><strong>Factura:</strong> {facturaSeleccionada?.numero_factura}</p><p><strong>Cliente:</strong> {facturaSeleccionada?.nombre_cliente}</p><p><strong>Total:</strong> ${Math.round(parseFloat(facturaSeleccionada?.total || 0)).toLocaleString('es-CO')}</p></div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div><label className="block text-sm font-medium mb-1">Monto</label><input type="number" step="1" value={datosPago.monto} onChange={(e) => setDatosPago({...datosPago, monto: Math.round(Number(e.target.value))})} className="w-full px-3 py-2 border rounded-lg" /></div>
                                 <div><label className="block text-sm font-medium mb-1">Fecha</label><input type="date" value={datosPago.fecha_pago} onChange={(e) => setDatosPago({...datosPago, fecha_pago: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div>
@@ -534,7 +534,7 @@ const cargarFacturasPagadasInicial = async () => {
                             <button onClick={() => setMostrarModalDetalle(false)}><X className="w-6 h-6" /></button>
                         </div>
                         <div className="space-y-4">
-                            <div className="bg-blue-50 p-4 rounded"><h3 className="font-semibold mb-2">Factura</h3><p><strong>Número:</strong> {facturaSeleccionada.numero_factura}</p><p><strong>Cliente:</strong> {facturaSeleccionada.nombre_cliente}</p><p><strong>Total:</strong> ${parseFloat(facturaSeleccionada.total).toLocaleString()}</p></div>
+                            <div className="bg-blue-50 p-4 rounded"><h3 className="font-semibold mb-2">Factura</h3><p><strong>Número:</strong> {facturaSeleccionada.numero_factura}</p><p><strong>Cliente:</strong> {facturaSeleccionada.nombre_cliente}</p><p><strong>Total:</strong> ${Math.round(parseFloat(facturaSeleccionada.total || 0)).toLocaleString('es-CO')}</p></div>
                             <div className="bg-green-50 p-4 rounded"><h3 className="font-semibold mb-2">Pago</h3><p><strong>Fecha:</strong> {facturaSeleccionada.fecha_pago ? new Date(facturaSeleccionada.fecha_pago).toLocaleDateString() : 'N/A'}</p><p><strong>Método:</strong> {facturaSeleccionada.metodo_pago || 'N/A'}</p><p><strong>Banco:</strong> {bancos.find(b => b.id === facturaSeleccionada.banco_id)?.nombre || 'N/A'}</p><p><strong>Referencia:</strong> {facturaSeleccionada.referencia_pago || 'N/A'}</p>{facturaSeleccionada.observaciones && (<p className="mt-2"><strong>Observaciones:</strong> {facturaSeleccionada.observaciones}</p>)}</div>
                             <button onClick={() => setMostrarModalDetalle(false)} className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg">Cerrar</button>
                         </div>
