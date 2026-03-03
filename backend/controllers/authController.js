@@ -172,6 +172,7 @@ class AuthController {
           apellidos: user.apellidos,
           telefono: user.telefono,
           rol: user.rol,
+          sede_id: user.sede_id || null,
           ultimo_acceso: user.ultimo_acceso
         },
         {

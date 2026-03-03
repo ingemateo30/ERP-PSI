@@ -90,7 +90,7 @@ const GeographyConfig = () => {
         initialData = { departamento_id: '', codigo: '', nombre: '' };
         break;
       case 'sector':
-        initialData = { codigo: '', nombre: '', ciudad_id: '' };
+        initialData = { codigo: '', nombre: '', ciudad_id: '', tipo_zona: 'urbano' };
         break;
       default:
         initialData = {};
@@ -546,6 +546,15 @@ const GeographyConfig = () => {
                       <span className="font-medium">{item.ciudad_nombre}</span>
                     </div>
                     <div className="flex justify-between">
+                      <span className="text-gray-600">Tipo de Zona:</span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.tipo_zona === 'rural'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-blue-100 text-blue-800'
+                        }`}>
+                        {item.tipo_zona === 'rural' ? 'Rural' : 'Urbano'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-gray-600">Estado:</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.activo
                         ? 'bg-green-100 text-green-800'
@@ -709,6 +718,24 @@ const GeographyConfig = () => {
                   required
                 />
               </div>
+
+              {/* Tipo de zona para sectores */}
+              {modalType === 'sector' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Zona *
+                  </label>
+                  <select
+                    value={formData.tipo_zona || 'urbano'}
+                    onChange={(e) => setFormData(prev => ({ ...prev, tipo_zona: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                    required
+                  >
+                    <option value="urbano">Urbano</option>
+                    <option value="rural">Rural</option>
+                  </select>
+                </div>
+              )}
 
               {/* Debug info en desarrollo */}
               {process.env.NODE_ENV === 'development' && (

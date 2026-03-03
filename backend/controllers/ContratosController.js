@@ -97,6 +97,12 @@ class ContratosController {
                 params.push(searchTerm, searchTerm, searchTerm);
             }
 
+            // Restricción de sede
+            if (req.user && req.user.rol !== 'administrador' && req.user.sede_id) {
+                query += ' AND cl.ciudad_id = ?';
+                params.push(req.user.sede_id);
+            }
+
             query += ' GROUP BY c.id';
 
             // Contar total

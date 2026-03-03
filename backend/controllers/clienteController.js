@@ -34,6 +34,11 @@ class ClienteController {
       if (ciudad_id) filtros.ciudad_id = ciudad_id;
       if (telefono) filtros.telefono = telefono;
 
+      // Restricción de sede: si el usuario no es administrador y tiene sede_id, filtrar por ciudad
+      if (req.user && req.user.rol !== 'administrador' && req.user.sede_id) {
+        filtros.ciudad_id = req.user.sede_id;
+      }
+
       const [clientes, total] = await Promise.all([
         Cliente.obtenerTodos(filtros),
         Cliente.contarTotal(filtros)
@@ -95,6 +100,11 @@ class ClienteController {
       // CORRECCIÓN: Agregar filtros de fecha si se proporcionan
       if (fechaInicio) filtros.fecha_inicio = fechaInicio;
       if (fechaFin) filtros.fecha_fin = fechaFin;
+
+      // Restricción de sede
+      if (req.user && req.user.rol !== 'administrador' && req.user.sede_id) {
+        filtros.ciudad_id = req.user.sede_id;
+      }
 
       // Obtener todos los clientes que coincidan con los filtros
       const clientes = await Cliente.obtenerTodosParaExportar(filtros);

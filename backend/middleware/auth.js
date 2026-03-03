@@ -35,7 +35,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     const [user] = await Database.query(
-      'SELECT id, email, nombre, rol, activo FROM sistema_usuarios WHERE id = ? AND activo = 1',
+      'SELECT id, email, nombre, rol, activo, sede_id FROM sistema_usuarios WHERE id = ? AND activo = 1',
       [userId]
     );
 
@@ -52,7 +52,8 @@ const authenticateToken = async (req, res, next) => {
       id: user.id,
       email: user.email,
       nombre: user.nombre,
-      rol: user.rol
+      rol: user.rol,
+      sede_id: user.sede_id || null
     };
 
     console.log('✅ Usuario autenticado:', { id: user.id, nombre: user.nombre, rol: user.rol });

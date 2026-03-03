@@ -14,26 +14,19 @@ const SEDES = [
 ];
 
 // Definición de bancos/redes de pago disponibles
+// Caja Social unificada con selector de formato CSV/TXT
 const BANCOS = [
   {
-    id: 'cajasocial_csv',
+    id: 'cajasocial',
     nombre: 'Caja Social Corresponsales',
-    descripcion: 'CSV con encabezado (registro tipo 01)',
+    descripcion: 'Selecciona el formato: CSV (con encabezado) o TXT (solo registros de detalle)',
     icono: Building2,
     color: 'blue',
     sedes: ['todas', 'campoalegre', 'otros'],
-    accion: () => facturasService.descargarFormatoCajaSocialCSV(),
-    badge: 'CSV',
-  },
-  {
-    id: 'cajasocial_txt',
-    nombre: 'Caja Social Corresponsales',
-    descripcion: 'TXT sin encabezados (solo registros de detalle)',
-    icono: Building2,
-    color: 'blue',
-    sedes: ['todas', 'campoalegre', 'otros'],
-    accion: () => facturasService.descargarFormatoCajaSocialTXT(),
-    badge: 'TXT',
+    formatos: ['CSV', 'TXT'],
+    accion: (fmt) => fmt === 'CSV'
+      ? facturasService.descargarFormatoCajaSocialCSV()
+      : facturasService.descargarFormatoCajaSocialTXT(),
   },
   {
     id: 'efecty',
@@ -90,6 +83,8 @@ const FormatosBancarios = () => {
   const [cargando, setCargando] = useState({});
   const [mensaje, setMensaje] = useState(null);
   const [expandido, setExpandido] = useState(true);
+  // Formato seleccionado para Caja Social (CSV o TXT)
+  const [cajaFmt, setCajaFmt] = useState('CSV');
   const { hasPermission } = useAuth();
 
   if (!hasPermission('administrador') && !hasPermission('supervisor')) return null;
@@ -97,16 +92,18 @@ const FormatosBancarios = () => {
   const bancosVisibles = BANCOS.filter(b => b.sedes.includes(sede));
 
   const descargar = async (banco) => {
-    setCargando(prev => ({ ...prev, [banco.id]: true }));
+    const key = banco.id === 'cajasocial' ? `cajasocial_${cajaFmt}` : banco.id;
+    setCargando(prev => ({ ...prev, [key]: true }));
     setMensaje(null);
     try {
-      await banco.accion();
-      setMensaje({ tipo: 'success', texto: `Formato ${banco.nombre} (${banco.badge}) descargado correctamente.` });
+      await banco.accion(cajaFmt);
+      const label = banco.formatos ? `${banco.nombre} (${cajaFmt})` : `${banco.nombre} (${banco.badge})`;
+      setMensaje({ tipo: 'success', texto: `Formato ${label} descargado correctamente.` });
     } catch (error) {
       console.error(`Error descargando ${banco.id}:`, error);
       setMensaje({ tipo: 'error', texto: `Error al descargar ${banco.nombre}: ${error.message}` });
     } finally {
-      setCargando(prev => ({ ...prev, [banco.id]: false }));
+      setCargando(prev => ({ ...prev, [key]: false }));
       setTimeout(() => setMensaje(null), 6000);
     }
   };
@@ -186,7 +183,9 @@ const FormatosBancarios = () => {
             {bancosVisibles.map(banco => {
               const c = colorClasses[banco.color];
               const Icon = banco.icono;
-              const loading = cargando[banco.id];
+              const isCaja = banco.id === 'cajasocial';
+              const loadingKey = isCaja ? `cajasocial_${cajaFmt}` : banco.id;
+              const loading = cargando[loadingKey];
               return (
                 <div
                   key={banco.id}
@@ -198,12 +197,34 @@ const FormatosBancarios = () => {
                         <Icon className={`w-4 h-4 ${c.text}`} />
                         <span className={`font-semibold text-sm ${c.text}`}>{banco.nombre}</span>
                       </div>
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-mono font-medium ${c.badge}`}>
-                        {banco.badge}
-                      </span>
+                      {!isCaja && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-mono font-medium ${c.badge}`}>
+                          {banco.badge}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-gray-500 leading-snug">{banco.descripcion}</p>
                   </div>
+
+                  {/* Selector CSV / TXT solo para Caja Social */}
+                  {isCaja && (
+                    <div className="flex space-x-1 mb-3">
+                      {banco.formatos.map(fmt => (
+                        <button
+                          key={fmt}
+                          onClick={() => setCajaFmt(fmt)}
+                          className={`flex-1 py-1 text-xs font-mono font-semibold rounded transition-colors ${
+                            cajaFmt === fmt
+                              ? `${c.btn} text-white`
+                              : 'bg-white border border-blue-300 text-blue-700 hover:bg-blue-50'
+                          }`}
+                        >
+                          {fmt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   <button
                     onClick={() => descargar(banco)}
                     disabled={loading}
@@ -217,7 +238,7 @@ const FormatosBancarios = () => {
                     ) : (
                       <>
                         <Download className="w-3.5 h-3.5" />
-                        <span>Descargar</span>
+                        <span>Descargar{isCaja ? ` (${cajaFmt})` : ''}</span>
                       </>
                     )}
                   </button>

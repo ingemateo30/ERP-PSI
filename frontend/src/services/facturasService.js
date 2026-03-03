@@ -1,6 +1,7 @@
 // frontend/src/services/facturasService.js - CON UTILIDADES AGREGADAS
 
 import apiService from './apiService';
+import authService from './authService';
 
 const API_BASE = '/facturacion';
 
@@ -423,7 +424,7 @@ export const facturasService = {
    * @param {string} filename  - Nombre sugerido del archivo
    */
   async _descargarFormato(endpoint, filename) {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const token = authService.getToken();
     const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'GET',

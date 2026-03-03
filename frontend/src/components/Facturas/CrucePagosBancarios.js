@@ -208,7 +208,7 @@ const cargarFacturasPagadasInicial = async () => {
     const abrirModalCruce = (factura) => {
         setFacturaSeleccionada(factura);
         setDatosPago({
-            monto: factura.total,
+            monto: Math.round(factura.total),
             referencia: '',
             fecha_pago: new Date().toISOString().split('T')[0],
             banco_id: '',
@@ -511,7 +511,7 @@ const cargarFacturasPagadasInicial = async () => {
                         <div className="space-y-4">
                             <div className="bg-gray-50 p-4 rounded"><p><strong>Factura:</strong> {facturaSeleccionada?.numero_factura}</p><p><strong>Cliente:</strong> {facturaSeleccionada?.nombre_cliente}</p><p><strong>Total:</strong> ${parseFloat(facturaSeleccionada?.total || 0).toLocaleString()}</p></div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="block text-sm font-medium mb-1">Monto</label><input type="number" value={datosPago.monto} onChange={(e) => setDatosPago({...datosPago, monto: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div>
+                                <div><label className="block text-sm font-medium mb-1">Monto</label><input type="number" step="1" value={datosPago.monto} onChange={(e) => setDatosPago({...datosPago, monto: Math.round(Number(e.target.value))})} className="w-full px-3 py-2 border rounded-lg" /></div>
                                 <div><label className="block text-sm font-medium mb-1">Fecha</label><input type="date" value={datosPago.fecha_pago} onChange={(e) => setDatosPago({...datosPago, fecha_pago: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -535,7 +535,7 @@ const cargarFacturasPagadasInicial = async () => {
                         </div>
                         <div className="space-y-4">
                             <div className="bg-blue-50 p-4 rounded"><h3 className="font-semibold mb-2">Factura</h3><p><strong>Número:</strong> {facturaSeleccionada.numero_factura}</p><p><strong>Cliente:</strong> {facturaSeleccionada.nombre_cliente}</p><p><strong>Total:</strong> ${parseFloat(facturaSeleccionada.total).toLocaleString()}</p></div>
-                            <div className="bg-green-50 p-4 rounded"><h3 className="font-semibold mb-2">Pago</h3><p><strong>Fecha:</strong> {facturaSeleccionada.fecha_pago ? new Date(facturaSeleccionada.fecha_pago).toLocaleDateString() : 'N/A'}</p><p><strong>Método:</strong> {facturaSeleccionada.metodo_pago || 'N/A'}</p><p><strong>Banco:</strong> {bancos.find(b => b.id === facturaSeleccionada.banco_id)?.nombre || 'N/A'}</p></div>
+                            <div className="bg-green-50 p-4 rounded"><h3 className="font-semibold mb-2">Pago</h3><p><strong>Fecha:</strong> {facturaSeleccionada.fecha_pago ? new Date(facturaSeleccionada.fecha_pago).toLocaleDateString() : 'N/A'}</p><p><strong>Método:</strong> {facturaSeleccionada.metodo_pago || 'N/A'}</p><p><strong>Banco:</strong> {bancos.find(b => b.id === facturaSeleccionada.banco_id)?.nombre || 'N/A'}</p><p><strong>Referencia:</strong> {facturaSeleccionada.referencia_pago || 'N/A'}</p>{facturaSeleccionada.observaciones && (<p className="mt-2"><strong>Observaciones:</strong> {facturaSeleccionada.observaciones}</p>)}</div>
                             <button onClick={() => setMostrarModalDetalle(false)} className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg">Cerrar</button>
                         </div>
                     </div>
