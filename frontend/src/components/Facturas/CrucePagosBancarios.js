@@ -282,11 +282,6 @@ const cargarFacturasPagadasInicial = async () => {
                     <h1 className="text-2xl font-bold text-gray-900">Cruce de Pagos Bancarios</h1>
                     <p className="text-gray-600">Registrar pagos de facturas pendientes</p>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={() => exportarPorBanco(7)} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 shadow-sm">
-                        <Download className="w-4 h-4" />Exportar Caja Social
-                    </button>
-                </div>
             </div>
 
             {/* FACTURAS PENDIENTES */}
