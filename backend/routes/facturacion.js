@@ -2,9 +2,17 @@
 
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const FacturacionAutomaticaController = require('../controllers/FacturacionAutomaticaController');
 const BancosFormatosController = require('../controllers/BancosFormatosController');
+const CruceMasivoController = require('../controllers/CruceMasivoController');
+
+// Multer en memoria para cruce masivo (no guarda en disco)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10 MB max
+});
 
 
 // Aplicar autenticación a todas las rutas
@@ -48,6 +56,36 @@ router.get('/formatos/finecoop', requireRole('administrador', 'supervisor'), Ban
  *       Consolida todos los servicios pendientes de un cliente en una sola fila
  */
 router.get('/formatos/comultrasan', requireRole('administrador', 'supervisor'), BancosFormatosController.generarFormatoComultrasan);
+
+// ==========================================
+// ENDPOINTS: CRUCE MASIVO DE PAGOS BANCARIOS
+// ==========================================
+
+/**
+ * @route POST /api/v1/facturacion/cruce-masivo/preview
+ * @desc Previsualiza los pagos detectados en el archivo sin marcar facturas
+ *       Soporta: cajasocial (CSV), cajasocial_d44 (D44), finecoop (XLSX),
+ *                comultrasan (XLSX), asobancaria/efecty/pse (TXT)
+ * @access Administrador / Supervisor
+ */
+router.post(
+  '/cruce-masivo/preview',
+  requireRole('administrador', 'supervisor'),
+  upload.single('archivo'),
+  CruceMasivoController.previewCruceMasivo
+);
+
+/**
+ * @route POST /api/v1/facturacion/cruce-masivo/procesar
+ * @desc Procesa el archivo del banco y marca facturas como pagadas masivamente
+ * @access Administrador / Supervisor
+ */
+router.post(
+  '/cruce-masivo/procesar',
+  requireRole('administrador', 'supervisor'),
+  upload.single('archivo'),
+  CruceMasivoController.procesarCruceMasivo
+);
 
 // ==========================================
 // ENDPOINT PRINCIPAL: OBTENER FACTURAS
