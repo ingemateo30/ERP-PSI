@@ -4,10 +4,50 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const FacturacionAutomaticaController = require('../controllers/FacturacionAutomaticaController');
+const BancosFormatosController = require('../controllers/BancosFormatosController');
 
 
 // Aplicar autenticación a todas las rutas
 router.use(authenticateToken);
+
+// ==========================================
+// ENDPOINTS: FORMATOS DE RECAUDO BANCARIO
+// ==========================================
+
+/**
+ * @route GET /api/v1/facturacion/formatos/cajasocial?tipo=csv|txt
+ * @desc Descargar formato de recaudo para Caja Social Corresponsales
+ *       tipo=csv incluye cabecera (01); tipo=txt solo registros de detalle (02)
+ */
+router.get('/formatos/cajasocial', requireRole('administrador', 'supervisor'), BancosFormatosController.generarFormatoCajaSocial);
+
+/**
+ * @route GET /api/v1/facturacion/formatos/efecty
+ * @desc Descargar formato Asobancaria 221 chars para Efecty (Convenio 113760)
+ */
+router.get('/formatos/efecty', requireRole('administrador', 'supervisor'), BancosFormatosController.generarFormatoEfecty);
+
+/**
+ * @route GET /api/v1/facturacion/formatos/pse
+ * @desc Descargar formato Asobancaria 220 chars para PSE (pago en línea)
+ */
+router.get('/formatos/pse', requireRole('administrador', 'supervisor'), BancosFormatosController.generarFormatoPSE);
+
+/**
+ * @route GET /api/v1/facturacion/formatos/finecoop
+ * @desc Descargar formato XLSX para Finecoop
+ *       El campo ID usa clientes.codigo_usuario (debe configurarse con el ID asignado por Finecoop)
+ *       Consolida todos los servicios pendientes de un cliente en una sola fila
+ */
+router.get('/formatos/finecoop', requireRole('administrador', 'supervisor'), BancosFormatosController.generarFormatoFinecoop);
+
+/**
+ * @route GET /api/v1/facturacion/formatos/comultrasan
+ * @desc Descargar formato XLSX para Comultrasan
+ *       El campo ID usa clientes.codigo_usuario (debe configurarse con el ID asignado por Comultrasan)
+ *       Consolida todos los servicios pendientes de un cliente en una sola fila
+ */
+router.get('/formatos/comultrasan', requireRole('administrador', 'supervisor'), BancosFormatosController.generarFormatoComultrasan);
 
 // ==========================================
 // ENDPOINT PRINCIPAL: OBTENER FACTURAS

@@ -8,6 +8,7 @@ import FacturasList from './FacturasList';
 import FacturaModal from './FacturaModal';
 import PagoModal from './PagoModal';
 import AnularModal from './AnularModal';
+import FormatosBancarios from './FormatosBancarios';
 import { useAuth } from '../../contexts/AuthContext';
 
 
@@ -501,6 +502,9 @@ const { hasPermission } = useAuth();
 
       {/* Estadísticas */}
       <FacturasStats loading={loading} />
+
+      {/* Formatos de recaudo bancario */}
+      <FormatosBancarios />
 
       {filtrosAvanzados && (
   <div className="mb-6">
