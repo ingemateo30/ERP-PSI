@@ -48,6 +48,7 @@ const FirmaContratosWrapper = lazy(() => import('./components/Contratos/FirmaCon
 const HistorialFacturacionWrapper = lazy(() => import('./components/Facturas/HistorialFacturacionWrapper'));
 const CrucePagosBancarios = lazy(() => import('./components/Facturas/CrucePagosBancarios'));
 const FormatosBancarios = lazy(() => import('./components/Facturas/FormatosBancarios'));
+const CruceMasivoBancos = lazy(() => import('./components/Facturas/CruceMasivoBancos'));
 const MapaInstalaciones = lazy(() => import('./components/Mapa/MapaInstalaciones'));
 
 <Route path="/calendar" element={<ProtectedRoute><CalendarioManagement /></ProtectedRoute>} />
@@ -398,6 +399,16 @@ function App() {
                   <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Formatos Bancos" subtitle="Archivos de recaudo para bancos y redes de pago">
                       <FormatosBancarios />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cruce-masivo"
+                element={
+                  <ProtectedRoute requiredRole="supervisor,administrador">
+                    <MainLayout title="Cruce Masivo de Pagos" subtitle="Procesar archivos de pago enviados por bancos y cooperativas">
+                      <CruceMasivoBancos />
                     </MainLayout>
                   </ProtectedRoute>
                 }

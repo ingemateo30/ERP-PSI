@@ -447,34 +447,88 @@ export const facturasService = {
     window.URL.revokeObjectURL(url);
   },
 
-  async descargarFormatoCajaSocialCSV() {
+  async descargarFormatoCajaSocialCSV(sede = 'todas') {
     const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    return this._descargarFormato(`${API_BASE}/formatos/cajasocial?tipo=csv`, `cajasocial_${hoy}.csv`);
+    return this._descargarFormato(`${API_BASE}/formatos/cajasocial?tipo=csv&sede=${sede}`, `cajasocial_${hoy}.csv`);
   },
 
-  async descargarFormatoCajaSocialTXT() {
+  async descargarFormatoCajaSocialTXT(sede = 'todas') {
     const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    return this._descargarFormato(`${API_BASE}/formatos/cajasocial?tipo=txt`, `cajasocial_${hoy}.txt`);
+    return this._descargarFormato(`${API_BASE}/formatos/cajasocial?tipo=txt&sede=${sede}`, `cajasocial_${hoy}.txt`);
   },
 
-  async descargarFormatoEfecty() {
+  async descargarFormatoEfecty(sede = 'todas') {
     const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    return this._descargarFormato(`${API_BASE}/formatos/efecty`, `efecty_${hoy}.txt`);
+    return this._descargarFormato(`${API_BASE}/formatos/efecty?sede=${sede}`, `efecty_${hoy}.txt`);
   },
 
-  async descargarFormatoPSE() {
+  async descargarFormatoPSE(sede = 'todas') {
     const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    return this._descargarFormato(`${API_BASE}/formatos/pse`, `pse_${hoy}.txt`);
+    return this._descargarFormato(`${API_BASE}/formatos/pse?sede=${sede}`, `pse_${hoy}.txt`);
   },
 
-  async descargarFormatoFinecoop() {
+  async descargarFormatoFinecoop(sede = 'otros') {
     const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    return this._descargarFormato(`${API_BASE}/formatos/finecoop`, `finecoop_${hoy}.xlsx`);
+    return this._descargarFormato(`${API_BASE}/formatos/finecoop?sede=${sede}`, `finecoop_${hoy}.xlsx`);
   },
 
-  async descargarFormatoComultrasan() {
+  async descargarFormatoComultrasan(sede = 'otros') {
     const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    return this._descargarFormato(`${API_BASE}/formatos/comultrasan`, `comultrasan_${hoy}.xlsx`);
+    return this._descargarFormato(`${API_BASE}/formatos/comultrasan?sede=${sede}`, `comultrasan_${hoy}.xlsx`);
+  },
+
+  // ==========================================
+  // CRUCE MASIVO DE PAGOS BANCARIOS
+  // ==========================================
+
+  /**
+   * Previsualiza el cruce masivo (no marca nada, solo analiza el archivo)
+   * @param {File} archivo - Archivo enviado por el banco
+   * @param {string} banco - cajasocial|cajasocial_d44|finecoop|comultrasan|asobancaria
+   */
+  async previewCruceMasivo(archivo, banco) {
+    const token = authService.getToken();
+    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+    formData.append('banco', banco);
+
+    const response = await fetch(`${API_BASE_URL}${API_BASE}/cruce-masivo/preview`, {
+      method: 'POST',
+      headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Error ${response.status}`);
+    }
+    return response.json();
+  },
+
+  /**
+   * Procesa el cruce masivo y marca facturas como pagadas
+   * @param {File} archivo - Archivo enviado por el banco
+   * @param {string} banco - cajasocial|cajasocial_d44|finecoop|comultrasan|asobancaria
+   * @param {string} fechaPago - YYYY-MM-DD (opcional, usa fecha del archivo si no se proporciona)
+   */
+  async procesarCruceMasivo(archivo, banco, fechaPago = '') {
+    const token = authService.getToken();
+    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+    formData.append('banco', banco);
+    if (fechaPago) formData.append('fecha_pago', fechaPago);
+
+    const response = await fetch(`${API_BASE_URL}${API_BASE}/cruce-masivo/procesar`, {
+      method: 'POST',
+      headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Error ${response.status}`);
+    }
+    return response.json();
   }
 };
 

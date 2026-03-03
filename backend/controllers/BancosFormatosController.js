@@ -51,8 +51,16 @@ class BancosFormatosController {
   /**
    * Obtener última factura pendiente por cliente
    * Agrupa por cliente y usa la factura más reciente de cada uno
+   * @param {string} sede - 'campoalegre' | 'otros' | 'todas'
    */
-  static async getUltimasFacturasPendientes() {
+  static async getUltimasFacturasPendientes(sede = 'todas') {
+    let filtroSede = '';
+    if (sede === 'campoalegre') {
+      filtroSede = `AND c.ciudad_id IN (SELECT id FROM ciudades WHERE LOWER(nombre) LIKE '%campoalegre%')`;
+    } else if (sede === 'otros') {
+      filtroSede = `AND (c.ciudad_id NOT IN (SELECT id FROM ciudades WHERE LOWER(nombre) LIKE '%campoalegre%') OR c.ciudad_id IS NULL)`;
+    }
+
     const rows = await Database.query(`
       SELECT
         f.id,
@@ -72,6 +80,7 @@ class BancosFormatosController {
       LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
       WHERE f.estado IN ('pendiente', 'vencida')
         AND f.activo = 1
+        ${filtroSede}
       ORDER BY f.cliente_id, f.fecha_emision DESC
     `);
 
@@ -126,8 +135,9 @@ class BancosFormatosController {
   static async generarFormatoCajaSocial(req, res) {
     try {
       const tipo = (req.query.tipo || 'csv').toLowerCase();
+      const sede = req.query.sede || 'todas';
       const empresa = await BancosFormatosController.getEmpresaConfig();
-      const facturas = await BancosFormatosController.getUltimasFacturasPendientes();
+      const facturas = await BancosFormatosController.getUltimasFacturasPendientes(sede);
 
       const nit = (empresa.empresa_nit || '').replace(/[^0-9]/g, '');
       const codigoGs1 = empresa.codigo_gs1 || '';
@@ -290,8 +300,9 @@ class BancosFormatosController {
     try {
       const WIDTH = 221;
       const CONVENIO = '123'; // Efecty convenio — ajustar según contrato
+      const sede = req.query.sede || 'todas';
       const empresa = await BancosFormatosController.getEmpresaConfig();
-      const facturas = await BancosFormatosController.getUltimasFacturasPendientes();
+      const facturas = await BancosFormatosController.getUltimasFacturasPendientes(sede);
       const fecha = BancosFormatosController.formatFecha(new Date());
       const nit = (empresa.empresa_nit || '').replace(/[^0-9]/g, '');
 
@@ -329,8 +340,9 @@ class BancosFormatosController {
     try {
       const WIDTH = 220;
       const CONVENIO = '123'; // PSE convenio — ajustar según contrato
+      const sede = req.query.sede || 'todas';
       const empresa = await BancosFormatosController.getEmpresaConfig();
-      const facturas = await BancosFormatosController.getUltimasFacturasPendientes();
+      const facturas = await BancosFormatosController.getUltimasFacturasPendientes(sede);
       const fecha = BancosFormatosController.formatFecha(new Date());
       const nit = (empresa.empresa_nit || '').replace(/[^0-9]/g, '');
 
@@ -372,8 +384,9 @@ class BancosFormatosController {
    */
   static async generarFormatoFinecoop(req, res) {
     try {
+      const sede = req.query.sede || 'otros';
       const empresa = await BancosFormatosController.getEmpresaConfig();
-      const facturas = await BancosFormatosController.getUltimasFacturasPendientes();
+      const facturas = await BancosFormatosController.getUltimasFacturasPendientes(sede);
       const fecha = BancosFormatosController.formatFecha(new Date());
 
       // Calcular fechas límite y hasta (último día del mes actual)
@@ -433,8 +446,9 @@ class BancosFormatosController {
    */
   static async generarFormatoComultrasan(req, res) {
     try {
+      const sede = req.query.sede || 'otros';
       const empresa = await BancosFormatosController.getEmpresaConfig();
-      const facturas = await BancosFormatosController.getUltimasFacturasPendientes();
+      const facturas = await BancosFormatosController.getUltimasFacturasPendientes(sede);
       const fecha = BancosFormatosController.formatFecha(new Date());
 
       const ahora = new Date();

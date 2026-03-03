@@ -15,6 +15,7 @@ const SEDES = [
 
 // Definición de bancos/redes de pago disponibles
 // Caja Social unificada con selector de formato CSV/TXT
+// Los bancos ahora reciben la sede al momento de la descarga (ver función descargar)
 const BANCOS = [
   {
     id: 'cajasocial',
@@ -24,9 +25,9 @@ const BANCOS = [
     color: 'blue',
     sedes: ['todas', 'campoalegre', 'otros'],
     formatos: ['CSV', 'TXT'],
-    accion: (fmt) => fmt === 'CSV'
-      ? facturasService.descargarFormatoCajaSocialCSV()
-      : facturasService.descargarFormatoCajaSocialTXT(),
+    accion: (fmt, sede) => fmt === 'CSV'
+      ? facturasService.descargarFormatoCajaSocialCSV(sede)
+      : facturasService.descargarFormatoCajaSocialTXT(sede),
   },
   {
     id: 'efecty',
@@ -35,7 +36,7 @@ const BANCOS = [
     icono: Store,
     color: 'yellow',
     sedes: ['todas', 'campoalegre', 'otros'],
-    accion: () => facturasService.descargarFormatoEfecty(),
+    accion: (_, sede) => facturasService.descargarFormatoEfecty(sede),
     badge: 'TXT',
   },
   {
@@ -45,7 +46,7 @@ const BANCOS = [
     icono: Wifi,
     color: 'green',
     sedes: ['todas', 'campoalegre', 'otros'],
-    accion: () => facturasService.descargarFormatoPSE(),
+    accion: (_, sede) => facturasService.descargarFormatoPSE(sede),
     badge: 'TXT',
   },
   {
@@ -54,8 +55,8 @@ const BANCOS = [
     descripcion: 'Excel consolidado con ID por cliente',
     icono: Building2,
     color: 'purple',
-    sedes: ['todos', 'otros'],   // NO disponible en Campoalegre
-    accion: () => facturasService.descargarFormatoFinecoop(),
+    sedes: ['todas', 'otros'],   // NO disponible en Campoalegre
+    accion: (_, sede) => facturasService.descargarFormatoFinecoop(sede),
     badge: 'XLSX',
   },
   {
@@ -64,8 +65,8 @@ const BANCOS = [
     descripcion: 'Excel consolidado con ID por cliente',
     icono: Building2,
     color: 'orange',
-    sedes: ['todos', 'otros'],   // NO disponible en Campoalegre
-    accion: () => facturasService.descargarFormatoComultrasan(),
+    sedes: ['todas', 'otros'],   // NO disponible en Campoalegre
+    accion: (_, sede) => facturasService.descargarFormatoComultrasan(sede),
     badge: 'XLSX',
   },
 ];
@@ -96,7 +97,8 @@ const FormatosBancarios = () => {
     setCargando(prev => ({ ...prev, [key]: true }));
     setMensaje(null);
     try {
-      await banco.accion(cajaFmt);
+      // Pasar la sede actual al método de descarga para filtrar por ubicación
+      await banco.accion(cajaFmt, sede);
       const label = banco.formatos ? `${banco.nombre} (${cajaFmt})` : `${banco.nombre} (${banco.badge})`;
       setMensaje({ tipo: 'success', texto: `Formato ${label} descargado correctamente.` });
     } catch (error) {
