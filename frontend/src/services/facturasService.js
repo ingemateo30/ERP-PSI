@@ -411,6 +411,69 @@ export const facturasService = {
       console.error('Error generando XML DIAN:', error);
       throw error;
     }
+  },
+
+  // ==========================================
+  // FORMATOS DE RECAUDO BANCARIO
+  // ==========================================
+
+  /**
+   * Descarga un archivo de formato bancario disparando la descarga del navegador
+   * @param {string} endpoint - URL del endpoint
+   * @param {string} filename  - Nombre sugerido del archivo
+   */
+  async _descargarFormato(endpoint, filename) {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `Error ${response.status}`);
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async descargarFormatoCajaSocialCSV() {
+    const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    return this._descargarFormato(`${API_BASE}/formatos/cajasocial?tipo=csv`, `cajasocial_${hoy}.csv`);
+  },
+
+  async descargarFormatoCajaSocialTXT() {
+    const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    return this._descargarFormato(`${API_BASE}/formatos/cajasocial?tipo=txt`, `cajasocial_${hoy}.txt`);
+  },
+
+  async descargarFormatoEfecty() {
+    const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    return this._descargarFormato(`${API_BASE}/formatos/efecty`, `efecty_${hoy}.txt`);
+  },
+
+  async descargarFormatoPSE() {
+    const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    return this._descargarFormato(`${API_BASE}/formatos/pse`, `pse_${hoy}.txt`);
+  },
+
+  async descargarFormatoFinecoop() {
+    const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    return this._descargarFormato(`${API_BASE}/formatos/finecoop`, `finecoop_${hoy}.xlsx`);
+  },
+
+  async descargarFormatoComultrasan() {
+    const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    return this._descargarFormato(`${API_BASE}/formatos/comultrasan`, `comultrasan_${hoy}.xlsx`);
   }
 };
 
