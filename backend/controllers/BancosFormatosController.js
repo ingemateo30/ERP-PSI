@@ -373,7 +373,7 @@ class BancosFormatosController {
   static async generarFormatoFinecoop(req, res) {
     try {
       const empresa = await BancosFormatosController.getEmpresaConfig();
-      const facturas = await BancosFormatosController.getFacturasPendientesAgrupadas();
+      const facturas = await BancosFormatosController.getUltimasFacturasPendientes();
       const fecha = BancosFormatosController.formatFecha(new Date());
 
       // Calcular fechas límite y hasta (último día del mes actual)
@@ -434,7 +434,7 @@ class BancosFormatosController {
   static async generarFormatoComultrasan(req, res) {
     try {
       const empresa = await BancosFormatosController.getEmpresaConfig();
-      const facturas = await BancosFormatosController.getFacturasPendientesAgrupadas();
+      const facturas = await BancosFormatosController.getUltimasFacturasPendientes();
       const fecha = BancosFormatosController.formatFecha(new Date());
 
       const ahora = new Date();

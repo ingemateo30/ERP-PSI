@@ -6,6 +6,39 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 
 console.log('📋 Cargando rutas de contratos...');
 
+// Middleware flexible: acepta token por header Authorization o por query param ?token=
+const authenticateFlexible = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  let token = authHeader && authHeader.split(' ')[1];
+
+  // Si no hay token en header, buscar en query params (necesario para window.open)
+  if (!token && req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: 'Token de acceso requerido',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  try {
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error('❌ Error de autenticación:', error.message);
+    return res.status(403).json({
+      success: false,
+      message: 'Token inválido',
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
 /**
  * @route GET /api/v1/contratos
  * @desc Obtener todos los contratos con paginación y filtros
@@ -41,20 +74,20 @@ router.get('/:id',
 /**
  * @route GET /api/v1/contratos/:id/pdf
  * @desc Generar y descargar PDF del contrato
- * @access Private
+ * @access Private (acepta token en header o query param para window.open)
  */
 router.get('/:id/pdf',
-  authenticateToken,
+  authenticateFlexible,
   ContratosController.generarPDF
 );
 
 router.get('/:id/verificar-pdf',
-  authenticateToken,
+  authenticateFlexible,
   ContratosController.verificarPDF
 );
 
 router.get('/:id/descargar-pdf',
-  authenticateToken,
+  authenticateFlexible,
   ContratosController.descargarPDF
 );
 
@@ -80,37 +113,6 @@ router.get('/:id/abrir-firma', ContratosController.abrirParaFirma);
  * @desc Procesar firma digital y guardar PDF
  */
 router.post('/:id/procesar-firma', ContratosController.procesarFirmaDigital);
-
-const authenticateFlexible = (req, res, next) => {
-  // Intentar autenticación por header primero
-  const authHeader = req.headers['authorization'];
-  let token = authHeader && authHeader.split(' ')[1];
-  
-  // Si no hay token en header, buscar en query params
-  if (!token && req.query.token) {
-    token = req.query.token;
-  }
-  
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Token de acceso requerido'
-    });
-  }
-
-  try {
-    const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    console.error('❌ Error de autenticación:', error.message);
-    return res.status(403).json({
-      success: false,
-      message: 'Token inválido'
-    });
-  }
-};
 
 console.log('✅ Rutas de contratos cargadas correctamente');
 
