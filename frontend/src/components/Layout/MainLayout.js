@@ -8,7 +8,7 @@ import {
   DollarSign, TrendingUp, UserCheck, Wifi, Loader2,
   Building2, CreditCard, MapPin, PieChart as PieChartIcon,
   Package, FileText, Wrench, BarChart3, Home, Mail,
-  Clock, Zap, Hash, ArrowRight, Mic, MicOff
+  Clock, Zap, Hash, ArrowRight, Mic, MicOff, GitMerge
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -52,6 +52,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <TrendingUp size={18} />, label: 'Facturas', path: '/facturas', keywords: ['facturas', 'invoices', 'cobros'], color: 'yellow', permission: 'supervisor,administrador' },
     { icon: <FileText size={18} />, label: 'Contratos', path: '/contratos', keywords: ['contratos', 'contracts', 'acuerdos'], color: 'orange', permission: 'supervisor,administrador' },
     { icon: <CreditCard size={18} />, label: 'Pagos', path: '/cruce-pagos', keywords: ['pagos', 'payments', 'cruce'], color: 'green', permission: 'supervisor,administrador' },
+    { icon: <GitMerge size={18} />, label: 'Cruce Masivo', path: '/cruce-masivo', keywords: ['cruce', 'masivo', 'bancos', 'bulk'], color: 'teal', permission: 'supervisor,administrador' },
     { icon: <Building2 size={18} />, label: 'Formatos Bancos', path: '/formatos-bancos', keywords: ['formatos', 'bancos', 'recaudo', 'caja social'], color: 'blue', permission: 'supervisor,administrador' },
     { icon: <FileText size={18} />, label: 'Historial Facturas', path: '/historial-facturas', keywords: ['historial', 'history'], color: 'gray', permission: 'supervisor,administrador' },
     { icon: <Wifi size={18} />, label: 'Planes de Servicio', path: '/config/service-plans', keywords: ['planes', 'servicios', 'plans'], color: 'blue', permission: 'administrador' },
@@ -454,6 +455,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <TrendingUp size={22} />, label: 'Facturas', path: '/facturas', permission: 'supervisor,administrador' },
     { icon: <FileText size={22} />, label: 'Contratos', path: '/contratos', permission: 'supervisor,administrador' },
     { icon: <CreditCard size={22} />, label: 'Pagos', path: '/cruce-pagos', permission: 'supervisor,administrador' },
+    { icon: <GitMerge size={22} />, label: 'Cruce Masivo', path: '/cruce-masivo', permission: 'supervisor,administrador' },
     { icon: <Building2 size={22} />, label: 'Formatos Bancos', path: '/formatos-bancos', permission: 'supervisor,administrador' },
     { icon: <FileText size={22} />, label: 'Historial Facturas', path: '/historial-facturas', permission: 'supervisor,administrador' }
   ];

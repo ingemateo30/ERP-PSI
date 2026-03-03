@@ -283,12 +283,6 @@ const cargarFacturasPagadasInicial = async () => {
                     <p className="text-gray-600">Registrar pagos de facturas pendientes</p>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={() => exportarPorBanco(5)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 shadow-sm">
-                        <Download className="w-4 h-4" />Exportar Comultrasan
-                    </button>
-                    <button onClick={() => exportarPorBanco(6)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm">
-                        <Download className="w-4 h-4" />Exportar Finecoop
-                    </button>
                     <button onClick={() => exportarPorBanco(7)} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 shadow-sm">
                         <Download className="w-4 h-4" />Exportar Caja Social
                     </button>
