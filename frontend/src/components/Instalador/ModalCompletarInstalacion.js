@@ -113,11 +113,6 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
       return;
     }
 
-    if (equiposSeleccionados.length === 0) {
-      alert('❌ Debes seleccionar al menos un equipo instalado');
-      return;
-    }
-
     // ✅ VALIDACIONES DE IP Y TAP
     if (!ipAsignada.trim()) {
       alert('❌ Debes ingresar la IP asignada al cliente');
@@ -282,7 +277,7 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Package className="inline mr-2" size={18} />
-              Equipos Instalados * ({equiposSeleccionados.length} seleccionados)
+              Equipos Instalados ({equiposSeleccionados.length} seleccionados)
             </label>
 
             {equiposDisponibles.length === 0 ? (
@@ -411,7 +406,7 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
             </button>
             <button
               type="submit"
-              disabled={loading || !foto || equiposSeleccionados.length === 0}
+              disabled={loading || !foto}
               className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Completando...' : '✓ Completar Instalación'}

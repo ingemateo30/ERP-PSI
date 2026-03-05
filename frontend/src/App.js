@@ -30,6 +30,7 @@ const InventoryManagement = lazy(() => import('./components/Inventory/InventoryM
 
 // Lazy loading de componentes de gestión
 const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagement'));
+const ClientesPorSector = lazy(() => import('./components/Clients/ClientesPorSector'));
 const FacturasManagement = lazy(() => import('./components/Facturas/FacturasManagement'));// CORREGIDO: Importación correcta del componente FacturasManagement'./components/Facturas/FacturasManagement';from './components/Facturas/FacturasManagement';
 
 const ReportesRegulatorios = lazy(() => import('./components/Reports/ReportesRegulatorios'));// CORREGIDO: Importación correcta del componente ReportesRegulatorios'from './components/Reports/ReportesRegulatorios';
@@ -338,6 +339,17 @@ function App() {
                   <ProtectedRoute requiredRole="supervisor,administrador">
                     <MainLayout title="Detalle de Cliente" subtitle="">
                       <ClientsManagement />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/clients/por-sector"
+                element={
+                  <ProtectedRoute requiredRole="supervisor,administrador">
+                    <MainLayout title="Clientes por Sector" subtitle="Listado de clientes agrupados por zona y sede">
+                      <ClientesPorSector />
                     </MainLayout>
                   </ProtectedRoute>
                 }
