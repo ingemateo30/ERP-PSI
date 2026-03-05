@@ -199,7 +199,7 @@ const ClientesPorSector = () => {
       if (filtroZona)   params.append('tipo_zona', filtroZona);
       if (filtroEstado) params.append('estado', filtroEstado);
 
-      const res = await fetch(`${API_URL}/clientes/por-sector?${params}`, {
+      const res = await fetch(`${API_URL}/clients/por-sector?${params}`, {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       const json = await res.json();
