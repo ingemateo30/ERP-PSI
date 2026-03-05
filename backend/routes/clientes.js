@@ -261,6 +261,149 @@ router.get('/identification/:identificacion',
   ClienteController.obtenerPorIdentificacion
 );
 
+/**
+ * @route GET /api/v1/clientes/por-sector
+ * @desc Obtener clientes agrupados por tipo de zona (urbano/rural), ciudad y sector
+ * @access Administrador, Supervisor
+ */
+router.get('/por-sector',
+  requireRole(['administrador', 'supervisor']),
+  async (req, res) => {
+    try {
+      const { ciudad_id, tipo_zona, estado } = req.query;
+
+      let whereConditions = ['1=1'];
+      const params = [];
+
+      if (ciudad_id) {
+        whereConditions.push('ci.id = ?');
+        params.push(ciudad_id);
+      }
+      if (tipo_zona) {
+        whereConditions.push('s.tipo_zona = ?');
+        params.push(tipo_zona);
+      }
+      if (estado) {
+        whereConditions.push('c.estado = ?');
+        params.push(estado);
+      }
+
+      const whereClause = whereConditions.join(' AND ');
+
+      const connection = await pool.getConnection();
+      try {
+        // Obtener clientes con información de sector y ciudad
+        const [clientes] = await connection.execute(
+          `SELECT
+             c.id, c.nombre, c.identificacion, c.tipo_documento,
+             c.telefono, c.correo, c.direccion, c.barrio, c.estrato,
+             c.estado, c.created_at,
+             s.id as sector_id, s.nombre as sector_nombre,
+             s.codigo as sector_codigo, s.tipo_zona,
+             ci.id as ciudad_id, ci.nombre as ciudad_nombre,
+             d.nombre as departamento_nombre
+           FROM clientes c
+           LEFT JOIN sectores s ON c.sector_id = s.id
+           LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+           LEFT JOIN departamentos d ON ci.departamento_id = d.id
+           WHERE ${whereClause}
+           ORDER BY ci.nombre ASC, s.tipo_zona ASC, s.nombre ASC, c.nombre ASC`,
+          params
+        );
+
+        // Obtener lista de ciudades disponibles para filtros
+        const [ciudades] = await connection.execute(
+          `SELECT DISTINCT ci.id, ci.nombre
+           FROM clientes c
+           LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+           WHERE ci.id IS NOT NULL
+           ORDER BY ci.nombre ASC`
+        );
+
+        // Agrupar por ciudad → tipo_zona → sector
+        const agrupado = {};
+
+        for (const cliente of clientes) {
+          const ciudadKey = cliente.ciudad_id || 'sin_ciudad';
+          const ciudadNombre = cliente.ciudad_nombre || 'Sin Ciudad';
+          const tipoZona = cliente.tipo_zona || 'sin_zona';
+          const sectorKey = cliente.sector_id || 'sin_sector';
+          const sectorNombre = cliente.sector_nombre || 'Sin Sector';
+
+          if (!agrupado[ciudadKey]) {
+            agrupado[ciudadKey] = {
+              ciudad_id: cliente.ciudad_id,
+              ciudad_nombre: ciudadNombre,
+              departamento_nombre: cliente.departamento_nombre,
+              zonas: {}
+            };
+          }
+
+          if (!agrupado[ciudadKey].zonas[tipoZona]) {
+            agrupado[ciudadKey].zonas[tipoZona] = {
+              tipo_zona: tipoZona,
+              sectores: {}
+            };
+          }
+
+          if (!agrupado[ciudadKey].zonas[tipoZona].sectores[sectorKey]) {
+            agrupado[ciudadKey].zonas[tipoZona].sectores[sectorKey] = {
+              sector_id: cliente.sector_id,
+              sector_nombre: sectorNombre,
+              sector_codigo: cliente.sector_codigo,
+              clientes: []
+            };
+          }
+
+          agrupado[ciudadKey].zonas[tipoZona].sectores[sectorKey].clientes.push({
+            id: cliente.id,
+            nombre: cliente.nombre,
+            identificacion: cliente.identificacion,
+            tipo_documento: cliente.tipo_documento,
+            telefono: cliente.telefono,
+            correo: cliente.correo,
+            direccion: cliente.direccion,
+            barrio: cliente.barrio,
+            estrato: cliente.estrato,
+            estado: cliente.estado,
+            created_at: cliente.created_at
+          });
+        }
+
+        // Convertir a array para el frontend
+        const resultado = Object.values(agrupado).map(ciudad => ({
+          ...ciudad,
+          zonas: Object.values(ciudad.zonas).map(zona => ({
+            ...zona,
+            sectores: Object.values(zona.sectores).map(sector => ({
+              ...sector,
+              total: sector.clientes.length
+            }))
+          }))
+        }));
+
+        res.json({
+          success: true,
+          data: resultado,
+          ciudades_disponibles: ciudades,
+          total_clientes: clientes.length
+        });
+
+      } finally {
+        connection.release();
+      }
+
+    } catch (error) {
+      console.error('❌ Error obteniendo clientes por sector:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener clientes por sector',
+        error: error.message
+      });
+    }
+  }
+);
+
 // ⭐ CRÍTICO: ESTA RUTA DEBE IR AL FINAL
 // Obtener cliente por ID (debe ir al final para evitar conflictos)
 router.get('/:id',
@@ -1105,149 +1248,6 @@ router.put('/:id/reactivar',
       res.status(500).json({
         success: false,
         message: error.message || 'Error al reactivar cliente'
-      });
-    }
-  }
-);
-
-/**
- * @route GET /api/v1/clientes/por-sector
- * @desc Obtener clientes agrupados por tipo de zona (urbano/rural), ciudad y sector
- * @access Administrador, Supervisor
- */
-router.get('/por-sector',
-  requireRole(['administrador', 'supervisor']),
-  async (req, res) => {
-    try {
-      const { ciudad_id, tipo_zona, estado } = req.query;
-
-      let whereConditions = ['1=1'];
-      const params = [];
-
-      if (ciudad_id) {
-        whereConditions.push('ci.id = ?');
-        params.push(ciudad_id);
-      }
-      if (tipo_zona) {
-        whereConditions.push('s.tipo_zona = ?');
-        params.push(tipo_zona);
-      }
-      if (estado) {
-        whereConditions.push('c.estado = ?');
-        params.push(estado);
-      }
-
-      const whereClause = whereConditions.join(' AND ');
-
-      const connection = await pool.getConnection();
-      try {
-        // Obtener clientes con información de sector y ciudad
-        const [clientes] = await connection.execute(
-          `SELECT
-             c.id, c.nombre, c.identificacion, c.tipo_documento,
-             c.telefono, c.correo, c.direccion, c.barrio, c.estrato,
-             c.estado, c.created_at,
-             s.id as sector_id, s.nombre as sector_nombre,
-             s.codigo as sector_codigo, s.tipo_zona,
-             ci.id as ciudad_id, ci.nombre as ciudad_nombre,
-             d.nombre as departamento_nombre
-           FROM clientes c
-           LEFT JOIN sectores s ON c.sector_id = s.id
-           LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
-           LEFT JOIN departamentos d ON ci.departamento_id = d.id
-           WHERE ${whereClause}
-           ORDER BY ci.nombre ASC, s.tipo_zona ASC, s.nombre ASC, c.nombre ASC`,
-          params
-        );
-
-        // Obtener lista de ciudades disponibles para filtros
-        const [ciudades] = await connection.execute(
-          `SELECT DISTINCT ci.id, ci.nombre
-           FROM clientes c
-           LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
-           WHERE ci.id IS NOT NULL
-           ORDER BY ci.nombre ASC`
-        );
-
-        // Agrupar por ciudad → tipo_zona → sector
-        const agrupado = {};
-
-        for (const cliente of clientes) {
-          const ciudadKey = cliente.ciudad_id || 'sin_ciudad';
-          const ciudadNombre = cliente.ciudad_nombre || 'Sin Ciudad';
-          const tipoZona = cliente.tipo_zona || 'sin_zona';
-          const sectorKey = cliente.sector_id || 'sin_sector';
-          const sectorNombre = cliente.sector_nombre || 'Sin Sector';
-
-          if (!agrupado[ciudadKey]) {
-            agrupado[ciudadKey] = {
-              ciudad_id: cliente.ciudad_id,
-              ciudad_nombre: ciudadNombre,
-              departamento_nombre: cliente.departamento_nombre,
-              zonas: {}
-            };
-          }
-
-          if (!agrupado[ciudadKey].zonas[tipoZona]) {
-            agrupado[ciudadKey].zonas[tipoZona] = {
-              tipo_zona: tipoZona,
-              sectores: {}
-            };
-          }
-
-          if (!agrupado[ciudadKey].zonas[tipoZona].sectores[sectorKey]) {
-            agrupado[ciudadKey].zonas[tipoZona].sectores[sectorKey] = {
-              sector_id: cliente.sector_id,
-              sector_nombre: sectorNombre,
-              sector_codigo: cliente.sector_codigo,
-              clientes: []
-            };
-          }
-
-          agrupado[ciudadKey].zonas[tipoZona].sectores[sectorKey].clientes.push({
-            id: cliente.id,
-            nombre: cliente.nombre,
-            identificacion: cliente.identificacion,
-            tipo_documento: cliente.tipo_documento,
-            telefono: cliente.telefono,
-            correo: cliente.correo,
-            direccion: cliente.direccion,
-            barrio: cliente.barrio,
-            estrato: cliente.estrato,
-            estado: cliente.estado,
-            created_at: cliente.created_at
-          });
-        }
-
-        // Convertir a array para el frontend
-        const resultado = Object.values(agrupado).map(ciudad => ({
-          ...ciudad,
-          zonas: Object.values(ciudad.zonas).map(zona => ({
-            ...zona,
-            sectores: Object.values(zona.sectores).map(sector => ({
-              ...sector,
-              total: sector.clientes.length
-            }))
-          }))
-        }));
-
-        res.json({
-          success: true,
-          data: resultado,
-          ciudades_disponibles: ciudades,
-          total_clientes: clientes.length
-        });
-
-      } finally {
-        connection.release();
-      }
-
-    } catch (error) {
-      console.error('❌ Error obteniendo clientes por sector:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al obtener clientes por sector',
-        error: error.message
       });
     }
   }
