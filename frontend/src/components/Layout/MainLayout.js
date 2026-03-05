@@ -48,6 +48,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const paginasDelSistema = [
     { icon: <Home size={18} />, label: 'Dashboard', path: '/dashboard', keywords: ['inicio', 'home', 'principal'], color: 'blue', permission: null },
     { icon: <Users size={18} />, label: 'Clientes', path: '/clients', keywords: ['clientes', 'usuarios', 'customers'], color: 'green', permission: 'supervisor,administrador' },
+    { icon: <MapPin size={18} />, label: 'Clientes por Sector', path: '/clients/por-sector', keywords: ['clientes', 'sector', 'urbano', 'rural', 'sede', 'ciudad'], color: 'green', permission: 'supervisor,administrador' },
     { icon: <Activity size={18} />, label: 'Facturación Automática', path: '/facturacion-automatica', keywords: ['facturas', 'billing', 'automatico'], color: 'purple', permission: 'administrador' },
     { icon: <TrendingUp size={18} />, label: 'Facturas', path: '/facturas', keywords: ['facturas', 'invoices', 'cobros'], color: 'yellow', permission: 'supervisor,administrador' },
     { icon: <FileText size={18} />, label: 'Contratos', path: '/contratos', keywords: ['contratos', 'contracts', 'acuerdos'], color: 'orange', permission: 'supervisor,administrador' },
@@ -447,7 +448,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
   const gestionPrincipal = [
     { icon: <Home size={22} />, label: 'Dashboard', path: '/dashboard', permission: null },
-    { icon: <Users size={22} />, label: 'Clientes', path: '/clients', permission: 'supervisor,administrador' }
+    { icon: <Users size={22} />, label: 'Clientes', path: '/clients', permission: 'supervisor,administrador' },
+    { icon: <MapPin size={22} />, label: 'Clientes por Sector', path: '/clients/por-sector', permission: 'supervisor,administrador' }
   ];
 
   const facturacionFinanzas = [
