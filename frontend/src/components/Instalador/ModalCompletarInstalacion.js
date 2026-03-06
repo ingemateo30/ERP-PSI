@@ -273,18 +273,18 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
             )}
           </div>
 
-          {/* Equipos instalados */}
+          {/* Equipos instalados - OPCIONAL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Package className="inline mr-2" size={18} />
               Equipos Instalados ({equiposSeleccionados.length} seleccionados)
+              <span className="ml-2 text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Opcional</span>
             </label>
 
             {equiposDisponibles.length === 0 ? (
-              <div className="text-center py-8 bg-gray-50 rounded-lg">
-                <Package size={48} className="mx-auto text-gray-400 mb-2" />
-                <p className="text-gray-600">No tienes equipos asignados</p>
-                <p className="text-sm text-gray-400">Contacta al administrador</p>
+              <div className="text-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                <Package size={32} className="mx-auto text-gray-300 mb-1" />
+                <p className="text-sm text-gray-500">Sin equipos asignados — puedes continuar sin seleccionar</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">

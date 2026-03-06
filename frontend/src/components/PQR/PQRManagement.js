@@ -25,6 +25,7 @@ const PQRManagement = () => {
         fechaInicio: '',
         fechaFin: '',
         search: '',
+        searchBy: '',
         page: 1,
         limit: 50
     });
@@ -131,6 +132,7 @@ const PQRManagement = () => {
             fechaInicio: '',
             fechaFin: '',
             search: '',
+            searchBy: '',
             page: 1,
             limit: 50
         });
@@ -292,7 +294,87 @@ const PQRManagement = () => {
 
             {/* Filtros */}
             <div className="bg-white rounded-lg shadow p-6">
+                {/* Búsqueda de clientes por cédula, nombre o dirección */}
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <Search className="inline w-4 h-4 mr-1" />
+                        Buscar Cliente
+                    </label>
+                    <div className="flex gap-2">
+                        <select
+                            value={filters.searchBy}
+                            onChange={(e) => handleFilterChange('searchBy', e.target.value)}
+                            className="w-40 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        >
+                            <option value="">General</option>
+                            <option value="cedula">Cédula</option>
+                            <option value="nombre">Nombre</option>
+                            <option value="direccion">Dirección</option>
+                        </select>
+                        <input
+                            type="text"
+                            value={filters.search}
+                            onChange={(e) => handleFilterChange('search', e.target.value)}
+                            placeholder={
+                                filters.searchBy === 'cedula' ? 'Buscar por cédula...' :
+                                filters.searchBy === 'nombre' ? 'Buscar por nombre...' :
+                                filters.searchBy === 'direccion' ? 'Buscar por dirección...' :
+                                'Buscar por radicado, cliente, asunto...'
+                            }
+                            className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Estado
+                        </label>
+                        <select
+                            value={filters.estado}
+                            onChange={(e) => handleFilterChange('estado', e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="">Todos</option>
+                            {estadosPQR.map(e => (
+                                <option key={e.value} value={e.value}>{e.label}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Tipo
+                        </label>
+                        <select
+                            value={filters.tipo}
+                            onChange={(e) => handleFilterChange('tipo', e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="">Todos</option>
+                            {tiposPQR.map(t => (
+                                <option key={t.value} value={t.value}>{t.label}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Categoría
+                        </label>
+                        <select
+                            value={filters.categoria}
+                            onChange={(e) => handleFilterChange('categoria', e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="">Todas</option>
+                            {categorias.map(c => (
+                                <option key={c.value} value={c.value}>{c.label}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Fecha Inicio

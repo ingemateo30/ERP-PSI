@@ -12,15 +12,16 @@ router.use(authenticateToken);
 // Obtener todas las PQR con filtros y paginación
 router.get('/', async (req, res) => {
     try {
-        const { 
-            estado, 
-            tipo, 
+        const {
+            estado,
+            tipo,
             categoria,
-            fechaInicio, 
-            fechaFin, 
-            search, 
-            page = 1, 
-            limit = 50 
+            fechaInicio,
+            fechaFin,
+            search,
+            searchBy,
+            page = 1,
+            limit = 50
         } = req.query;
         
         let query = `
@@ -65,9 +66,20 @@ router.get('/', async (req, res) => {
         }
         
         if (search) {
-            query += ' AND (p.numero_radicado LIKE ? OR c.nombre LIKE ? OR c.identificacion LIKE ? OR p.asunto LIKE ?)';
             const searchParam = `%${search}%`;
-            params.push(searchParam, searchParam, searchParam, searchParam);
+            if (searchBy === 'cedula') {
+                query += ' AND c.identificacion LIKE ?';
+                params.push(searchParam);
+            } else if (searchBy === 'nombre') {
+                query += ' AND c.nombre LIKE ?';
+                params.push(searchParam);
+            } else if (searchBy === 'direccion') {
+                query += ' AND c.direccion LIKE ?';
+                params.push(searchParam);
+            } else {
+                query += ' AND (p.numero_radicado LIKE ? OR c.nombre LIKE ? OR c.identificacion LIKE ? OR c.direccion LIKE ? OR p.asunto LIKE ?)';
+                params.push(searchParam, searchParam, searchParam, searchParam, searchParam);
+            }
         }
         
         // Contar total de registros

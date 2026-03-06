@@ -60,7 +60,12 @@ class InventoryModel {
       if (filters.disponible) {
         query += ' AND e.estado = "disponible"';
       }
-      
+
+      if (filters.sede) {
+        query += ' AND e.sede = ?';
+        params.push(filters.sede);
+      }
+
       // ✅ Ordenamiento seguro
       const allowedOrderBy = ['e.codigo', 'e.nombre', 'e.tipo', 'e.estado', 'e.created_at', 'e.updated_at'];
       const orderBy = allowedOrderBy.includes(filters.orderBy) ? filters.orderBy : 'e.updated_at';
@@ -112,7 +117,12 @@ const [equipos] = await db.execute(query, params);
       if (filters.disponible) {
         totalQuery += ' AND e.estado = "disponible"';
       }
-      
+
+      if (filters.sede) {
+        totalQuery += ' AND e.sede = ?';
+        totalParams.push(filters.sede);
+      }
+
       const [totalResult] = await db.execute(totalQuery, totalParams);
       const total = totalResult[0].total;
       
@@ -161,31 +171,46 @@ const [equipos] = await db.execute(query, params);
   
   static async create(equipoData, userId) {
     try {
-      const query = `
+      // Intentar con sede, si falla (columna no existe) intentar sin ella
+      let query = `
         INSERT INTO inventario_equipos (
           codigo, nombre, tipo, marca, modelo, numero_serie,
           estado, precio_compra, fecha_compra, proveedor,
-          ubicacion, observaciones
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ubicacion, sede, observaciones
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
-      
-      const params = [
-        equipoData.codigo,
-        equipoData.nombre,
-        equipoData.tipo,
-        equipoData.marca || null,
-        equipoData.modelo || null,
-        equipoData.numero_serie || null,
-        equipoData.estado || 'disponible',
-        equipoData.precio_compra || null,
-        equipoData.fecha_compra || null,
-        equipoData.proveedor || null,
-        equipoData.ubicacion || null,
-        equipoData.observaciones || null
+      let params = [
+        equipoData.codigo, equipoData.nombre, equipoData.tipo,
+        equipoData.marca || null, equipoData.modelo || null,
+        equipoData.numero_serie || null, equipoData.estado || 'disponible',
+        equipoData.precio_compra || null, equipoData.fecha_compra || null,
+        equipoData.proveedor || null, equipoData.ubicacion || null,
+        equipoData.sede || null, equipoData.observaciones || null
       ];
-      
-      const [result] = await db.execute(query, params);
-      
+
+      let result;
+      try {
+        [result] = await db.execute(query, params);
+      } catch (sedeError) {
+        // Columna sede no existe aún
+        query = `
+          INSERT INTO inventario_equipos (
+            codigo, nombre, tipo, marca, modelo, numero_serie,
+            estado, precio_compra, fecha_compra, proveedor,
+            ubicacion, observaciones
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        params = [
+          equipoData.codigo, equipoData.nombre, equipoData.tipo,
+          equipoData.marca || null, equipoData.modelo || null,
+          equipoData.numero_serie || null, equipoData.estado || 'disponible',
+          equipoData.precio_compra || null, equipoData.fecha_compra || null,
+          equipoData.proveedor || null, equipoData.ubicacion || null,
+          equipoData.observaciones || null
+        ];
+        [result] = await db.execute(query, params);
+      }
+
       return {
         id: result.insertId,
         ...equipoData,
@@ -199,31 +224,46 @@ const [equipos] = await db.execute(query, params);
   
   static async update(id, equipoData, userId) {
     try {
-      const query = `
+      // Intentar con sede, si falla (columna no existe) intentar sin ella
+      let query = `
         UPDATE inventario_equipos SET
           codigo = ?, nombre = ?, tipo = ?, marca = ?, modelo = ?,
           numero_serie = ?, precio_compra = ?, fecha_compra = ?,
-          proveedor = ?, ubicacion = ?, observaciones = ?,
+          proveedor = ?, ubicacion = ?, sede = ?, observaciones = ?,
           updated_at = NOW()
         WHERE id = ?
       `;
-      
-      const params = [
-        equipoData.codigo,
-        equipoData.nombre,
-        equipoData.tipo,
-        equipoData.marca || null,
-        equipoData.modelo || null,
-        equipoData.numero_serie || null,
-        equipoData.precio_compra || null,
-        equipoData.fecha_compra || null,
-        equipoData.proveedor || null,
-        equipoData.ubicacion || null,
-        equipoData.observaciones || null,
-        id
+      let params = [
+        equipoData.codigo, equipoData.nombre, equipoData.tipo,
+        equipoData.marca || null, equipoData.modelo || null,
+        equipoData.numero_serie || null, equipoData.precio_compra || null,
+        equipoData.fecha_compra || null, equipoData.proveedor || null,
+        equipoData.ubicacion || null, equipoData.sede || null,
+        equipoData.observaciones || null, id
       ];
-      
-      await db.execute(query, params);
+
+      try {
+        await db.execute(query, params);
+      } catch (sedeError) {
+        // Columna sede no existe aún
+        query = `
+          UPDATE inventario_equipos SET
+            codigo = ?, nombre = ?, tipo = ?, marca = ?, modelo = ?,
+            numero_serie = ?, precio_compra = ?, fecha_compra = ?,
+            proveedor = ?, ubicacion = ?, observaciones = ?,
+            updated_at = NOW()
+          WHERE id = ?
+        `;
+        params = [
+          equipoData.codigo, equipoData.nombre, equipoData.tipo,
+          equipoData.marca || null, equipoData.modelo || null,
+          equipoData.numero_serie || null, equipoData.precio_compra || null,
+          equipoData.fecha_compra || null, equipoData.proveedor || null,
+          equipoData.ubicacion || null, equipoData.observaciones || null, id
+        ];
+        await db.execute(query, params);
+      }
+
       return await this.getById(id);
     } catch (error) {
       console.error('❌ Error en update:', error);
@@ -668,6 +708,69 @@ static async getInstallerHistory(instaladorId, limit = 50) {
     }
   }
   
+  static async bulkCreate(equiposData, userId) {
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+      const inserted = [];
+      const errors = [];
+
+      // Verificar si la columna 'sede' existe (migración puede no haberse aplicado)
+      let hasSedeCol = true;
+      try {
+        await conn.execute('SELECT sede FROM inventario_equipos LIMIT 0');
+      } catch (e) {
+        hasSedeCol = false;
+      }
+
+      for (let i = 0; i < equiposData.length; i++) {
+        const item = equiposData[i];
+        try {
+          let sql, params;
+          if (hasSedeCol) {
+            sql = `INSERT INTO inventario_equipos (
+              codigo, nombre, tipo, marca, modelo, numero_serie,
+              estado, precio_compra, fecha_compra, proveedor,
+              ubicacion, sede, observaciones
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            params = [
+              item.codigo, item.nombre, item.tipo,
+              item.marca || null, item.modelo || null, item.numero_serie || null,
+              item.estado || 'disponible', item.precio_compra || null,
+              item.fecha_compra || null, item.proveedor || null,
+              item.ubicacion || null, item.sede || null, item.observaciones || null
+            ];
+          } else {
+            sql = `INSERT INTO inventario_equipos (
+              codigo, nombre, tipo, marca, modelo, numero_serie,
+              estado, precio_compra, fecha_compra, proveedor,
+              ubicacion, observaciones
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            params = [
+              item.codigo, item.nombre, item.tipo,
+              item.marca || null, item.modelo || null, item.numero_serie || null,
+              item.estado || 'disponible', item.precio_compra || null,
+              item.fecha_compra || null, item.proveedor || null,
+              item.ubicacion || null, item.observaciones || null
+            ];
+          }
+          const [result] = await conn.execute(sql, params);
+          inserted.push({ fila: i + 2, id: result.insertId, codigo: item.codigo });
+        } catch (rowError) {
+          errors.push({ fila: i + 2, codigo: item.codigo, error: rowError.message });
+        }
+      }
+
+      await conn.commit();
+      return { inserted, errors };
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async getBrandsByType(tipo) {
     try {
       const query = `
