@@ -3,9 +3,27 @@
 const express = require('express');
 const { body, param, query } = require('express-validator');
 const router = express.Router();
+const multer = require('multer');
 
 const InventoryController = require('../controllers/inventarioController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+
+// Configurar multer para subida de Excel en memoria
+const uploadExcel = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel'
+    ];
+    if (allowed.includes(file.mimetype) || file.originalname.match(/\.(xlsx|xls)$/i)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos Excel (.xlsx, .xls)'));
+    }
+  }
+});
 
 // Aplicar autenticación a todas las rutas
 router.use(authenticateToken);
@@ -151,6 +169,21 @@ if (req.user.rol === 'instalador' && req.user.id != req.params.instaladorId) {
   InventoryController.getInstallerEquipment
 );
 
+
+// ==========================================
+// RUTAS DE IMPORTACIÓN MASIVA
+// ==========================================
+
+router.post('/bulk-upload',
+  requireRole(['administrador']),
+  uploadExcel.single('archivo'),
+  InventoryController.bulkUpload
+);
+
+router.get('/bulk-upload/template',
+  requireRole(['administrador', 'supervisor']),
+  InventoryController.downloadTemplate
+);
 
 router.get('/test', (req, res) => {
   res.json({

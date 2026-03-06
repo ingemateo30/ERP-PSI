@@ -1,6 +1,6 @@
 // frontend/src/components/Inventory/InventoryManagement.js
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import inventoryService from '../../services/inventoryService';
 import EquipmentList from './EquipmentList';
@@ -9,7 +9,7 @@ import EquipmentFilters from './EquipmentFilters';
 import EquipmentStats from './EquipmentStats';
 import AssignmentModal from './AssignmentModal';
 import HistoryModal from './HistoryModal';
-import { Package, Plus, CheckCircle, AlertCircle } from 'lucide-react';
+import { Package, Plus, CheckCircle, AlertCircle, Upload, Download } from 'lucide-react';
 
 const InventoryManagement = () => {
   const { user } = useAuth();
@@ -31,6 +31,9 @@ const InventoryManagement = () => {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [uploadingExcel, setUploadingExcel] = useState(false);
+  const [uploadSede, setUploadSede] = useState('');
+  const excelInputRef = useRef(null);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -160,6 +163,72 @@ const loadStats = async () => {
       alert('Error al exportar: ' + error.message);
     }
   };
+  // Descargar plantilla Excel
+  const handleDownloadTemplate = async () => {
+    try {
+      const apiBase = process.env.REACT_APP_API_URL || '';
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`${apiBase}/inventory/bulk-upload/template`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Error descargando plantilla');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'plantilla_inventario.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Error descargando plantilla: ' + err.message);
+    }
+  };
+
+  // Subir archivo Excel masivo
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setUploadingExcel(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('archivo', file);
+      if (uploadSede) formData.append('sede', uploadSede);
+
+      const apiBase = process.env.REACT_APP_API_URL || '';
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`${apiBase}/inventory/bulk-upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        let msg = `✅ ${data.insertados} equipo(s) importado(s) correctamente.`;
+        if (data.erroresValidacion?.length > 0) {
+          msg += ` ⚠️ ${data.erroresValidacion.length} fila(s) con errores de validación.`;
+        }
+        if (data.erroresInsercion?.length > 0) {
+          msg += ` ❌ ${data.erroresInsercion.length} error(es) de inserción.`;
+        }
+        setSuccess(msg);
+        loadEquipment();
+        loadStats();
+      } else {
+        setError(data.message || 'Error al importar el archivo');
+      }
+    } catch (err) {
+      setError('Error procesando el archivo: ' + err.message);
+    } finally {
+      setUploadingExcel(false);
+    }
+  };
+
   // Manejar cambios en filtros
   const handleFilterChange = (newFilters) => {
     setFilters({
@@ -296,13 +365,48 @@ const loadStats = async () => {
           </div>
           
           {user.rol === 'administrador' && (
-            <button
-              onClick={handleCreate}
-              className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-4 md:px-6 backdrop-blur-sm flex items-center space-x-2 font-medium"
-            >
-              <Plus size={20} />
-              <span>Nuevo Equipo</span>
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {/* Botones de importación masiva */}
+              <button
+                onClick={handleDownloadTemplate}
+                className="bg-white/10 hover:bg-white/20 transition-all rounded-lg py-2 px-4 backdrop-blur-sm flex items-center space-x-2 text-sm font-medium"
+                title="Descargar plantilla Excel para importación"
+              >
+                <Download size={16} />
+                <span>Plantilla</span>
+              </button>
+
+              <div className="flex items-center gap-1 bg-white/10 rounded-lg px-2">
+                <input
+                  type="text"
+                  value={uploadSede}
+                  onChange={(e) => setUploadSede(e.target.value)}
+                  placeholder="Sede (opcional)"
+                  className="bg-transparent text-white placeholder-white/60 text-sm py-2 px-1 w-28 outline-none"
+                />
+              </div>
+
+              <label className={`cursor-pointer bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 px-4 backdrop-blur-sm flex items-center space-x-2 font-medium ${uploadingExcel ? 'opacity-60 cursor-wait' : ''}`}>
+                <Upload size={20} />
+                <span>{uploadingExcel ? 'Importando...' : 'Importar Excel'}</span>
+                <input
+                  ref={excelInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleExcelUpload}
+                  className="hidden"
+                  disabled={uploadingExcel}
+                />
+              </label>
+
+              <button
+                onClick={handleCreate}
+                className="bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 md:py-3 px-4 md:px-6 backdrop-blur-sm flex items-center space-x-2 font-medium"
+              >
+                <Plus size={20} />
+                <span>Nuevo Equipo</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

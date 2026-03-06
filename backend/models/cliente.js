@@ -416,14 +416,16 @@ class Cliente {
         LEFT JOIN sectores s ON c.sector_id = s.id
         LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
         WHERE (
-          c.identificacion LIKE ? OR 
-          c.nombre LIKE ? OR 
+          c.identificacion LIKE ? OR
+          c.nombre LIKE ? OR
           c.telefono LIKE ? OR
-          c.telefono_2 LIKE ?
+          c.telefono_2 LIKE ? OR
+          c.direccion LIKE ?
         )
       `;
 
       const params = [
+        `%${termino}%`,
         `%${termino}%`,
         `%${termino}%`,
         `%${termino}%`,

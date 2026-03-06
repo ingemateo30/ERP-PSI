@@ -4,8 +4,10 @@ import React, { useState, useEffect } from 'react';
 import inventoryService from '../../services/inventoryService';
 import { EQUIPMENT_TYPES } from '../../constants/inventoryConstants';
 import { Package } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     codigo: '',
     nombre: '',
@@ -17,6 +19,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
     fecha_compra: '',
     proveedor: '',
     ubicacion: '',
+    sede: '',
     observaciones: ''
   });
   const [errors, setErrors] = useState({});
@@ -59,6 +62,7 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
         fecha_compra: equipo.fecha_compra ? equipo.fecha_compra.split('T')[0] : '',
         proveedor: equipo.proveedor || '',
         ubicacion: equipo.ubicacion || '',
+        sede: equipo.sede || '',
         observaciones: equipo.observaciones || ''
       });
     }
@@ -413,6 +417,25 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
               />
             </div>
           </div>
+
+          {/* Sede - Solo visible para administradores */}
+          {user?.rol === 'administrador' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Sede
+              </label>
+              <input
+                type="text"
+                name="sede"
+                value={formData.sede}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                placeholder="Sede Central, Sede Norte, etc."
+                maxLength="100"
+              />
+              <p className="text-xs text-gray-500 mt-1">Asigna este equipo a una sede para controlar el acceso por operadores</p>
+            </div>
+          )}
 
           {/* Observaciones */}
           <div>

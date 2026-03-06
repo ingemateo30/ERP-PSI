@@ -34,10 +34,19 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    const [user] = await Database.query(
-      'SELECT id, email, nombre, rol, activo, sede_id FROM sistema_usuarios WHERE id = ? AND activo = 1',
-      [userId]
-    );
+    let user;
+    try {
+      [user] = await Database.query(
+        'SELECT id, email, nombre, rol, activo, sede FROM sistema_usuarios WHERE id = ? AND activo = 1',
+        [userId]
+      );
+    } catch (colError) {
+      // Si la columna 'sede' aún no existe (migración pendiente), usar query básica
+      [user] = await Database.query(
+        'SELECT id, email, nombre, rol, activo FROM sistema_usuarios WHERE id = ? AND activo = 1',
+        [userId]
+      );
+    }
 
     if (!user) {
       return res.status(401).json({
@@ -53,7 +62,7 @@ const authenticateToken = async (req, res, next) => {
       email: user.email,
       nombre: user.nombre,
       rol: user.rol,
-      sede_id: user.sede_id || null
+      sede: user.sede !== undefined ? (user.sede || null) : null
     };
 
     console.log('✅ Usuario autenticado:', { id: user.id, nombre: user.nombre, rol: user.rol });

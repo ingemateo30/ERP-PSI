@@ -2,7 +2,8 @@
 
 const InventoryModel = require('../models/inventario');
 const { validationResult } = require('express-validator');
-const { Database } = require('../models/Database'); 
+const { Database } = require('../models/Database');
+const xlsx = require('xlsx');
 
 class InventoryController {
 
@@ -26,6 +27,14 @@ class InventoryController {
                 orderBy: req.query.orderBy || 'updated_at',
                 orderDirection: req.query.orderDirection || 'DESC'
             };
+
+            // Operadores y supervisores solo ven inventario de su sede asignada
+            if (req.user.rol !== 'administrador' && req.user.sede) {
+                filters.sede = req.user.sede;
+            } else if (req.user.rol === 'administrador' && req.query.sede) {
+                // Admin puede filtrar por sede manualmente
+                filters.sede = req.query.sede;
+            }
 
             // Calcular offset para paginación
             filters.offset = (filters.page - 1) * filters.limit;
@@ -613,6 +622,133 @@ class InventoryController {
                 message: 'Error interno del servidor',
                 error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
+        }
+    }
+
+    /**
+     * Importación masiva de equipos desde archivo Excel
+     */
+    static async bulkUpload(req, res) {
+        try {
+            if (!req.file) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'No se recibió ningún archivo'
+                });
+            }
+
+            const sede = req.body.sede || null;
+
+            // Parsear el archivo Excel desde buffer
+            const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+
+            if (!rows || rows.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El archivo Excel está vacío o no tiene datos'
+                });
+            }
+
+            const tiposValidos = ['router', 'decodificador', 'cable', 'antena', 'splitter', 'amplificador', 'otro'];
+
+            // Normalizar y validar filas
+            const equiposData = [];
+            const validationErrors = [];
+
+            rows.forEach((row, idx) => {
+                const fila = idx + 2;
+                const codigo = String(row.codigo || row.Codigo || row.CODIGO || '').trim().toUpperCase();
+                const nombre = String(row.nombre || row.Nombre || row.NOMBRE || '').trim();
+                const tipo = String(row.tipo || row.Tipo || row.TIPO || '').trim().toLowerCase();
+
+                if (!codigo) {
+                    validationErrors.push({ fila, error: 'Código es obligatorio' });
+                    return;
+                }
+                if (!nombre) {
+                    validationErrors.push({ fila, error: 'Nombre es obligatorio' });
+                    return;
+                }
+                if (!tiposValidos.includes(tipo)) {
+                    validationErrors.push({ fila, error: `Tipo '${tipo}' no válido. Use: ${tiposValidos.join(', ')}` });
+                    return;
+                }
+
+                equiposData.push({
+                    codigo,
+                    nombre,
+                    tipo,
+                    marca: String(row.marca || row.Marca || row.MARCA || '').trim() || null,
+                    modelo: String(row.modelo || row.Modelo || row.MODELO || '').trim() || null,
+                    numero_serie: String(row.numero_serie || row.NumeroSerie || row.NUMERO_SERIE || '').trim() || null,
+                    estado: 'disponible',
+                    precio_compra: parseFloat(row.precio_compra || row.PrecioCompra || row.PRECIO_COMPRA || 0) || null,
+                    fecha_compra: row.fecha_compra || row.FechaCompra || null,
+                    proveedor: String(row.proveedor || row.Proveedor || row.PROVEEDOR || '').trim() || null,
+                    ubicacion: String(row.ubicacion || row.Ubicacion || row.UBICACION || '').trim() || null,
+                    sede: String(row.sede || row.Sede || row.SEDE || sede || '').trim() || null,
+                    observaciones: String(row.observaciones || row.Observaciones || row.OBSERVACIONES || '').trim() || null
+                });
+            });
+
+            if (validationErrors.length > 0 && equiposData.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Todos los registros tienen errores de validación',
+                    errores: validationErrors
+                });
+            }
+
+            const result = await InventoryModel.bulkCreate(equiposData, req.user.id);
+
+            res.json({
+                success: true,
+                message: `Importación completada: ${result.inserted.length} equipos insertados`,
+                insertados: result.inserted.length,
+                erroresValidacion: validationErrors,
+                erroresInsercion: result.errors
+            });
+
+        } catch (error) {
+            console.error('Error en bulkUpload:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error procesando el archivo',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    }
+
+    /**
+     * Descargar plantilla Excel para importación masiva
+     */
+    static downloadTemplate(req, res) {
+        try {
+            const headers = [
+                'codigo', 'nombre', 'tipo', 'marca', 'modelo', 'numero_serie',
+                'precio_compra', 'fecha_compra', 'proveedor', 'ubicacion', 'sede', 'observaciones'
+            ];
+
+            const example = [
+                'RTR001', 'Router WiFi AC1200', 'router', 'TP-Link', 'Archer C6', 'TPL001',
+                75000, '2025-01-15', 'Distribuidora Tech', 'Almacén Principal', 'Sede Central', 'Equipo nuevo'
+            ];
+
+            const wb = xlsx.utils.book_new();
+            const ws = xlsx.utils.aoa_to_sheet([headers, example]);
+            xlsx.utils.book_append_sheet(wb, ws, 'Inventario');
+
+            const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+            res.setHeader('Content-Disposition', 'attachment; filename=plantilla_inventario.xlsx');
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.send(buffer);
+        } catch (error) {
+            console.error('Error generando plantilla:', error);
+            res.status(500).json({ success: false, message: 'Error generando plantilla' });
         }
     }
 
