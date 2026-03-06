@@ -108,36 +108,100 @@ class InventoryController {
                 });
             }
 
-            // Verificar que el código no exista
-            const codeAvailable = await InventoryModel.checkCodeAvailability(req.body.codigo);
-            if (!codeAvailable) {
+            const cantidad = parseInt(req.body.cantidad) || 1;
+
+            // Parsear seriales si se proporcionaron
+            let serialesArray = [];
+            const serialesRaw = req.body.seriales;
+            if (serialesRaw) {
+                if (Array.isArray(serialesRaw)) {
+                    serialesArray = serialesRaw.map(s => String(s).trim()).filter(s => s);
+                } else {
+                    serialesArray = String(serialesRaw).split(/[\n,]/).map(s => s.trim()).filter(s => s);
+                }
+            }
+
+            // Validar que seriales coincidan con cantidad si se proporcionaron
+            if (serialesArray.length > 0 && serialesArray.length !== cantidad) {
                 return res.status(400).json({
                     success: false,
-                    message: 'El código del equipo ya existe'
+                    message: `Se proporcionaron ${serialesArray.length} seriales pero la cantidad es ${cantidad}. Deben coincidir.`
                 });
             }
 
-            const equipoData = {
-                codigo: req.body.codigo.toUpperCase().trim(),
+            const baseData = {
                 nombre: req.body.nombre.trim(),
                 tipo: req.body.tipo,
                 marca: req.body.marca?.trim(),
                 modelo: req.body.modelo?.trim(),
-                numero_serie: req.body.numero_serie?.trim(),
                 estado: req.body.estado || 'disponible',
                 precio_compra: req.body.precio_compra,
                 fecha_compra: req.body.fecha_compra,
                 proveedor: req.body.proveedor?.trim(),
                 ubicacion: req.body.ubicacion?.trim(),
+                sede: req.body.sede?.trim() || null,
                 observaciones: req.body.observaciones?.trim()
             };
 
-            const nuevoEquipo = await InventoryModel.create(equipoData, req.user.id);
+            if (cantidad === 1) {
+                // Verificar que el código no exista
+                const codeAvailable = await InventoryModel.checkCodeAvailability(req.body.codigo);
+                if (!codeAvailable) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'El código del equipo ya existe'
+                    });
+                }
 
-            res.status(201).json({
+                const equipoData = {
+                    ...baseData,
+                    codigo: req.body.codigo.toUpperCase().trim(),
+                    numero_serie: req.body.numero_serie?.trim() || (serialesArray[0] || null)
+                };
+
+                const nuevoEquipo = await InventoryModel.create(equipoData, req.user.id);
+
+                return res.status(201).json({
+                    success: true,
+                    message: 'Equipo creado exitosamente',
+                    data: nuevoEquipo
+                });
+            }
+
+            // Creación por lotes (cantidad > 1)
+            const baseCodigo = req.body.codigo.toUpperCase().trim();
+            const creados = [];
+            const erroresCreacion = [];
+
+            for (let i = 1; i <= cantidad; i++) {
+                const suffix = String(i).padStart(3, '0');
+                const codigo = `${baseCodigo}-${suffix}`;
+
+                const available = await InventoryModel.checkCodeAvailability(codigo);
+                if (!available) {
+                    erroresCreacion.push(`Código ${codigo} ya existe, se omitió`);
+                    continue;
+                }
+
+                const equipoData = {
+                    ...baseData,
+                    codigo,
+                    numero_serie: serialesArray[i - 1] || null
+                };
+
+                try {
+                    const equipo = await InventoryModel.create(equipoData, req.user.id);
+                    creados.push(equipo);
+                } catch (createErr) {
+                    erroresCreacion.push(`Error creando ${codigo}: ${createErr.message}`);
+                }
+            }
+
+            return res.status(201).json({
                 success: true,
-                message: 'Equipo creado exitosamente',
-                data: nuevoEquipo
+                message: `${creados.length} equipo(s) creado(s) exitosamente`,
+                data: creados,
+                errores: erroresCreacion
             });
         } catch (error) {
             console.error('Error en createEquipment:', error);
@@ -196,6 +260,7 @@ class InventoryController {
                 fecha_compra: req.body.fecha_compra || equipoExistente.fecha_compra,
                 proveedor: req.body.proveedor?.trim() || equipoExistente.proveedor,
                 ubicacion: req.body.ubicacion?.trim() || equipoExistente.ubicacion,
+                sede: req.body.sede !== undefined ? (req.body.sede?.trim() || null) : equipoExistente.sede,
                 observaciones: req.body.observaciones?.trim() || equipoExistente.observaciones
             };
 
@@ -660,11 +725,13 @@ class InventoryController {
 
             rows.forEach((row, idx) => {
                 const fila = idx + 2;
-                const codigo = String(row.codigo || row.Codigo || row.CODIGO || '').trim().toUpperCase();
+                const codigoBase = String(row.codigo || row.Codigo || row.CODIGO || '').trim().toUpperCase();
                 const nombre = String(row.nombre || row.Nombre || row.NOMBRE || '').trim();
                 const tipo = String(row.tipo || row.Tipo || row.TIPO || '').trim().toLowerCase();
+                const cantidad = parseInt(row.cantidad || row.Cantidad || row.CANTIDAD || 1) || 1;
+                const serialesRaw = String(row.seriales || row.Seriales || row.SERIALES || '').trim();
 
-                if (!codigo) {
+                if (!codigoBase) {
                     validationErrors.push({ fila, error: 'Código es obligatorio' });
                     return;
                 }
@@ -677,13 +744,11 @@ class InventoryController {
                     return;
                 }
 
-                equiposData.push({
-                    codigo,
+                const baseEquipo = {
                     nombre,
                     tipo,
                     marca: String(row.marca || row.Marca || row.MARCA || '').trim() || null,
                     modelo: String(row.modelo || row.Modelo || row.MODELO || '').trim() || null,
-                    numero_serie: String(row.numero_serie || row.NumeroSerie || row.NUMERO_SERIE || '').trim() || null,
                     estado: 'disponible',
                     precio_compra: parseFloat(row.precio_compra || row.PrecioCompra || row.PRECIO_COMPRA || 0) || null,
                     fecha_compra: row.fecha_compra || row.FechaCompra || null,
@@ -691,7 +756,25 @@ class InventoryController {
                     ubicacion: String(row.ubicacion || row.Ubicacion || row.UBICACION || '').trim() || null,
                     sede: String(row.sede || row.Sede || row.SEDE || sede || '').trim() || null,
                     observaciones: String(row.observaciones || row.Observaciones || row.OBSERVACIONES || '').trim() || null
-                });
+                };
+
+                if (cantidad === 1) {
+                    // Fila única
+                    const numero_serie = String(row.numero_serie || row.NumeroSerie || row.NUMERO_SERIE || serialesRaw || '').trim() || null;
+                    equiposData.push({ ...baseEquipo, codigo: codigoBase, numero_serie });
+                } else {
+                    // Expandir fila en múltiples equipos
+                    const serialesArr = serialesRaw
+                        ? serialesRaw.split(/[,\n]/).map(s => s.trim()).filter(s => s)
+                        : [];
+
+                    for (let i = 1; i <= cantidad; i++) {
+                        const suffix = String(i).padStart(3, '0');
+                        const codigo = `${codigoBase}-${suffix}`;
+                        const numero_serie = serialesArr[i - 1] || null;
+                        equiposData.push({ ...baseEquipo, codigo, numero_serie });
+                    }
+                }
             });
 
             if (validationErrors.length > 0 && equiposData.length === 0) {
@@ -729,16 +812,24 @@ class InventoryController {
         try {
             const headers = [
                 'codigo', 'nombre', 'tipo', 'marca', 'modelo', 'numero_serie',
+                'cantidad', 'seriales',
                 'precio_compra', 'fecha_compra', 'proveedor', 'ubicacion', 'sede', 'observaciones'
             ];
 
             const example = [
-                'RTR001', 'Router WiFi AC1200', 'router', 'TP-Link', 'Archer C6', 'TPL001',
+                'RTR001', 'Router WiFi AC1200', 'router', 'TP-Link', 'Archer C6', '',
+                3, 'SER001,SER002,SER003',
                 75000, '2025-01-15', 'Distribuidora Tech', 'Almacén Principal', 'Sede Central', 'Equipo nuevo'
             ];
 
+            const exampleSingle = [
+                'DEC001', 'Decodificador HD', 'decodificador', 'ZTE', 'ZXV10', 'DEC-001-SN',
+                1, '',
+                50000, '2025-01-15', 'Distribuidora Tech', 'Almacén Principal', 'Sede Sur', ''
+            ];
+
             const wb = xlsx.utils.book_new();
-            const ws = xlsx.utils.aoa_to_sheet([headers, example]);
+            const ws = xlsx.utils.aoa_to_sheet([headers, example, exampleSingle]);
             xlsx.utils.book_append_sheet(wb, ws, 'Inventario');
 
             const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });

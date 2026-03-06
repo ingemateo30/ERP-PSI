@@ -244,40 +244,38 @@ class PQRService {
     // MÉTODOS PARA CLIENTES - AGREGADOS
     // ==========================================
 
-    // Obtener clientes activos (con búsqueda opcional)
-    async getClientesActivos(searchTerm = '') {
+    // Obtener clientes activos (con búsqueda opcional por cédula, nombre o dirección)
+    async getClientesActivos(searchTerm = '', searchBy = '') {
         try {
-            // ✅ Cambiado aquí: usar apiBase desde .env
             const apiBase = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
-            let url = `${apiBase.replace(/\/$/, '')}/clients`;
-            
-            // Agregar parámetro de búsqueda si existe
-            if (searchTerm && searchTerm.trim() !== '') {
+            let url;
+
+            if (searchTerm && searchTerm.trim().length >= 2) {
+                // Usar endpoint de búsqueda que filtra por identificacion, nombre, telefono y direccion
                 const queryParams = new URLSearchParams();
-                queryParams.append('search', searchTerm.trim());
-                url += `?${queryParams.toString()}`;
+                queryParams.append('q', searchTerm.trim());
+                url = `${apiBase.replace(/\/$/, '')}/clients/search?${queryParams.toString()}`;
+            } else {
+                // Carga inicial: traer primeros 100 clientes activos
+                url = `${apiBase.replace(/\/$/, '')}/clients?limit=100&estado=activo`;
             }
-            
+
             const response = await this.makeRequest(url);
-            
-            // Asegurar estructura de respuesta consistente
+
             if (response && response.success) {
                 return {
                     success: true,
                     clientes: response.clientes || response.data || []
                 };
             }
-            
-            // Si no tiene la estructura esperada, adaptarla
+
             return {
                 success: true,
                 clientes: Array.isArray(response) ? response : []
             };
-            
+
         } catch (error) {
             console.error('❌ Error obteniendo clientes activos:', error);
-            
-            // Retornar estructura consistente en caso de error
             return {
                 success: false,
                 clientes: [],

@@ -606,14 +606,15 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
     const [clientes, setClientes] = useState([]);
     const [usuarios, setUsuarios] = useState([]);
     const [clienteSearch, setClienteSearch] = useState('');
-    
+    const [clienteSearchBy, setClienteSearchBy] = useState('');
+    const [searchingClientes, setSearchingClientes] = useState(false);
+
     // ✅ ESTADOS PARA FIRMA DEL CLIENTE
     const sigCanvas = useRef(null);
     const [firmaCompleta, setFirmaCompleta] = useState(false);
     const [firmaExistente, setFirmaExistente] = useState(null);
 
     useEffect(() => {
-        cargarClientes();
         cargarUsuarios();
         if (pqr) {
             setFormData({
@@ -640,14 +641,25 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
         }
     }, [pqr]);
 
-    const cargarClientes = async () => {
+    // Cargar clientes con búsqueda debounced
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            cargarClientes(clienteSearch, clienteSearchBy);
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [clienteSearch, clienteSearchBy]);
+
+    const cargarClientes = async (term = '', searchBy = '') => {
         try {
-            const response = await pqrService.getClientesActivos(clienteSearch);
+            setSearchingClientes(true);
+            const response = await pqrService.getClientesActivos(term, searchBy);
             if (response.success) {
                 setClientes(response.clientes || response.data || []);
             }
         } catch (error) {
             console.error('Error cargando clientes:', error);
+        } finally {
+            setSearchingClientes(false);
         }
     };
 
@@ -754,16 +766,54 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Cliente *
                             </label>
+                            {/* Búsqueda de cliente */}
+                            <div className="flex gap-2 mb-2">
+                                <select
+                                    value={clienteSearchBy}
+                                    onChange={(e) => setClienteSearchBy(e.target.value)}
+                                    className="w-36 p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="">General</option>
+                                    <option value="cedula">Cédula</option>
+                                    <option value="nombre">Nombre</option>
+                                    <option value="direccion">Dirección</option>
+                                </select>
+                                <div className="relative flex-1">
+                                    <input
+                                        type="text"
+                                        value={clienteSearch}
+                                        onChange={(e) => setClienteSearch(e.target.value)}
+                                        placeholder={
+                                            clienteSearchBy === 'cedula' ? 'Buscar por cédula...' :
+                                            clienteSearchBy === 'nombre' ? 'Buscar por nombre...' :
+                                            clienteSearchBy === 'direccion' ? 'Buscar por dirección...' :
+                                            'Buscar cliente por cédula, nombre o dirección...'
+                                        }
+                                        className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    {searchingClientes && (
+                                        <div className="absolute right-2 top-2">
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                             <select
                                 value={formData.cliente_id}
                                 onChange={(e) => handleChange('cliente_id', e.target.value)}
                                 required
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                size={clientes.length > 0 && clienteSearch.length >= 2 ? Math.min(clientes.length + 1, 6) : 1}
                             >
-                                <option value="">Seleccionar cliente...</option>
+                                <option value="">
+                                    {clientes.length === 0 && clienteSearch.length >= 2
+                                        ? 'Sin resultados'
+                                        : 'Seleccionar cliente...'}
+                                </option>
                                 {clientes.map(cliente => (
                                     <option key={cliente.id} value={cliente.id}>
                                         {cliente.nombre} - {cliente.identificacion}
+                                        {cliente.direccion ? ` | ${cliente.direccion}` : ''}
                                     </option>
                                 ))}
                             </select>
