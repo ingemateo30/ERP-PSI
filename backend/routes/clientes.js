@@ -91,7 +91,6 @@ router.get('/mapa', async (req, res) => {
           c.tap,
           c.poste,
           c.ruta,
-          c.fecha_inicio_servicio,
           ci.id        AS ciudad_id,
           ci.nombre    AS ciudad_nombre,
           d.nombre     AS departamento_nombre,
@@ -164,7 +163,6 @@ router.get('/mapa', async (req, res) => {
           poste: c.poste,
           ruta: c.ruta,
           sector_nombre: c.sector_nombre,
-          fecha_inicio_servicio: c.fecha_inicio_servicio,
           servicios: serviciosPorCliente[c.id] || []
         });
       }
