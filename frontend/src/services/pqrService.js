@@ -244,20 +244,20 @@ class PQRService {
     // MÉTODOS PARA CLIENTES - AGREGADOS
     // ==========================================
 
-    // Obtener clientes activos (con búsqueda opcional por cédula, nombre o dirección)
+    // Obtener clientes para PQR (con búsqueda opcional por cédula, nombre o dirección)
     async getClientesActivos(searchTerm = '', searchBy = '') {
         try {
             const apiBase = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
+            const base = apiBase.replace(/\/$/, '');
             let url;
 
             if (searchTerm && searchTerm.trim().length >= 2) {
-                // Usar endpoint de búsqueda que filtra por identificacion, nombre, telefono y direccion
-                const queryParams = new URLSearchParams();
-                queryParams.append('q', searchTerm.trim());
-                url = `${apiBase.replace(/\/$/, '')}/clients/search?${queryParams.toString()}`;
+                // Buscar en identificacion, nombre, telefono, direccion
+                const q = encodeURIComponent(searchTerm.trim());
+                url = `${base}/clients/search?q=${q}`;
             } else {
-                // Carga inicial: traer primeros 100 clientes activos
-                url = `${apiBase.replace(/\/$/, '')}/clients?limit=100&estado=activo`;
+                // Carga inicial sin filtro de estado para ver todos los clientes
+                url = `${base}/clients?limit=50`;
             }
 
             const response = await this.makeRequest(url);
@@ -265,7 +265,7 @@ class PQRService {
             if (response && response.success) {
                 return {
                     success: true,
-                    clientes: response.clientes || response.data || []
+                    clientes: response.data || response.clientes || []
                 };
             }
 
@@ -276,11 +276,7 @@ class PQRService {
 
         } catch (error) {
             console.error('❌ Error obteniendo clientes activos:', error);
-            return {
-                success: false,
-                clientes: [],
-                error: error.message
-            };
+            return { success: false, clientes: [], error: error.message };
         }
     }
 
