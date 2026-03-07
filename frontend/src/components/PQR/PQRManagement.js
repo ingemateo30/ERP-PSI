@@ -608,6 +608,7 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
     const [clienteSearch, setClienteSearch] = useState('');
     const [clienteSearchBy, setClienteSearchBy] = useState('');
     const [searchingClientes, setSearchingClientes] = useState(false);
+    const clienteSearchMounted = useRef(false);
 
     // ✅ ESTADOS PARA FIRMA DEL CLIENTE
     const sigCanvas = useRef(null);
@@ -615,6 +616,8 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
     const [firmaExistente, setFirmaExistente] = useState(null);
 
     useEffect(() => {
+        // Cargar lista inicial de clientes al abrir el modal
+        cargarClientes('', '');
         cargarUsuarios();
         if (pqr) {
             setFormData({
@@ -641,8 +644,12 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
         }
     }, [pqr]);
 
-    // Cargar clientes con búsqueda debounced
+    // Re-buscar clientes cuando el usuario cambia el texto de búsqueda (debounced)
     useEffect(() => {
+        if (!clienteSearchMounted.current) {
+            clienteSearchMounted.current = true;
+            return; // Ignorar el primer disparo; la carga inicial ya se hizo arriba
+        }
         const timer = setTimeout(() => {
             cargarClientes(clienteSearch, clienteSearchBy);
         }, 400);
