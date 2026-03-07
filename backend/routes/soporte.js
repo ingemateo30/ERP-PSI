@@ -33,11 +33,11 @@ router.post(
       .withMessage('El mensaje es requerido')
       .isLength({ max: 1000 })
       .withMessage('El mensaje no puede exceder 1000 caracteres'),
-    body('sessionId').optional().isString(),
+    body('sessionId').optional({ checkFalsy: true }).isString(),
     body('nombre').optional({ checkFalsy: true }).trim().isLength({ max: 255 }),
     body('email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Email inválido'),
     body('telefono').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
-    body('conversationHistory').optional().isArray(),
+    body('conversationHistory').optional({ checkFalsy: true }).isArray(),
     validate,
   ],
   soporteController.chatMessage
@@ -80,10 +80,10 @@ router.post(
 router.post(
   '/resolved',
   [
-    body('messageId').optional().isInt(),
-    body('sessionId').optional().isString(),
+    body('messageId').optional({ checkFalsy: true }).isInt(),
+    body('sessionId').optional({ checkFalsy: true }).isString(),
     body('satisfaccion')
-      .optional()
+      .optional({ checkFalsy: true })
       .isInt({ min: 1, max: 5 })
       .withMessage('Satisfacción debe ser entre 1 y 5'),
     validate,
