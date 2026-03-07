@@ -34,9 +34,9 @@ router.post(
       .isLength({ max: 1000 })
       .withMessage('El mensaje no puede exceder 1000 caracteres'),
     body('sessionId').optional().isString(),
-    body('nombre').optional().trim().isLength({ max: 255 }),
-    body('email').optional().trim().isEmail().withMessage('Email inválido'),
-    body('telefono').optional().trim().isLength({ max: 20 }),
+    body('nombre').optional({ checkFalsy: true }).trim().isLength({ max: 255 }),
+    body('email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Email inválido'),
+    body('telefono').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
     body('conversationHistory').optional().isArray(),
     validate,
   ],
@@ -51,13 +51,13 @@ router.post(
   '/ticket',
   [
     body('sessionId').notEmpty().withMessage('Session ID es requerido'),
-    body('nombre').optional().trim().isLength({ max: 255 }),
+    body('nombre').optional({ checkFalsy: true }).trim().isLength({ max: 255 }),
     body('email')
-      .optional()
+      .optional({ checkFalsy: true })
       .trim()
       .isEmail()
       .withMessage('Email inválido'),
-    body('telefono').optional().trim().isLength({ max: 20 }),
+    body('telefono').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
     body('clienteId').optional().isInt(),
     body('categoria')
       .optional()

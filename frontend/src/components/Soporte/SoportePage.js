@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MessageCircle, HelpCircle, Zap, Shield, Phone, Mail,
   ChevronDown, ChevronUp, ThumbsUp, Search, Clock,
@@ -134,6 +134,13 @@ const SoportePage = () => {
   const [busqueda,        setBusqueda]        = useState('');
   const [faqsUtiles,      setFaqsUtiles]      = useState(new Set());
   const searchRef = useRef(null);
+  const chatRef   = useRef(null);
+
+  const preguntarAlChat = useCallback((texto) => {
+    chatRef.current?.send(texto);
+    // Scroll suave hacia el chat en móvil
+    document.getElementById('chat-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   // Cargar FAQs desde backend (complementa las locales)
   useEffect(() => {
@@ -215,34 +222,31 @@ const SoportePage = () => {
               label: 'Teléfono',
               value: 'Línea de atención',
               sub: 'Lun–Sáb 7:00 AM – 8:00 PM',
-              color: 'bg-blue-600',
-              bg: 'bg-blue-50 border-blue-200',
+              iconBg: 'bg-blue-600',
             },
             {
               Icon: MessageCircle,
               label: 'WhatsApp',
               value: 'Chat corporativo',
               sub: 'Respuesta inmediata',
-              color: 'bg-green-600',
-              bg: 'bg-green-50 border-green-200',
+              iconBg: 'bg-green-600',
             },
             {
               Icon: Mail,
               label: 'Correo',
               value: 'soporte@psi.com.co',
               sub: 'Respuesta en 4–8 horas',
-              color: 'bg-purple-600',
-              bg: 'bg-purple-50 border-purple-200',
+              iconBg: 'bg-purple-600',
             },
-          ].map(({ Icon, label, value, sub, color, bg }) => (
-            <div key={label} className={`${bg} border rounded-xl px-5 py-4 flex items-center gap-4 shadow-sm bg-white`}>
-              <div className={`${color} text-white p-3 rounded-xl flex-shrink-0`}>
+          ].map(({ Icon, label, value, sub, iconBg }) => (
+            <div key={label} className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+              <div className={`${iconBg} text-white p-3 rounded-xl flex-shrink-0`}>
                 <Icon className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
+                <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</p>
                 <p className="font-semibold text-gray-900 text-sm">{value}</p>
-                <p className="text-xs text-gray-500">{sub}</p>
+                <p className="text-xs text-gray-400">{sub}</p>
               </div>
             </div>
           ))}
@@ -318,10 +322,34 @@ const SoportePage = () => {
             {/* Temas de ayuda adicionales */}
             <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
-                { Icon: Zap,      title: 'Soporte Técnico',  items: ['Reinicio de router','Problemas WiFi','Velocidad lenta','Configuración de red'], color: 'bg-purple-100 text-purple-700' },
-                { Icon: CreditCard,title:'Facturación',       items: ['Ver mi factura','Métodos de pago','Fecha de vencimiento','Acuerdo de pago'],     color: 'bg-green-100 text-green-700'  },
-                { Icon: Settings, title: 'Configuración',    items: ['Cambio de contraseña WiFi','Gestión de dispositivos','Actualizar datos','Portal cliente'], color: 'bg-orange-100 text-orange-700' },
-                { Icon: Users,    title: 'Mi Servicio',      items: ['Cambiar de plan','Nueva instalación','Traslado de servicio','Cancelar servicio'], color: 'bg-blue-100 text-blue-700' },
+                { Icon: Zap,       title: 'Soporte Técnico', color: 'bg-purple-100 text-purple-700',
+                  items: [
+                    { label: 'Reinicio de router',      q: '¿Cómo reinicio el router?' },
+                    { label: 'Problemas WiFi',           q: 'El WiFi no aparece o no conecta' },
+                    { label: 'Internet lento',           q: '¿Por qué está lento mi internet?' },
+                    { label: 'Sin internet',             q: 'No tengo internet, ¿qué hago?' },
+                  ]},
+                { Icon: CreditCard, title: 'Facturación',  color: 'bg-green-100 text-green-700',
+                  items: [
+                    { label: 'Ver mi factura',           q: '¿Cómo consulto mi factura?' },
+                    { label: 'Métodos de pago',          q: '¿Dónde y cómo puedo pagar?' },
+                    { label: 'Servicio suspendido',      q: 'Mi servicio está suspendido, ¿qué hago?' },
+                    { label: 'Acuerdo de pago',          q: '¿Puedo hacer un acuerdo de pago?' },
+                  ]},
+                { Icon: Settings,  title: 'Configuración', color: 'bg-orange-100 text-orange-700',
+                  items: [
+                    { label: 'Cambiar clave WiFi',       q: '¿Cómo cambio la contraseña del WiFi?' },
+                    { label: 'Luces del router',         q: '¿Qué significan las luces del router?' },
+                    { label: 'Dispositivo no conecta',   q: 'Un dispositivo no se conecta al WiFi' },
+                    { label: 'Velocidad de mi plan',     q: '¿Cómo sé qué velocidad tiene mi plan?' },
+                  ]},
+                { Icon: Users,     title: 'Mi Servicio',   color: 'bg-blue-100 text-blue-700',
+                  items: [
+                    { label: 'Cambiar de plan',          q: '¿Cómo solicito un cambio de plan?' },
+                    { label: 'Nueva instalación',        q: '¿Cómo solicito una nueva instalación?' },
+                    { label: 'Traslado de servicio',     q: '¿Cómo traslado el servicio a otra dirección?' },
+                    { label: 'Cancelar servicio',        q: '¿Cómo cancelo el servicio?' },
+                  ]},
               ].map(({ Icon, title, items, color }) => (
                 <div key={title} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-2 mb-3">
@@ -330,14 +358,16 @@ const SoportePage = () => {
                     </div>
                     <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
                   </div>
-                  <ul className="space-y-1">
-                    {items.map(item => (
-                      <li key={item}
-                        onClick={() => {}}
-                        className="text-xs text-gray-600 flex items-center gap-1.5 cursor-pointer hover:text-[#0e6493] transition-colors"
+                  <ul className="space-y-1.5">
+                    {items.map(({ label, q }) => (
+                      <li key={label}
+                        onClick={() => preguntarAlChat(q)}
+                        className="text-xs text-gray-600 flex items-center gap-2 cursor-pointer hover:text-[#0e6493] group transition-colors py-0.5"
+                        title={`Preguntar: ${q}`}
                       >
-                        <span className="w-1 h-1 bg-gray-400 rounded-full flex-shrink-0" />
-                        {item}
+                        <span className="w-1.5 h-1.5 bg-gray-300 group-hover:bg-[#0e6493] rounded-full flex-shrink-0 transition-colors" />
+                        {label}
+                        <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-[#0e6493]">Preguntar →</span>
                       </li>
                     ))}
                   </ul>
@@ -347,9 +377,9 @@ const SoportePage = () => {
           </div>
 
           {/* ── PANEL DERECHO: CHAT EMBEBIDO ── */}
-          <div className="w-full lg:w-[400px] flex-shrink-0 sticky top-4">
+          <div id="chat-panel" className="w-full lg:w-[400px] flex-shrink-0 sticky top-4">
             <div className="rounded-2xl overflow-hidden shadow-xl border border-gray-200">
-              <ChatBot isOpen={true} standalone={true} />
+              <ChatBot ref={chatRef} isOpen={true} standalone={true} />
             </div>
             {/* Nota debajo del chat */}
             <div className="mt-3 flex items-start gap-2 text-xs text-gray-400 px-1">
