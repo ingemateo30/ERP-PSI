@@ -74,7 +74,8 @@ router.get('/mapa', async (req, res) => {
   try {
     const connection = await pool.getConnection();
     try {
-      const [rows] = await connection.query(`
+      // Query 1: clientes con info de ciudad
+      const [clientes] = await connection.query(`
         SELECT
           c.id,
           c.identificacion,
@@ -91,83 +92,90 @@ router.get('/mapa', async (req, res) => {
           c.poste,
           c.ruta,
           c.fecha_inicio_servicio,
-          ci.id   AS ciudad_id,
-          ci.nombre AS ciudad_nombre,
-          d.nombre  AS departamento_nombre,
-          s.nombre  AS sector_nombre,
-          GROUP_CONCAT(
-            JSON_OBJECT(
-              'id',           sc.id,
-              'plan_id',      sc.plan_id,
-              'plan_nombre',  ps.nombre,
-              'tipo',         ps.tipo,
-              'precio',       COALESCE(sc.precio_personalizado, ps.precio),
-              'estado',       sc.estado,
-              'fecha_activacion', sc.fecha_activacion
-            )
-            ORDER BY sc.id
-          ) AS servicios_json
+          ci.id        AS ciudad_id,
+          ci.nombre    AS ciudad_nombre,
+          d.nombre     AS departamento_nombre,
+          s.nombre     AS sector_nombre
         FROM clientes c
-        LEFT JOIN ciudades     ci ON c.ciudad_id  = ci.id
+        LEFT JOIN ciudades      ci ON c.ciudad_id  = ci.id
         LEFT JOIN departamentos d  ON ci.departamento_id = d.id
         LEFT JOIN sectores      s  ON c.sector_id  = s.id
-        LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id
-        LEFT JOIN planes_servicio   ps ON sc.plan_id = ps.id
         WHERE c.estado != 'inactivo'
-        GROUP BY c.id
         ORDER BY ci.nombre, c.nombre
       `);
 
-      // Parsear servicios_json y agrupar por ciudad
-      const ciudadesMap = {};
-      for (const row of rows) {
-        let servicios = [];
-        if (row.servicios_json) {
-          try {
-            servicios = JSON.parse('[' + row.servicios_json + ']');
-          } catch (_) {
-            servicios = [];
-          }
-        }
+      // Query 2: servicios de todos los clientes activos
+      const [servicios] = await connection.query(`
+        SELECT
+          sc.id,
+          sc.cliente_id,
+          sc.plan_id,
+          sc.estado,
+          sc.fecha_activacion,
+          sc.precio_personalizado,
+          ps.nombre  AS plan_nombre,
+          ps.tipo    AS tipo,
+          ps.precio  AS precio_base
+        FROM servicios_cliente sc
+        JOIN planes_servicio ps ON sc.plan_id = ps.id
+        ORDER BY sc.cliente_id, sc.id
+      `);
 
-        const ciudadKey = row.ciudad_nombre || 'Sin ciudad';
+      // Indexar servicios por cliente_id
+      const serviciosPorCliente = {};
+      for (const sv of servicios) {
+        if (!serviciosPorCliente[sv.cliente_id]) serviciosPorCliente[sv.cliente_id] = [];
+        serviciosPorCliente[sv.cliente_id].push({
+          id: sv.id,
+          plan_id: sv.plan_id,
+          plan_nombre: sv.plan_nombre,
+          tipo: sv.tipo,
+          precio: sv.precio_personalizado !== null ? sv.precio_personalizado : sv.precio_base,
+          estado: sv.estado,
+          fecha_activacion: sv.fecha_activacion
+        });
+      }
+
+      // Agrupar clientes por ciudad
+      const ciudadesMap = {};
+      for (const c of clientes) {
+        const ciudadKey = c.ciudad_nombre || 'Sin ciudad';
         if (!ciudadesMap[ciudadKey]) {
           ciudadesMap[ciudadKey] = {
-            ciudad_id: row.ciudad_id,
+            ciudad_id: c.ciudad_id,
             ciudad_nombre: ciudadKey,
-            departamento_nombre: row.departamento_nombre || '',
+            departamento_nombre: c.departamento_nombre || '',
             clientes: []
           };
         }
-
         ciudadesMap[ciudadKey].clientes.push({
-          id: row.id,
-          identificacion: row.identificacion,
-          nombre: row.nombre,
-          direccion: row.direccion,
-          barrio: row.barrio,
-          telefono: row.telefono,
-          telefono_2: row.telefono_2,
-          correo: row.correo,
-          estado: row.estado,
-          mac_address: row.mac_address,
-          ip_asignada: row.ip_asignada,
-          tap: row.tap,
-          poste: row.poste,
-          ruta: row.ruta,
-          sector_nombre: row.sector_nombre,
-          fecha_inicio_servicio: row.fecha_inicio_servicio,
-          servicios
+          id: c.id,
+          identificacion: c.identificacion,
+          nombre: c.nombre,
+          direccion: c.direccion,
+          barrio: c.barrio,
+          telefono: c.telefono,
+          telefono_2: c.telefono_2,
+          correo: c.correo,
+          estado: c.estado,
+          mac_address: c.mac_address,
+          ip_asignada: c.ip_asignada,
+          tap: c.tap,
+          poste: c.poste,
+          ruta: c.ruta,
+          sector_nombre: c.sector_nombre,
+          fecha_inicio_servicio: c.fecha_inicio_servicio,
+          servicios: serviciosPorCliente[c.id] || []
         });
       }
 
       const ciudades = Object.values(ciudadesMap).map(ciudad => ({
         ...ciudad,
-        total_clientes: ciudad.clientes.length,
-        clientes_activos: ciudad.clientes.filter(c => c.estado === 'activo').length,
-        clientes_suspendidos: ciudad.clientes.filter(c => c.estado === 'suspendido').length,
-        clientes_cortados: ciudad.clientes.filter(c => c.estado === 'cortado').length,
-        clientes_retirados: ciudad.clientes.filter(c => c.estado === 'retirado').length
+        total_clientes:      ciudad.clientes.length,
+        clientes_activos:    ciudad.clientes.filter(c => c.estado === 'activo').length,
+        clientes_suspendidos:ciudad.clientes.filter(c => c.estado === 'suspendido').length,
+        clientes_cortados:   ciudad.clientes.filter(c => c.estado === 'cortado').length,
+        clientes_retirados:  ciudad.clientes.filter(c => c.estado === 'retirado').length
       }));
 
       res.json({ success: true, data: ciudades });
