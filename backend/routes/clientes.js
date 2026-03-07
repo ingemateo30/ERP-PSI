@@ -66,6 +66,121 @@ router.use(authenticateToken);
 
 
 /**
+ * @route GET /api/v1/clientes/mapa
+ * @desc Obtener todos los clientes con sus servicios agrupados por ciudad para el mapa general
+ * @access Administrador, Supervisor
+ */
+router.get('/mapa', async (req, res) => {
+  try {
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.query(`
+        SELECT
+          c.id,
+          c.identificacion,
+          c.nombre,
+          c.direccion,
+          c.barrio,
+          c.telefono,
+          c.telefono_2,
+          c.correo,
+          c.estado,
+          c.mac_address,
+          c.ip_asignada,
+          c.tap,
+          c.poste,
+          c.ruta,
+          c.fecha_inicio_servicio,
+          ci.id   AS ciudad_id,
+          ci.nombre AS ciudad_nombre,
+          d.nombre  AS departamento_nombre,
+          s.nombre  AS sector_nombre,
+          GROUP_CONCAT(
+            JSON_OBJECT(
+              'id',           sc.id,
+              'plan_id',      sc.plan_id,
+              'plan_nombre',  ps.nombre,
+              'tipo',         ps.tipo,
+              'precio',       COALESCE(sc.precio_personalizado, ps.precio),
+              'estado',       sc.estado,
+              'fecha_activacion', sc.fecha_activacion
+            )
+            ORDER BY sc.id
+          ) AS servicios_json
+        FROM clientes c
+        LEFT JOIN ciudades     ci ON c.ciudad_id  = ci.id
+        LEFT JOIN departamentos d  ON ci.departamento_id = d.id
+        LEFT JOIN sectores      s  ON c.sector_id  = s.id
+        LEFT JOIN servicios_cliente sc ON c.id = sc.cliente_id
+        LEFT JOIN planes_servicio   ps ON sc.plan_id = ps.id
+        WHERE c.estado != 'inactivo'
+        GROUP BY c.id
+        ORDER BY ci.nombre, c.nombre
+      `);
+
+      // Parsear servicios_json y agrupar por ciudad
+      const ciudadesMap = {};
+      for (const row of rows) {
+        let servicios = [];
+        if (row.servicios_json) {
+          try {
+            servicios = JSON.parse('[' + row.servicios_json + ']');
+          } catch (_) {
+            servicios = [];
+          }
+        }
+
+        const ciudadKey = row.ciudad_nombre || 'Sin ciudad';
+        if (!ciudadesMap[ciudadKey]) {
+          ciudadesMap[ciudadKey] = {
+            ciudad_id: row.ciudad_id,
+            ciudad_nombre: ciudadKey,
+            departamento_nombre: row.departamento_nombre || '',
+            clientes: []
+          };
+        }
+
+        ciudadesMap[ciudadKey].clientes.push({
+          id: row.id,
+          identificacion: row.identificacion,
+          nombre: row.nombre,
+          direccion: row.direccion,
+          barrio: row.barrio,
+          telefono: row.telefono,
+          telefono_2: row.telefono_2,
+          correo: row.correo,
+          estado: row.estado,
+          mac_address: row.mac_address,
+          ip_asignada: row.ip_asignada,
+          tap: row.tap,
+          poste: row.poste,
+          ruta: row.ruta,
+          sector_nombre: row.sector_nombre,
+          fecha_inicio_servicio: row.fecha_inicio_servicio,
+          servicios
+        });
+      }
+
+      const ciudades = Object.values(ciudadesMap).map(ciudad => ({
+        ...ciudad,
+        total_clientes: ciudad.clientes.length,
+        clientes_activos: ciudad.clientes.filter(c => c.estado === 'activo').length,
+        clientes_suspendidos: ciudad.clientes.filter(c => c.estado === 'suspendido').length,
+        clientes_cortados: ciudad.clientes.filter(c => c.estado === 'cortado').length,
+        clientes_retirados: ciudad.clientes.filter(c => c.estado === 'retirado').length
+      }));
+
+      res.json({ success: true, data: ciudades });
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('❌ Error obteniendo clientes para mapa:', error);
+    res.status(500).json({ success: false, message: 'Error obteniendo datos del mapa', error: error.message });
+  }
+});
+
+/**
  * @route GET /api/v1/clientes/verificar-existente
  * @desc Verificar si un cliente ya existe por identificación
  * @access Autenticado

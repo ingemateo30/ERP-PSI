@@ -65,7 +65,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <Mail size={18} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', keywords: ['correo', 'email', 'plantillas'], color: 'blue', permission: 'supervisor,administrador' },
     { icon: <PieChartIcon size={18} />, label: 'Reportes', path: '/reportes-regulatorios', keywords: ['reportes', 'reports', 'regulatorios'], color: 'purple', permission: 'administrador' },
     { icon: <BarChart3 size={18} />, label: 'Estadísticas', path: '/reports', keywords: ['estadisticas', 'stats', 'analytics'], color: 'green', permission: 'administrador' },
-    { icon: <BarChart3 size={18} />, label: 'Mapa', path: '/mapa-instalaciones', keywords: ['mapa', 'map', 'ubicacion'], color: 'green', permission: 'instalador,administrador,supervisor' },
+    { icon: <BarChart3 size={18} />, label: 'Mapa Instalaciones', path: '/mapa-instalaciones', keywords: ['mapa', 'map', 'ubicacion', 'instalaciones'], color: 'green', permission: 'instalador,administrador,supervisor' },
+    { icon: <MapPin size={18} />, label: 'Mapa Clientes', path: '/mapa-clientes', keywords: ['mapa', 'clientes', 'map', 'ciudad', 'ubicacion', 'general'], color: 'blue', permission: 'administrador,supervisor' },
     { icon: <UserCheck size={18} />, label: 'Usuarios Sistema', path: '/admin/users', keywords: ['usuarios', 'admin', 'sistema'], color: 'blue', permission: 'administrador' },
     { icon: <FileText size={18} />, label: 'Firma de Contratos', path: '/firma-contratos', keywords: ['firma', 'signature', 'contratos'], color: 'indigo', permission: 'operador,supervisor,administrador' },
     { icon: <Settings size={18} />, label: 'Configuración', path: '/config', keywords: ['configuracion', 'settings', 'config'], color: 'gray', permission: 'administrador' },
@@ -478,8 +479,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const reportesAnalisis = [
     { icon: <PieChartIcon size={22} />, label: 'Reportes', path: '/reportes-regulatorios', permission: 'administrador' },
     { icon: <BarChart3 size={22} />, label: 'Estadísticas', path: '/reports', permission: 'administrador' },
-    { icon: <BarChart3 size={22} />, label: 'Mapa', path: '/mapa-instalaciones', permission: 'instalador,administrador,supervisor' }
-    
+    { icon: <BarChart3 size={22} />, label: 'Mapa Instalaciones', path: '/mapa-instalaciones', permission: 'instalador,administrador,supervisor' },
+    { icon: <MapPin size={22} />, label: 'Mapa Clientes', path: '/mapa-clientes', permission: 'administrador,supervisor' }
   ];
 
   const administracion = [
