@@ -51,6 +51,7 @@ const CrucePagosBancarios = lazy(() => import('./components/Facturas/CrucePagosB
 const FormatosBancarios = lazy(() => import('./components/Facturas/FormatosBancarios'));
 const CruceMasivoBancos = lazy(() => import('./components/Facturas/CruceMasivoBancos'));
 const MapaInstalaciones = lazy(() => import('./components/Mapa/MapaInstalaciones'));
+const MapaClientes = lazy(() => import('./components/Mapa/MapaClientes'));
 
 <Route path="/calendar" element={<ProtectedRoute><CalendarioManagement /></ProtectedRoute>} />
 // Componente de carga
@@ -488,6 +489,17 @@ function App() {
                   <ProtectedRoute allowedRoles={['administrador', 'supervisor']}>
                     <MainLayout title="Gestión de Mapa de Instalaciones" subtitle="">
                     <MapaInstalaciones />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/mapa-clientes"
+                element={
+                  <ProtectedRoute allowedRoles={['administrador', 'supervisor']}>
+                    <MainLayout title="Mapa General de Clientes" subtitle="">
+                      <MapaClientes />
                     </MainLayout>
                   </ProtectedRoute>
                 }
