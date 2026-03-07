@@ -3,15 +3,20 @@
 -- Cambios:
 --   - Renombrar rol 'operador' → 'secretaria'
 --   - Renombrar rol 'supervisor' → 'secretaria'
---   - Actualizar ENUM con los 3 roles válidos: administrador, instalador, secretaria
+--   - Dejar solo 3 roles válidos: administrador, instalador, secretaria
 
--- 1. Convertir usuarios con roles obsoletos a 'secretaria'
---    (operador y supervisor se unifican en secretaria)
+-- PASO 1: Ampliar ENUM para incluir 'secretaria' junto con los valores actuales
+ALTER TABLE `sistema_usuarios`
+  MODIFY COLUMN `rol`
+    ENUM('administrador', 'instalador', 'supervisor', 'operador', 'secretaria')
+    NOT NULL DEFAULT 'instalador';
+
+-- PASO 2: Migrar usuarios con roles obsoletos a 'secretaria'
 UPDATE `sistema_usuarios`
   SET `rol` = 'secretaria'
   WHERE `rol` IN ('operador', 'supervisor');
 
--- 2. Modificar el ENUM para aceptar los nuevos valores
+-- PASO 3: Reducir ENUM a solo los 3 roles definitivos
 ALTER TABLE `sistema_usuarios`
   MODIFY COLUMN `rol`
     ENUM('administrador', 'instalador', 'secretaria')
