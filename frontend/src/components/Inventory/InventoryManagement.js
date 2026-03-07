@@ -33,7 +33,15 @@ const InventoryManagement = () => {
   const [success, setSuccess] = useState('');
   const [uploadingExcel, setUploadingExcel] = useState(false);
   const [uploadSede, setUploadSede] = useState('');
+  const [ciudades, setCiudades] = useState([]);
   const excelInputRef = useRef(null);
+
+  // Cargar ciudades del sistema
+  useEffect(() => {
+    inventoryService.getCiudades().then(data => {
+      if (Array.isArray(data)) setCiudades(data);
+    });
+  }, []);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -312,10 +320,17 @@ const loadStats = async () => {
         await inventoryService.updateEquipment(selectedEquipo.id, equipmentData);
         setSuccess('Equipo actualizado exitosamente');
       } else {
-        await inventoryService.createEquipment(equipmentData);
-        setSuccess('Equipo creado exitosamente');
+        const result = await inventoryService.createEquipment(equipmentData);
+        const cantidad = equipmentData.cantidad || 1;
+        if (cantidad > 1) {
+          const creados = Array.isArray(result?.data) ? result.data.length : cantidad;
+          const errores = result?.errores?.length || 0;
+          setSuccess(`${creados} equipo(s) creado(s) exitosamente${errores > 0 ? ` (${errores} con error)` : ''}`);
+        } else {
+          setSuccess('Equipo creado exitosamente');
+        }
       }
-      
+
       setShowForm(false);
       loadEquipment();
       loadStats();
@@ -377,13 +392,19 @@ const loadStats = async () => {
               </button>
 
               <div className="flex items-center gap-1 bg-white/10 rounded-lg px-2">
-                <input
-                  type="text"
+                <select
                   value={uploadSede}
                   onChange={(e) => setUploadSede(e.target.value)}
-                  placeholder="Sede (opcional)"
-                  className="bg-transparent text-white placeholder-white/60 text-sm py-2 px-1 w-28 outline-none"
-                />
+                  className="bg-transparent text-white text-sm py-2 px-1 outline-none cursor-pointer"
+                  style={{ minWidth: '140px' }}
+                >
+                  <option value="" className="text-gray-800 bg-white">Sede (opcional)</option>
+                  {ciudades.map(ciudad => (
+                    <option key={ciudad.id} value={ciudad.nombre} className="text-gray-800 bg-white">
+                      {ciudad.nombre}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <label className={`cursor-pointer bg-white/20 hover:bg-white/30 transition-all rounded-lg py-2 px-4 backdrop-blur-sm flex items-center space-x-2 font-medium ${uploadingExcel ? 'opacity-60 cursor-wait' : ''}`}>

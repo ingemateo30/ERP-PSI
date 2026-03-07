@@ -234,6 +234,19 @@ async getActiveInstallers() {
   }
   
   /**
+   * Obtener ciudades/sedes activas del sistema
+   */
+  async getCiudades() {
+    try {
+      const response = await apiService.get('/config/cities');
+      return response.data?.data || response.data || [];
+    } catch (error) {
+      console.error('Error obteniendo ciudades:', error);
+      return [];
+    }
+  }
+
+  /**
    * Obtener estadísticas del inventario
    */
   async getStats() {

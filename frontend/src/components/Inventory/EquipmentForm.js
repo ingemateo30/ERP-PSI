@@ -26,6 +26,9 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [codeChecking, setCodeChecking] = useState(false);
   const [codeAvailable, setCodeAvailable] = useState(true);
+  const [ciudades, setCiudades] = useState([]);
+  const [cantidad, setCantidad] = useState(1);
+  const [seriales, setSeriales] = useState('');
 
   // Constantes locales como fallback
   const EQUIPMENT_TYPES = [
@@ -47,6 +50,13 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
       return EQUIPMENT_TYPES;
     }
   };
+
+  // Cargar ciudades del sistema
+  useEffect(() => {
+    inventoryService.getCiudades().then(data => {
+      if (Array.isArray(data)) setCiudades(data);
+    });
+  }, []);
 
   // Cargar datos del equipo si es edición
   useEffect(() => {
@@ -164,19 +174,38 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
   // Manejar envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm() || !codeAvailable) {
       return;
     }
 
+    // Validar seriales si cantidad > 1
+    if (!equipo && cantidad > 1 && seriales.trim()) {
+      const serialesArray = seriales.split('\n').map(s => s.trim()).filter(s => s);
+      if (serialesArray.length !== cantidad) {
+        setErrors(prev => ({
+          ...prev,
+          seriales: `Debe ingresar exactamente ${cantidad} seriales (uno por línea), o dejar en blanco`
+        }));
+        return;
+      }
+    }
+
     try {
       setLoading(true);
-      
+
       const dataToSend = {
         ...formData,
         codigo: formData.codigo.toUpperCase().trim(),
         precio_compra: formData.precio_compra ? parseFloat(formData.precio_compra) : null
       };
+
+      if (!equipo && cantidad > 1) {
+        dataToSend.cantidad = cantidad;
+        if (seriales.trim()) {
+          dataToSend.seriales = seriales.split('\n').map(s => s.trim()).filter(s => s);
+        }
+      }
 
       await onSubmit(dataToSend);
     } catch (error) {
@@ -424,15 +453,20 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Sede
               </label>
-              <input
-                type="text"
+              <select
                 name="sede"
                 value={formData.sede}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
-                placeholder="Sede Central, Sede Norte, etc."
-                maxLength="100"
-              />
+              >
+                <option value="">Sin sede asignada</option>
+                {ciudades.map(ciudad => (
+                  <option key={ciudad.id} value={ciudad.nombre}>
+                    {ciudad.nombre}
+                    {ciudad.departamento_nombre ? ` - ${ciudad.departamento_nombre}` : ''}
+                  </option>
+                ))}
+              </select>
               <p className="text-xs text-gray-500 mt-1">Asigna este equipo a una sede para controlar el acceso por operadores</p>
             </div>
           )}
@@ -455,6 +489,61 @@ const EquipmentForm = ({ equipo, onSubmit, onCancel }) => {
               {formData.observaciones.length}/1000
             </div>
           </div>
+
+          {/* Cantidad y Seriales - Solo para creación */}
+          {!equipo && (
+            <div className="border-t pt-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cantidad de unidades
+                </label>
+                <input
+                  type="number"
+                  value={cantidad}
+                  onChange={(e) => {
+                    const val = Math.max(1, parseInt(e.target.value) || 1);
+                    setCantidad(val);
+                    if (val === 1) setSeriales('');
+                  }}
+                  min="1"
+                  max="500"
+                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                />
+                {cantidad > 1 && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Se crearán {cantidad} equipos con código base <strong>{formData.codigo || 'CODIGO'}</strong>-001, -002, etc.
+                  </p>
+                )}
+              </div>
+
+              {cantidad > 1 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Números de serie (opcional)
+                    <span className="font-normal text-gray-500 ml-1">— uno por línea, debe coincidir con la cantidad</span>
+                  </label>
+                  <textarea
+                    value={seriales}
+                    onChange={(e) => {
+                      setSeriales(e.target.value);
+                      setErrors(prev => { const n = {...prev}; delete n.seriales; return n; });
+                    }}
+                    rows="5"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] font-mono text-sm ${
+                      errors.seriales ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder={`Serial 1\nSerial 2\nSerial 3\n...`}
+                  />
+                  {errors.seriales && (
+                    <p className="mt-1 text-sm text-red-600">{errors.seriales}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    {seriales.split('\n').filter(s => s.trim()).length} / {cantidad} seriales ingresados
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Botones */}
           <div className="flex justify-end gap-4 pt-6 border-t-2 border-gray-200 -mx-6 -mb-6 p-6 bg-gray-50 rounded-b-xl">
