@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import {
   Send, X, Bot, User, AlertCircle, CheckCircle,
   FileText, Loader2, Wifi, CreditCard, Settings,
@@ -218,7 +218,7 @@ const TicketModal = ({ userInfo, setUserInfo, step, setStep, onSubmit, onClose }
 );
 
 // ═════════════════════════════════════════════════════════════════════════════
-const ChatBot = ({ isOpen, onClose, standalone = false }) => {
+const ChatBot = forwardRef(({ isOpen, onClose, standalone = false }, ref) => {
   const [messages,   setMessages]   = useState([]);
   const [input,      setInput]      = useState('');
   const [loading,    setLoading]    = useState(false);
@@ -328,6 +328,12 @@ const ChatBot = ({ isOpen, onClose, standalone = false }) => {
     }]), 100);
   };
 
+  // Exponer send() para uso externo — siempre apunta a la versión actual de enviarMensaje
+  useImperativeHandle(ref, () => ({
+    send: (texto) => enviarMensaje(texto),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
+
   if (!isOpen && !standalone) return null;
 
   return (
@@ -423,6 +429,7 @@ const ChatBot = ({ isOpen, onClose, standalone = false }) => {
       )}
     </div>
   );
-};
+});
 
+ChatBot.displayName = 'ChatBot';
 export default ChatBot;
