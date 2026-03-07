@@ -113,7 +113,7 @@ const MapaClientes = () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await apiService.get('/clientes/mapa');
+      const res = await apiService.get('/clients/mapa');
       if (res.success && Array.isArray(res.data)) {
         setCiudades(res.data);
       }
