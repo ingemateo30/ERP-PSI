@@ -285,7 +285,7 @@ const handleExportarCSV = () => {
         switch (rol) {
             case 'administrador':
                 return 'bg-red-100 text-red-800';
-            case 'supervisor':
+            case 'secretaria':
                 return 'bg-yellow-100 text-yellow-800';
             case 'instalador':
                 return 'bg-green-100 text-green-800';
@@ -298,8 +298,8 @@ const handleExportarCSV = () => {
         switch (rol) {
             case 'administrador':
                 return 'Administrador';
-            case 'supervisor':
-                return 'Supervisor';
+            case 'secretaria':
+                return 'Secretaria';
             case 'instalador':
                 return 'Instalador';
             default:
@@ -399,7 +399,7 @@ const handleExportarCSV = () => {
                             >
                                 <option value="">Todos los roles</option>
                                 <option value="administrador">Administrador</option>
-                                <option value="supervisor">Supervisor</option>
+                                <option value="secretaria">Secretaria</option>
                                 <option value="instalador">Instalador</option>
                             </select>
 
@@ -760,7 +760,7 @@ const UserModal = ({ type, user, onClose, onSave }) => {
         confirmPassword: '',
         nombre: '',
         telefono: '',
-        rol: 'supervisor',
+        rol: 'instalador',
         sede_id: '',
         activo: true
     });
@@ -787,7 +787,7 @@ const UserModal = ({ type, user, onClose, onSave }) => {
                 confirmPassword: '',
                 nombre: user.nombre || '',
                 telefono: user.telefono || '',
-                rol: user.rol || 'supervisor',
+                rol: user.rol || 'instalador',
                 sede_id: user.sede_id || '',
                 activo: Boolean(user.activo)
             });
@@ -936,8 +936,7 @@ const UserModal = ({ type, user, onClose, onSave }) => {
                                         required
                                     >
                                         <option value="instalador">Instalador</option>
-                                        <option value="operador">Operador</option>
-                                        <option value="supervisor">Supervisor</option>
+                                        <option value="secretaria">Secretaria</option>
                                         <option value="administrador">Administrador</option>
                                     </select>
                                     {errors.rol && (

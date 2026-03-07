@@ -177,9 +177,9 @@ class UsersController {
         return error(res, 'Solo los administradores pueden crear otros administradores', 403);
       }
 
-      if (userRole === 'supervisor' && (rol === 'administrador' || rol === 'supervisor')) {
+      if (userRole === 'secretaria' && (rol === 'administrador' || rol === 'secretaria')) {
         connection.release();
-        return error(res, 'Los supervisores solo pueden crear instaladores', 403);
+        return error(res, 'Las secretarias solo pueden crear instaladores', 403);
       }
 
       // Encriptar contraseña
@@ -690,7 +690,7 @@ class UsersController {
           SUM(CASE WHEN activo = 1 THEN 1 ELSE 0 END) as usuarios_activos,
           SUM(CASE WHEN activo = 0 THEN 1 ELSE 0 END) as usuarios_inactivos,
           SUM(CASE WHEN rol = 'administrador' THEN 1 ELSE 0 END) as administradores,
-          SUM(CASE WHEN rol = 'supervisor' THEN 1 ELSE 0 END) as supervisores,
+          SUM(CASE WHEN rol = 'secretaria' THEN 1 ELSE 0 END) as secretarias,
           SUM(CASE WHEN rol = 'instalador' THEN 1 ELSE 0 END) as instaladores,
           SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as usuarios_recientes,
           SUM(CASE WHEN ultimo_acceso >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as usuarios_activos_semana

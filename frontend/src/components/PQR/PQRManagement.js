@@ -803,11 +803,10 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                                 onChange={(e) => handleChange('cliente_id', e.target.value)}
                                 required
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                size={clientes.length > 0 && clienteSearch.length >= 2 ? Math.min(clientes.length + 1, 6) : 1}
                             >
                                 <option value="">
                                     {clientes.length === 0 && clienteSearch.length >= 2
-                                        ? 'Sin resultados'
+                                        ? '— Sin resultados —'
                                         : 'Seleccionar cliente...'}
                                 </option>
                                 {clientes.map(cliente => (

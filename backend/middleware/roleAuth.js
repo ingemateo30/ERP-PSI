@@ -58,20 +58,34 @@ const PERMISOS = {
     editar: true,
     ver: true
   },
-   supervisor: {
-    configuracion: false,      // ❌ NO puede acceder a config
-    usuarios: false,            // ❌ NO puede gestionar usuarios
-    reportes: false,            // ❌ NO puede ver reportes
-    estadisticas: false,        // ❌ NO puede ver estadísticas
-    eliminar: false,            // ❌ NO puede eliminar
-    crear: false,               // ❌ NO puede crear en CONFIG
-    editar: false,              // ❌ NO puede editar en CONFIG
-    ver: true,                  // ✅ SÍ puede VER (solo lectura)
-    // Permisos específicos para otras secciones
-    crear_cliente: true,        // ✅ Puede crear clientes
-    editar_cliente: true,       // ✅ Puede editar clientes
-    ver_facturacion: true,      // ✅ Puede ver facturación
-    crear_factura: true         // ✅ Puede crear facturas
+  secretaria: {
+    configuracion: false,
+    usuarios: false,
+    reportes: false,
+    estadisticas: false,
+    eliminar: false,
+    crear: false,
+    editar: false,
+    ver: true,
+    crear_cliente: true,
+    editar_cliente: true,
+    ver_facturacion: true,
+    crear_factura: true
+  },
+  // Alias para compatibilidad con código existente
+  supervisor: {
+    configuracion: false,
+    usuarios: false,
+    reportes: false,
+    estadisticas: false,
+    eliminar: false,
+    crear: false,
+    editar: false,
+    ver: true,
+    crear_cliente: true,
+    editar_cliente: true,
+    ver_facturacion: true,
+    crear_factura: true
   },
   instalador: {
     configuracion: false,

@@ -37,11 +37,15 @@ const authenticateToken = async (req, res, next) => {
     let user;
     try {
       [user] = await Database.query(
-        'SELECT id, email, nombre, rol, activo, sede FROM sistema_usuarios WHERE id = ? AND activo = 1',
+        `SELECT su.id, su.email, su.nombre, su.rol, su.activo, su.sede_id,
+                c.nombre AS sede_nombre
+         FROM sistema_usuarios su
+         LEFT JOIN ciudades c ON su.sede_id = c.id
+         WHERE su.id = ? AND su.activo = 1`,
         [userId]
       );
     } catch (colError) {
-      // Si la columna 'sede' aún no existe (migración pendiente), usar query básica
+      // Si sede_id aún no existe (migración pendiente), usar query básica
       [user] = await Database.query(
         'SELECT id, email, nombre, rol, activo FROM sistema_usuarios WHERE id = ? AND activo = 1',
         [userId]
@@ -62,7 +66,9 @@ const authenticateToken = async (req, res, next) => {
       email: user.email,
       nombre: user.nombre,
       rol: user.rol,
-      sede: user.sede !== undefined ? (user.sede || null) : null
+      sede_id: user.sede_id || null,
+      // sede contiene el nombre de la ciudad para filtrar inventario
+      sede: user.sede_nombre || null
     };
 
     console.log('✅ Usuario autenticado:', { id: user.id, nombre: user.nombre, rol: user.rol });
@@ -108,23 +114,25 @@ const requireRole = (...args) => {
       });
     }
 
-    // ✅ MANEJAR AMBOS FORMATOS
+    // Manejar ambos formatos: array o múltiples argumentos
     let roles;
-    
-    // Si el primer argumento es un array, usar ese array
     if (Array.isArray(args[0])) {
       roles = args[0];
     } else {
-      // Si no, usar todos los argumentos como roles individuales
       roles = args;
     }
 
-    // Verificar que el rol del usuario esté en la lista permitida
-    if (!roles.includes(req.user.rol)) {
+    // 'secretaria' hereda los permisos de 'supervisor' para compatibilidad
+    const expandedRoles = [...roles];
+    if (roles.includes('supervisor') && !expandedRoles.includes('secretaria')) {
+      expandedRoles.push('secretaria');
+    }
+
+    if (!expandedRoles.includes(req.user.rol)) {
       return res.status(403).json({
         success: false,
         message: 'Permisos insuficientes',
-        required_roles: roles,
+        required_roles: expandedRoles,
         user_role: req.user.rol,
         timestamp: new Date().toISOString()
       });
