@@ -68,6 +68,13 @@ export const ROLE_PERMISSIONS = {
     canView: true,
     canExport: true
   },
+  secretaria: {
+    canCreate: true,
+    canEdit: true,
+    canDelete: false,
+    canView: true,
+    canExport: true
+  },
   supervisor: {
     canCreate: true,
     canEdit: true,
