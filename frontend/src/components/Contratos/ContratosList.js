@@ -14,7 +14,8 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
-  PenTool
+  PenTool,
+  RefreshCw
 } from 'lucide-react';
 import contratosService from '../../services/contratosService';
 
@@ -30,6 +31,9 @@ const ContratosList = () => {
     limit: 50
   });
   const [estadisticas, setEstadisticas] = useState(null);
+  const [modalRenovar, setModalRenovar] = useState({ visible: false, contrato: null });
+  const [renovarForm, setRenovarForm] = useState({ permanencia_meses: 12, observaciones: '', terminar_anterior: true });
+  const [renovarLoading, setRenovarLoading] = useState(false);
   const [paginacion, setPaginacion] = useState({
     page: 1,
     totalPages: 1,
@@ -136,6 +140,37 @@ const { hasPermission } = useAuth();
   const handleIrAFirmar = (contratoId) => {
     // Redirigir a la página de firma con el ID del contrato
     window.location.href = `/firma-contratos?contratoId=${contratoId}`;
+  };
+
+  const handleAbrirRenovar = (contrato) => {
+    setRenovarForm({
+      permanencia_meses: contrato.permanencia_meses || 12,
+      observaciones: '',
+      terminar_anterior: true
+    });
+    setModalRenovar({ visible: true, contrato });
+  };
+
+  const handleRenovarContrato = async () => {
+    try {
+      setRenovarLoading(true);
+      const response = await contratosService.renovarContrato(
+        modalRenovar.contrato.id,
+        renovarForm
+      );
+
+      if (response.success) {
+        setModalRenovar({ visible: false, contrato: null });
+        await cargarContratos();
+        await cargarEstadisticas();
+        alert(`Contrato renovado exitosamente.\nNuevo contrato: ${response.data.numero_contrato}`);
+      }
+    } catch (err) {
+      console.error('Error renovando contrato:', err);
+      alert('Error al renovar el contrato: ' + err.message);
+    } finally {
+      setRenovarLoading(false);
+    }
   };
 
   const obtenerIconoEstado = (estado) => {
@@ -453,6 +488,16 @@ const { hasPermission } = useAuth();
                       >
                         <Download className="w-4 h-4" />
                       </button>
+{(hasPermission('administrador') || hasPermission('supervisor') || hasPermission('secretaria')) && contrato.estado !== 'anulado' && (
+  <button
+    onClick={() => handleAbrirRenovar(contrato)}
+    className="text-teal-600 hover:text-teal-900 p-1 rounded transition-colors"
+    title="Renovar contrato"
+  >
+    <RefreshCw className="w-4 h-4" />
+  </button>
+)}
+
 {hasPermission('administrador') && contrato.estado === 'activo' && (
   <button
     onClick={() => handleCambiarEstado(contrato.id, 'terminado')}
@@ -551,6 +596,101 @@ const { hasPermission } = useAuth();
               : 'Aún no se han generado contratos en el sistema.'
             }
           </p>
+        </div>
+      )}
+
+      {/* Modal Renovar Contrato */}
+      {modalRenovar.visible && modalRenovar.contrato && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-6 border-b">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-teal-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Renovar Contrato</h2>
+              </div>
+              <button
+                onClick={() => setModalRenovar({ visible: false, contrato: null })}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                <p className="font-medium text-gray-700">Contrato actual:</p>
+                <p className="text-gray-600">{modalRenovar.contrato.numero_contrato} — {modalRenovar.contrato.cliente_nombre}</p>
+                <p className="text-gray-500">{modalRenovar.contrato.plan_nombre}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Meses de permanencia del nuevo contrato
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={renovarForm.permanencia_meses}
+                  onChange={(e) => setRenovarForm(prev => ({ ...prev, permanencia_meses: parseInt(e.target.value) || 12 }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Observaciones (opcional)
+                </label>
+                <textarea
+                  value={renovarForm.observaciones}
+                  onChange={(e) => setRenovarForm(prev => ({ ...prev, observaciones: e.target.value }))}
+                  placeholder={`Renovación del contrato ${modalRenovar.contrato.numero_contrato}`}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="terminarAnterior"
+                  checked={renovarForm.terminar_anterior}
+                  onChange={(e) => setRenovarForm(prev => ({ ...prev, terminar_anterior: e.target.checked }))}
+                  className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                />
+                <label htmlFor="terminarAnterior" className="text-sm text-gray-700">
+                  Marcar contrato anterior como terminado
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 p-6 border-t">
+              <button
+                onClick={() => setModalRenovar({ visible: false, contrato: null })}
+                disabled={renovarLoading}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleRenovarContrato}
+                disabled={renovarLoading}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {renovarLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Renovando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4" />
+                    Renovar Contrato
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
