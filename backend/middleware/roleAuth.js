@@ -21,7 +21,14 @@ const verificarRol = (...rolesPermitidos) => {
         rolesPermitidos
       });
 
-      const tienePermiso = rolesPermitidos.some(rol => 
+      // 'secretaria' hereda permisos de 'supervisor' para compatibilidad
+      const rolesExpandidos = [...rolesPermitidos];
+      if (rolesPermitidos.some(r => r.toLowerCase().trim() === 'supervisor') &&
+          !rolesExpandidos.some(r => r.toLowerCase().trim() === 'secretaria')) {
+        rolesExpandidos.push('secretaria');
+      }
+
+      const tienePermiso = rolesExpandidos.some(rol =>
         rol.toLowerCase().trim() === rolUsuario
       );
 
@@ -30,7 +37,7 @@ const verificarRol = (...rolesPermitidos) => {
         return res.status(403).json({
           success: false,
           message: 'No tienes permisos para acceder a este recurso',
-          requiredRoles: rolesPermitidos,
+          requiredRoles: rolesExpandidos,
           userRole: rolUsuario
         });
       }
@@ -72,15 +79,14 @@ const PERMISOS = {
     ver_facturacion: true,
     crear_factura: true
   },
-  // Alias para compatibilidad con código existente
   supervisor: {
     configuracion: false,
     usuarios: false,
     reportes: false,
     estadisticas: false,
     eliminar: false,
-    crear: false,
-    editar: false,
+    crear: true,
+    editar: true,
     ver: true,
     crear_cliente: true,
     editar_cliente: true,
