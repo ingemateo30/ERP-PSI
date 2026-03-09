@@ -501,6 +501,7 @@ const hasPermission = (requiredRole) => {
     // Definir permisos por rol y recurso
     const permissions = {
       'administrador': ['*'], // Acceso total
+      'secretaria': ['clients', 'invoices', 'payments', 'reports'],
       'supervisor': ['clients', 'invoices', 'payments', 'reports'],
       'instalador': ['clients', 'installations'],
       'usuario': ['profile']
@@ -540,7 +541,9 @@ const hasPermission = (requiredRole) => {
     
     // Estados derivados
     isAdmin: state.user?.role === 'administrador' || state.user?.rol === 'administrador',
-    isSupervisor: state.user?.role === 'supervisor' || state.user?.rol === 'supervisor',
+    isSecretaria: state.user?.role === 'secretaria' || state.user?.rol === 'secretaria',
+    isSupervisor: state.user?.role === 'supervisor' || state.user?.rol === 'supervisor' ||
+                  state.user?.role === 'secretaria' || state.user?.rol === 'secretaria',
     isInstaller: state.user?.role === 'instalador' || state.user?.rol === 'instalador',
     // Sede asignada al usuario (null = sin restricción / administrador)
     sedeId: state.user?.sede_id || null
