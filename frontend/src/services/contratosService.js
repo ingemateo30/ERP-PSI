@@ -385,6 +385,27 @@ async anularContrato(id, motivo = '') {
 }
 
 /**
+ * Renovar contrato existente generando uno nuevo
+ */
+async renovarContrato(id, datos = {}) {
+    try {
+        if (!id || isNaN(id)) {
+            throw new Error('ID de contrato inválido');
+        }
+
+        console.log(`🔄 Renovando contrato ID: ${id}`);
+
+        const response = await apiService.post(`${API_BASE}/${id}/renovar`, datos);
+
+        console.log('✅ Contrato renovado exitosamente');
+        return response;
+    } catch (error) {
+        console.error('❌ Error renovando contrato:', error);
+        throw this.handleError(error);
+    }
+}
+
+/**
  * Obtener estadísticas de contratos
  */
 async obtenerEstadisticas(filtros = {}) {

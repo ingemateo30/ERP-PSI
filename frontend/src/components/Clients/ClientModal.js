@@ -1,16 +1,18 @@
 // frontend/src/components/Clients/ClientModal.js - VERSIÓN CORREGIDA
 
 import React, { useState } from 'react';
-import { 
-  X, Edit, Trash2, Phone, Mail, MapPin, Calendar, 
+import {
+  X, Edit, Trash2, Phone, Mail, MapPin, Calendar,
   User, CreditCard, Wifi, Settings, AlertTriangle,
   CheckCircle, Clock, XCircle
 } from 'lucide-react';
 import { clientService } from '../../services/clientService';
+import ClientServiceManager from './ClientServiceManager';
 
 const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showServiceManager, setShowServiceManager] = useState(false);
 
   // Función para formatear fechas
 const formatDate = (dateString) => {
@@ -115,6 +117,7 @@ const formatDate = (dateString) => {
   };
 
   return (
+    <>
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         
@@ -138,6 +141,16 @@ const formatDate = (dateString) => {
           </div>
           
           <div className="flex items-center gap-2">
+            {permissions.canEdit && (
+              <button
+                onClick={() => setShowServiceManager(true)}
+                className="flex items-center gap-2 px-3 py-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+              >
+                <Wifi className="w-4 h-4" />
+                Servicios
+              </button>
+            )}
+
             {permissions.canEdit && (
               <button
                 onClick={onEdit}
@@ -521,6 +534,16 @@ const formatDate = (dateString) => {
         )}
       </div>
     </div>
+
+    {/* Modal de gestión de servicios */}
+    {showServiceManager && (
+      <ClientServiceManager
+        cliente={client}
+        onClose={() => setShowServiceManager(false)}
+        onUpdate={() => setShowServiceManager(false)}
+      />
+    )}
+    </>
   );
 };
 

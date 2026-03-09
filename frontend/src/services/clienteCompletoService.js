@@ -241,6 +241,106 @@ class ClienteCompletoService {
   }
 
   /**
+   * Obtener servicios activos e histórico de un cliente
+   */
+  async getClientServices(clienteId) {
+    try {
+      const response = await apiService.get(`/clientes-completo/${clienteId}/servicios`);
+      return response;
+    } catch (error) {
+      console.error('❌ Error obteniendo servicios del cliente:', error);
+      throw new Error(error.response?.data?.message || 'Error al obtener servicios');
+    }
+  }
+
+  /**
+   * Obtener planes de servicio disponibles
+   */
+  async getPlanesDisponibles() {
+    try {
+      const response = await apiService.get('/config/service-plans');
+      return response;
+    } catch (error) {
+      console.error('❌ Error obteniendo planes disponibles:', error);
+      throw new Error(error.response?.data?.message || 'Error al obtener planes');
+    }
+  }
+
+  /**
+   * Cambiar plan de servicio del cliente
+   */
+  async cambiarPlanCliente(clienteId, datos) {
+    try {
+      const response = await apiService.put(`/clientes-completo/${clienteId}/cambiar-plan`, datos);
+      return response;
+    } catch (error) {
+      console.error('❌ Error cambiando plan del cliente:', error);
+      throw new Error(error.response?.data?.message || 'Error al cambiar plan');
+    }
+  }
+
+  /**
+   * Agregar un servicio adicional al cliente
+   */
+  async agregarServicioCliente(clienteId, datos) {
+    try {
+      const response = await apiService.post(`/clientes/${clienteId}/agregar-servicio`, datos);
+      return response;
+    } catch (error) {
+      console.error('❌ Error agregando servicio al cliente:', error);
+      throw new Error(error.response?.data?.message || 'Error al agregar servicio');
+    }
+  }
+
+  /**
+   * Formatear valor a moneda colombiana
+   */
+  formatearMoneda(valor) {
+    if (!valor && valor !== 0) return '$0';
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(valor);
+  }
+
+  /**
+   * Formatear fecha a formato legible
+   */
+  formatearFecha(fecha) {
+    if (!fecha) return 'N/A';
+    try {
+      const datePart = fecha.split('T')[0].split(' ')[0];
+      const [year, month, day] = datePart.split('-').map(Number);
+      return new Date(year, month - 1, day).toLocaleDateString('es-CO', {
+        year: 'numeric', month: 'short', day: 'numeric'
+      });
+    } catch {
+      return 'Fecha inválida';
+    }
+  }
+
+  /**
+   * Calcular totales en tiempo real para previsualización
+   */
+  calcularTotalesEnTiempoReal(plan, precioPersonalizado, estrato) {
+    const precio = precioPersonalizado ? parseFloat(precioPersonalizado) : parseFloat(plan.precio || 0);
+    const estratoNum = parseInt(estrato) || 3;
+    // IVA: internet exento estratos 1-3, TV siempre 19%
+    const aplicaIva = plan.tipo === 'television' || (plan.tipo === 'internet' && estratoNum >= 4);
+    const iva = aplicaIva ? Math.round(precio * 0.19) : 0;
+    return {
+      servicio: {
+        precio,
+        iva,
+        total: precio + iva,
+        aplica_iva: aplicaIva
+      }
+    };
+  }
+
+  /**
    * Listar todas las sedes de un cliente
    */
   async listarSedesCliente(clienteId) {
