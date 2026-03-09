@@ -69,7 +69,7 @@ const CruceMasivoBancos = () => {
   const [mensaje, setMensaje] = useState(null);
   const fileRef = useRef();
 
-  if (!hasPermission('administrador') && !hasPermission('supervisor')) return null;
+  if (!hasPermission('administrador') && !hasPermission('supervisor') && !hasPermission('secretaria')) return null;
 
   const resetear = () => {
     setArchivo(null);
