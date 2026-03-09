@@ -22,7 +22,7 @@ const SimpleDashboard = () => {
     const renderDashboardByRole = () => {
         if (hasPermission('administrador')) {
             return <AdminDashboard />;
-        } else if (hasPermission('supervisor')) {
+        } else if (hasPermission('secretaria') || hasPermission('supervisor')) {
             return <SupervisorDashboard />;
         } else if (hasPermission('instalador')) {
             return <InstaladorDashboard />;
