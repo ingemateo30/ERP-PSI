@@ -28,8 +28,9 @@ class InventoryController {
                 orderDirection: req.query.orderDirection || 'DESC'
             };
 
-            // Operadores y supervisores solo ven inventario de su sede asignada
-            if (req.user.rol !== 'administrador' && req.user.sede) {
+            // Solo instaladores se restringen a sus propios equipos por sede
+            // Secretaria/supervisor ven todo el inventario para gestión completa
+            if (req.user.rol === 'instalador' && req.user.sede) {
                 filters.sede = req.user.sede;
             } else if (req.user.rol === 'administrador' && req.query.sede) {
                 // Admin puede filtrar por sede manualmente

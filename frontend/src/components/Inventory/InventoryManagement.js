@@ -379,7 +379,7 @@ const loadStats = async () => {
             <p className="text-lg opacity-90">Administra equipos, asignaciones e instalaciones</p>
           </div>
           
-          {(user.rol === 'administrador' || user.rol === 'supervisor' || user.rol === 'secretaria') && (
+          {user.rol === 'administrador' && (
             <div className="flex flex-wrap gap-2">
               {/* Botones de importación masiva */}
               <button
