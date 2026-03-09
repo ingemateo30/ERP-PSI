@@ -379,7 +379,7 @@ const loadStats = async () => {
             <p className="text-lg opacity-90">Administra equipos, asignaciones e instalaciones</p>
           </div>
           
-          {user.rol === 'administrador' && (
+          {(user.rol === 'administrador' || user.rol === 'supervisor' || user.rol === 'secretaria') && (
             <div className="flex flex-wrap gap-2">
               {/* Botones de importación masiva */}
               <button
@@ -451,8 +451,8 @@ const loadStats = async () => {
         </div>
       )}
 
-{/* Estadísticas - Solo admin/supervisor */}
-{user.rol === 'administrador' && stats && (
+{/* Estadísticas - admin/supervisor/secretaria */}
+{(user.rol === 'administrador' || user.rol === 'supervisor' || user.rol === 'secretaria') && stats && (
   <div className="bg-white rounded-lg shadow-md p-6">
     <EquipmentStats stats={stats} />
   </div>
