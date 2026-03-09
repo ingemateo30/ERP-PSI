@@ -233,7 +233,7 @@ router.get('/verificar-existente',
  * @access Administrador, Supervisor
  */
 router.post('/:id/agregar-servicio',
-  requireRole(['administrador', 'supervisor']),
+  requireRole(['administrador', 'supervisor', 'secretaria']),
   async (req, res) => {
     try {
       const { id: clienteId } = req.params;

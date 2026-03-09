@@ -418,7 +418,7 @@ router.get('/:id/servicios',
 
 router.put('/:id/cambiar-plan',
   authenticateToken,
-  requireRole(['supervisor', 'administrador']),
+  requireRole(['supervisor', 'administrador', 'secretaria']),
   async (req, res) => {
     try {
       const { id } = req.params;
