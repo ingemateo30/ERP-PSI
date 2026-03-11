@@ -646,6 +646,132 @@ router.put('/:id/inactivar',
 );
 
 /**
+ * @route POST /api/v1/clientes/:id/cancelar-instalacion
+ * @desc Cancela el proceso de un cliente recién creado cuando NO se pudo realizar
+ *       la instalación técnica. Anula el contrato y las facturas pendientes para
+ *       evitar cobros de mora y deudas fantasmas.
+ * @body { motivo: string, observaciones?: string }
+ * @access Administrador, Supervisor
+ */
+router.post('/:id/cancelar-instalacion',
+  requireRole(['administrador', 'supervisor']),
+  async (req, res) => {
+    const { id } = req.params;
+    const { motivo, observaciones } = req.body;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ success: false, message: 'ID de cliente inválido' });
+    }
+    if (!motivo || !motivo.trim()) {
+      return res.status(400).json({ success: false, message: 'El motivo de cancelación es requerido' });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Verificar que el cliente existe y está activo
+      const [clienteRows] = await connection.execute(
+        'SELECT id, nombre, identificacion, estado FROM clientes WHERE id = ?',
+        [id]
+      );
+      if (clienteRows.length === 0) {
+        throw new Error('Cliente no encontrado');
+      }
+      const cliente = clienteRows[0];
+
+      // 2. Anular facturas PENDIENTES del cliente (no las pagadas)
+      const [facturas] = await connection.execute(
+        `SELECT id, numero_factura, estado FROM facturas
+         WHERE cliente_id = ? AND estado IN ('pendiente', 'vencida')
+         ORDER BY created_at DESC`,
+        [id]
+      );
+
+      const facturasAnuladas = [];
+      for (const factura of facturas) {
+        await connection.execute(
+          `UPDATE facturas
+           SET estado = 'anulada',
+               observaciones = CONCAT(COALESCE(observaciones,''), ' | ANULADA: ', ?, ' - ', NOW()),
+               updated_at = NOW()
+           WHERE id = ? AND estado IN ('pendiente', 'vencida')`,
+          [motivo.trim(), factura.id]
+        );
+        facturasAnuladas.push(factura.numero_factura);
+      }
+
+      // 3. Anular contratos ACTIVOS del cliente
+      const [contratos] = await connection.execute(
+        `SELECT id, numero_contrato, estado FROM contratos
+         WHERE cliente_id = ? AND estado IN ('activo', 'vencido')
+         ORDER BY created_at DESC`,
+        [id]
+      );
+
+      const contratosAnulados = [];
+      for (const contrato of contratos) {
+        await connection.execute(
+          `UPDATE contratos
+           SET estado = 'anulado',
+               observaciones = CONCAT(COALESCE(observaciones,''), ' | ANULADO: ', ?, ' - ', NOW()),
+               updated_at = NOW()
+           WHERE id = ? AND estado IN ('activo', 'vencido')`,
+          [motivo.trim(), contrato.id]
+        );
+        contratosAnulados.push(contrato.numero_contrato);
+      }
+
+      // 4. Suspender/cancelar servicios activos
+      await connection.execute(
+        `UPDATE servicios_cliente
+         SET estado = 'cancelado', fecha_suspension = NOW(), updated_at = NOW()
+         WHERE cliente_id = ? AND estado IN ('activo', 'suspendido')`,
+        [id]
+      );
+
+      // 5. Marcar cliente como 'suspendido' (no inactivo, por si se recupera la instalación)
+      const motivoCompleto = `Instalación no realizada: ${motivo.trim()}${observaciones ? ' - ' + observaciones.trim() : ''}`;
+      await connection.execute(
+        `UPDATE clientes
+         SET estado = 'suspendido',
+             observaciones = CONCAT(COALESCE(observaciones,''), ' | ', ?),
+             updated_at = NOW()
+         WHERE id = ?`,
+        [motivoCompleto, id]
+      );
+
+      await connection.commit();
+
+      console.log(`✅ Cancelación de instalación procesada: cliente ${id}, facturas: ${facturasAnuladas.length}, contratos: ${contratosAnulados.length}`);
+
+      res.json({
+        success: true,
+        message: `Cancelación procesada correctamente para ${cliente.nombre}`,
+        data: {
+          cliente_id: parseInt(id),
+          cliente_nombre: cliente.nombre,
+          estado_nuevo: 'suspendido',
+          facturas_anuladas: facturasAnuladas,
+          contratos_anulados: contratosAnulados,
+          motivo: motivoCompleto,
+        }
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      console.error('❌ Error cancelando instalación:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error al cancelar la instalación',
+      });
+    } finally {
+      connection.release();
+    }
+  }
+);
+
+/**
  * @route POST /api/clientes/clientes-con-servicios
  * @desc Crear cliente con múltiples servicios independientes
  * @access Private (Administrador)
