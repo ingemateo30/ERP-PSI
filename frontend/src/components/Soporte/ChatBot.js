@@ -160,12 +160,12 @@ const Typing = () => (
 );
 
 // ── Modal ticket ───────────────────────────────────────────────────────────
-const TicketModal = ({ userInfo, setUserInfo, step, setStep, onSubmit, onClose }) => (
+const TicketModal = ({ userInfo, setUserInfo, step, setStep, onSubmit, onClose, ticketError }) => (
   <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 z-20">
     <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <h3 className="font-bold text-gray-900">
-          {step === 'info' ? 'Datos de contacto' : 'Confirmar ticket'}
+          {step === 'info' ? 'Verificar identidad' : 'Confirmar ticket'}
         </h3>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
           <X className="w-5 h-5" />
@@ -174,35 +174,50 @@ const TicketModal = ({ userInfo, setUserInfo, step, setStep, onSubmit, onClose }
 
       {step === 'info' ? (
         <form onSubmit={e => { e.preventDefault(); setStep('confirm'); }} className="p-5 space-y-3">
-          <p className="text-sm text-gray-500">Para asignarte el ticket necesitamos algunos datos:</p>
-          {[
-            { key: 'nombre',   placeholder: 'Nombre completo *', type: 'text',  required: true  },
-            { key: 'email',    placeholder: 'Correo electrónico *', type: 'email', required: true  },
-            { key: 'telefono', placeholder: 'Teléfono (opcional)', type: 'tel',   required: false },
-          ].map(({ key, placeholder, type, required }) => (
-            <input key={key} type={type} placeholder={placeholder} required={required}
-              value={userInfo[key]}
-              onChange={e => setUserInfo(p => ({ ...p, [key]: e.target.value }))}
+          <p className="text-sm text-gray-500">
+            Ingresa tu número de identificación para verificar que eres usuario de PSI:
+          </p>
+          <div>
+            <input
+              type="text"
+              placeholder="Número de cédula *"
+              required
+              minLength={5}
+              value={userInfo.identificacion}
+              onChange={e => setUserInfo(p => ({ ...p, identificacion: e.target.value.trim() }))}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+              autoFocus
             />
-          ))}
+            <p className="text-xs text-gray-400 mt-1 pl-1">Con esto buscamos tu cuenta en el sistema</p>
+          </div>
+          <input
+            type="tel"
+            placeholder="Teléfono (opcional, ayuda a encontrarte)"
+            value={userInfo.telefono}
+            onChange={e => setUserInfo(p => ({ ...p, telefono: e.target.value }))}
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+          />
+          {ticketError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
+              {ticketError}
+            </div>
+          )}
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors">
               Cancelar
             </button>
-            <button type="submit"
-              className="flex-1 py-2.5 bg-[#0e6493] text-white rounded-xl text-sm font-medium hover:bg-[#0a5278] transition-colors">
+            <button type="submit" disabled={!userInfo.identificacion}
+              className="flex-1 py-2.5 bg-[#0e6493] text-white rounded-xl text-sm font-medium hover:bg-[#0a5278] transition-colors disabled:opacity-40">
               Continuar
             </button>
           </div>
         </form>
       ) : (
         <form onSubmit={onSubmit} className="p-5">
-          <p className="text-sm text-gray-500 mb-3">Se creará un ticket con toda la conversación:</p>
+          <p className="text-sm text-gray-500 mb-3">Se creará un ticket con la conversación actual:</p>
           <div className="bg-gray-50 rounded-xl p-4 space-y-1 text-sm mb-4">
-            <p><span className="text-gray-500">Nombre:</span> <strong>{userInfo.nombre}</strong></p>
-            <p><span className="text-gray-500">Email:</span> <strong>{userInfo.email}</strong></p>
+            <p><span className="text-gray-500">Cédula:</span> <strong>{userInfo.identificacion}</strong></p>
             {userInfo.telefono && <p><span className="text-gray-500">Tel:</span> <strong>{userInfo.telefono}</strong></p>}
           </div>
           <div className="flex gap-3">
@@ -227,8 +242,9 @@ const ChatBot = forwardRef(({ isOpen, onClose, standalone = false }, ref) => {
   const [input,      setInput]      = useState('');
   const [loading,    setLoading]    = useState(false);
   const [sessionId,  setSessionId]  = useState(null);
-  const [userInfo,   setUserInfo]   = useState({ nombre: '', email: '', telefono: '' });
+  const [userInfo,   setUserInfo]   = useState({ identificacion: '', telefono: '' });
   const [ticketStep, setTicketStep] = useState(null); // null | 'info' | 'confirm'
+  const [ticketError, setTicketError] = useState('');
   const endRef   = useRef(null);
   const inputRef = useRef(null);
 
@@ -307,18 +323,42 @@ const ChatBot = forwardRef(({ isOpen, onClose, standalone = false }, ref) => {
 
   const crearTicket = async (e) => {
     e.preventDefault();
+    setTicketError('');
     try {
       const res = await soporteService.createTicketFromChat({
-        sessionId, nombre: userInfo.nombre, email: userInfo.email,
-        telefono: userInfo.telefono, categoria: 'tecnico', prioridad: 'media',
+        sessionId,
+        identificacion: userInfo.identificacion,
+        telefono: userInfo.telefono || undefined,
+        categoria: 'tecnico',
+        prioridad: 'media',
       });
       setTicketStep(null);
+      setUserInfo({ identificacion: '', telefono: '' });
       setMessages(prev => [...prev, {
         id: Date.now(), role: 'assistant', timestamp: new Date(),
-        content: `✅ **Ticket creado correctamente**\n\n**Radicado:** ${res.data?.numeroRadicado || 'PSI-' + Date.now()}\n\nUn agente de soporte revisará tu caso y te contactará al correo **${userInfo.email}** a la brevedad.\n\n¿Necesitas algo más?`,
+        content:
+          `✅ **Ticket creado correctamente**\n\n` +
+          `**Radicado:** ${res.data?.numeroRadicado || 'PSI-' + Date.now()}\n\n` +
+          `Un agente de soporte revisará tu caso y se comunicará contigo a la brevedad.\n\n` +
+          `¿Necesitas algo más?`,
       }]);
-    } catch {
-      alert('Error al crear el ticket. Por favor, intenta de nuevo.');
+    } catch (err) {
+      // err puede ser el objeto lanzado por soporteService (error.response.data)
+      const data = err?.response?.data || err;
+      if (data?.notClient) {
+        // No es cliente: mostrar en el modal (paso 'info') y en el chat
+        setTicketStep('info');
+        setTicketError(
+          data.message ||
+          'No encontramos tu número en el sistema. Verifica tu cédula o comunícate directamente con PSI.'
+        );
+      } else {
+        setTicketStep(null);
+        setMessages(prev => [...prev, {
+          id: Date.now(), role: 'error', timestamp: new Date(),
+          content: '❌ Error al crear el ticket. Por favor intenta de nuevo o comunícate con nosotros directamente.',
+        }]);
+      }
     }
   };
 
@@ -427,7 +467,8 @@ const ChatBot = forwardRef(({ isOpen, onClose, standalone = false }, ref) => {
           step={ticketStep}
           setStep={setTicketStep}
           onSubmit={crearTicket}
-          onClose={() => setTicketStep(null)}
+          onClose={() => { setTicketStep(null); setTicketError(''); }}
+          ticketError={ticketError}
         />
       )}
     </div>
