@@ -107,14 +107,63 @@ exports.createTicketFromChat = async (req, res) => {
 
     const {
       sessionId,
-      nombre,
-      email,
-      telefono,
-      clienteId,
+      identificacion, // cédula del cliente (campo obligatorio para crear ticket)
+      telefono,       // opcional, segundo intento de búsqueda
+      clienteId,      // si viene con sesión autenticada desde el sistema interno
       categoria,
       prioridad,
       asuntoAdicional,
     } = req.body;
+
+    // ─── Verificar que es cliente activo de PSI ───────────────────────────────
+    let resolvedClienteId = clienteId ? parseInt(clienteId) : null;
+    let clienteInfo = null;
+
+    if (!resolvedClienteId) {
+      // 1. Buscar por cédula / identificación (campo principal)
+      if (identificacion && identificacion.trim()) {
+        const [byId] = await connection.query(
+          `SELECT id, nombre, correo, telefono
+           FROM clientes
+           WHERE REPLACE(identificacion,' ','') = ? AND estado != 'inactivo'
+           LIMIT 1`,
+          [identificacion.replace(/\s/g, '')]
+        );
+        if (byId.length > 0) {
+          resolvedClienteId = byId[0].id;
+          clienteInfo = byId[0];
+        }
+      }
+
+      // 2. Segundo intento por teléfono si no encontró por cédula
+      if (!resolvedClienteId && telefono && telefono.trim()) {
+        const tel = telefono.replace(/\D/g, '');
+        const [byPhone] = await connection.query(
+          `SELECT id, nombre, correo, telefono
+           FROM clientes
+           WHERE REPLACE(REPLACE(telefono,' ',''),'-','') = ? AND estado != 'inactivo'
+           LIMIT 1`,
+          [tel]
+        );
+        if (byPhone.length > 0) {
+          resolvedClienteId = byPhone[0].id;
+          clienteInfo = byPhone[0];
+        }
+      }
+
+      // 3. No es cliente registrado → retornar error específico
+      if (!resolvedClienteId) {
+        await connection.rollback();
+        return res.status(404).json({
+          success: false,
+          notClient: true,
+          message:
+            `No encontramos ningún cliente activo con el número de identificación **${identificacion || 'ingresado'}** en nuestro sistema. ` +
+            'Para crear un ticket debes ser usuario activo de PSI. ' +
+            'Si crees que es un error comunícate con nosotros: 📞 línea de soporte o 💬 WhatsApp.',
+        });
+      }
+    }
 
     // Obtener historial de la conversación
     const [historial] = await connection.query(
@@ -131,87 +180,36 @@ exports.createTicketFromChat = async (req, res) => {
 
     // Construir descripción del PQR
     const descripcionChat = historial
-      .map((msg, idx) => {
-        return `**Usuario:** ${msg.mensaje_usuario}\n\n**Asistente:** ${msg.respuesta_ia}\n\n---`;
-      })
+      .map(msg => `**Usuario:** ${msg.mensaje_usuario}\n\n**Asistente:** ${msg.respuesta_ia}\n\n---`)
       .join('\n\n');
 
-    const descripcionCompleta = `**Ticket generado desde chatbot de soporte**\n\n${asuntoAdicional ? `**Información adicional del usuario:**\n${asuntoAdicional}\n\n---\n\n` : ''}**Historial de conversación:**\n\n${descripcionChat}`;
+    const descripcionCompleta =
+      `**Ticket generado desde chatbot de soporte**\n\n` +
+      (asuntoAdicional ? `**Información adicional del usuario:**\n${asuntoAdicional}\n\n---\n\n` : '') +
+      `**Historial de conversación:**\n\n${descripcionChat}`;
 
     // Determinar datos del PQR
     const tipoConsulta = historial[0].tipo_consulta;
-    const asunto =
-      asuntoAdicional || historial[0].mensaje_usuario.substring(0, 100);
+    const asunto = asuntoAdicional || historial[0].mensaje_usuario.substring(0, 100);
 
-    // Mapear tipo de consulta a categoría PQR
     const categoriaMap = {
       tecnica: 'tecnico',
       facturacion: 'facturacion',
       comercial: 'comercial',
       general: 'atencion_cliente',
     };
-
     const categoriaPQR = categoria || categoriaMap[tipoConsulta] || 'otros';
 
     // Generar número de radicado
     const numeroRadicado = await generarNumeroRadicado(connection);
 
-    // ─── Buscar cliente registrado ────────────────────────────────────────────
-    // El usuario del chatbot puede o no ser cliente. Intentamos encontrarlo.
-    let resolvedClienteId = clienteId || null;
-
-    if (!resolvedClienteId) {
-      // 1. Buscar por email
-      if (email) {
-        const [byEmail] = await connection.query(
-          `SELECT id FROM clientes WHERE correo = ? AND estado != 'inactivo' LIMIT 1`,
-          [email.trim().toLowerCase()]
-        );
-        if (byEmail.length > 0) resolvedClienteId = byEmail[0].id;
-      }
-
-      // 2. Si no hay match por email, buscar por teléfono
-      if (!resolvedClienteId && telefono) {
-        const telefonoLimpio = telefono.replace(/\D/g, '');
-        const [byPhone] = await connection.query(
-          `SELECT id FROM clientes WHERE REPLACE(telefono,' ','') = ? AND estado != 'inactivo' LIMIT 1`,
-          [telefonoLimpio]
-        );
-        if (byPhone.length > 0) resolvedClienteId = byPhone[0].id;
-      }
-    }
-
-    // Preparar datos del usuario externo (cuando no es cliente registrado)
-    const esUsuarioExterno = !resolvedClienteId;
-
-    // Crear el PQR
-    // cliente_id puede ser NULL para usuarios externos (requiere migración 005)
-    let insertQuery, insertParams;
-    if (esUsuarioExterno) {
-      insertQuery = `INSERT INTO pqr
-        (numero_radicado, cliente_id, tipo, categoria, medio_recepcion,
-         fecha_recepcion, estado, prioridad, asunto, descripcion,
-         nombre_usuario_externo, email_usuario_externo, telefono_usuario_externo)
-        VALUES (?, NULL, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)`;
-      insertParams = [
-        numeroRadicado,
-        'peticion',
-        categoriaPQR,
-        'chat',
-        'abierto',
-        prioridad || 'media',
-        asunto,
-        descripcionCompleta,
-        nombre || null,
-        email  || null,
-        telefono || null,
-      ];
-    } else {
-      insertQuery = `INSERT INTO pqr
-        (numero_radicado, cliente_id, tipo, categoria, medio_recepcion,
-         fecha_recepcion, estado, prioridad, asunto, descripcion)
-        VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)`;
-      insertParams = [
+    // Crear PQR con el cliente verificado
+    const [pqrResult] = await connection.query(
+      `INSERT INTO pqr
+       (numero_radicado, cliente_id, tipo, categoria, medio_recepcion,
+        fecha_recepcion, estado, prioridad, asunto, descripcion)
+       VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)`,
+      [
         numeroRadicado,
         resolvedClienteId,
         'peticion',
@@ -221,42 +219,8 @@ exports.createTicketFromChat = async (req, res) => {
         prioridad || 'media',
         asunto,
         descripcionCompleta,
-      ];
-    }
-
-    // Manejar tablas que aún no tengan las columnas de usuario externo
-    let pqrResult;
-    try {
-      [pqrResult] = await connection.query(insertQuery, insertParams);
-    } catch (insertErr) {
-      // Fallback: si las columnas externas aún no existen, insertar sin ellas
-      if (insertErr.code === 'ER_BAD_FIELD_ERROR' || insertErr.sqlState === '42S22') {
-        const fallbackQuery = `INSERT INTO pqr
-          (numero_radicado, cliente_id, tipo, categoria, medio_recepcion,
-           fecha_recepcion, estado, prioridad, asunto, descripcion)
-          VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)`;
-        // Para el fallback necesitamos cliente_id. Si es NULL y la columna
-        // no es nullable, usar el primer cliente activo del sistema como receptor
-        let fallbackClienteId = resolvedClienteId;
-        if (!fallbackClienteId) {
-          const [defaultCliente] = await connection.query(
-            `SELECT id FROM clientes WHERE estado = 'activo' ORDER BY id ASC LIMIT 1`
-          );
-          fallbackClienteId = defaultCliente.length > 0 ? defaultCliente[0].id : null;
-          if (!fallbackClienteId) throw new Error('No se encontró un cliente para asignar el ticket. Ejecute la migración 005_pqr_cliente_id_nullable.sql');
-        }
-        // Incluir datos del usuario externo en descripción para no perderlos
-        const descConContacto = esUsuarioExterno
-          ? `**Datos de contacto del usuario:**\n- Nombre: ${nombre || 'No proporcionado'}\n- Email: ${email || 'No proporcionado'}\n- Teléfono: ${telefono || 'No proporcionado'}\n\n---\n\n${descripcionCompleta}`
-          : descripcionCompleta;
-        [pqrResult] = await connection.query(fallbackQuery, [
-          numeroRadicado, fallbackClienteId, 'peticion', categoriaPQR,
-          'chat', 'abierto', prioridad || 'media', asunto, descConContacto,
-        ]);
-      } else {
-        throw insertErr;
-      }
-    }
+      ]
+    );
 
     const pqrId = pqrResult.insertId;
 

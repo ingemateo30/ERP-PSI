@@ -52,14 +52,13 @@ router.post(
   '/ticket',
   [
     body('sessionId').notEmpty().withMessage('Session ID es requerido'),
-    body('nombre').optional({ checkFalsy: true }).trim().isLength({ max: 255 }),
-    body('email')
+    body('identificacion')
       .optional({ checkFalsy: true })
       .trim()
-      .isEmail()
-      .withMessage('Email inválido'),
-    body('telefono').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
-    body('clienteId').optional().isInt(),
+      .isLength({ min: 5, max: 20 })
+      .withMessage('Identificación inválida'),
+    body('telefono').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('clienteId').optional({ nullable: true }).isInt(),
     body('categoria')
       .optional()
       .isIn(['tecnico', 'facturacion', 'comercial', 'atencion_cliente', 'otros'])
