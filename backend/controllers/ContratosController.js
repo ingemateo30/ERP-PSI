@@ -32,11 +32,19 @@ class ContratosController {
             let query = `
             SELECT
                 c.*,
-                COALESCE(cl.nombre, ci.nombre, 'Cliente eliminado') as cliente_nombre,
-                COALESCE(cl.identificacion, ci.identificacion, 'N/A') as cliente_identificacion,
-                COALESCE(cl.telefono, ci.telefono, '') as cliente_telefono,
+                COALESCE(cl.nombre,
+                    (SELECT ci.nombre FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
+                    'Cliente eliminado') as cliente_nombre,
+                COALESCE(cl.identificacion,
+                    (SELECT ci.identificacion FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
+                    'N/A') as cliente_identificacion,
+                COALESCE(cl.telefono,
+                    (SELECT ci.telefono FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
+                    '') as cliente_telefono,
                 COALESCE(cl.correo, '') as cliente_email,
-                COALESCE(cl.direccion, ci.direccion, '') as cliente_direccion,
+                COALESCE(cl.direccion,
+                    (SELECT ci.direccion FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
+                    '') as cliente_direccion,
                 COALESCE(cl.estrato, '') as cliente_estrato,
                 GROUP_CONCAT(
                     DISTINCT CONCAT(
@@ -47,11 +55,10 @@ class ContratosController {
                 ) as servicios_info
             FROM contratos c
             LEFT JOIN clientes cl ON c.cliente_id = cl.id
-            LEFT JOIN clientes_inactivos ci ON c.cliente_id = ci.cliente_id
             LEFT JOIN servicios_cliente sc ON (
-                CASE 
+                CASE
                     WHEN c.servicio_id IS NULL THEN FALSE
-                    WHEN c.servicio_id REGEXP '^[0-9]+$' 
+                    WHEN c.servicio_id REGEXP '^[0-9]+$'
                     THEN sc.id = CAST(c.servicio_id AS UNSIGNED)
                     WHEN c.servicio_id LIKE '[%'
                     THEN JSON_CONTAINS(CAST(c.servicio_id AS JSON), CAST(sc.id AS JSON))
