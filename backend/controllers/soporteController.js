@@ -3,7 +3,7 @@
  */
 
 const db = require('../config/database');
-const geminiService = require('../services/geminiService');
+const groqService = require('../services/groqService');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -34,14 +34,14 @@ exports.chatMessage = async (req, res) => {
     // Verificar o crear sesión
     await ensureSession(actualSessionId, nombre, email, telefono, req);
 
-    // Obtener respuesta de la IA
-    const aiResponse = await geminiService.generateResponse(
+    // Obtener respuesta de la IA (Groq + Llama 3.3)
+    const aiResponse = await groqService.generateResponse(
       message,
       conversationHistory
     );
 
     // Clasificar tipo de consulta
-    const tipoConsulta = geminiService.classifyQuery(message);
+    const tipoConsulta = groqService.classifyQuery(message);
 
     // Guardar en historial
     const [result] = await db.query(
@@ -424,6 +424,131 @@ exports.endSession = async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Error al finalizar sesión',
+    });
+  }
+};
+
+/**
+ * Analiza un PQR con IA para sugerir prioridad, categoría y respuesta rápida
+ * POST /api/v1/soporte/ai/analyze-pqr
+ */
+exports.analyzePQRWithAI = async (req, res) => {
+  try {
+    const { descripcion, asunto, categoria } = req.body;
+
+    if (!descripcion || !asunto) {
+      return res.status(400).json({
+        success: false,
+        error: 'Descripción y asunto son requeridos',
+      });
+    }
+
+    const analysis = await groqService.analyzePQR(descripcion, asunto, categoria || 'otros');
+
+    if (!analysis) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Análisis IA no disponible (GROQ_API_KEY no configurada)',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: analysis,
+      model: 'llama-3.3-70b-versatile',
+    });
+  } catch (error) {
+    console.error('Error en analyzePQRWithAI:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al analizar PQR con IA',
+    });
+  }
+};
+
+/**
+ * Genera una respuesta sugerida para que el agente conteste un ticket
+ * POST /api/v1/soporte/ai/suggest-response
+ */
+exports.suggestAgentResponse = async (req, res) => {
+  try {
+    const { descripcion, asunto, historialPrevio } = req.body;
+
+    if (!descripcion || !asunto) {
+      return res.status(400).json({
+        success: false,
+        error: 'Descripción y asunto son requeridos',
+      });
+    }
+
+    const suggestion = await groqService.generateAgentResponse(
+      descripcion,
+      asunto,
+      historialPrevio || ''
+    );
+
+    if (!suggestion) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Sugerencia IA no disponible (GROQ_API_KEY no configurada)',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { respuestaSugerida: suggestion },
+      model: 'llama-3.3-70b-versatile',
+    });
+  } catch (error) {
+    console.error('Error en suggestAgentResponse:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al generar respuesta sugerida',
+    });
+  }
+};
+
+/**
+ * Diagnóstico técnico asistido por IA para técnicos de campo
+ * POST /api/v1/soporte/ai/technical-diagnosis
+ */
+exports.technicalDiagnosis = async (req, res) => {
+  try {
+    const { sintomas, tipoServicio, equipoInfo } = req.body;
+
+    if (!sintomas) {
+      return res.status(400).json({
+        success: false,
+        error: 'Los síntomas son requeridos',
+      });
+    }
+
+    const diagnosis = await groqService.technicalDiagnosis(
+      sintomas,
+      tipoServicio || 'internet',
+      equipoInfo || ''
+    );
+
+    if (!diagnosis) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Diagnóstico IA no disponible (GROQ_API_KEY no configurada)',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { diagnostico: diagnosis },
+      model: 'llama-3.3-70b-versatile',
+    });
+  } catch (error) {
+    console.error('Error en technicalDiagnosis:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al generar diagnóstico técnico',
     });
   }
 };

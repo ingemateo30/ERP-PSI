@@ -168,4 +168,54 @@ router.post(
   soporteController.endSession
 );
 
+// ==================== ENDPOINTS DE IA (GROQ + LLAMA 3.3) ====================
+
+/**
+ * POST /api/v1/soporte/ai/analyze-pqr
+ * Analiza un PQR para sugerir prioridad, categoría y solución rápida
+ * Usado por agentes en el módulo de tickets
+ */
+router.post(
+  '/ai/analyze-pqr',
+  [
+    body('asunto').trim().notEmpty().withMessage('El asunto es requerido').isLength({ max: 255 }),
+    body('descripcion').trim().notEmpty().withMessage('La descripción es requerida').isLength({ max: 5000 }),
+    body('categoria').optional().isIn(['tecnico', 'facturacion', 'comercial', 'atencion_cliente', 'otros']),
+    validate,
+  ],
+  soporteController.analyzePQRWithAI
+);
+
+/**
+ * POST /api/v1/soporte/ai/suggest-response
+ * Genera una respuesta sugerida para que el agente conteste un ticket
+ * Usado en el panel de gestión de PQRs
+ */
+router.post(
+  '/ai/suggest-response',
+  [
+    body('asunto').trim().notEmpty().withMessage('El asunto es requerido').isLength({ max: 255 }),
+    body('descripcion').trim().notEmpty().withMessage('La descripción es requerida').isLength({ max: 5000 }),
+    body('historialPrevio').optional().trim().isLength({ max: 3000 }),
+    validate,
+  ],
+  soporteController.suggestAgentResponse
+);
+
+/**
+ * POST /api/v1/soporte/ai/technical-diagnosis
+ * Diagnóstico técnico asistido por IA para técnicos de campo
+ * Usado en el módulo de incidencias/instalaciones
+ */
+router.post(
+  '/ai/technical-diagnosis',
+  [
+    body('sintomas').trim().notEmpty().withMessage('Los síntomas son requeridos').isLength({ max: 2000 }),
+    body('tipoServicio').optional().isIn(['internet', 'television', 'combo', 'voip']),
+    body('equipoInfo').optional().trim().isLength({ max: 500 }),
+    validate,
+  ],
+  soporteController.technicalDiagnosis
+);
+
 module.exports = router;
