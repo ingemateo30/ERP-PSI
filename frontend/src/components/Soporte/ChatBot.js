@@ -8,12 +8,16 @@ import * as soporteService from '../../services/soporteService';
 
 // ── Sugerencias rápidas ────────────────────────────────────────────────────
 const SUGERENCIAS = [
-  { label: '📡 Sin internet',       text: 'No tengo internet, ¿qué hago?' },
-  { label: '🐌 Internet lento',     text: '¿Por qué está lento mi internet?' },
-  { label: '🔄 Reiniciar router',   text: '¿Cómo reinicio el router?' },
-  { label: '💳 Pagar factura',      text: '¿Dónde y cómo pago mi factura?' },
-  { label: '🔑 Cambiar WiFi',       text: '¿Cómo cambio la contraseña del WiFi?' },
-  { label: '📦 Ver planes',         text: '¿Qué planes de internet tienen disponibles?' },
+  { label: '📡 Sin internet',        text: 'No tengo internet, ¿qué hago?' },
+  { label: '🐌 Internet lento',      text: '¿Por qué está lento mi internet?' },
+  { label: '🔄 Reiniciar router',    text: '¿Cómo reinicio el router correctamente?' },
+  { label: '💳 Pagar factura',       text: '¿Dónde y cómo pago mi factura?' },
+  { label: '🔑 Cambiar clave WiFi',  text: '¿Cómo cambio la contraseña del WiFi?' },
+  { label: '📦 Ver planes',          text: '¿Qué planes de internet tienen disponibles?' },
+  { label: '🔴 Luz roja router',     text: '¿Qué significa la luz roja en mi router?' },
+  { label: '📶 Mejorar señal WiFi',  text: '¿Cómo puedo mejorar la señal del WiFi en mi casa?' },
+  { label: '🎮 Reducir ping',        text: '¿Cómo reduzco el lag y el ping para jugar?' },
+  { label: '📞 Contactar soporte',   text: '¿Cuáles son los horarios y canales de atención?' },
 ];
 
 // ── Formato markdown simple ────────────────────────────────────────────────
@@ -348,7 +352,7 @@ const ChatBot = forwardRef(({ isOpen, onClose, standalone = false }, ref) => {
           <p className="font-bold text-sm">Asistente PSI</p>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-xs text-blue-100">En línea · Responde en segundos</span>
+            <span className="text-xs text-blue-100">En línea · Groq / Llama 3.3</span>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -412,7 +416,7 @@ const ChatBot = forwardRef(({ isOpen, onClose, standalone = false }, ref) => {
           </button>
         </div>
         <p className="text-center text-xs text-gray-400 mt-1.5">
-          Asistente IA · Respuestas orientativas
+          Groq · Llama 3.3 · Respuestas orientativas
         </p>
       </form>
 
