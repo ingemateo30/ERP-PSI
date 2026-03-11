@@ -293,6 +293,22 @@ class ClienteCompletoService {
   }
 
   /**
+   * Cancela la instalación de un cliente recién creado cuando no se pudo realizar.
+   * Anula contrato y facturas pendientes para evitar cobros de mora.
+   * @param {number} clienteId
+   * @param {object} datos - { motivo: string, observaciones?: string }
+   */
+  async cancelarInstalacion(clienteId, datos) {
+    try {
+      const response = await apiService.post(`/clientes/${clienteId}/cancelar-instalacion`, datos);
+      return response;
+    } catch (error) {
+      console.error('❌ Error cancelando instalación:', error);
+      throw new Error(error.response?.data?.message || 'Error al cancelar la instalación');
+    }
+  }
+
+  /**
    * Formatear valor a moneda colombiana
    */
   formatearMoneda(valor) {

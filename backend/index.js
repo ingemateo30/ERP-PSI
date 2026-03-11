@@ -237,11 +237,12 @@ console.log('✅ Rutas de registro web cargadas: /api/v1/registro-web');
   app.use('/api/v1/conceptos', conceptosRoutes);
   console.log('✅ Rutas de conceptos cargadas: /api/v1/conceptos');
 
-  // Rutas de clientes
+  // Rutas de clientes (montadas en ambas rutas por compatibilidad)
   console.log('👤 Cargando rutas de clientes...');
   const clientRoutes = require('./routes/clientes');
   app.use('/api/v1/clients', clientRoutes);
-  console.log('✅ Rutas de clientes cargadas: /api/v1/clients');
+  app.use('/api/v1/clientes', clientRoutes); // Alias: frontend usa /clientes
+  console.log('✅ Rutas de clientes cargadas: /api/v1/clients y /api/v1/clientes');
 
   // Rutas de inventario
   console.log('📦 Cargando rutas de inventario...');

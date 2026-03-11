@@ -30,14 +30,14 @@ class ContratosController {
 
             // ✅ Query mejorado - maneja servicio_id NULL y JSON arrays
             let query = `
-            SELECT 
+            SELECT
                 c.*,
-                cl.nombre as cliente_nombre,
-                cl.identificacion as cliente_identificacion,
-                cl.telefono as cliente_telefono,
-                cl.correo as cliente_email,
-                cl.direccion as cliente_direccion,
-                cl.estrato as cliente_estrato,
+                COALESCE(cl.nombre, ci.nombre, 'Cliente eliminado') as cliente_nombre,
+                COALESCE(cl.identificacion, ci.identificacion, 'N/A') as cliente_identificacion,
+                COALESCE(cl.telefono, ci.telefono, '') as cliente_telefono,
+                COALESCE(cl.correo, '') as cliente_email,
+                COALESCE(cl.direccion, ci.direccion, '') as cliente_direccion,
+                COALESCE(cl.estrato, '') as cliente_estrato,
                 GROUP_CONCAT(
                     DISTINCT CONCAT(
                         COALESCE(ps.nombre, ''), '|',
@@ -47,6 +47,7 @@ class ContratosController {
                 ) as servicios_info
             FROM contratos c
             LEFT JOIN clientes cl ON c.cliente_id = cl.id
+            LEFT JOIN clientes_inactivos ci ON c.cliente_id = ci.cliente_id
             LEFT JOIN servicios_cliente sc ON (
                 CASE 
                     WHEN c.servicio_id IS NULL THEN FALSE
@@ -106,8 +107,9 @@ class ContratosController {
             query += ' GROUP BY c.id';
 
             // Contar total
-            const countQuery = `SELECT COUNT(DISTINCT c.id) as total FROM contratos c 
-                           LEFT JOIN clientes cl ON c.cliente_id = cl.id 
+            const countQuery = `SELECT COUNT(DISTINCT c.id) as total FROM contratos c
+                           LEFT JOIN clientes cl ON c.cliente_id = cl.id
+                           LEFT JOIN clientes_inactivos ci ON c.cliente_id = ci.cliente_id
                            WHERE 1=1 ${query.substring(query.indexOf('WHERE 1=1') + 9, query.indexOf('GROUP BY'))}`;
             const [countResult] = await Database.query(countQuery, params);
             const total = countResult[0]?.total || 0;

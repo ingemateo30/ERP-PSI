@@ -4,7 +4,9 @@
 
 const db = require('../config/database');
 const groqService = require('../services/groqService');
-const { v4: uuidv4 } = require('uuid');
+// Usamos crypto nativo de Node.js (disponible desde v14.17+), sin dependencias externas
+const { randomUUID } = require('crypto');
+const uuidv4 = () => randomUUID();
 
 /**
  * Enviar mensaje al chatbot y obtener respuesta

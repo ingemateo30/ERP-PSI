@@ -120,46 +120,31 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
             console.log('📱 Dispositivos seleccionados:', devices);
 
             if (devices.length > 0) {
-                // Filtrar dispositivos STU
-                const stuDevices = devices.filter(device => {
-                    const isSTU = device.productName && 
-                                 (device.productName.includes('STU') || 
-                                  device.productName.includes('Signature') ||
-                                  device.productName.includes('540'));
-                    
-                    console.log(`🔍 Dispositivo ${device.productName}: es STU = ${isSTU}`);
-                    return isSTU;
-                });
+                // Aceptar cualquier dispositivo Wacom seleccionado (no solo STU-540)
+                const selectedDevice = devices[0];
+                console.log('✅ Dispositivo Wacom seleccionado:', selectedDevice.productName || `VID:${selectedDevice.vendorId?.toString(16)}`);
 
-                if (stuDevices.length > 0) {
-                    const selectedSTU = stuDevices[0];
-                    console.log('✅ STU seleccionado:', selectedSTU);
-                    
-                    setWacomDevices([selectedSTU]);
-                    setSelectedDevice(selectedSTU);
-                    setWacomAvailable(true);
-                    setModoFirma('wacom');
-                    setSuccess(`✅ ${selectedSTU.productName} conectado y listo`);
-                    setError('');
+                setWacomDevices(devices);
+                setSelectedDevice(selectedDevice);
+                setWacomAvailable(true);
+                setModoFirma('wacom');
+                setSuccess(`✅ ${selectedDevice.productName || 'Tablet Wacom'} conectada y lista para firmar`);
+                setError('');
 
-                    // Intentar abrir el dispositivo inmediatamente para verificar
-                    try {
-                        if (!selectedSTU.opened) {
-                            await selectedSTU.open();
-                            console.log('🔓 Dispositivo STU abierto correctamente');
-                            await selectedSTU.close();
-                        }
-                    } catch (openError) {
-                        console.error('⚠️ Error abriendo dispositivo:', openError);
-                        setError('Dispositivo conectado pero no se pudo abrir. Verifique que no esté en uso por otra aplicación.');
+                // Intentar abrir el dispositivo para verificar que responde
+                try {
+                    if (!selectedDevice.opened) {
+                        await selectedDevice.open();
+                        console.log('🔓 Dispositivo Wacom abierto correctamente');
+                        await selectedDevice.close();
                     }
-                } else {
-                    console.log('❌ No se encontraron dispositivos STU válidos');
-                    setError('Los dispositivos seleccionados no son tablets STU compatibles.');
+                } catch (openError) {
+                    // Solo warning - el dispositivo puede funcionar igualmente
+                    console.warn('⚠️ Aviso al abrir dispositivo:', openError.message);
                 }
             } else {
                 console.log('❌ No se seleccionó ningún dispositivo');
-                setError('No se seleccionó ningún dispositivo Wacom.');
+                setError('No se seleccionó ningún dispositivo. Haga clic en "Conectar Wacom" e seleccione su tablet de la lista.');
             }
         } catch (error) {
             console.error('❌ Error solicitando acceso Wacom:', error);
@@ -1166,24 +1151,53 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Firma con Tablet Wacom
+                                {wacomAvailable && (
+                                    <span className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-green-600">
+                                        <span className="w-2 h-2 bg-green-500 rounded-full inline-block" />
+                                        Conectada
+                                    </span>
+                                )}
                             </label>
-                            <div className="border-2 border-dashed border-green-300 rounded-lg p-4 bg-green-50">
-                                <canvas
-                                    ref={wacomCanvasRef}
-                                    width={400}
-                                    height={150}
-                                    className="w-full border rounded bg-white mx-auto block"
-                                />
-                            </div>
-                            <div className="mt-2 text-sm text-green-700 space-y-1">
-                                <p>📝 Firme directamente en la pantalla LCD de su STU-540</p>
-                                <p>👀 El trazado aparecerá tanto en la tablet como en el preview</p>
-                                <p>✅ Use los botones que aparecerán en pantalla para confirmar</p>
-                                <p>⌨️ O presione <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">Enter</kbd> confirmar • <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">Esc</kbd> cancelar</p>
+
+                            {!wacomAvailable ? (
+                                // Tablet no conectada — mostrar instrucciones prominentes
+                                <div className="border-2 border-dashed border-orange-300 rounded-lg p-6 bg-orange-50 text-center">
+                                    <div className="text-3xl mb-2">🖊️</div>
+                                    <p className="text-sm font-medium text-orange-800 mb-1">Tablet Wacom no conectada</p>
+                                    <p className="text-xs text-orange-600 mb-3">Conecte su tablet por USB y haga clic en "Conectar Wacom"</p>
+                                    <button
+                                        type="button"
+                                        onClick={solicitarAccesoWacom}
+                                        className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                    >
+                                        🔌 Conectar Wacom ahora
+                                    </button>
+                                    <p className="text-xs text-orange-500 mt-2">Requiere Chrome o Edge con la tablet conectada por USB</p>
+                                </div>
+                            ) : (
+                                // Tablet conectada — mostrar canvas
+                                <div className="border-2 border-dashed border-green-300 rounded-lg p-4 bg-green-50">
+                                    <canvas
+                                        ref={wacomCanvasRef}
+                                        width={400}
+                                        height={150}
+                                        className="w-full border rounded bg-white mx-auto block"
+                                    />
+                                    {!isCapturingWacom && (
+                                        <p className="text-center text-sm text-green-700 mt-2">
+                                            ✅ Tablet lista — haga clic en <strong>"Firmar"</strong> para iniciar la captura
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="mt-2 text-sm text-gray-600 space-y-0.5">
+                                <p>📝 Firme directamente en la pantalla de su tablet</p>
+                                <p>⌨️ <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">Enter</kbd> confirmar · <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">Esc</kbd> cancelar</p>
                             </div>
                             {isCapturingWacom && (
-                                <div className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm">
-                                    🖊️ Capturando firma... Use su tablet Wacom ahora.
+                                <div className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm animate-pulse">
+                                    🖊️ Capturando firma en tablet... Firme ahora en la pantalla de su Wacom.
                                 </div>
                             )}
                         </div>
