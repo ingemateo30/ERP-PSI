@@ -266,14 +266,13 @@ const ChatBot = forwardRef(({ isOpen, onClose, standalone = false }, ref) => {
 
     try {
       const history = messages.map(m => ({ role: m.role, content: m.content }));
-      const res = await soporteService.sendMessage({
-        message: msg,
-        sessionId,
-        nombre: userInfo.nombre,
-        email: userInfo.email,
-        telefono: userInfo.telefono,
-        conversationHistory: history,
-      });
+      // Construir payload omitiendo campos vacíos para evitar errores de validación
+      const payload = { message: msg, conversationHistory: history };
+      if (sessionId)           payload.sessionId  = sessionId;
+      if (userInfo.nombre)     payload.nombre     = userInfo.nombre;
+      if (userInfo.email)      payload.email      = userInfo.email;
+      if (userInfo.telefono)   payload.telefono   = userInfo.telefono;
+      const res = await soporteService.sendMessage(payload);
 
       if (!sessionId) setSessionId(res.data.sessionId);
 

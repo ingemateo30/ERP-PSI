@@ -33,11 +33,12 @@ router.post(
       .withMessage('El mensaje es requerido')
       .isLength({ max: 1000 })
       .withMessage('El mensaje no puede exceder 1000 caracteres'),
-    body('sessionId').optional().isString(),
-    body('nombre').optional({ checkFalsy: true }).trim().isLength({ max: 255 }),
-    body('email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Email inválido'),
-    body('telefono').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
-    body('conversationHistory').optional().isArray(),
+    // nullable:true ignora null (primer mensaje antes de tener sessionId)
+    body('sessionId').optional({ nullable: true }).isString(),
+    body('nombre').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 255 }),
+    body('email').optional({ nullable: true, checkFalsy: true }).trim().isEmail().withMessage('Email inválido'),
+    body('telefono').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('conversationHistory').optional({ nullable: true }).isArray(),
     validate,
   ],
   soporteController.chatMessage
@@ -80,10 +81,10 @@ router.post(
 router.post(
   '/resolved',
   [
-    body('messageId').optional().isInt(),
-    body('sessionId').optional().isString(),
+    body('messageId').optional({ nullable: true }).isInt(),
+    body('sessionId').optional({ nullable: true }).isString(),
     body('satisfaccion')
-      .optional()
+      .optional({ nullable: true })
       .isInt({ min: 1, max: 5 })
       .withMessage('Satisfacción debe ser entre 1 y 5'),
     validate,
@@ -158,9 +159,9 @@ router.get(
 router.post(
   '/session/end',
   [
-    body('sessionId').notEmpty().withMessage('Session ID es requerido'),
+    body('sessionId').optional({ nullable: true }).isString(),
     body('satisfaccion')
-      .optional()
+      .optional({ nullable: true })
       .isInt({ min: 1, max: 5 })
       .withMessage('Satisfacción debe ser entre 1 y 5'),
     validate,
