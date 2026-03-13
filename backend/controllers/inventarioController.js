@@ -730,12 +730,15 @@ class InventoryController {
                 'splitters': 'splitter', 'divisor': 'splitter',
                 'amplificadores': 'amplificador', 'amplifier': 'amplificador',
                 'otros': 'otro', 'switch': 'otro', 'switches': 'otro',
-                'ups': 'otro', 'modem': 'router', 'onu': 'router', 'olt': 'otro'
+                'ups': 'otro', 'modem': 'router', 'onu': 'router', 'olt': 'otro',
+                'no aplica': 'otro', 'no_aplica': 'otro', 'n/a': 'otro', 'na': 'otro',
+                'sin tipo': 'otro', 'sin_tipo': 'otro', 'ninguno': 'otro', 'desconocido': 'otro'
             };
 
             const normalizarTipo = (tipoRaw) => {
                 if (!tipoRaw) return 'otro';
-                const t = tipoRaw.trim().toLowerCase();
+                const t = tipoRaw.trim().toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // quitar tildes
                 if (tiposValidos.includes(t)) return t;
                 if (tipoAliases[t]) return tipoAliases[t];
                 return null; // Tipo inválido
