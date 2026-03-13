@@ -451,8 +451,8 @@ const loadStats = async () => {
         </div>
       )}
 
-{/* Estadísticas - Solo admin/supervisor */}
-{user.rol === 'administrador' && stats && (
+{/* Estadísticas - admin/supervisor/secretaria */}
+{(user.rol === 'administrador' || user.rol === 'supervisor' || user.rol === 'secretaria') && stats && (
   <div className="bg-white rounded-lg shadow-md p-6">
     <EquipmentStats stats={stats} />
   </div>

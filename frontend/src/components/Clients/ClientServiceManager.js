@@ -14,6 +14,7 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
   const [servicios, setServicios] = useState([]);
   const [planesDisponibles, setPlanesDisponibles] = useState([]);
   const [showChangeModal, setShowChangeModal] = useState(false);
+  const [showAgregarModal, setShowAgregarModal] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [error, setError] = useState(null);
 
@@ -116,13 +117,22 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
                 <h3 className="text-lg font-medium text-gray-900">
                   Servicio Activo
                 </h3>
-                <button
-                  onClick={() => handleCambiarPlan(servicioActivo)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Edit3 className="w-4 h-4" />
-                  Cambiar Plan
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowAgregarModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Agregar Servicio
+                  </button>
+                  <button
+                    onClick={() => handleCambiarPlan(servicioActivo)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    Cambiar Plan
+                  </button>
+                </div>
               </div>
 
               <div className="bg-green-50 border border-green-200 rounded-lg p-6">
@@ -253,6 +263,13 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
               <p className="text-gray-600 mb-4">
                 Este cliente no tiene servicios asignados actualmente.
               </p>
+              <button
+                onClick={() => setShowAgregarModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Agregar Servicio
+              </button>
             </div>
           )}
         </div>
@@ -281,6 +298,20 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
           onSuccess={() => {
             setShowChangeModal(false);
             setSelectedService(null);
+            cargarDatos();
+            onUpdate && onUpdate();
+          }}
+        />
+      )}
+
+      {/* Modal para agregar servicio */}
+      {showAgregarModal && (
+        <AgregarServicioModal
+          cliente={cliente}
+          planesDisponibles={planesDisponibles}
+          onClose={() => setShowAgregarModal(false)}
+          onSuccess={() => {
+            setShowAgregarModal(false);
             cargarDatos();
             onUpdate && onUpdate();
           }}
@@ -521,6 +552,199 @@ const ChangePlanModal = ({ cliente, servicioActual, planesDisponibles, onClose, 
                 <>
                   <Check className="w-4 h-4" />
                   Cambiar Plan
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Componente para agregar un nuevo servicio al cliente
+const AgregarServicioModal = ({ cliente, planesDisponibles, onClose, onSuccess }) => {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    plan_id: '',
+    tipo_servicio: 'internet',
+    precio_personalizado: '',
+    fecha_activacion: new Date().toISOString().split('T')[0],
+    observaciones: ''
+  });
+  const [errors, setErrors] = useState({});
+
+  const planSeleccionado = planesDisponibles.find(p => p.id == formData.plan_id);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.plan_id) {
+      setErrors({ general: 'Selecciona un plan de servicio' });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setErrors({});
+
+      await clienteCompletoService.agregarServicioCliente(cliente.id, {
+        plan_id: parseInt(formData.plan_id),
+        precio_personalizado: formData.precio_personalizado ? parseFloat(formData.precio_personalizado) : null,
+        fecha_activacion: formData.fecha_activacion,
+        observaciones: formData.observaciones
+      });
+
+      onSuccess();
+    } catch (error) {
+      console.error('Error agregando servicio:', error);
+      setErrors({ general: error.message || 'Error al agregar el servicio' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const planesFiltrados = planesDisponibles.filter(p =>
+    !formData.tipo_servicio || p.tipo === formData.tipo_servicio || p.tipo === 'combo'
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Agregar Servicio</h3>
+            <p className="text-sm text-gray-500">Cliente: {cliente.nombre}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {errors.general && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <span className="text-red-700 text-sm">{errors.general}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo de Servicio
+            </label>
+            <select
+              value={formData.tipo_servicio}
+              onChange={(e) => setFormData(prev => ({ ...prev, tipo_servicio: e.target.value, plan_id: '' }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="internet">Internet</option>
+              <option value="television">Televisión</option>
+              <option value="combo">Combo (Internet + TV)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Plan <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={formData.plan_id}
+              onChange={(e) => setFormData(prev => ({ ...prev, plan_id: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              required
+            >
+              <option value="">Seleccionar plan</option>
+              {planesFiltrados.map(plan => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.nombre} — {clienteCompletoService.formatearMoneda(plan.precio)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {planSeleccionado && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-800">
+              <p className="font-medium mb-1">{planSeleccionado.nombre}</p>
+              {planSeleccionado.velocidad_bajada && (
+                <p>Velocidad: {planSeleccionado.velocidad_bajada} Mbps bajada / {planSeleccionado.velocidad_subida} Mbps subida</p>
+              )}
+              {planSeleccionado.canales_tv && (
+                <p>Canales TV: {planSeleccionado.canales_tv}</p>
+              )}
+              <p>Precio: {clienteCompletoService.formatearMoneda(planSeleccionado.precio)}/mes</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Precio Personalizado (Opcional)
+            </label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+              <input
+                type="number"
+                value={formData.precio_personalizado}
+                onChange={(e) => setFormData(prev => ({ ...prev, precio_personalizado: e.target.value }))}
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Dejar vacío para usar precio del plan"
+                min="0"
+                step="100"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Fecha de Activación
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+              <input
+                type="date"
+                value={formData.fecha_activacion}
+                onChange={(e) => setFormData(prev => ({ ...prev, fecha_activacion: e.target.value }))}
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Observaciones
+            </label>
+            <textarea
+              value={formData.observaciones}
+              onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Motivo de la adición del servicio..."
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-4 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !formData.plan_id}
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Agregando...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  Agregar Servicio
                 </>
               )}
             </button>

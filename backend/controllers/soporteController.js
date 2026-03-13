@@ -3,8 +3,10 @@
  */
 
 const db = require('../config/database');
-const geminiService = require('../services/geminiService');
-const { v4: uuidv4 } = require('uuid');
+const groqService = require('../services/groqService');
+// Usamos crypto nativo de Node.js (disponible desde v14.17+), sin dependencias externas
+const { randomUUID } = require('crypto');
+const uuidv4 = () => randomUUID();
 
 /**
  * Enviar mensaje al chatbot y obtener respuesta
@@ -34,14 +36,14 @@ exports.chatMessage = async (req, res) => {
     // Verificar o crear sesión
     await ensureSession(actualSessionId, nombre, email, telefono, req);
 
-    // Obtener respuesta de la IA
-    const aiResponse = await geminiService.generateResponse(
+    // Obtener respuesta de la IA (Groq + Llama 3.3)
+    const aiResponse = await groqService.generateResponse(
       message,
       conversationHistory
     );
 
     // Clasificar tipo de consulta
-    const tipoConsulta = geminiService.classifyQuery(message);
+    const tipoConsulta = groqService.classifyQuery(message);
 
     // Guardar en historial
     const [result] = await db.query(
@@ -105,14 +107,63 @@ exports.createTicketFromChat = async (req, res) => {
 
     const {
       sessionId,
-      nombre,
-      email,
-      telefono,
-      clienteId,
+      identificacion, // cédula del cliente (campo obligatorio para crear ticket)
+      telefono,       // opcional, segundo intento de búsqueda
+      clienteId,      // si viene con sesión autenticada desde el sistema interno
       categoria,
       prioridad,
       asuntoAdicional,
     } = req.body;
+
+    // ─── Verificar que es cliente activo de PSI ───────────────────────────────
+    let resolvedClienteId = clienteId ? parseInt(clienteId) : null;
+    let clienteInfo = null;
+
+    if (!resolvedClienteId) {
+      // 1. Buscar por cédula / identificación (campo principal)
+      if (identificacion && identificacion.trim()) {
+        const [byId] = await connection.query(
+          `SELECT id, nombre, correo, telefono
+           FROM clientes
+           WHERE REPLACE(identificacion,' ','') = ? AND estado != 'inactivo'
+           LIMIT 1`,
+          [identificacion.replace(/\s/g, '')]
+        );
+        if (byId.length > 0) {
+          resolvedClienteId = byId[0].id;
+          clienteInfo = byId[0];
+        }
+      }
+
+      // 2. Segundo intento por teléfono si no encontró por cédula
+      if (!resolvedClienteId && telefono && telefono.trim()) {
+        const tel = telefono.replace(/\D/g, '');
+        const [byPhone] = await connection.query(
+          `SELECT id, nombre, correo, telefono
+           FROM clientes
+           WHERE REPLACE(REPLACE(telefono,' ',''),'-','') = ? AND estado != 'inactivo'
+           LIMIT 1`,
+          [tel]
+        );
+        if (byPhone.length > 0) {
+          resolvedClienteId = byPhone[0].id;
+          clienteInfo = byPhone[0];
+        }
+      }
+
+      // 3. No es cliente registrado → retornar error específico
+      if (!resolvedClienteId) {
+        await connection.rollback();
+        return res.status(404).json({
+          success: false,
+          notClient: true,
+          message:
+            `No encontramos ningún cliente activo con el número de identificación **${identificacion || 'ingresado'}** en nuestro sistema. ` +
+            'Para crear un ticket debes ser usuario activo de PSI. ' +
+            'Si crees que es un error comunícate con nosotros: 📞 línea de soporte o 💬 WhatsApp.',
+        });
+      }
+    }
 
     // Obtener historial de la conversación
     const [historial] = await connection.query(
@@ -129,32 +180,30 @@ exports.createTicketFromChat = async (req, res) => {
 
     // Construir descripción del PQR
     const descripcionChat = historial
-      .map((msg, idx) => {
-        return `**Usuario:** ${msg.mensaje_usuario}\n\n**Asistente:** ${msg.respuesta_ia}\n\n---`;
-      })
+      .map(msg => `**Usuario:** ${msg.mensaje_usuario}\n\n**Asistente:** ${msg.respuesta_ia}\n\n---`)
       .join('\n\n');
 
-    const descripcionCompleta = `**Ticket generado desde chatbot de soporte**\n\n${asuntoAdicional ? `**Información adicional del usuario:**\n${asuntoAdicional}\n\n---\n\n` : ''}**Historial de conversación:**\n\n${descripcionChat}`;
+    const descripcionCompleta =
+      `**Ticket generado desde chatbot de soporte**\n\n` +
+      (asuntoAdicional ? `**Información adicional del usuario:**\n${asuntoAdicional}\n\n---\n\n` : '') +
+      `**Historial de conversación:**\n\n${descripcionChat}`;
 
     // Determinar datos del PQR
     const tipoConsulta = historial[0].tipo_consulta;
-    const asunto =
-      asuntoAdicional || historial[0].mensaje_usuario.substring(0, 100);
+    const asunto = asuntoAdicional || historial[0].mensaje_usuario.substring(0, 100);
 
-    // Mapear tipo de consulta a categoría PQR
     const categoriaMap = {
       tecnica: 'tecnico',
       facturacion: 'facturacion',
       comercial: 'comercial',
       general: 'atencion_cliente',
     };
-
     const categoriaPQR = categoria || categoriaMap[tipoConsulta] || 'otros';
 
     // Generar número de radicado
     const numeroRadicado = await generarNumeroRadicado(connection);
 
-    // Crear el PQR
+    // Crear PQR con el cliente verificado
     const [pqrResult] = await connection.query(
       `INSERT INTO pqr
        (numero_radicado, cliente_id, tipo, categoria, medio_recepcion,
@@ -162,8 +211,8 @@ exports.createTicketFromChat = async (req, res) => {
        VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)`,
       [
         numeroRadicado,
-        clienteId || null,
-        'peticion', // Tipo por defecto
+        resolvedClienteId,
+        'peticion',
         categoriaPQR,
         'chat',
         'abierto',
@@ -424,6 +473,131 @@ exports.endSession = async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Error al finalizar sesión',
+    });
+  }
+};
+
+/**
+ * Analiza un PQR con IA para sugerir prioridad, categoría y respuesta rápida
+ * POST /api/v1/soporte/ai/analyze-pqr
+ */
+exports.analyzePQRWithAI = async (req, res) => {
+  try {
+    const { descripcion, asunto, categoria } = req.body;
+
+    if (!descripcion || !asunto) {
+      return res.status(400).json({
+        success: false,
+        error: 'Descripción y asunto son requeridos',
+      });
+    }
+
+    const analysis = await groqService.analyzePQR(descripcion, asunto, categoria || 'otros');
+
+    if (!analysis) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Análisis IA no disponible (GROQ_API_KEY no configurada)',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: analysis,
+      model: 'llama-3.3-70b-versatile',
+    });
+  } catch (error) {
+    console.error('Error en analyzePQRWithAI:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al analizar PQR con IA',
+    });
+  }
+};
+
+/**
+ * Genera una respuesta sugerida para que el agente conteste un ticket
+ * POST /api/v1/soporte/ai/suggest-response
+ */
+exports.suggestAgentResponse = async (req, res) => {
+  try {
+    const { descripcion, asunto, historialPrevio } = req.body;
+
+    if (!descripcion || !asunto) {
+      return res.status(400).json({
+        success: false,
+        error: 'Descripción y asunto son requeridos',
+      });
+    }
+
+    const suggestion = await groqService.generateAgentResponse(
+      descripcion,
+      asunto,
+      historialPrevio || ''
+    );
+
+    if (!suggestion) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Sugerencia IA no disponible (GROQ_API_KEY no configurada)',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { respuestaSugerida: suggestion },
+      model: 'llama-3.3-70b-versatile',
+    });
+  } catch (error) {
+    console.error('Error en suggestAgentResponse:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al generar respuesta sugerida',
+    });
+  }
+};
+
+/**
+ * Diagnóstico técnico asistido por IA para técnicos de campo
+ * POST /api/v1/soporte/ai/technical-diagnosis
+ */
+exports.technicalDiagnosis = async (req, res) => {
+  try {
+    const { sintomas, tipoServicio, equipoInfo } = req.body;
+
+    if (!sintomas) {
+      return res.status(400).json({
+        success: false,
+        error: 'Los síntomas son requeridos',
+      });
+    }
+
+    const diagnosis = await groqService.technicalDiagnosis(
+      sintomas,
+      tipoServicio || 'internet',
+      equipoInfo || ''
+    );
+
+    if (!diagnosis) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Diagnóstico IA no disponible (GROQ_API_KEY no configurada)',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { diagnostico: diagnosis },
+      model: 'llama-3.3-70b-versatile',
+    });
+  } catch (error) {
+    console.error('Error en technicalDiagnosis:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al generar diagnóstico técnico',
     });
   }
 };

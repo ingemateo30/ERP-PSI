@@ -47,36 +47,37 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
   const paginasDelSistema = [
     { icon: <Home size={18} />, label: 'Dashboard', path: '/dashboard', keywords: ['inicio', 'home', 'principal'], color: 'blue', permission: null },
-    { icon: <Users size={18} />, label: 'Clientes', path: '/clients', keywords: ['clientes', 'usuarios', 'customers'], color: 'green', permission: 'supervisor,administrador' },
-    { icon: <MapPin size={18} />, label: 'Clientes por Sector', path: '/clients/por-sector', keywords: ['clientes', 'sector', 'urbano', 'rural', 'sede', 'ciudad'], color: 'green', permission: 'supervisor,administrador' },
+    { icon: <Users size={18} />, label: 'Clientes', path: '/clients', keywords: ['clientes', 'usuarios', 'customers'], color: 'green', permission: 'secretaria,supervisor,administrador' },
+    { icon: <MapPin size={18} />, label: 'Clientes por Sector', path: '/clients/por-sector', keywords: ['clientes', 'sector', 'urbano', 'rural', 'sede', 'ciudad'], color: 'green', permission: 'secretaria,supervisor,administrador' },
     { icon: <Activity size={18} />, label: 'Facturación Automática', path: '/facturacion-automatica', keywords: ['facturas', 'billing', 'automatico'], color: 'purple', permission: 'administrador' },
-    { icon: <TrendingUp size={18} />, label: 'Facturas', path: '/facturas', keywords: ['facturas', 'invoices', 'cobros'], color: 'yellow', permission: 'supervisor,administrador' },
-    { icon: <FileText size={18} />, label: 'Contratos', path: '/contratos', keywords: ['contratos', 'contracts', 'acuerdos'], color: 'orange', permission: 'supervisor,administrador' },
-    { icon: <CreditCard size={18} />, label: 'Pagos', path: '/cruce-pagos', keywords: ['pagos', 'payments', 'cruce'], color: 'green', permission: 'supervisor,administrador' },
-    { icon: <GitMerge size={18} />, label: 'Cruce Masivo', path: '/cruce-masivo', keywords: ['cruce', 'masivo', 'bancos', 'bulk'], color: 'teal', permission: 'supervisor,administrador' },
-    { icon: <Building2 size={18} />, label: 'Formatos Bancos', path: '/formatos-bancos', keywords: ['formatos', 'bancos', 'recaudo', 'caja social'], color: 'blue', permission: 'supervisor,administrador' },
-    { icon: <FileText size={18} />, label: 'Historial Facturas', path: '/historial-facturas', keywords: ['historial', 'history'], color: 'gray', permission: 'supervisor,administrador' },
+    { icon: <TrendingUp size={18} />, label: 'Facturas', path: '/facturas', keywords: ['facturas', 'invoices', 'cobros'], color: 'yellow', permission: 'secretaria,supervisor,administrador' },
+    { icon: <FileText size={18} />, label: 'Contratos', path: '/contratos', keywords: ['contratos', 'contracts', 'acuerdos'], color: 'orange', permission: 'secretaria,supervisor,administrador' },
+    { icon: <CreditCard size={18} />, label: 'Pagos', path: '/cruce-pagos', keywords: ['pagos', 'payments', 'cruce'], color: 'green', permission: 'secretaria,supervisor,administrador' },
+    { icon: <GitMerge size={18} />, label: 'Cruce Masivo', path: '/cruce-masivo', keywords: ['cruce', 'masivo', 'bancos', 'bulk'], color: 'teal', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Building2 size={18} />, label: 'Formatos Bancos', path: '/formatos-bancos', keywords: ['formatos', 'bancos', 'recaudo', 'caja social'], color: 'blue', permission: 'secretaria,supervisor,administrador' },
+    { icon: <FileText size={18} />, label: 'Historial Facturas', path: '/historial-facturas', keywords: ['historial', 'history'], color: 'gray', permission: 'secretaria,supervisor,administrador' },
     { icon: <Wifi size={18} />, label: 'Planes de Servicio', path: '/config/service-plans', keywords: ['planes', 'servicios', 'plans'], color: 'blue', permission: 'administrador' },
-    { icon: <Wrench size={18} />, label: 'Instalaciones', path: '/instalaciones', keywords: ['instalaciones', 'installation', 'instalar'], color: 'red', permission: 'instalador,supervisor,administrador' },
-    { icon: <Package size={18} />, label: 'Inventario', path: '/inventory', keywords: ['inventario', 'stock', 'productos'], color: 'indigo', permission: 'instalador,supervisor,administrador' },
-    { icon: <Calendar size={18} />, label: 'Calendario', path: '/calendar', keywords: ['calendario', 'calendar', 'agenda'], color: 'pink', permission: 'instalador,supervisor,administrador' },
-    { icon: <FileText size={18} />, label: 'PQR', path: '/pqr', keywords: ['pqr', 'quejas', 'reclamos', 'peticiones'], color: 'red', permission: 'supervisor,administrador' },
-    { icon: <Loader2 size={18} />, label: 'Incidencias', path: '/incidencias', keywords: ['incidencias', 'issues', 'problemas'], color: 'orange', permission: 'supervisor,administrador' },
-    { icon: <Mail size={18} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', keywords: ['correo', 'email', 'plantillas'], color: 'blue', permission: 'supervisor,administrador' },
+    { icon: <Wrench size={18} />, label: 'Instalaciones', path: '/instalaciones', keywords: ['instalaciones', 'installation', 'instalar'], color: 'red', permission: 'instalador,secretaria,supervisor,administrador' },
+    { icon: <Package size={18} />, label: 'Inventario', path: '/inventory', keywords: ['inventario', 'stock', 'productos'], color: 'indigo', permission: 'instalador,secretaria,supervisor,administrador' },
+    { icon: <Calendar size={18} />, label: 'Calendario', path: '/calendar', keywords: ['calendario', 'calendar', 'agenda'], color: 'pink', permission: 'instalador,secretaria,supervisor,administrador' },
+    { icon: <FileText size={18} />, label: 'PQR', path: '/pqr', keywords: ['pqr', 'quejas', 'reclamos', 'peticiones'], color: 'red', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Loader2 size={18} />, label: 'Incidencias', path: '/incidencias', keywords: ['incidencias', 'issues', 'problemas'], color: 'orange', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Mail size={18} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', keywords: ['correo', 'email', 'plantillas'], color: 'blue', permission: 'secretaria,supervisor,administrador' },
     { icon: <PieChartIcon size={18} />, label: 'Reportes', path: '/reportes-regulatorios', keywords: ['reportes', 'reports', 'regulatorios'], color: 'purple', permission: 'administrador' },
     { icon: <BarChart3 size={18} />, label: 'Estadísticas', path: '/reports', keywords: ['estadisticas', 'stats', 'analytics'], color: 'green', permission: 'administrador' },
-    { icon: <BarChart3 size={18} />, label: 'Mapa', path: '/mapa-instalaciones', keywords: ['mapa', 'map', 'ubicacion'], color: 'green', permission: 'instalador,administrador,supervisor' },
+    { icon: <BarChart3 size={18} />, label: 'Mapa Instalaciones', path: '/mapa-instalaciones', keywords: ['mapa', 'map', 'ubicacion', 'instalaciones'], color: 'green', permission: 'instalador,administrador,supervisor,secretaria' },
+    { icon: <MapPin size={18} />, label: 'Mapa Clientes', path: '/mapa-clientes', keywords: ['mapa', 'clientes', 'map', 'ciudad', 'ubicacion', 'general'], color: 'blue', permission: 'administrador,supervisor,secretaria' },
     { icon: <UserCheck size={18} />, label: 'Usuarios Sistema', path: '/admin/users', keywords: ['usuarios', 'admin', 'sistema'], color: 'blue', permission: 'administrador' },
-    { icon: <FileText size={18} />, label: 'Firma de Contratos', path: '/firma-contratos', keywords: ['firma', 'signature', 'contratos'], color: 'indigo', permission: 'operador,supervisor,administrador' },
+    { icon: <FileText size={18} />, label: 'Firma de Contratos', path: '/firma-contratos', keywords: ['firma', 'signature', 'contratos'], color: 'indigo', permission: 'operador,secretaria,supervisor,administrador' },
     { icon: <Settings size={18} />, label: 'Configuración', path: '/config', keywords: ['configuracion', 'settings', 'config'], color: 'gray', permission: 'administrador' },
     { icon: <User size={18} />, label: 'Mi Perfil', path: '/profile', keywords: ['perfil', 'profile', 'cuenta'], color: 'blue', permission: null },
   ];
 
   const comandosRapidos = [
-    { icon: <Zap size={18} />, label: 'Nuevo Cliente', action: () => navigate('/clients?action=new'), keywords: ['nuevo', 'cliente', 'crear'], color: 'green', permission: 'supervisor,administrador' },
-    { icon: <FileText size={18} />, label: 'Nueva Factura', action: () => navigate('/facturas?action=new'), keywords: ['nueva', 'factura', 'crear'], color: 'blue', permission: 'supervisor,administrador' },
-    { icon: <Wrench size={18} />, label: 'Nueva Instalación', action: () => navigate('/instalaciones?action=new'), keywords: ['nueva', 'instalacion', 'crear'], color: 'red', permission: 'instalador,supervisor,administrador' },
-    { icon: <Calendar size={18} />, label: 'Ver Calendario Hoy', action: () => navigate('/calendar'), keywords: ['calendario', 'hoy', 'agenda'], color: 'pink', permission: 'instalador,supervisor,administrador' },
+    { icon: <Zap size={18} />, label: 'Nuevo Cliente', action: () => navigate('/clients?action=new'), keywords: ['nuevo', 'cliente', 'crear'], color: 'green', permission: 'secretaria,supervisor,administrador' },
+    { icon: <FileText size={18} />, label: 'Nueva Factura', action: () => navigate('/facturas?action=new'), keywords: ['nueva', 'factura', 'crear'], color: 'blue', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Wrench size={18} />, label: 'Nueva Instalación', action: () => navigate('/instalaciones?action=new'), keywords: ['nueva', 'instalacion', 'crear'], color: 'red', permission: 'instalador,secretaria,supervisor,administrador' },
+    { icon: <Calendar size={18} />, label: 'Ver Calendario Hoy', action: () => navigate('/calendar'), keywords: ['calendario', 'hoy', 'agenda'], color: 'pink', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <LogOut size={18} />, label: 'Cerrar Sesión', action: logout, keywords: ['salir', 'logout', 'cerrar'], color: 'red', permission: null },
   ];
 
@@ -86,7 +87,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
   const buscarClientes = async (query) => {
     // ✅ Solo buscar clientes si tiene permisos
-    if (!hasPermission('supervisor,administrador')) {
+    if (!hasPermission('secretaria,supervisor,administrador')) {
       return [];
     }
 
@@ -448,43 +449,43 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
   const gestionPrincipal = [
     { icon: <Home size={22} />, label: 'Dashboard', path: '/dashboard', permission: null },
-    { icon: <Users size={22} />, label: 'Clientes', path: '/clients', permission: 'supervisor,administrador' },
-    { icon: <MapPin size={22} />, label: 'Clientes por Sector', path: '/clients/por-sector', permission: 'supervisor,administrador' }
+    { icon: <Users size={22} />, label: 'Clientes', path: '/clients', permission: 'secretaria,supervisor,administrador' },
+    { icon: <MapPin size={22} />, label: 'Clientes por Sector', path: '/clients/por-sector', permission: 'secretaria,supervisor,administrador' }
   ];
 
   const facturacionFinanzas = [
     { icon: <Activity size={22} />, label: 'Facturación Automática', path: '/facturacion-automatica', permission: 'administrador' },
-    { icon: <TrendingUp size={22} />, label: 'Facturas', path: '/facturas', permission: 'supervisor,administrador' },
-    { icon: <FileText size={22} />, label: 'Contratos', path: '/contratos', permission: 'supervisor,administrador' },
-    { icon: <CreditCard size={22} />, label: 'Pagos', path: '/cruce-pagos', permission: 'supervisor,administrador' },
-    { icon: <GitMerge size={22} />, label: 'Cruce Masivo', path: '/cruce-masivo', permission: 'supervisor,administrador' },
-    { icon: <Building2 size={22} />, label: 'Formatos Bancos', path: '/formatos-bancos', permission: 'supervisor,administrador' },
-    { icon: <FileText size={22} />, label: 'Historial Facturas', path: '/historial-facturas', permission: 'supervisor,administrador' }
+    { icon: <TrendingUp size={22} />, label: 'Facturas', path: '/facturas', permission: 'secretaria,supervisor,administrador' },
+    { icon: <FileText size={22} />, label: 'Contratos', path: '/contratos', permission: 'secretaria,supervisor,administrador' },
+    { icon: <CreditCard size={22} />, label: 'Pagos', path: '/cruce-pagos', permission: 'secretaria,supervisor,administrador' },
+    { icon: <GitMerge size={22} />, label: 'Cruce Masivo', path: '/cruce-masivo', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Building2 size={22} />, label: 'Formatos Bancos', path: '/formatos-bancos', permission: 'secretaria,supervisor,administrador' },
+    { icon: <FileText size={22} />, label: 'Historial Facturas', path: '/historial-facturas', permission: 'secretaria,supervisor,administrador' }
   ];
 
   const serviciosOperaciones = [
     { icon: <Wifi size={22} />, label: 'Planes de Servicio', path: '/config/service-plans', permission: 'administrador' },
-    { icon: <Wrench size={22} />, label: 'Instalaciones', path: '/instalaciones', permission: 'instalador,supervisor,administrador' },
-    { icon: <Package size={22} />, label: 'Inventario', path: '/inventory', permission: 'instalador,supervisor,administrador' },
-    { icon: <Calendar size={22} />, label: 'Calendario', path: '/calendar', permission: 'instalador,supervisor,administrador' }
+    { icon: <Wrench size={22} />, label: 'Instalaciones', path: '/instalaciones', permission: 'instalador,secretaria,supervisor,administrador' },
+    { icon: <Package size={22} />, label: 'Inventario', path: '/inventory', permission: 'instalador,secretaria,supervisor,administrador' },
+    { icon: <Calendar size={22} />, label: 'Calendario', path: '/calendar', permission: 'instalador,secretaria,supervisor,administrador' }
   ];
 
   const atencionCliente = [
-    { icon: <FileText size={22} />, label: 'PQR', path: '/pqr', permission: 'supervisor,administrador' },
-    { icon: <Loader2 size={22} />, label: 'Incidencias', path: '/incidencias', permission: 'supervisor,administrador' },
-    { icon: <Mail size={22} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', permission: 'supervisor,administrador' }
+    { icon: <FileText size={22} />, label: 'PQR', path: '/pqr', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Loader2 size={22} />, label: 'Incidencias', path: '/incidencias', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Mail size={22} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', permission: 'secretaria,supervisor,administrador' }
   ];
 
   const reportesAnalisis = [
     { icon: <PieChartIcon size={22} />, label: 'Reportes', path: '/reportes-regulatorios', permission: 'administrador' },
     { icon: <BarChart3 size={22} />, label: 'Estadísticas', path: '/reports', permission: 'administrador' },
-    { icon: <BarChart3 size={22} />, label: 'Mapa', path: '/mapa-instalaciones', permission: 'instalador,administrador,supervisor' }
-    
+    { icon: <BarChart3 size={22} />, label: 'Mapa Instalaciones', path: '/mapa-instalaciones', permission: 'instalador,administrador,supervisor,secretaria' },
+    { icon: <MapPin size={22} />, label: 'Mapa Clientes', path: '/mapa-clientes', permission: 'administrador,supervisor,secretaria' }
   ];
 
   const administracion = [
     { icon: <UserCheck size={22} />, label: 'Usuarios Sistema', path: '/admin/users', permission: 'administrador' },
-    { icon: <FileText size={22} />, label: 'Firma de Contratos', path: '/firma-contratos', permission: 'operador,supervisor,administrador' },
+    { icon: <FileText size={22} />, label: 'Firma de Contratos', path: '/firma-contratos', permission: 'operador,secretaria,supervisor,administrador' },
     { icon: <Settings size={22} />, label: 'Configuración', path: '/config', permission: 'administrador' }
   ];
 

@@ -49,11 +49,11 @@ class CronJobs {
 
   /**
    * Facturación mensual automática
-   * Se ejecuta el día 1 de cada mes a las 06:00 AM
+   * Se ejecuta el día 20 de cada mes a las 06:00 AM para el MES SIGUIENTE
    */
   static facturacionMensualAutomatica() {
-    // Cron: minuto(0) hora(6) día(1) mes(*) día_semana(*)
-    cron.schedule('0 6 1 * *', async () => {
+    // Cron: minuto(0) hora(6) día(20) mes(*) día_semana(*) - genera facturas del MES SIGUIENTE
+    cron.schedule('0 6 20 * *', async () => {
       try {
         console.log('🔄 INICIANDO FACTURACIÓN MENSUAL AUTOMÁTICA...');
         console.log(`📅 Fecha: ${new Date().toISOString()}`);
@@ -113,6 +113,22 @@ class CronJobs {
           });
         } catch (emailError) {
           console.warn('⚠️ No se pudo enviar notificación por email:', emailError.message);
+        }
+
+        // ✅ INICIAR ENVÍO MASIVO DE FACTURAS POR EMAIL (automático, en background)
+        if (resultado.exitosas > 0) {
+          try {
+            console.log('📧 Iniciando envío masivo automático de facturas por email...');
+            const EnvioMasivoEmailService = require('../services/EnvioMasivoEmailService');
+            // Período = mes siguiente (las facturas generadas son para el mes siguiente)
+            const mesSiguiente = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
+            const periodoMesSiguiente = `${mesSiguiente.getFullYear()}-${String(mesSiguiente.getMonth() + 1).padStart(2, '0')}`;
+            const lote = await EnvioMasivoEmailService.iniciarEnvioMasivo(periodoMesSiguiente, null);
+            EnvioMasivoEmailService.iniciarYProcesarEnBackground(lote.lote_id);
+            console.log(`📧 Lote de envío masivo #${lote.lote_id} iniciado: ${lote.total_facturas} facturas`);
+          } catch (envioError) {
+            console.warn('⚠️ No se pudo iniciar envío masivo de facturas:', envioError.message);
+          }
         }
 
         console.log('✅ FACTURACIÓN MENSUAL AUTOMÁTICA COMPLETADA');

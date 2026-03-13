@@ -5,6 +5,7 @@ const nodemailer = require('nodemailer');
 const pool = require('../config/database');
 const PDFGenerator = require('../utils/pdfGenerator');
 const ContratoPDFGeneratorMINTIC = require('../utils/ContratoPDFGeneratorMINTIC');
+const IVACalculatorService = require('./IVACalculatorService');
 
 class EmailService {
   /**
@@ -228,10 +229,37 @@ static async generarPDFContrato(contratoId, conexionExistente = null) {
     // Obtener configuración de empresa
     const empresa = await this.obtenerConfiguracionEmpresa();
 
+    // ✅ Calcular IVA correctamente según estrato del cliente (igual que ContratosController)
+    const clienteEstrato = parseInt(contrato.cliente_estrato) || 3;
+    const serviciosConIVA = servicios.map(servicio => {
+      const precioBase = parseFloat(servicio.precio_personalizado || servicio.precio_plan || servicio.precio || 0);
+      const tipoServicio = servicio.tipo_servicio || servicio.tipo || 'internet';
+      const ivaInfo = IVACalculatorService.determinarIVA(tipoServicio, clienteEstrato);
+      const valorIVA = ivaInfo.aplica ? Math.round(precioBase * (ivaInfo.porcentaje / 100)) : 0;
+      const precioConIVA = precioBase + valorIVA;
+
+      return {
+        plan_nombre: servicio.plan_nombre,
+        tipo: tipoServicio,
+        tipo_servicio: tipoServicio,
+        precio_plan: precioBase,
+        precio: precioBase,
+        precio_con_iva: precioConIVA,
+        valor_iva: valorIVA,
+        velocidad_bajada: servicio.velocidad_bajada,
+        velocidad_subida: servicio.velocidad_subida,
+        canales_tv: servicio.canales_tv,
+        tecnologia: servicio.tecnologia,
+        descripcion: servicio.descripcion,
+        aplica_iva: ivaInfo.aplica,
+        porcentaje_iva: ivaInfo.porcentaje
+      };
+    });
+
     // ✅ CORRECCIÓN: Preparar datos COMPLETOS para el generador de PDF
     const datosContrato = {
       ...contrato,
-      servicios: servicios,
+      servicios: serviciosConIVA,
       empresa: empresa,
       // ✅ CRÍTICO: Incluir explícitamente estos campos
       departamento: contrato.departamento_nombre || '',

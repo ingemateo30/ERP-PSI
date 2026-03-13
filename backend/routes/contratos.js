@@ -103,6 +103,17 @@ router.put('/:id/estado',
 );
 
 /**
+ * @route POST /api/v1/contratos/:id/renovar
+ * @desc Renovar contrato generando uno nuevo
+ * @access Private (Supervisor+)
+ */
+router.post('/:id/renovar',
+  authenticateToken,
+  requireRole(['supervisor', 'administrador', 'secretaria']),
+  ContratosController.renovarContrato
+);
+
+/**
  * @route GET /api/v1/contratos/:id/abrir-firma
  * @desc Obtener contrato para proceso de firma
  */

@@ -76,7 +76,7 @@ const tienePermanencia = permanenciaMeses > 1;
     <style>
         @page {
             size: Letter;
-            margin: 19mm;
+            margin: 8mm 10mm;
         }
 
         * {
@@ -834,6 +834,7 @@ static determinarServicios(contratoData) {
     const html = this.generarHTML(datosContrato, datosContrato.empresa || {}, logoPath);
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: '/usr/bin/google-chrome',
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
@@ -843,7 +844,7 @@ static determinarServicios(contratoData) {
       const pdfBuffer = await page.pdf({
         format: 'Letter',
         printBackground: true,
-        margin: { top: '19mm', right: '19mm', bottom: '19mm', left: '19mm' }
+        margin: { top: '8mm', right: '10mm', bottom: '8mm', left: '10mm' }
       });
       return pdfBuffer;
     } finally {

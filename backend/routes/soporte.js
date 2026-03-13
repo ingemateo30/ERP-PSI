@@ -33,11 +33,12 @@ router.post(
       .withMessage('El mensaje es requerido')
       .isLength({ max: 1000 })
       .withMessage('El mensaje no puede exceder 1000 caracteres'),
-    body('sessionId').optional().isString(),
-    body('nombre').optional().trim().isLength({ max: 255 }),
-    body('email').optional().trim().isEmail().withMessage('Email inválido'),
-    body('telefono').optional().trim().isLength({ max: 20 }),
-    body('conversationHistory').optional().isArray(),
+    // nullable:true ignora null (primer mensaje antes de tener sessionId)
+    body('sessionId').optional({ nullable: true }).isString(),
+    body('nombre').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 255 }),
+    body('email').optional({ nullable: true, checkFalsy: true }).trim().isEmail().withMessage('Email inválido'),
+    body('telefono').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('conversationHistory').optional({ nullable: true }).isArray(),
     validate,
   ],
   soporteController.chatMessage
@@ -51,14 +52,13 @@ router.post(
   '/ticket',
   [
     body('sessionId').notEmpty().withMessage('Session ID es requerido'),
-    body('nombre').optional().trim().isLength({ max: 255 }),
-    body('email')
-      .optional()
+    body('identificacion')
+      .optional({ checkFalsy: true })
       .trim()
-      .isEmail()
-      .withMessage('Email inválido'),
-    body('telefono').optional().trim().isLength({ max: 20 }),
-    body('clienteId').optional().isInt(),
+      .isLength({ min: 5, max: 20 })
+      .withMessage('Identificación inválida'),
+    body('telefono').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('clienteId').optional({ nullable: true }).isInt(),
     body('categoria')
       .optional()
       .isIn(['tecnico', 'facturacion', 'comercial', 'atencion_cliente', 'otros'])
@@ -80,10 +80,10 @@ router.post(
 router.post(
   '/resolved',
   [
-    body('messageId').optional().isInt(),
-    body('sessionId').optional().isString(),
+    body('messageId').optional({ nullable: true }).isInt(),
+    body('sessionId').optional({ nullable: true }).isString(),
     body('satisfaccion')
-      .optional()
+      .optional({ nullable: true })
       .isInt({ min: 1, max: 5 })
       .withMessage('Satisfacción debe ser entre 1 y 5'),
     validate,
@@ -158,14 +158,64 @@ router.get(
 router.post(
   '/session/end',
   [
-    body('sessionId').notEmpty().withMessage('Session ID es requerido'),
+    body('sessionId').optional({ nullable: true }).isString(),
     body('satisfaccion')
-      .optional()
+      .optional({ nullable: true })
       .isInt({ min: 1, max: 5 })
       .withMessage('Satisfacción debe ser entre 1 y 5'),
     validate,
   ],
   soporteController.endSession
+);
+
+// ==================== ENDPOINTS DE IA (GROQ + LLAMA 3.3) ====================
+
+/**
+ * POST /api/v1/soporte/ai/analyze-pqr
+ * Analiza un PQR para sugerir prioridad, categoría y solución rápida
+ * Usado por agentes en el módulo de tickets
+ */
+router.post(
+  '/ai/analyze-pqr',
+  [
+    body('asunto').trim().notEmpty().withMessage('El asunto es requerido').isLength({ max: 255 }),
+    body('descripcion').trim().notEmpty().withMessage('La descripción es requerida').isLength({ max: 5000 }),
+    body('categoria').optional().isIn(['tecnico', 'facturacion', 'comercial', 'atencion_cliente', 'otros']),
+    validate,
+  ],
+  soporteController.analyzePQRWithAI
+);
+
+/**
+ * POST /api/v1/soporte/ai/suggest-response
+ * Genera una respuesta sugerida para que el agente conteste un ticket
+ * Usado en el panel de gestión de PQRs
+ */
+router.post(
+  '/ai/suggest-response',
+  [
+    body('asunto').trim().notEmpty().withMessage('El asunto es requerido').isLength({ max: 255 }),
+    body('descripcion').trim().notEmpty().withMessage('La descripción es requerida').isLength({ max: 5000 }),
+    body('historialPrevio').optional().trim().isLength({ max: 3000 }),
+    validate,
+  ],
+  soporteController.suggestAgentResponse
+);
+
+/**
+ * POST /api/v1/soporte/ai/technical-diagnosis
+ * Diagnóstico técnico asistido por IA para técnicos de campo
+ * Usado en el módulo de incidencias/instalaciones
+ */
+router.post(
+  '/ai/technical-diagnosis',
+  [
+    body('sintomas').trim().notEmpty().withMessage('Los síntomas son requeridos').isLength({ max: 2000 }),
+    body('tipoServicio').optional().isIn(['internet', 'television', 'combo', 'voip']),
+    body('equipoInfo').optional().trim().isLength({ max: 500 }),
+    validate,
+  ],
+  soporteController.technicalDiagnosis
 );
 
 module.exports = router;

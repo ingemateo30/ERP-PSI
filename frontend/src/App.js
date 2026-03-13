@@ -51,6 +51,7 @@ const CrucePagosBancarios = lazy(() => import('./components/Facturas/CrucePagosB
 const FormatosBancarios = lazy(() => import('./components/Facturas/FormatosBancarios'));
 const CruceMasivoBancos = lazy(() => import('./components/Facturas/CruceMasivoBancos'));
 const MapaInstalaciones = lazy(() => import('./components/Mapa/MapaInstalaciones'));
+const MapaClientes = lazy(() => import('./components/Mapa/MapaClientes'));
 
 <Route path="/calendar" element={<ProtectedRoute><CalendarioManagement /></ProtectedRoute>} />
 // Componente de carga
@@ -228,7 +229,7 @@ function App() {
               <Route
                 path="/mis-trabajos"
                 element={
-                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
+                  <ProtectedRoute requiredRole="instalador,secretaria,supervisor,administrador">
                     <MainLayout title="Mis Trabajos" subtitle="Gestión de instalaciones del día">
                       <MisTrabajos />
                     </MainLayout>
@@ -276,7 +277,7 @@ function App() {
               <Route
                 path="/config/banks"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Configuración de Bancos" subtitle="Gestión de entidades bancarias">
                       <BanksConfig />
                     </MainLayout>
@@ -298,7 +299,7 @@ function App() {
               <Route
                 path="/config/service-plans"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Planes de Servicio" subtitle="Configuración de planes y servicios">
                       <ServicePlansConfig />
                     </MainLayout>
@@ -310,7 +311,7 @@ function App() {
               <Route
                 path="/config/conceptos"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Conceptos de Facturación" subtitle="Gestión de conceptos facturables">
                       <ConceptosConfig />
                     </MainLayout>
@@ -320,7 +321,7 @@ function App() {
               <Route
                 path="/config/plantillas-correo"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Plantillas de Correo" subtitle="Gestión de plantillas de correo electrónico">
                       <PlantillasCorreoConfig />
                     </MainLayout>
@@ -336,7 +337,7 @@ function App() {
               <Route
                 path="/clients"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Detalle de Cliente" subtitle="">
                       <ClientsManagement />
                     </MainLayout>
@@ -347,7 +348,7 @@ function App() {
               <Route
                 path="/clients/por-sector"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Clientes por Sector" subtitle="Listado de clientes agrupados por zona y sede">
                       <ClientesPorSector />
                     </MainLayout>
@@ -358,7 +359,7 @@ function App() {
               <Route
                 path="/clients/:id"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Detalle de Cliente" subtitle="Esta funcionalidad está en desarrollo">
                       <ComingSoon pageName="Detalle de Cliente" />
                     </MainLayout>
@@ -368,7 +369,7 @@ function App() {
               <Route
                 path="/facturas"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Facturas" subtitle="Sistema de facturación mensual">
                       <FacturasManagement />
                     </MainLayout>
@@ -378,7 +379,7 @@ function App() {
               <Route
                 path="/facturacion-automatica"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador" >
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador" >
                     <MainLayout title="Facturación Automática" subtitle="Sistema automatizado de facturación mensual">
                       <FacturacionAutomatica />
                     </MainLayout>
@@ -388,7 +389,7 @@ function App() {
               <Route
                 path="/historial-facturas"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador" >
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador" >
                     <MainLayout title="Historial Facturacion cliente" subtitle="">
                       <HistorialFacturacionWrapper />
                     </MainLayout>
@@ -398,7 +399,7 @@ function App() {
               <Route
                 path="/cruce-pagos"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Cruce de Pagos Bancarios" subtitle="Registrar pagos de facturas">
                       <CrucePagosBancarios />
                     </MainLayout>
@@ -408,7 +409,7 @@ function App() {
               <Route
                 path="/formatos-bancos"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Formatos Bancos" subtitle="Archivos de recaudo para bancos y redes de pago">
                       <FormatosBancarios />
                     </MainLayout>
@@ -418,7 +419,7 @@ function App() {
               <Route
                 path="/cruce-masivo"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Cruce Masivo de Pagos" subtitle="Procesar archivos de pago enviados por bancos y cooperativas">
                       <CruceMasivoBancos />
                     </MainLayout>
@@ -428,7 +429,7 @@ function App() {
               <Route
                 path="/contratos"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Contratos" subtitle="Gestión de contratos de servicio">
                       <ContratosList />
                     </MainLayout>
@@ -438,7 +439,7 @@ function App() {
               <Route
                 path="/firma-contratos"
                 element={
-                  <ProtectedRoute requiredRole="operador,supervisor,administrador">
+                  <ProtectedRoute requiredRole="operador,secretaria,supervisor,administrador">
                     <MainLayout title="Firma de Contratos" subtitle="Gestión de firma de contratos">
                       <FirmaContratosWrapper />
                     </MainLayout>
@@ -449,7 +450,7 @@ function App() {
               <Route
                 path="/services"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Gestión de Servicios" subtitle="Esta funcionalidad está en desarrollo">
                       <ComingSoon pageName="Gestión de Servicios" />
                     </MainLayout>
@@ -460,7 +461,7 @@ function App() {
               <Route
                 path="/instalaciones"
                 element={
-                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
+                  <ProtectedRoute requiredRole="instalador,secretaria,supervisor,administrador">
                     <MainLayout
                       title="Gestión de Instalaciones"
                       subtitle="Administra las instalaciones de servicios de internet y televisión"
@@ -474,7 +475,7 @@ function App() {
               <Route
                 path="/inventory"
                 element={
-                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
+                  <ProtectedRoute requiredRole="instalador,secretaria,supervisor,administrador">
                     <MainLayout title="Gestión de Inventario" subtitle="">
                       <InventoryManagement />
                     </MainLayout>
@@ -485,9 +486,20 @@ function App() {
                <Route
                 path="/mapa-instalaciones"
                 element={
-                  <ProtectedRoute allowedRoles={['administrador', 'supervisor']}>
+                  <ProtectedRoute allowedRoles={['administrador', 'supervisor', 'secretaria']}>
                     <MainLayout title="Gestión de Mapa de Instalaciones" subtitle="">
                     <MapaInstalaciones />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/mapa-clientes"
+                element={
+                  <ProtectedRoute allowedRoles={['administrador', 'supervisor', 'secretaria']}>
+                    <MainLayout title="Mapa General de Clientes" subtitle="">
+                      <MapaClientes />
                     </MainLayout>
                   </ProtectedRoute>
                 }
@@ -495,7 +507,7 @@ function App() {
               <Route
                 path="pqr"
                 element={
-                  <ProtectedRoute requiredRole="supervisor,administrador">
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Gestión de Incidencias" subtitle="">
                       <PQRManagement />
                     </MainLayout>
@@ -506,7 +518,7 @@ function App() {
               <Route
                 path="incidencias"
                 element={
-                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
+                  <ProtectedRoute requiredRole="instalador,secretaria,supervisor,administrador">
                     <MainLayout title="Gestión de Incidencias" subtitle="">
                       <IncidenciasManagement />
                     </MainLayout>
@@ -539,7 +551,7 @@ function App() {
               <Route
                 path="/calendar"
                 element={
-                  <ProtectedRoute requiredRole="instalador,supervisor,administrador">
+                  <ProtectedRoute requiredRole="instalador,secretaria,supervisor,administrador">
                     <MainLayout title="Calendario" subtitle="Agenda y gestión de eventos">
                       <CalendarioManagement />
                     </MainLayout>

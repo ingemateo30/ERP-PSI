@@ -30,14 +30,22 @@ class ContratosController {
 
             // ✅ Query mejorado - maneja servicio_id NULL y JSON arrays
             let query = `
-            SELECT 
+            SELECT
                 c.*,
-                cl.nombre as cliente_nombre,
-                cl.identificacion as cliente_identificacion,
-                cl.telefono as cliente_telefono,
-                cl.correo as cliente_email,
-                cl.direccion as cliente_direccion,
-                cl.estrato as cliente_estrato,
+                COALESCE(cl.nombre,
+                    (SELECT ci.nombre FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
+                    'Cliente eliminado') as cliente_nombre,
+                COALESCE(cl.identificacion,
+                    (SELECT ci.identificacion FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
+                    'N/A') as cliente_identificacion,
+                COALESCE(cl.telefono,
+                    (SELECT ci.telefono FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
+                    '') as cliente_telefono,
+                COALESCE(cl.correo, '') as cliente_email,
+                COALESCE(cl.direccion,
+                    (SELECT ci.direccion FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
+                    '') as cliente_direccion,
+                COALESCE(cl.estrato, '') as cliente_estrato,
                 GROUP_CONCAT(
                     DISTINCT CONCAT(
                         COALESCE(ps.nombre, ''), '|',
@@ -48,9 +56,9 @@ class ContratosController {
             FROM contratos c
             LEFT JOIN clientes cl ON c.cliente_id = cl.id
             LEFT JOIN servicios_cliente sc ON (
-                CASE 
+                CASE
                     WHEN c.servicio_id IS NULL THEN FALSE
-                    WHEN c.servicio_id REGEXP '^[0-9]+$' 
+                    WHEN c.servicio_id REGEXP '^[0-9]+$'
                     THEN sc.id = CAST(c.servicio_id AS UNSIGNED)
                     WHEN c.servicio_id LIKE '[%'
                     THEN JSON_CONTAINS(CAST(c.servicio_id AS JSON), CAST(sc.id AS JSON))
@@ -106,8 +114,9 @@ class ContratosController {
             query += ' GROUP BY c.id';
 
             // Contar total
-            const countQuery = `SELECT COUNT(DISTINCT c.id) as total FROM contratos c 
-                           LEFT JOIN clientes cl ON c.cliente_id = cl.id 
+            const countQuery = `SELECT COUNT(DISTINCT c.id) as total FROM contratos c
+                           LEFT JOIN clientes cl ON c.cliente_id = cl.id
+                           LEFT JOIN clientes_inactivos ci ON c.cliente_id = ci.cliente_id
                            WHERE 1=1 ${query.substring(query.indexOf('WHERE 1=1') + 9, query.indexOf('GROUP BY'))}`;
             const [countResult] = await Database.query(countQuery, params);
             const total = countResult[0]?.total || 0;
@@ -803,6 +812,121 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
      * @route GET /api/v1/contratos/:id/verificar-pdf
      * @desc Verificar disponibilidad del PDF
      */
+    /**
+     * @route POST /api/v1/contratos/:id/renovar
+     * @desc Renovar un contrato existente generando uno nuevo
+     * @access Private (Supervisor+)
+     */
+    static async renovarContrato(req, res) {
+        try {
+            const { id } = req.params;
+            const { permanencia_meses, observaciones, terminar_anterior = true } = req.body;
+
+            console.log(`🔄 Renovando contrato ID: ${id}`);
+
+            if (!id || isNaN(id)) {
+                return res.status(400).json({ success: false, message: 'ID de contrato inválido' });
+            }
+
+            // Obtener contrato existente
+            const contratos = await Database.query(
+                'SELECT * FROM contratos WHERE id = ? AND activo = 1',
+                [id]
+            );
+
+            if (contratos.length === 0) {
+                return res.status(404).json({ success: false, message: 'Contrato no encontrado' });
+            }
+
+            const contratoOriginal = contratos[0];
+
+            if (contratoOriginal.estado === 'anulado') {
+                return res.status(400).json({ success: false, message: 'No se puede renovar un contrato anulado' });
+            }
+
+            const meses = parseInt(permanencia_meses) || contratoOriginal.permanencia_meses || 12;
+
+            // Generar número de contrato usando configuración de empresa
+            const [configRows] = await Database.query(
+                'SELECT prefijo_contrato, consecutivo_contrato FROM configuracion_empresa WHERE id = 1'
+            );
+
+            let nuevoNumero;
+            if (configRows) {
+                const { prefijo_contrato, consecutivo_contrato } = configRows;
+                const year = new Date().getFullYear();
+                nuevoNumero = `${prefijo_contrato}-${year}-${String(consecutivo_contrato).padStart(6, '0')}`;
+                // Incrementar consecutivo
+                await Database.query(
+                    'UPDATE configuracion_empresa SET consecutivo_contrato = consecutivo_contrato + 1 WHERE id = 1'
+                );
+            } else {
+                nuevoNumero = `CON-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+            }
+
+            const fechaInicio = new Date();
+            const fechaFin = new Date();
+            fechaFin.setMonth(fechaFin.getMonth() + meses);
+
+            const obsTexto = observaciones ||
+                `Renovación del contrato ${contratoOriginal.numero_contrato}`;
+
+            // Crear nuevo contrato basado en el anterior
+            const resultado = await Database.query(
+                `INSERT INTO contratos (
+                    numero_contrato, cliente_id, servicio_id, tipo_contrato, tipo_permanencia,
+                    permanencia_meses, fecha_generacion, fecha_inicio, fecha_fin,
+                    fecha_vencimiento_permanencia, estado, observaciones, firmado_cliente,
+                    activo, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, 'activo', ?, 0, 1, NOW(), NOW())`,
+                [
+                    nuevoNumero,
+                    contratoOriginal.cliente_id,
+                    contratoOriginal.servicio_id,
+                    contratoOriginal.tipo_contrato,
+                    contratoOriginal.tipo_permanencia,
+                    meses,
+                    fechaInicio.toISOString().split('T')[0],
+                    fechaFin.toISOString().split('T')[0],
+                    fechaFin.toISOString().split('T')[0],
+                    obsTexto
+                ]
+            );
+
+            // Terminar contrato anterior si se solicita
+            if (terminar_anterior) {
+                await Database.query(
+                    'UPDATE contratos SET estado = ?, updated_at = NOW() WHERE id = ?',
+                    ['terminado', id]
+                );
+            }
+
+            console.log(`✅ Contrato renovado: ${nuevoNumero} (ID: ${resultado.insertId})`);
+
+            res.json({
+                success: true,
+                message: 'Contrato renovado exitosamente',
+                data: {
+                    nuevo_contrato_id: resultado.insertId,
+                    numero_contrato: nuevoNumero,
+                    contrato_anterior_id: parseInt(id),
+                    contrato_anterior_estado: terminar_anterior ? 'terminado' : contratoOriginal.estado,
+                    fecha_inicio: fechaInicio.toISOString().split('T')[0],
+                    fecha_fin: fechaFin.toISOString().split('T')[0],
+                    permanencia_meses: meses
+                }
+            });
+
+        } catch (error) {
+            console.error('❌ Error renovando contrato:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error interno del servidor',
+                error: error.message
+            });
+        }
+    }
+
     static async verificarPDF(req, res) {
         try {
             const { id } = req.params;

@@ -21,7 +21,14 @@ const verificarRol = (...rolesPermitidos) => {
         rolesPermitidos
       });
 
-      const tienePermiso = rolesPermitidos.some(rol => 
+      // 'secretaria' hereda permisos de 'supervisor' para compatibilidad
+      const rolesExpandidos = [...rolesPermitidos];
+      if (rolesPermitidos.some(r => r.toLowerCase().trim() === 'supervisor') &&
+          !rolesExpandidos.some(r => r.toLowerCase().trim() === 'secretaria')) {
+        rolesExpandidos.push('secretaria');
+      }
+
+      const tienePermiso = rolesExpandidos.some(rol =>
         rol.toLowerCase().trim() === rolUsuario
       );
 
@@ -30,7 +37,7 @@ const verificarRol = (...rolesPermitidos) => {
         return res.status(403).json({
           success: false,
           message: 'No tienes permisos para acceder a este recurso',
-          requiredRoles: rolesPermitidos,
+          requiredRoles: rolesExpandidos,
           userRole: rolUsuario
         });
       }
@@ -58,20 +65,33 @@ const PERMISOS = {
     editar: true,
     ver: true
   },
-   supervisor: {
-    configuracion: false,      // ❌ NO puede acceder a config
-    usuarios: false,            // ❌ NO puede gestionar usuarios
-    reportes: false,            // ❌ NO puede ver reportes
-    estadisticas: false,        // ❌ NO puede ver estadísticas
-    eliminar: false,            // ❌ NO puede eliminar
-    crear: false,               // ❌ NO puede crear en CONFIG
-    editar: false,              // ❌ NO puede editar en CONFIG
-    ver: true,                  // ✅ SÍ puede VER (solo lectura)
-    // Permisos específicos para otras secciones
-    crear_cliente: true,        // ✅ Puede crear clientes
-    editar_cliente: true,       // ✅ Puede editar clientes
-    ver_facturacion: true,      // ✅ Puede ver facturación
-    crear_factura: true         // ✅ Puede crear facturas
+  secretaria: {
+    configuracion: false,
+    usuarios: false,
+    reportes: false,
+    estadisticas: false,
+    eliminar: false,
+    crear: true,
+    editar: true,
+    ver: true,
+    crear_cliente: true,
+    editar_cliente: true,
+    ver_facturacion: true,
+    crear_factura: true
+  },
+  supervisor: {
+    configuracion: false,
+    usuarios: false,
+    reportes: false,
+    estadisticas: false,
+    eliminar: false,
+    crear: true,
+    editar: true,
+    ver: true,
+    crear_cliente: true,
+    editar_cliente: true,
+    ver_facturacion: true,
+    crear_factura: true
   },
   instalador: {
     configuracion: false,

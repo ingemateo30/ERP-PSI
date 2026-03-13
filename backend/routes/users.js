@@ -31,10 +31,10 @@ const userValidation = {
       .isLength({ max: 20 })
       .withMessage('El teléfono no puede tener más de 20 caracteres'),
     body('rol')
-      .isIn(['administrador', 'supervisor', 'instalador'])
-      .withMessage('El rol debe ser administrador, supervisor o instalador')
+      .isIn(['administrador', 'secretaria', 'instalador'])
+      .withMessage('El rol debe ser administrador, secretaria o instalador')
   ],
-  
+
   update: [
     body('email')
       .optional()
@@ -53,8 +53,8 @@ const userValidation = {
       .withMessage('El teléfono no puede tener más de 20 caracteres'),
     body('rol')
       .optional()
-      .isIn(['administrador', 'supervisor', 'instalador'])
-      .withMessage('El rol debe ser administrador, supervisor o instalador'),
+      .isIn(['administrador', 'secretaria', 'instalador'])
+      .withMessage('El rol debe ser administrador, secretaria o instalador'),
     body('activo')
       .optional()
       .isBoolean()

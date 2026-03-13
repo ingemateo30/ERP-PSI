@@ -66,6 +66,127 @@ router.use(authenticateToken);
 
 
 /**
+ * @route GET /api/v1/clientes/mapa
+ * @desc Obtener todos los clientes con sus servicios agrupados por ciudad para el mapa general
+ * @access Administrador, Supervisor
+ */
+router.get('/mapa', async (req, res) => {
+  try {
+    const connection = await pool.getConnection();
+    try {
+      // Query 1: clientes con info de ciudad
+      const [clientes] = await connection.query(`
+        SELECT
+          c.id,
+          c.identificacion,
+          c.nombre,
+          c.direccion,
+          c.barrio,
+          c.telefono,
+          c.telefono_2,
+          c.correo,
+          c.estado,
+          c.mac_address,
+          c.ip_asignada,
+          c.tap,
+          c.poste,
+          c.ruta,
+          ci.id        AS ciudad_id,
+          ci.nombre    AS ciudad_nombre,
+          d.nombre     AS departamento_nombre,
+          s.nombre     AS sector_nombre
+        FROM clientes c
+        LEFT JOIN ciudades      ci ON c.ciudad_id  = ci.id
+        LEFT JOIN departamentos d  ON ci.departamento_id = d.id
+        LEFT JOIN sectores      s  ON c.sector_id  = s.id
+        WHERE c.estado != 'inactivo'
+        ORDER BY ci.nombre, c.nombre
+      `);
+
+      // Query 2: servicios de todos los clientes activos
+      const [servicios] = await connection.query(`
+        SELECT
+          sc.id,
+          sc.cliente_id,
+          sc.plan_id,
+          sc.estado,
+          sc.fecha_activacion,
+          sc.precio_personalizado,
+          ps.nombre  AS plan_nombre,
+          ps.tipo    AS tipo,
+          ps.precio  AS precio_base
+        FROM servicios_cliente sc
+        JOIN planes_servicio ps ON sc.plan_id = ps.id
+        ORDER BY sc.cliente_id, sc.id
+      `);
+
+      // Indexar servicios por cliente_id
+      const serviciosPorCliente = {};
+      for (const sv of servicios) {
+        if (!serviciosPorCliente[sv.cliente_id]) serviciosPorCliente[sv.cliente_id] = [];
+        serviciosPorCliente[sv.cliente_id].push({
+          id: sv.id,
+          plan_id: sv.plan_id,
+          plan_nombre: sv.plan_nombre,
+          tipo: sv.tipo,
+          precio: sv.precio_personalizado !== null ? sv.precio_personalizado : sv.precio_base,
+          estado: sv.estado,
+          fecha_activacion: sv.fecha_activacion
+        });
+      }
+
+      // Agrupar clientes por ciudad
+      const ciudadesMap = {};
+      for (const c of clientes) {
+        const ciudadKey = c.ciudad_nombre || 'Sin ciudad';
+        if (!ciudadesMap[ciudadKey]) {
+          ciudadesMap[ciudadKey] = {
+            ciudad_id: c.ciudad_id,
+            ciudad_nombre: ciudadKey,
+            departamento_nombre: c.departamento_nombre || '',
+            clientes: []
+          };
+        }
+        ciudadesMap[ciudadKey].clientes.push({
+          id: c.id,
+          identificacion: c.identificacion,
+          nombre: c.nombre,
+          direccion: c.direccion,
+          barrio: c.barrio,
+          telefono: c.telefono,
+          telefono_2: c.telefono_2,
+          correo: c.correo,
+          estado: c.estado,
+          mac_address: c.mac_address,
+          ip_asignada: c.ip_asignada,
+          tap: c.tap,
+          poste: c.poste,
+          ruta: c.ruta,
+          sector_nombre: c.sector_nombre,
+          servicios: serviciosPorCliente[c.id] || []
+        });
+      }
+
+      const ciudades = Object.values(ciudadesMap).map(ciudad => ({
+        ...ciudad,
+        total_clientes:      ciudad.clientes.length,
+        clientes_activos:    ciudad.clientes.filter(c => c.estado === 'activo').length,
+        clientes_suspendidos:ciudad.clientes.filter(c => c.estado === 'suspendido').length,
+        clientes_cortados:   ciudad.clientes.filter(c => c.estado === 'cortado').length,
+        clientes_retirados:  ciudad.clientes.filter(c => c.estado === 'retirado').length
+      }));
+
+      res.json({ success: true, data: ciudades });
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('❌ Error obteniendo clientes para mapa:', error);
+    res.status(500).json({ success: false, message: 'Error obteniendo datos del mapa', error: error.message });
+  }
+});
+
+/**
  * @route GET /api/v1/clientes/verificar-existente
  * @desc Verificar si un cliente ya existe por identificación
  * @access Autenticado
@@ -112,7 +233,7 @@ router.get('/verificar-existente',
  * @access Administrador, Supervisor
  */
 router.post('/:id/agregar-servicio',
-  requireRole(['administrador', 'supervisor']),
+  requireRole(['administrador', 'supervisor', 'secretaria']),
   async (req, res) => {
     try {
       const { id: clienteId } = req.params;
@@ -149,6 +270,98 @@ router.post('/:id/agregar-servicio',
     }
   }
 );
+/**
+ * @route DELETE /api/v1/clientes/:clienteId/servicios/:servicioId
+ * @desc Suspender/cancelar un servicio específico de un cliente existente
+ * @body { motivo?: string }
+ * @access Administrador, Supervisor
+ */
+router.delete('/:clienteId/servicios/:servicioId',
+  requireRole(['administrador', 'supervisor']),
+  async (req, res) => {
+    const { clienteId, servicioId } = req.params;
+    const { motivo } = req.body;
+
+    if (!clienteId || isNaN(clienteId) || !servicioId || isNaN(servicioId)) {
+      return res.status(400).json({ success: false, message: 'IDs inválidos' });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Verificar que el servicio pertenece al cliente
+      const [servicios] = await connection.execute(
+        `SELECT sc.*, ps.nombre as plan_nombre, ps.tipo
+         FROM servicios_cliente sc
+         JOIN planes_servicio ps ON sc.plan_id = ps.id
+         WHERE sc.id = ? AND sc.cliente_id = ? AND sc.estado = 'activo'`,
+        [servicioId, clienteId]
+      );
+
+      if (servicios.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Servicio no encontrado, ya cancelado, o no pertenece al cliente'
+        });
+      }
+
+      const servicio = servicios[0];
+
+      // Suspender el servicio
+      const motivoCancelacion = motivo?.trim() || 'Cancelado manualmente';
+      await connection.execute(
+        `UPDATE servicios_cliente
+         SET estado = 'cancelado', fecha_suspension = NOW(),
+             observaciones = CONCAT(COALESCE(observaciones,''), ' | CANCELADO: ', ?, ' - ', NOW()),
+             updated_at = NOW()
+         WHERE id = ?`,
+        [motivoCancelacion, servicioId]
+      );
+
+      // Anular facturas PENDIENTES que solo cubran este servicio (si el cliente tiene otros activos)
+      const [otrosActivos] = await connection.execute(
+        `SELECT COUNT(*) as total FROM servicios_cliente
+         WHERE cliente_id = ? AND estado = 'activo' AND id != ?`,
+        [clienteId, servicioId]
+      );
+
+      let facturasAnuladas = 0;
+      // Si no quedan más servicios activos, anular facturas pendientes
+      if (otrosActivos[0].total === 0) {
+        const [result] = await connection.execute(
+          `UPDATE facturas SET estado = 'anulada',
+             observaciones = CONCAT(COALESCE(observaciones,''), ' | Anulada por cancelación de servicio')
+           WHERE cliente_id = ? AND estado IN ('pendiente','vencida') AND activo = '1'`,
+          [clienteId]
+        );
+        facturasAnuladas = result.affectedRows;
+      }
+
+      await connection.commit();
+
+      console.log(`✅ Servicio ${servicioId} cancelado del cliente ${clienteId}: ${servicio.plan_nombre}`);
+
+      res.json({
+        success: true,
+        message: `Servicio "${servicio.plan_nombre}" cancelado exitosamente`,
+        data: {
+          servicio_cancelado: servicio.plan_nombre,
+          facturas_anuladas: facturasAnuladas,
+          otros_servicios_activos: otrosActivos[0].total
+        }
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      console.error('❌ Error cancelando servicio:', error);
+      res.status(500).json({ success: false, message: error.message });
+    } finally {
+      connection.release();
+    }
+  }
+);
+
 // ==========================================
 // RUTAS DE CONSULTA
 // ==========================================
@@ -520,6 +733,132 @@ router.put('/:id/inactivar',
         success: false,
         message: error.message || 'Error al inactivar cliente'
       });
+    }
+  }
+);
+
+/**
+ * @route POST /api/v1/clientes/:id/cancelar-instalacion
+ * @desc Cancela el proceso de un cliente recién creado cuando NO se pudo realizar
+ *       la instalación técnica. Anula el contrato y las facturas pendientes para
+ *       evitar cobros de mora y deudas fantasmas.
+ * @body { motivo: string, observaciones?: string }
+ * @access Administrador, Supervisor
+ */
+router.post('/:id/cancelar-instalacion',
+  requireRole(['administrador', 'supervisor']),
+  async (req, res) => {
+    const { id } = req.params;
+    const { motivo, observaciones } = req.body;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ success: false, message: 'ID de cliente inválido' });
+    }
+    if (!motivo || !motivo.trim()) {
+      return res.status(400).json({ success: false, message: 'El motivo de cancelación es requerido' });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Verificar que el cliente existe y está activo
+      const [clienteRows] = await connection.execute(
+        'SELECT id, nombre, identificacion, estado FROM clientes WHERE id = ?',
+        [id]
+      );
+      if (clienteRows.length === 0) {
+        throw new Error('Cliente no encontrado');
+      }
+      const cliente = clienteRows[0];
+
+      // 2. Anular facturas PENDIENTES del cliente (no las pagadas)
+      const [facturas] = await connection.execute(
+        `SELECT id, numero_factura, estado FROM facturas
+         WHERE cliente_id = ? AND estado IN ('pendiente', 'vencida')
+         ORDER BY created_at DESC`,
+        [id]
+      );
+
+      const facturasAnuladas = [];
+      for (const factura of facturas) {
+        await connection.execute(
+          `UPDATE facturas
+           SET estado = 'anulada',
+               observaciones = CONCAT(COALESCE(observaciones,''), ' | ANULADA: ', ?, ' - ', NOW()),
+               updated_at = NOW()
+           WHERE id = ? AND estado IN ('pendiente', 'vencida')`,
+          [motivo.trim(), factura.id]
+        );
+        facturasAnuladas.push(factura.numero_factura);
+      }
+
+      // 3. Anular contratos ACTIVOS del cliente
+      const [contratos] = await connection.execute(
+        `SELECT id, numero_contrato, estado FROM contratos
+         WHERE cliente_id = ? AND estado IN ('activo', 'vencido')
+         ORDER BY created_at DESC`,
+        [id]
+      );
+
+      const contratosAnulados = [];
+      for (const contrato of contratos) {
+        await connection.execute(
+          `UPDATE contratos
+           SET estado = 'anulado',
+               observaciones = CONCAT(COALESCE(observaciones,''), ' | ANULADO: ', ?, ' - ', NOW()),
+               updated_at = NOW()
+           WHERE id = ? AND estado IN ('activo', 'vencido')`,
+          [motivo.trim(), contrato.id]
+        );
+        contratosAnulados.push(contrato.numero_contrato);
+      }
+
+      // 4. Suspender/cancelar servicios activos
+      await connection.execute(
+        `UPDATE servicios_cliente
+         SET estado = 'cancelado', fecha_suspension = NOW(), updated_at = NOW()
+         WHERE cliente_id = ? AND estado IN ('activo', 'suspendido')`,
+        [id]
+      );
+
+      // 5. Marcar cliente como 'suspendido' (no inactivo, por si se recupera la instalación)
+      const motivoCompleto = `Instalación no realizada: ${motivo.trim()}${observaciones ? ' - ' + observaciones.trim() : ''}`;
+      await connection.execute(
+        `UPDATE clientes
+         SET estado = 'suspendido',
+             observaciones = CONCAT(COALESCE(observaciones,''), ' | ', ?),
+             updated_at = NOW()
+         WHERE id = ?`,
+        [motivoCompleto, id]
+      );
+
+      await connection.commit();
+
+      console.log(`✅ Cancelación de instalación procesada: cliente ${id}, facturas: ${facturasAnuladas.length}, contratos: ${contratosAnulados.length}`);
+
+      res.json({
+        success: true,
+        message: `Cancelación procesada correctamente para ${cliente.nombre}`,
+        data: {
+          cliente_id: parseInt(id),
+          cliente_nombre: cliente.nombre,
+          estado_nuevo: 'suspendido',
+          facturas_anuladas: facturasAnuladas,
+          contratos_anulados: contratosAnulados,
+          motivo: motivoCompleto,
+        }
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      console.error('❌ Error cancelando instalación:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error al cancelar la instalación',
+      });
+    } finally {
+      connection.release();
     }
   }
 );

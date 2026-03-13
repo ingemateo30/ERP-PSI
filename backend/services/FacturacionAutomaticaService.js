@@ -282,19 +282,23 @@ class FacturacionAutomaticaService {
         
         // ========================================================================
         // CASO 3: FACTURACIÓN MENSUAL ESTÁNDAR (2+ facturas previas)
+        // Se genera el día 20 del mes actual cubriendo el mes SIGUIENTE completo
+        // Ejemplo: 20 de marzo → factura del 1 al 30 de abril
         // ========================================================================
         else {
-          tipoFacturacion = 'Facturación mensual estándar';
+          tipoFacturacion = 'Facturación mensual estándar (mes siguiente)';
 
-          // Del día 1 al último día del mes ANTERIOR a la fecha de referencia
-          const mesAnterior = fechaReferencia.getMonth() === 0 ? 11 : fechaReferencia.getMonth() - 1;
-          const anioMesAnterior = fechaReferencia.getMonth() === 0 ?
-            fechaReferencia.getFullYear() - 1 : fechaReferencia.getFullYear();
+          // Primer día del mes siguiente (JavaScript maneja overflow automáticamente)
+          const primerDiaMesSiguiente = new Date(
+            fechaReferencia.getFullYear(),
+            fechaReferencia.getMonth() + 1,
+            1
+          );
 
-          fechaDesde = new Date(anioMesAnterior, mesAnterior, 1);
-          fechaHasta = new Date(anioMesAnterior, mesAnterior + 1, 0);
+          fechaDesde = new Date(primerDiaMesSiguiente.getFullYear(), primerDiaMesSiguiente.getMonth(), 1);
+          fechaHasta = new Date(primerDiaMesSiguiente.getFullYear(), primerDiaMesSiguiente.getMonth() + 1, 0);
 
-          console.log(`   📊 Factura mensual: ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
+          console.log(`   📊 Factura mensual (mes siguiente): ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
         }
 
         // ✅ CÁLCULO CORRECTO DE DÍAS

@@ -112,6 +112,18 @@ export const ROLE_PERMISSIONS = {
     canManageEquipment: true,
     canViewMap: true
   },
+  secretaria: {
+    canCreate: true,
+    canEdit: true,
+    canDelete: false,
+    canViewAll: true,
+    canAssignInstaller: true,
+    canReschedule: true,
+    canViewStats: true,
+    canChangeStatus: true,
+    canManageEquipment: true,
+    canViewMap: true
+  },
   supervisor: {
     canCreate: true,
     canEdit: true,

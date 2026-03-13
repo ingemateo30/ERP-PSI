@@ -18,6 +18,16 @@ export const usePermissions = () => {
       reportes: true,
       estadisticas: true
     },
+    secretaria: {
+      ver: true,
+      crear: true,
+      editar: true,
+      eliminar: false,
+      configuracion: false,
+      usuarios: false,
+      reportes: false,
+      estadisticas: false
+    },
     supervisor: {
       ver: true,
       crear: true,
@@ -57,7 +67,8 @@ export const usePermissions = () => {
     puedeAccederReportes: tienePermiso('reportes'),
     puedeAccederEstadisticas: tienePermiso('estadisticas'),
     esAdministrador: normalizedRole === 'administrador',
-    esSupervisor: normalizedRole === 'supervisor',
+    esSecretaria: normalizedRole === 'secretaria',
+    esSupervisor: normalizedRole === 'supervisor' || normalizedRole === 'secretaria',
     esInstalador: normalizedRole === 'instalador'
   };
 };

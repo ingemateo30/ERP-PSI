@@ -88,7 +88,7 @@ const FormatosBancarios = () => {
   const [cajaFmt, setCajaFmt] = useState('CSV');
   const { hasPermission } = useAuth();
 
-  if (!hasPermission('administrador') && !hasPermission('supervisor')) return null;
+  if (!hasPermission('administrador') && !hasPermission('supervisor') && !hasPermission('secretaria')) return null;
 
   const bancosVisibles = BANCOS.filter(b => b.sedes.includes(sede));
 
