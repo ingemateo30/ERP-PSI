@@ -1,21 +1,23 @@
 // frontend/src/components/Facturas/FacturacionAutomatica.js - ESTILO LIMPIO APLICADO
 
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   Calendar, DollarSign, FileText, Users, CheckCircle, XCircle,
   Play, Eye, Download, RefreshCw, Loader2, AlertTriangle,
-  ChevronDown, ChevronUp, TrendingUp
+  ChevronDown, ChevronUp, TrendingUp, Mail
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { facturasService } from '../../services/facturasService';
 import { Card, CardContent } from '../ui/card';
+import EnvioMasivoEmailMonitor from './EnvioMasivoEmailMonitor';
 
 const FacturacionAutomatica = () => {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [expandedCliente, setExpandedCliente] = useState(null);
-  const [diasVencimiento, setDiasVencimiento] = useState(15); // Días de vencimiento por defecto
+  const [diasVencimiento, setDiasVencimiento] = useState(15);
+  const [tabActiva, setTabActiva] = useState('facturacion'); // 'facturacion' | 'envio_masivo'
 
   const { user } = useAuth();
 
@@ -230,6 +232,35 @@ const FacturacionAutomatica = () => {
           <p className="text-gray-600">Genera y gestiona la facturación mensual de forma automatizada</p>
         </div>
       </div>
+
+      {/* Tabs: Facturación / Envío Masivo */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex gap-6">
+          <button
+            onClick={() => setTabActiva('facturacion')}
+            className={`flex items-center gap-2 py-3 px-1 text-sm font-medium border-b-2 transition-colors ${tabActiva === 'facturacion' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          >
+            <Calendar className="w-4 h-4" />
+            Generación de Facturas
+          </button>
+          <button
+            onClick={() => setTabActiva('envio_masivo')}
+            className={`flex items-center gap-2 py-3 px-1 text-sm font-medium border-b-2 transition-colors ${tabActiva === 'envio_masivo' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          >
+            <Mail className="w-4 h-4" />
+            Envío Masivo por Email
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab: Envío Masivo */}
+      {tabActiva === 'envio_masivo' && (
+        <EnvioMasivoEmailMonitor />
+      )}
+
+      {/* Tab: Facturación (contenido original) */}
+      {tabActiva !== 'envio_masivo' && (
+      <>
 
       {/* Tarjetas de resumen si hay preview */}
       {preview?.resumen && (
@@ -659,6 +690,8 @@ const FacturacionAutomatica = () => {
             )}
           </div>
         </div>
+      )}
+      </> /* cierre del tab facturacion */
       )}
     </div>
   );

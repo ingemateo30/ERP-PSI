@@ -3,11 +3,12 @@
 // =============================================
 
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Download, RefreshCw, UserX, Users, X, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, Search, Filter, Download, RefreshCw, UserX, Users, X, AlertCircle, Loader2, Ban } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROLE_PERMISSIONS } from '../../constants/clientConstants';
 import { clientService } from '../../services/clientService';
+import clienteCompletoService from '../../services/clienteCompletoService';
 import ClientsList from './ClientsList';
 import ClientForm from './ClientForm';
 import ClientEditForm from './ClientEditForm';
@@ -46,6 +47,10 @@ const ClientsManagement = () => {
   // Estados para confirmaciones - NUEVO: Modal de inactivar
   const [showInactivarModal, setShowInactivarModal] = useState(false);
   const [inactivandoCliente, setInactivandoCliente] = useState(false);
+
+  // Estados para cancelar instalación (suspender + anular factura/contrato)
+  const [showCancelarInstalacionModal, setShowCancelarInstalacionModal] = useState(false);
+  const [cancelandoInstalacion, setCancelandoInstalacion] = useState(false);
 
   // Permisos del usuario actual
   const permissions = ROLE_PERMISSIONS[user?.role] || ROLE_PERMISSIONS.instalador;
@@ -114,6 +119,41 @@ const ClientsManagement = () => {
       }
     } finally {
       setInactivandoCliente(false);
+    }
+  };
+
+  // Manejar cancelación de instalación (suspender + anular factura/contrato)
+  const handleCancelarInstalacion = (client) => {
+    setSelectedClient(client);
+    setShowCancelarInstalacionModal(true);
+  };
+
+  const confirmarCancelarInstalacion = async (motivo, observaciones) => {
+    if (!selectedClient) return;
+    try {
+      setCancelandoInstalacion(true);
+      const response = await clienteCompletoService.cancelarInstalacion(selectedClient.id, {
+        motivo,
+        observaciones
+      });
+      if (response.success) {
+        if (window.showNotification) {
+          window.showNotification('success', `Instalación cancelada: ${response.data?.facturas_anuladas?.length || 0} factura(s) y ${response.data?.contratos_anulados?.length || 0} contrato(s) anulados`);
+        }
+        refresh();
+        setShowCancelarInstalacionModal(false);
+        setShowClientModal(false);
+        setSelectedClient(null);
+      } else {
+        throw new Error(response.message || 'Error al cancelar instalación');
+      }
+    } catch (error) {
+      console.error('Error cancelando instalación:', error);
+      if (window.showNotification) {
+        window.showNotification('error', error.message || 'Error al cancelar la instalación');
+      }
+    } finally {
+      setCancelandoInstalacion(false);
     }
   };
 
@@ -347,7 +387,8 @@ const ClientsManagement = () => {
         onClientSelect={handleClientSelect}
         onEditClient={handleEditClient}
         onDeleteClient={handleDeleteClient}
-        onInactivarCliente={handleInactivarCliente} // NUEVO: Función para inactivar
+        onInactivarCliente={handleInactivarCliente}
+        onCancelarInstalacion={handleCancelarInstalacion}
         onPageChange={changePage}
         onLimitChange={changeLimit}
         permissions={permissions}
@@ -400,6 +441,19 @@ const ClientsManagement = () => {
             setSelectedClient(null);
           }}
           loading={inactivandoCliente}
+        />
+      )}
+
+      {/* Modal: Cancelar instalación (suspender + anular factura/contrato) */}
+      {showCancelarInstalacionModal && selectedClient && (
+        <ModalCancelarInstalacion
+          client={selectedClient}
+          onConfirm={confirmarCancelarInstalacion}
+          onCancel={() => {
+            setShowCancelarInstalacionModal(false);
+            setSelectedClient(null);
+          }}
+          loading={cancelandoInstalacion}
         />
       )}
     </div>
@@ -515,6 +569,103 @@ const ModalInactivarCliente = ({ client, onConfirm, onCancel, loading }) => {
                   <UserX className="w-4 h-4" />
                   Inactivar Cliente
                 </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Modal para cancelar instalación no realizada (suspende cliente + anula facturas/contratos)
+const ModalCancelarInstalacion = ({ client, onConfirm, onCancel, loading }) => {
+  const [motivo, setMotivo] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!motivo.trim()) return;
+    onConfirm(motivo.trim(), observaciones.trim());
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <Ban className="w-5 h-5 text-red-600" />
+              Cancelar Instalación
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {client.nombre} — {client.identificacion}
+            </p>
+          </div>
+          <button onClick={onCancel} disabled={loading} className="p-2 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start gap-2 text-red-700">
+              <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">Acción irreversible</p>
+                <p className="text-sm mt-1">
+                  Esta acción suspenderá al cliente y anulará todas las facturas pendientes
+                  y contratos activos para evitar cobros de mora y deudas pendientes.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Motivo de la cancelación <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Ej: No se pudo realizar la instalación técnica"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Observaciones adicionales
+            </label>
+            <textarea
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Detalles adicionales (opcional)..."
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={loading}
+              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !motivo.trim()}
+              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            >
+              {loading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" />Procesando...</>
+              ) : (
+                <><Ban className="w-4 h-4" />Suspender y Anular</>
               )}
             </button>
           </div>

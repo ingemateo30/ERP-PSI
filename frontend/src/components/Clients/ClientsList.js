@@ -3,20 +3,21 @@
 // =============================================
 
 import React from 'react';
-import { 
-  Eye, Edit, Trash2, UserX, Phone, Mail, MapPin, 
+import {
+  Eye, Edit, Trash2, UserX, Phone, Mail, MapPin,
   Calendar, ChevronLeft, ChevronRight, AlertCircle,
-  RefreshCw, User
+  RefreshCw, User, Ban
 } from 'lucide-react';
 
-const ClientsList = ({ 
-  clients = [], 
-  pagination = {}, 
+const ClientsList = ({
+  clients = [],
+  pagination = {},
   loading = false,
   onClientSelect,
   onEditClient,
   onDeleteClient,
-  onInactivarCliente, // ⭐ NUEVA PROP PARA INACTIVAR
+  onInactivarCliente,
+  onCancelarInstalacion, // ⭐ NUEVA PROP: Suspender cliente nuevo con anulación de factura/contrato
   onPageChange,
   onLimitChange,
   permissions = {}
@@ -82,6 +83,20 @@ const ClientsList = ({
           title="Inactivar cliente"
         >
           <UserX className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* ⭐ NUEVO: Cancelar instalación (suspender + anular factura/contrato) - Solo activos */}
+      {permissions.canDelete && onCancelarInstalacion && client.estado === 'activo' && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onCancelarInstalacion(client);
+          }}
+          className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+          title="Suspender cliente y anular factura/contrato (instalación no realizada)"
+        >
+          <Ban className="w-4 h-4" />
         </button>
       )}
 

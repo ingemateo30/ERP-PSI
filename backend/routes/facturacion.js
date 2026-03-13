@@ -737,6 +737,114 @@ router.get('/automatica/estadisticas-ultimo-proceso',
 
 
 // ==========================================
+// ENDPOINTS: ENVÍO MASIVO DE FACTURAS POR EMAIL
+// ==========================================
+
+const EnvioMasivoEmailService = require('../services/EnvioMasivoEmailService');
+
+/**
+ * POST /api/v1/facturacion/envio-masivo
+ * Iniciar un lote de envío masivo de facturas por email
+ */
+router.post('/envio-masivo',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const { periodo } = req.body;
+      const usuarioId = req.user.id;
+
+      const lote = await EnvioMasivoEmailService.iniciarEnvioMasivo(periodo || null, usuarioId);
+
+      // Procesar en background (no bloquea la respuesta)
+      EnvioMasivoEmailService.iniciarYProcesarEnBackground(lote.lote_id);
+
+      res.json({
+        success: true,
+        message: `Envío masivo iniciado: ${lote.total_facturas} facturas para período ${lote.periodo}`,
+        data: lote
+      });
+    } catch (error) {
+      console.error('❌ Error iniciando envío masivo:', error);
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+/**
+ * GET /api/v1/facturacion/envio-masivo
+ * Listar historial de lotes de envío masivo
+ */
+router.get('/envio-masivo',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const limite = parseInt(req.query.limite) || 20;
+      const lotes = await EnvioMasivoEmailService.listarLotes(limite);
+      res.json({ success: true, data: lotes });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+/**
+ * GET /api/v1/facturacion/envio-masivo/:loteId
+ * Obtener estado de un lote específico (polling para monitoring)
+ */
+router.get('/envio-masivo/:loteId',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const { loteId } = req.params;
+      const estado = await EnvioMasivoEmailService.obtenerEstadoLote(parseInt(loteId));
+      res.json({ success: true, data: estado });
+    } catch (error) {
+      res.status(404).json({ success: false, message: error.message });
+    }
+  }
+);
+
+/**
+ * GET /api/v1/facturacion/envio-masivo/:loteId/errores
+ * Obtener detalle de errores de un lote
+ */
+router.get('/envio-masivo/:loteId/errores',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const { loteId } = req.params;
+      const errores = await EnvioMasivoEmailService.obtenerDetalleErrores(parseInt(loteId));
+      res.json({ success: true, data: errores });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+/**
+ * POST /api/v1/facturacion/envio-masivo/:loteId/reintentar
+ * Reintentar emails fallidos de un lote
+ */
+router.post('/envio-masivo/:loteId/reintentar',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const { loteId } = req.params;
+      const loteIdNum = parseInt(loteId);
+      const resultado = await EnvioMasivoEmailService.reintentarFallidos(loteIdNum);
+      EnvioMasivoEmailService.iniciarYProcesarEnBackground(loteIdNum);
+      res.json({
+        success: true,
+        message: `Reintentando ${resultado.reintentados} emails fallidos`,
+        data: resultado
+      });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// ==========================================
 // ENDPOINT: REGISTRAR PAGO - CORREGIDO
 // ==========================================
 

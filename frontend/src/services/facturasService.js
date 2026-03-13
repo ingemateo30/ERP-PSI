@@ -529,7 +529,31 @@ export const facturasService = {
       throw new Error(err.message || `Error ${response.status}`);
     }
     return response.json();
-  }
+  },
+
+  // ========================================
+  // ENVÍO MASIVO DE FACTURAS POR EMAIL
+  // ========================================
+
+  async iniciarEnvioMasivo(periodo) {
+    return apiService.post('/facturacion/envio-masivo', { periodo });
+  },
+
+  async listarLotesEnvioMasivo(limite = 20) {
+    return apiService.get(`/facturacion/envio-masivo?limite=${limite}`);
+  },
+
+  async obtenerEstadoLoteEnvio(loteId) {
+    return apiService.get(`/facturacion/envio-masivo/${loteId}`);
+  },
+
+  async obtenerErroresLoteEnvio(loteId) {
+    return apiService.get(`/facturacion/envio-masivo/${loteId}/errores`);
+  },
+
+  async reintentarFallidosEnvio(loteId) {
+    return apiService.post(`/facturacion/envio-masivo/${loteId}/reintentar`, {});
+  },
 };
 
 // Exportar también como default para compatibilidad
