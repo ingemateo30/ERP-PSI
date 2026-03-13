@@ -1771,6 +1771,15 @@ static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
     }
   }
 
+  // ✅ FALLBACK: Si no hay planInternetId ni planTelevisionId, usar plan_id genérico
+  if (todosLosPlanesIds.length === 0 && sedeData.plan_id) {
+    const planIdNum = parseInt(sedeData.plan_id);
+    if (!isNaN(planIdNum)) {
+      todosLosPlanesIds.push(planIdNum);
+      console.log(`🔄 Usando plan_id genérico como fallback: ${planIdNum}`);
+    }
+  }
+
   console.log(`📦 Total de planes a crear: ${todosLosPlanesIds.length}`, todosLosPlanesIds);
 
   // ✅ CREAR UN SERVICIO POR CADA PLAN
@@ -1786,7 +1795,11 @@ static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
     }
 
     const plan = planInfo[0];
-    const precioFinal = plan.precio; // Usar precio del plan
+    // ✅ Usar precio personalizado si se envió, de lo contrario precio del plan
+    const precioPersonalizado = sedeData.precio_personalizado ||
+      (plan.tipo === 'internet' ? sedeData.precioInternetCustom : null) ||
+      (plan.tipo === 'television' ? sedeData.precioTelevisionCustom : null);
+    const precioFinal = precioPersonalizado ? parseFloat(precioPersonalizado) : parseFloat(plan.precio);
 
     const observacionesServicio = JSON.stringify({
       sede_nombre: sedeData.nombre_sede || 'Sede Principal',
