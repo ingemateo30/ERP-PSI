@@ -270,6 +270,98 @@ router.post('/:id/agregar-servicio',
     }
   }
 );
+/**
+ * @route DELETE /api/v1/clientes/:clienteId/servicios/:servicioId
+ * @desc Suspender/cancelar un servicio específico de un cliente existente
+ * @body { motivo?: string }
+ * @access Administrador, Supervisor
+ */
+router.delete('/:clienteId/servicios/:servicioId',
+  requireRole(['administrador', 'supervisor']),
+  async (req, res) => {
+    const { clienteId, servicioId } = req.params;
+    const { motivo } = req.body;
+
+    if (!clienteId || isNaN(clienteId) || !servicioId || isNaN(servicioId)) {
+      return res.status(400).json({ success: false, message: 'IDs inválidos' });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Verificar que el servicio pertenece al cliente
+      const [servicios] = await connection.execute(
+        `SELECT sc.*, ps.nombre as plan_nombre, ps.tipo
+         FROM servicios_cliente sc
+         JOIN planes_servicio ps ON sc.plan_id = ps.id
+         WHERE sc.id = ? AND sc.cliente_id = ? AND sc.estado = 'activo'`,
+        [servicioId, clienteId]
+      );
+
+      if (servicios.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Servicio no encontrado, ya cancelado, o no pertenece al cliente'
+        });
+      }
+
+      const servicio = servicios[0];
+
+      // Suspender el servicio
+      const motivoCancelacion = motivo?.trim() || 'Cancelado manualmente';
+      await connection.execute(
+        `UPDATE servicios_cliente
+         SET estado = 'cancelado', fecha_suspension = NOW(),
+             observaciones = CONCAT(COALESCE(observaciones,''), ' | CANCELADO: ', ?, ' - ', NOW()),
+             updated_at = NOW()
+         WHERE id = ?`,
+        [motivoCancelacion, servicioId]
+      );
+
+      // Anular facturas PENDIENTES que solo cubran este servicio (si el cliente tiene otros activos)
+      const [otrosActivos] = await connection.execute(
+        `SELECT COUNT(*) as total FROM servicios_cliente
+         WHERE cliente_id = ? AND estado = 'activo' AND id != ?`,
+        [clienteId, servicioId]
+      );
+
+      let facturasAnuladas = 0;
+      // Si no quedan más servicios activos, anular facturas pendientes
+      if (otrosActivos[0].total === 0) {
+        const [result] = await connection.execute(
+          `UPDATE facturas SET estado = 'anulada',
+             observaciones = CONCAT(COALESCE(observaciones,''), ' | Anulada por cancelación de servicio')
+           WHERE cliente_id = ? AND estado IN ('pendiente','vencida') AND activo = '1'`,
+          [clienteId]
+        );
+        facturasAnuladas = result.affectedRows;
+      }
+
+      await connection.commit();
+
+      console.log(`✅ Servicio ${servicioId} cancelado del cliente ${clienteId}: ${servicio.plan_nombre}`);
+
+      res.json({
+        success: true,
+        message: `Servicio "${servicio.plan_nombre}" cancelado exitosamente`,
+        data: {
+          servicio_cancelado: servicio.plan_nombre,
+          facturas_anuladas: facturasAnuladas,
+          otros_servicios_activos: otrosActivos[0].total
+        }
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      console.error('❌ Error cancelando servicio:', error);
+      res.status(500).json({ success: false, message: error.message });
+    } finally {
+      connection.release();
+    }
+  }
+);
+
 // ==========================================
 // RUTAS DE CONSULTA
 // ==========================================
