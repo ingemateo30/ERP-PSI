@@ -149,7 +149,59 @@ const ClientsList = ({
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-      <div className="overflow-x-auto">
+
+      {/* Vista móvil: tarjetas */}
+      <div className="block md:hidden divide-y divide-gray-200">
+        {clients.map((client) => (
+          <div
+            key={client.id}
+            className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+            onClick={() => onClientSelect && onClientSelect(client)}
+          >
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">{client.nombre}</p>
+                <p className="text-xs text-gray-500">{client.identificacion}</p>
+              </div>
+              <span className={`ml-2 flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(client.estado)}`}>
+                {client.estado}
+              </span>
+            </div>
+            <div className="space-y-1 mb-3">
+              {client.telefono && (
+                <div className="flex items-center gap-1 text-xs text-gray-600">
+                  <Phone className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                  {client.telefono}
+                </div>
+              )}
+              {client.correo && (
+                <div className="flex items-center gap-1 text-xs text-gray-600 truncate">
+                  <Mail className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                  <span className="truncate">{client.correo}</span>
+                </div>
+              )}
+              {client.direccion && (
+                <div className="flex items-center gap-1 text-xs text-gray-600">
+                  <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                  <span className="truncate">{client.direccion}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 text-xs text-gray-400">
+                <Calendar className="w-3 h-3" />
+                {formatearFecha(client.fecha_registro)}
+              </div>
+              <div onClick={(e) => e.stopPropagation()}>
+                {renderActions(client)}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Vista desktop: tabla */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -180,19 +232,12 @@ const ClientsList = ({
                 className="hover:bg-gray-50 transition-colors cursor-pointer"
                 onClick={() => onClientSelect && onClientSelect(client)}
               >
-                {/* Datos del cliente */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {client.nombre}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {client.identificacion}
-                    </div>
+                    <div className="text-sm font-medium text-gray-900">{client.nombre}</div>
+                    <div className="text-sm text-gray-500">{client.identificacion}</div>
                   </div>
                 </td>
-
-                {/* Contacto */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="space-y-1">
                     {client.telefono && (
@@ -209,15 +254,11 @@ const ClientsList = ({
                     )}
                   </div>
                 </td>
-
-                {/* Ubicación */}
                 <td className="px-6 py-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-1 text-sm text-gray-900">
                       <MapPin className="w-3 h-3 text-gray-400" />
-                      <span className="truncate max-w-xs">
-                        {client.direccion}
-                      </span>
+                      <span className="truncate max-w-xs">{client.direccion}</span>
                     </div>
                     {(client.barrio || client.sector_nombre) && (
                       <div className="text-xs text-gray-500">
@@ -226,23 +267,17 @@ const ClientsList = ({
                     )}
                   </div>
                 </td>
-
-                {/* Estado */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(client.estado)}`}>
                     {client.estado}
                   </span>
                 </td>
-
-                {/* Fecha de registro */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center gap-1 text-sm text-gray-500">
                     <Calendar className="w-3 h-3 text-gray-400" />
                     {formatearFecha(client.fecha_registro)}
                   </div>
                 </td>
-
-                {/* Acciones */}
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   {renderActions(client)}
                 </td>

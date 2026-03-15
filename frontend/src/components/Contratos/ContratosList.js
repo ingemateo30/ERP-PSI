@@ -361,7 +361,42 @@ const { hasPermission } = useAuth();
 
       {/* Lista de contratos */}
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
+
+        {/* Vista móvil: tarjetas */}
+        <div className="block md:hidden divide-y divide-gray-200">
+          {contratos.map((contrato) => (
+            <div key={contrato.id} className="p-4 hover:bg-gray-50">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{contrato.numero_contrato}</p>
+                  <p className="text-xs text-gray-500">{contrato.tipo_contrato}</p>
+                </div>
+                <div className="flex items-center ml-2">
+                  {obtenerIconoEstado(contrato.estado)}
+                  <span className={`ml-1 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${obtenerColorEstado(contrato.estado)}`}>
+                    {contrato.estado}
+                  </span>
+                </div>
+              </div>
+              <div className="text-xs text-gray-600 space-y-1 mb-3">
+                <p><span className="font-medium">Cliente:</span> {contrato.cliente_nombre}</p>
+                <p><span className="font-medium">Plan:</span> {contrato.plan_nombre || 'N/A'}</p>
+                <p><span className="font-medium">Permanencia:</span> {contrato.tipo_permanencia === 'con_permanencia' ? `${contrato.permanencia_meses || 0} meses` : 'Sin permanencia'}</p>
+                <p><span className="font-medium">Fecha:</span> {contrato.fecha_generacion ? new Date(contrato.fecha_generacion).toLocaleDateString('es-CO') : 'N/A'}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={() => handleVerPDF(contrato.id)} className="text-indigo-600 hover:text-indigo-900" title="Ver PDF"><Eye className="w-4 h-4" /></button>
+                <button onClick={() => handleDescargarPDF(contrato.id)} className="text-blue-600 hover:text-blue-900" title="Descargar"><Download className="w-4 h-4" /></button>
+                {!contrato.firmado_cliente && contrato.estado !== 'anulado' && (
+                  <button onClick={() => handleIrAFirmar(contrato.id)} className="text-green-600 hover:text-green-900" title="Firmar"><PenTool className="w-4 h-4" /></button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Vista desktop: tabla */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -523,7 +558,7 @@ const { hasPermission } = useAuth();
               ))}
             </tbody>
           </table>
-        </div>
+        </div>{/* fin desktop */}
 
         {/* Paginación */}
         {paginacion.totalPages > 1 && (

@@ -778,7 +778,50 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            {/* Vista móvil: tarjetas */}
+            <div className="block md:hidden divide-y divide-gray-200">
+              {instalaciones.map((instalacion) => (
+                <div key={instalacion.id} className={`p-4 ${estaVencida(instalacion) ? 'bg-red-50' : 'hover:bg-gray-50'}`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{instalacion.cliente_nombre}</p>
+                      <p className="text-xs text-gray-500">{instalacion.cliente_identificacion}</p>
+                    </div>
+                    <span className={`ml-2 flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      instalacion.estado === 'programada' ? 'bg-blue-100 text-blue-800' :
+                      instalacion.estado === 'en_proceso' ? 'bg-yellow-100 text-yellow-800' :
+                      instalacion.estado === 'completada' ? 'bg-green-100 text-green-800' :
+                      instalacion.estado === 'cancelada' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {obtenerNombreEstado(instalacion.estado)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-1 mb-3">
+                    <p><span className="font-medium">Fecha:</span> {formatearFecha(instalacion.fecha_programada)} {formatearHora(instalacion.hora_programada)}</p>
+                    <p><span className="font-medium">Instalador:</span> {instalacion.instalador_nombre || 'Sin asignar'}</p>
+                    {instalacion.direccion_instalacion && <p><span className="font-medium">Dirección:</span> {instalacion.direccion_instalacion}</p>}
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {puedeEjecutarAccion('ver', instalacion) && (
+                      <button onClick={() => verDetalles(instalacion)} className="text-blue-600 hover:text-blue-800" title="Ver detalles"><Eye className="w-4 h-4" /></button>
+                    )}
+                    {puedeEjecutarAccion('iniciar', instalacion) && (
+                      <button onClick={() => iniciarInstalacion(instalacion)} className="text-green-600 hover:text-green-800" title="Iniciar"><Play className="w-4 h-4" /></button>
+                    )}
+                    {puedeEjecutarAccion('asignar', instalacion) && (
+                      <button onClick={() => abrirAsignarInstalador(instalacion)} className="text-purple-600 hover:text-purple-800" title="Asignar"><UserPlus className="w-4 h-4" /></button>
+                    )}
+                    {puedeEjecutarAccion('cancelar', instalacion) && !['cancelada','completada'].includes(instalacion.estado) && (
+                      <button onClick={() => cancelarInstalacion(instalacion)} className="text-red-600 hover:text-red-800" title="Cancelar"><XCircle className="w-4 h-4" /></button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Vista desktop: tabla */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -994,7 +1037,7 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </div>{/* fin desktop */}
           )}
         </div>
 
