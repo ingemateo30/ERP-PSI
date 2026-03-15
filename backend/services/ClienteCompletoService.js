@@ -595,6 +595,12 @@ const observacionesContrato = JSON.stringify({
   }
 });
 
+      // IDs de los servicios creados para esta sede
+      const serviciosIds = serviciosDeLaSede.map(s => s.id).filter(Boolean);
+
+      // Observaciones de la orden de instalación
+      const observacionesInstalacion = observacionesContrato;
+
       // Obtener datos del cliente para completar campos
       const [clienteData] = await conexion.execute(
         'SELECT nombre, direccion, barrio, telefono FROM clientes WHERE id = ?',
