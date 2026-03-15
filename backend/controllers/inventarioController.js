@@ -905,6 +905,27 @@ class InventoryController {
             });
         }
     }
+
+    /**
+     * Obtener inventario agrupado por tipo/nombre con cantidades
+     */
+    static async getGroupedEquipment(req, res) {
+        try {
+            const filters = {
+                tipo: req.query.tipo,
+                search: req.query.search
+            };
+            const grupos = await InventoryModel.getGrouped(filters);
+            res.json({ success: true, data: grupos });
+        } catch (error) {
+            console.error('Error en getGroupedEquipment:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error interno del servidor',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    }
 }
 
 module.exports = InventoryController;

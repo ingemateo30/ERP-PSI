@@ -788,6 +788,52 @@ static async getInstallerHistory(instaladorId, limit = 50) {
       throw error;
     }
   }
+
+  /**
+   * Obtener inventario agrupado por tipo y nombre con cantidades
+   */
+  static async getGrouped(filters = {}) {
+    try {
+      let query = `
+        SELECT
+          e.tipo,
+          e.nombre,
+          COUNT(*) AS cantidad_total,
+          SUM(CASE WHEN e.estado = 'disponible' THEN 1 ELSE 0 END) AS disponibles,
+          SUM(CASE WHEN e.estado = 'asignado' THEN 1 ELSE 0 END) AS asignados,
+          SUM(CASE WHEN e.estado = 'instalado' THEN 1 ELSE 0 END) AS instalados,
+          SUM(CASE WHEN e.estado = 'dañado' THEN 1 ELSE 0 END) AS daniados,
+          SUM(CASE WHEN e.estado = 'mantenimiento' THEN 1 ELSE 0 END) AS en_mantenimiento,
+          SUM(CASE WHEN e.estado = 'perdido' THEN 1 ELSE 0 END) AS perdidos,
+          SUM(CASE WHEN e.estado = 'devuelto' THEN 1 ELSE 0 END) AS devueltos,
+          MIN(e.precio_compra) AS precio_min,
+          MAX(e.precio_compra) AS precio_max
+        FROM inventario_equipos e
+        WHERE 1=1
+      `;
+
+      const params = [];
+
+      if (filters.tipo) {
+        query += ' AND e.tipo = ?';
+        params.push(filters.tipo);
+      }
+
+      if (filters.search) {
+        query += ' AND (e.nombre LIKE ? OR e.tipo LIKE ? OR e.marca LIKE ?)';
+        const s = `%${filters.search}%`;
+        params.push(s, s, s);
+      }
+
+      query += ' GROUP BY e.tipo, e.nombre ORDER BY e.tipo ASC, e.nombre ASC';
+
+      const [rows] = await db.execute(query, params);
+      return rows;
+    } catch (error) {
+      console.error('❌ Error en getGrouped:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = InventoryModel;

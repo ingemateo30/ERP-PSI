@@ -258,7 +258,21 @@ async getActiveInstallers() {
       throw this.handleError(error);
     }
   }
-  
+
+  async getGroupedEquipment(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      if (filters.tipo) params.append('tipo', filters.tipo);
+      if (filters.search) params.append('search', filters.search);
+      const query = params.toString();
+      const response = await apiService.get(`/inventory/equipment-grouped${query ? '?' + query : ''}`);
+      return response.data || response;
+    } catch (error) {
+      console.error('Error obteniendo inventario agrupado:', error);
+      throw this.handleError(error);
+    }
+  }
+
   /**
    * Obtener reporte por rango de fechas
    */

@@ -616,8 +616,6 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
     const [firmaExistente, setFirmaExistente] = useState(null);
 
     useEffect(() => {
-        // Cargar lista inicial de clientes al abrir el modal
-        cargarClientes('', '');
         cargarUsuarios();
         if (pqr) {
             setFormData({
@@ -633,14 +631,28 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
                 respuesta: pqr.respuesta || '',
                 usuario_asignado: pqr.usuario_asignado || '',
                 notas_internas: pqr.notas_internas || '',
-                firma_cliente: pqr.firma_cliente || null 
+                firma_cliente: pqr.firma_cliente || null
             });
-            
+
             // Si hay firma guardada, mostrarla
             if (pqr.firma_cliente) {
                 setFirmaExistente(pqr.firma_cliente);
                 setFirmaCompleta(true);
             }
+
+            // Pre-cargar el cliente actual para que aparezca en el dropdown
+            if (pqr.cliente_id) {
+                setClientes([{
+                    id: pqr.cliente_id,
+                    nombre: pqr.cliente_nombre || 'Cliente',
+                    identificacion: pqr.cliente_identificacion || ''
+                }]);
+            }
+            // Cargar la lista completa buscando por el nombre/identificación del cliente actual
+            cargarClientes(pqr.cliente_identificacion || pqr.cliente_nombre || '', '');
+        } else {
+            // Nuevo PQR: cargar lista inicial sin filtro
+            cargarClientes('', '');
         }
     }, [pqr]);
 
@@ -661,7 +673,14 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
             setSearchingClientes(true);
             const response = await pqrService.getClientesActivos(term, searchBy);
             if (response.success) {
-                setClientes(response.clientes || response.data || []);
+                const nuevosClientes = response.clientes || response.data || [];
+                setClientes(prev => {
+                    // Asegurarse de que el cliente actual (en edición) siempre esté en la lista
+                    const clientesActuales = prev.filter(c =>
+                        !nuevosClientes.some(n => n.id === c.id)
+                    );
+                    return [...clientesActuales, ...nuevosClientes];
+                });
             }
         } catch (error) {
             console.error('Error cargando clientes:', error);

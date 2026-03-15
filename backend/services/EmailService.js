@@ -531,18 +531,39 @@ static async generarPDFContrato(contratoId, conexionExistente = null) {
         throw new Error('Configuración de email no disponible');
       }
 
+      // Obtener plantilla de correo para facturas (con fallback)
+      const plantilla = await this.obtenerPlantilla('factura');
+      const variables = {
+        nombre_cliente: factura.cliente_nombre,
+        numero_factura: factura.numero_factura,
+        total_factura: `$${parseFloat(factura.total).toLocaleString('es-CO')}`,
+        fecha_vencimiento: new Date(factura.fecha_vencimiento).toLocaleDateString('es-CO'),
+        empresa_nombre: empresa.empresa_nombre || 'PSI Telecomunicaciones',
+        telefono_soporte: empresa.telefono || '',
+        periodo_facturacion: factura.periodo_facturacion || ''
+      };
+
+      const asunto = this.reemplazarVariables(
+        plantilla.asunto || `Factura ${factura.numero_factura} - ${empresa.empresa_nombre}`,
+        variables
+      );
+      const contenidoHTML = this.reemplazarVariables(
+        plantilla.contenido || `
+          <h2>Factura de Servicio</h2>
+          <p>Estimado/a {{nombre_cliente}},</p>
+          <p>Adjunto encontrará su factura <strong>{{numero_factura}}</strong> por un valor de <strong>{{total_factura}}</strong>.</p>
+          <p>Fecha de vencimiento: {{fecha_vencimiento}}</p>
+          <p>Saludos cordiales,<br>{{empresa_nombre}}</p>
+        `,
+        variables
+      );
+
       // Preparar y enviar correo
       const mailOptions = {
         from: `"${empresa.empresa_nombre || 'PSI'}" <${process.env.EMAIL_USER}>`,
         to: destinatario,
-        subject: `Factura ${factura.numero_factura} - ${empresa.empresa_nombre}`,
-        html: `
-          <h2>Factura de Servicio</h2>
-          <p>Estimado/a ${factura.cliente_nombre},</p>
-          <p>Adjunto encontrará su factura <strong>${factura.numero_factura}</strong> por un valor de <strong>$${parseFloat(factura.total).toLocaleString('es-CO')}</strong>.</p>
-          <p>Fecha de vencimiento: ${new Date(factura.fecha_vencimiento).toLocaleDateString('es-CO')}</p>
-          <p>Saludos cordiales,<br>${empresa.empresa_nombre}</p>
-        `,
+        subject: asunto,
+        html: contenidoHTML,
         attachments: [{
           filename: `Factura_${factura.numero_factura}.pdf`,
           content: pdfBuffer,
