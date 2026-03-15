@@ -58,9 +58,14 @@ const createEquipmentValidation = [
 // RUTAS DE EQUIPOS
 // ==========================================
 
-router.get('/equipment', 
+router.get('/equipment',
   requireRole(['supervisor', 'administrador', 'instalador']),
   InventoryController.getAllEquipment
+);
+
+router.get('/equipment-grouped',
+  requireRole(['supervisor', 'administrador', 'instalador']),
+  InventoryController.getGroupedEquipment
 );
 
 router.get('/equipment/:id',

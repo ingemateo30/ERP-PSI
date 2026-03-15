@@ -555,6 +555,7 @@ class ClienteCompletoService {
 
       // ✅ CORRECCIÓN 1: Calcular costo CORRECTO según tipo de contrato
       const tipoPermanencia = sedeData.tipoContrato || 'sin_permanencia';
+      const mesesPermanencia = sedeData.mesesPermanencia || (tipoPermanencia === 'con_permanencia' ? 6 : 0);
       let costoInstalacionTotal = 0;
 
       // ✅ COSTO CORREGIDO: UNA sola instalación independiente de cantidad de servicios

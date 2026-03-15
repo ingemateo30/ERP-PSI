@@ -9,7 +9,7 @@ import EquipmentFilters from './EquipmentFilters';
 import EquipmentStats from './EquipmentStats';
 import AssignmentModal from './AssignmentModal';
 import HistoryModal from './HistoryModal';
-import { Package, Plus, CheckCircle, AlertCircle, Upload, Download } from 'lucide-react';
+import { Package, Plus, CheckCircle, AlertCircle, Upload, Download, List, LayoutGrid } from 'lucide-react';
 
 const InventoryManagement = () => {
   const { user } = useAuth();
@@ -35,6 +35,9 @@ const InventoryManagement = () => {
   const [uploadSede, setUploadSede] = useState('');
   const [ciudades, setCiudades] = useState([]);
   const excelInputRef = useRef(null);
+  const [viewMode, setViewMode] = useState('grouped'); // 'grouped' | 'detail'
+  const [equiposAgrupados, setEquiposAgrupados] = useState([]);
+  const [loadingGrouped, setLoadingGrouped] = useState(false);
 
   // Cargar ciudades del sistema
   useEffect(() => {
@@ -45,9 +48,13 @@ const InventoryManagement = () => {
 
   // Cargar datos iniciales
   useEffect(() => {
-    loadEquipment();
+    if (viewMode === 'detail') {
+      loadEquipment();
+    } else {
+      loadGroupedEquipment();
+    }
     loadStats();
-  }, [filters]);
+  }, [filters, viewMode]);
 
   // Cargar equipos con filtros
 const loadEquipment = useCallback(async () => {
@@ -82,6 +89,24 @@ const loadEquipment = useCallback(async () => {
     setLoading(false);
   }
 }, [filters, user.rol]);
+  // Cargar inventario agrupado por tipo/nombre
+  const loadGroupedEquipment = useCallback(async () => {
+    try {
+      setLoadingGrouped(true);
+      setError('');
+      const data = await inventoryService.getGroupedEquipment({
+        tipo: filters.tipo,
+        search: filters.search
+      });
+      setEquiposAgrupados(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('❌ Error cargando inventario agrupado:', error);
+      setEquiposAgrupados([]);
+    } finally {
+      setLoadingGrouped(false);
+    }
+  }, [filters.tipo, filters.search]);
+
   // Cargar estadísticas
 // frontend/src/components/Inventory/InventoryManagement.js
 // ✅ CORREGIDO: Cargar estadísticas según el rol
@@ -488,7 +513,106 @@ const loadStats = async () => {
         />
       </div>
 
-      {/* Lista de equipos con fondo blanco y sombra */}
+      {/* Toggle de vista */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setViewMode('grouped')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'grouped' ? 'bg-[#0e6493] text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+        >
+          <LayoutGrid size={16} />
+          Resumen por producto
+        </button>
+        <button
+          onClick={() => setViewMode('detail')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'detail' ? 'bg-[#0e6493] text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+        >
+          <List size={16} />
+          Detalle individual
+        </button>
+      </div>
+
+      {/* Vista agrupada */}
+      {viewMode === 'grouped' && (
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {loadingGrouped ? (
+            <div className="p-8 text-center text-gray-500">Cargando inventario...</div>
+          ) : equiposAgrupados.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">No hay productos en el inventario</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-700">Tipo</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-700">Producto</th>
+                  <th className="text-center px-4 py-3 font-semibold text-gray-700">Total</th>
+                  <th className="text-center px-4 py-3 font-semibold text-green-700">Disponibles</th>
+                  <th className="text-center px-4 py-3 font-semibold text-blue-700">Asignados</th>
+                  <th className="text-center px-4 py-3 font-semibold text-purple-700">Instalados</th>
+                  <th className="text-center px-4 py-3 font-semibold text-red-700">Dañados</th>
+                  <th className="text-center px-4 py-3 font-semibold text-gray-600">Otros</th>
+                  {user.rol !== 'instalador' && (
+                    <th className="text-center px-4 py-3 font-semibold text-gray-700">Acciones</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {equiposAgrupados.map((grupo, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <span className="inline-block bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded capitalize">
+                        {grupo.tipo}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{grupo.nombre}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="font-bold text-gray-800">{grupo.cantidad_total}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`font-semibold ${grupo.disponibles > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                        {grupo.disponibles}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`font-semibold ${grupo.asignados > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+                        {grupo.asignados}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`font-semibold ${grupo.instalados > 0 ? 'text-purple-600' : 'text-gray-400'}`}>
+                        {grupo.instalados}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`font-semibold ${grupo.daniados > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                        {grupo.daniados}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center text-gray-500 text-xs">
+                      {(grupo.en_mantenimiento || 0) + (grupo.perdidos || 0) + (grupo.devueltos || 0)}
+                    </td>
+                    {user.rol !== 'instalador' && (
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => {
+                            setViewMode('detail');
+                            handleFilterChange({ search: grupo.nombre, tipo: grupo.tipo });
+                          }}
+                          className="text-xs text-[#0e6493] hover:underline font-medium"
+                        >
+                          Ver detalle
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Lista detallada de equipos con fondo blanco y sombra */}
+      {viewMode === 'detail' && (
       <div className="bg-white rounded-lg shadow-md">
         <EquipmentList
           equipos={equipos}
@@ -503,6 +627,7 @@ const loadStats = async () => {
           onPageChange={handlePageChange}
         />
       </div>
+      )}
 
       {/* Modales */}
       {showForm && (
