@@ -11,8 +11,8 @@ class InteresesMoratoriosService {
     try {
       console.log(`💰 Iniciando cálculo de intereses moratorios...`);
       
-      const conexion = await Database.conexion();
-      
+      const conexion = await Database.getConnection();
+
       try {
         // Obtener configuración de intereses
         const [config] = await conexion.execute(`
@@ -142,7 +142,7 @@ class InteresesMoratoriosService {
    */
   static async obtenerInteresesPendientes(clienteId, fechaCorte = new Date()) {
     try {
-      const conexion = await Database.conexion();
+      const conexion = await Database.getConnection();
       
       try {
         const [resultado] = await conexion.execute(`
@@ -199,7 +199,7 @@ class InteresesMoratoriosService {
    */
   static async obtenerHistorialIntereses(clienteId, fechaInicio = null, fechaFin = null) {
     try {
-      const conexion = await Database.conexion();
+      const conexion = await Database.getConnection();
       
       try {
         let whereClausulas = ['f.cliente_id = ?'];
@@ -251,7 +251,7 @@ class InteresesMoratoriosService {
    */
   static async configurarParametros(porcentajeMensual, diasGracia = 0) {
     try {
-      const conexion = await Database.conexion();
+      const conexion = await Database.getConnection();
       
       try {
         // Actualizar porcentaje mensual

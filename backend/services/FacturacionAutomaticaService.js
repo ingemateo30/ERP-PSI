@@ -573,7 +573,7 @@ class FacturacionAutomaticaService {
   static async calcularInteresMora(conexion, clienteId) {
     try {
       // Usar el servicio de intereses moratorios
-      const interes = await InteresesMoratoriosService.calcularInteresesMoratorios(cliente.id);
+      const interes = await InteresesMoratoriosService.calcularInteresesMoratorios(clienteId);
 
       return {
         tipo: 'interes',
@@ -602,14 +602,9 @@ class FacturacionAutomaticaService {
 
       const reconexion = parseFloat(resultado[0]?.total_reconexion || 0);
 
-      if (reconexion > 0) {
-        // Marcar como facturado
-        await conexion.execute(`
-          UPDATE traslados_servicio
-          SET facturado = 1
-          WHERE cliente_id = ? AND facturado = 0
-        `, [clienteId]);
-      }
+      // NOTA: NO se marca facturado aquí. El marcado ocurre en marcarConceptosComoFacturados()
+      // DESPUÉS de que la factura queda confirmada en BD, para evitar pérdida de datos
+      // si la creación de la factura falla.
 
       return {
         tipo: 'reconexion',
@@ -643,14 +638,8 @@ class FacturacionAutomaticaService {
           AND activo = 1
       `, [clienteId]);
 
-      if (varios.length > 0) {
-        // Marcar como facturados
-        await conexion.execute(`
-          UPDATE varios_pendientes
-          SET facturado = 1, fecha_facturacion = NOW()
-          WHERE cliente_id = ? AND facturado = 0
-        `, [clienteId]);
-      }
+      // NOTA: NO se marca facturado aquí. El marcado ocurre en marcarConceptosComoFacturados()
+      // DESPUÉS de que la factura queda confirmada en BD.
 
       return varios.map(v => ({
         tipo: 'varios',
@@ -672,77 +661,129 @@ class FacturacionAutomaticaService {
   // ========================================================================
 
   static async crearFacturaCompleta(cliente, conceptos, periodo, diasVencimiento = 15) {
+    const conexion = await Database.getConnection();
+
     try {
-      const conexion = await Database.getConnection();
+      // ✅ C4 FIX: Iniciar transacción real — todo o nada
+      await conexion.beginTransaction();
 
-      try {
-        // Generar número de factura
-        const numeroFactura = await this.generarNumeroFactura();
+      // ✅ C3 FIX: Generar número de factura con SELECT FOR UPDATE
+      // El lock garantiza que dos procesos simultáneos no lean el mismo consecutivo
+      const [configRows] = await conexion.execute(
+        'SELECT id, consecutivo_factura FROM configuracion_empresa LIMIT 1 FOR UPDATE'
+      );
 
-        // Calcular totales
-        const totales = this.calcularTotalesFactura(conceptos);
-
-        // Fechas de la factura
-        const fechaEmision = new Date();
-        const fechaVencimiento = new Date();
-        fechaVencimiento.setDate(fechaVencimiento.getDate() + diasVencimiento); // Días de vencimiento configurados
-
-        // Crear factura
-        const [resultado] = await conexion.execute(`
-          INSERT INTO facturas (
-            numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
-            periodo_facturacion, fecha_emision, fecha_vencimiento,
-            fecha_desde, fecha_hasta,
-            internet, television, saldo_anterior, interes, reconexion,
-            descuento, varios,
-            subtotal, iva, total,
-            estado, activo, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', 1, NOW())
-        `, [
-          numeroFactura,
-          cliente.id,
-          cliente.identificacion,
-          cliente.nombre,
-          `${fechaEmision.getFullYear()}-${String(fechaEmision.getMonth() + 1).padStart(2, '0')}`,
-          fechaEmision.toISOString().split('T')[0],
-          fechaVencimiento.toISOString().split('T')[0],
-          periodo.fecha_desde,
-          periodo.fecha_hasta,
-          totales.internet,
-          totales.television,
-          totales.saldo_anterior,
-          totales.interes,
-          totales.reconexion,
-          totales.descuento,
-          totales.varios,
-          totales.subtotal,
-          totales.iva,
-          totales.total
-        ]);
-
-        const facturaId = resultado.insertId;
-
-        // Crear detalles de factura
-        await this.crearDetalleFactura(conexion, facturaId, conceptos);
-
-        // Actualizar consecutivo
-        await this.actualizarConsecutivos();
-
-        return {
-          id: facturaId,
-          numero: numeroFactura,
-          total: totales.total,
-          subtotal: totales.subtotal,
-          iva: totales.iva
-        };
-
-      } finally {
-        conexion.release();
+      if (!configRows[0]) {
+        throw new Error('No existe configuración de empresa. Imposible generar número de factura.');
       }
 
+      const configId = configRows[0].id;
+      const nuevoConsecutivo = parseInt(configRows[0].consecutivo_factura || 0) + 1;
+      const numeroFactura = `FAC${nuevoConsecutivo.toString().padStart(6, '0')}`;
+
+      // Calcular totales
+      const totales = this.calcularTotalesFactura(conceptos);
+
+      // Fechas de la factura
+      const fechaEmision = new Date();
+      const fechaVencimiento = new Date();
+      fechaVencimiento.setDate(fechaVencimiento.getDate() + diasVencimiento);
+
+      // ✅ C4 FIX: INSERT de factura dentro de la transacción
+      const [resultado] = await conexion.execute(`
+        INSERT INTO facturas (
+          numero_factura, cliente_id, identificacion_cliente, nombre_cliente,
+          periodo_facturacion, fecha_emision, fecha_vencimiento,
+          fecha_desde, fecha_hasta,
+          internet, television, saldo_anterior, interes, reconexion,
+          descuento, varios,
+          subtotal, iva, total,
+          estado, activo, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', 1, NOW())
+      `, [
+        numeroFactura,
+        cliente.id,
+        cliente.identificacion,
+        cliente.nombre,
+        `${fechaEmision.getFullYear()}-${String(fechaEmision.getMonth() + 1).padStart(2, '0')}`,
+        fechaEmision.toISOString().split('T')[0],
+        fechaVencimiento.toISOString().split('T')[0],
+        periodo.fecha_desde,
+        periodo.fecha_hasta,
+        totales.internet,
+        totales.television,
+        totales.saldo_anterior,
+        totales.interes,
+        totales.reconexion,
+        totales.descuento,
+        totales.varios,
+        totales.subtotal,
+        totales.iva,
+        totales.total
+      ]);
+
+      const facturaId = resultado.insertId;
+
+      // ✅ C4 FIX: Detalles dentro de la misma transacción
+      await this.crearDetalleFactura(conexion, facturaId, conceptos);
+
+      // ✅ C3 FIX: Actualizar consecutivo dentro de la misma transacción
+      await conexion.execute(
+        'UPDATE configuracion_empresa SET consecutivo_factura = ?, updated_at = NOW() WHERE id = ?',
+        [nuevoConsecutivo, configId]
+      );
+
+      // ✅ C4 FIX: COMMIT — si llegamos aquí, la factura y sus detalles son atómicos
+      await conexion.commit();
+
+      // ✅ C5 FIX: Marcar conceptos como facturados DESPUÉS del commit exitoso.
+      // Si esto falla, la factura ya existe correctamente. En la próxima facturación
+      // esos conceptos se incluirán de nuevo (recuperable), a diferencia del bug anterior
+      // donde se marcaban antes del commit y quedaban perdidos si la factura fallaba.
+      await this.marcarConceptosComoFacturados(cliente.id).catch(err => {
+        console.error(
+          `⚠️ Factura ${numeroFactura} creada, pero no se pudieron marcar conceptos adicionales: ${err.message}`
+        );
+      });
+
+      return {
+        id: facturaId,
+        numero: numeroFactura,
+        total: totales.total,
+        subtotal: totales.subtotal,
+        iva: totales.iva
+      };
+
     } catch (error) {
-      console.error('❌ Error creando factura:', error);
+      // ✅ C4 FIX: Rollback completo si algo falla antes del commit
+      await conexion.rollback().catch(() => {});
+      console.error('❌ Error creando factura (transacción revertida):', error);
       throw error;
+    } finally {
+      conexion.release();
+    }
+  }
+
+  /**
+   * ✅ C5 FIX: Marcar conceptos de reconexión y varios como facturados.
+   * Se llama SOLO después de que la factura queda confirmada en BD.
+   */
+  static async marcarConceptosComoFacturados(clienteId) {
+    const conexion = await Database.getConnection();
+    try {
+      // Marcar reconexiones pendientes como facturadas
+      await conexion.execute(
+        'UPDATE traslados_servicio SET facturado = 1 WHERE cliente_id = ? AND facturado = 0 AND activo = 1',
+        [clienteId]
+      );
+
+      // Marcar varios pendientes como facturados
+      await conexion.execute(
+        'UPDATE varios_pendientes SET facturado = 1, fecha_facturacion = NOW() WHERE cliente_id = ? AND facturado = 0 AND activo = 1',
+        [clienteId]
+      );
+    } finally {
+      conexion.release();
     }
   }
 

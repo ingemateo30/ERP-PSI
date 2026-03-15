@@ -165,7 +165,7 @@ class CronJobs {
       try {
         console.log('🔄 Actualizando estados de facturas...');
 
-        const conexion = await Database.conexion();
+        const conexion = await Database.getConnection();
 
         try {
           // Marcar facturas como vencidas
@@ -226,7 +226,7 @@ class CronJobs {
       try {
         console.log('🔄 Calculando intereses por mora...');
 
-        const conexion = await Database.conexion();
+        const conexion = await Database.getConnection();
 
         try {
           // Obtener facturas morosas (más de 30 días vencidas)
@@ -308,7 +308,7 @@ class CronJobs {
       try {
         console.log('🔔 Enviando notificaciones de vencimiento...');
 
-        const conexion = await Database.conexion();
+        const conexion = await Database.getConnection();
 
         try {
           // Facturas que vencen en 3 días
@@ -353,6 +353,8 @@ class CronJobs {
               AND c.email IS NOT NULL
               AND c.email != ''
           `);
+
+          let notificacionesEnviadas = 0;
 
           // Simular envío de notificaciones (aquí integrarías tu servicio de email)
           for (const factura of facturasProximasVencer) {
@@ -417,7 +419,7 @@ class CronJobs {
       try {
         console.log('💾 Iniciando backup diario de datos críticos...');
 
-        const conexion = await Database.conexion();
+        const conexion = await Database.getConnection();
 
         try {
           // Crear respaldo de facturas del día
@@ -481,7 +483,7 @@ class CronJobs {
       try {
         console.log('🧹 Iniciando limpieza semanal...');
 
-        const conexion = await Database.conexion();
+        const conexion = await Database.getConnection();
 
         try {
           // Limpiar logs de sistema antiguos (más de 3 meses)
@@ -605,7 +607,7 @@ class CronJobs {
   static async registrarLogSistema(tipo, datos) {
     try {
       const { Database } = require('../models/Database');
-      const conexion = await Database.conexion();
+      const conexion = await Database.getConnection();
 
       try {
         await conexion.execute(`
@@ -632,7 +634,7 @@ class CronJobs {
   static async enviarNotificacionAdministradores(asunto, datos) {
     try {
       const { Database } = require('../models/Database');
-      const conexion = await Database.conexion();
+      const conexion = await Database.getConnection();
 
       try {
         // Obtener emails de administradores
@@ -793,7 +795,7 @@ class CronJobs {
       console.log('🔧 Verificando configuración del sistema...');
 
       const { Database } = require('../models/Database');
-      const conexion = await Database.conexion();
+      const conexion = await Database.getConnection();
 
       try {
         // Verificar configuración de empresa
@@ -940,7 +942,7 @@ class CronJobs {
       try {
         console.log('🔌 Procesando reconexiones automáticas...');
 
-        const conexion = await Database.conexion();
+        const conexion = await Database.getConnection();
 
         try {
           // Marcar clientes como inactivos si no se reconectaron
