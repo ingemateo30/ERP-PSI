@@ -24,7 +24,7 @@ const verificarTokenCliente = (req, res, next) => {
     const token = authHeader.substring(7);
     console.log('🔑 Token extraído:', token.substring(0, 20) + '...');
     
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key_psi_2024');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('✅ Token decodificado:', decoded);
 
     if (decoded.tipo !== 'cliente_publico') {

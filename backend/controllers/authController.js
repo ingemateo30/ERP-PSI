@@ -510,19 +510,14 @@ class AuthController {
         { expiresIn: '1h' }
       );
 
-      // TODO: Enviar email con el token
-      // Por ahora solo logueamos el token para desarrollo
-      console.log('🔑 Token de recuperación para', email, ':', resetToken);
-
+      // TODO: Enviar email con el token (integrar servicio de email)
       logger.logSecurity('info', 'Solicitud de recuperación de contraseña', {
         userId: user.id,
         email: user.email
       });
 
       return ApiResponse.success(res, {
-        message: 'Si el email existe, recibirás instrucciones para restablecer tu contraseña',
-        // En desarrollo, incluir el token para pruebas
-        ...(process.env.NODE_ENV === 'development' && { resetToken })
+        message: 'Si el email existe, recibirás instrucciones para restablecer tu contraseña'
       });
 
     } catch (error) {

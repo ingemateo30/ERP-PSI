@@ -5,12 +5,7 @@ const { Database } = require('../models/Database');
 const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    console.log('🔍 Auth Header completo:', authHeader);
-    console.log('🔍 Tipo de authHeader:', typeof authHeader);
-    
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-    console.log('🔑 Token extraído:', token ? `${token.substring(0, 30)}...` : 'NO HAY TOKEN');
-   
 
     if (!token) {
       return res.status(401).json({
@@ -22,7 +17,6 @@ const authenticateToken = async (req, res, next) => {
 
     // Verificar y decodificar token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('✅ Token decodificado:', decoded);
 
     // Soportar tanto 'id' como 'userId' por compatibilidad
     const userId = decoded.id || decoded.userId;
@@ -71,7 +65,6 @@ const authenticateToken = async (req, res, next) => {
       sede: user.sede_nombre || null
     };
 
-    console.log('✅ Usuario autenticado:', { id: user.id, nombre: user.nombre, rol: user.rol });
     next();
   } catch (error) {
     console.error('❌ Error en autenticación:', error.name, '-', error.message);
@@ -132,8 +125,6 @@ const requireRole = (...args) => {
       return res.status(403).json({
         success: false,
         message: 'Permisos insuficientes',
-        required_roles: expandedRoles,
-        user_role: req.user.rol,
         timestamp: new Date().toISOString()
       });
     }

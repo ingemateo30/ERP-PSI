@@ -55,6 +55,7 @@ const PORT = process.env.PORT || 3000;
 
 // Importar middleware de seguridad
 const { securityHeaders, hideServerInfo, validateContentType } = require('./middleware/security');
+const { authenticateToken } = require('./middleware/auth');
 
 // ============================================
 // MIDDLEWARE BÁSICO
@@ -132,21 +133,18 @@ app.use((req, res, next) => {
   next();
 });
 
+// Health check público — solo información mínima para load balancers
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     service: 'PSI sistema gestion',
     version: '1.0.0',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    node_version: process.version
+    timestamp: new Date().toISOString()
   });
 });
 
-// Test de base de datos detallado
-app.get('/test-db', async (req, res) => {
+// Test de base de datos — requiere autenticación
+app.get('/test-db', authenticateToken, async (req, res) => {
   try {
     const pool = require('./config/database');
     const connection = await pool.getConnection();
@@ -175,22 +173,17 @@ app.get('/test-db', async (req, res) => {
     res.status(500).json({
       status: 'ERROR',
       message: 'Error de conexión a base de datos',
-      error: error.message,
       timestamp: new Date().toISOString()
     });
   }
 });
 
-// Endpoint de información del sistema
-app.get('/system-info', (req, res) => {
+// Endpoint de información del sistema — requiere autenticación
+app.get('/system-info', authenticateToken, (req, res) => {
   res.json({
     service: 'Sistema PSI',
     version: '1.0.0',
-    node_version: process.version,
-    platform: process.platform,
-    architecture: process.arch,
     environment: process.env.NODE_ENV || 'development',
-    pid: process.pid,
     uptime: process.uptime(),
     memory_usage: process.memoryUsage(),
     timestamp: new Date().toISOString()

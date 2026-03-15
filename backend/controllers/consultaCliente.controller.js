@@ -50,7 +50,7 @@ const consultaClienteController = {
           identificacion: cliente.identificacion,
           tipo: 'cliente_publico'
         },
-        process.env.JWT_SECRET || 'secret_key_psi_2024',
+        process.env.JWT_SECRET,
         { expiresIn: '30m' }
       );
 
