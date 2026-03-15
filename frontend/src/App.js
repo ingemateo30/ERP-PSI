@@ -357,13 +357,7 @@ function App() {
 
               <Route
                 path="/clients/:id"
-                element={
-                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
-                    <MainLayout title="Detalle de Cliente" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Detalle de Cliente" />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
+                element={<Navigate to="/clients" replace />}
               />
               <Route
                 path="/facturas"
@@ -448,13 +442,7 @@ function App() {
 
               <Route
                 path="/services"
-                element={
-                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
-                    <MainLayout title="Gestión de Servicios" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Gestión de Servicios" />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
+                element={<Navigate to="/clients" replace />}
               />
 
               <Route
