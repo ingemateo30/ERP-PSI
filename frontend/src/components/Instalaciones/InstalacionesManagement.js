@@ -778,6 +778,7 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
               </p>
             </div>
           ) : (
+            <>
             {/* Vista móvil: tarjetas */}
             <div className="block md:hidden divide-y divide-gray-200">
               {instalaciones.map((instalacion) => (
@@ -1038,6 +1039,7 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
                 </tbody>
               </table>
             </div>{/* fin desktop */}
+            </>
           )}
         </div>
 
