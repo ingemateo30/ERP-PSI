@@ -19,16 +19,17 @@
 | C5 | 🔴 CRÍTICO | ✅ **CORREGIDO** | Marcado `facturado=1` movido a DESPUÉS del commit con `marcarConceptosComoFacturados()` |
 | C6 | 🔴 CRÍTICO | ✅ **CORREGIDO** | Eliminado fallback `\|\| 'secret_key_psi_2024'` en controller y route |
 | A4 | 🟠 ALTO | ✅ **CORREGIDO** | Declarada `let notificacionesEnviadas = 0` en cron de notificaciones |
-| A1 | 🟠 ALTO | ⏳ Pendiente | `procesoReconexionAutomatica()` nunca se invoca desde `inicializar()` |
+| A1 | 🟠 ALTO | ✅ **CORREGIDO** | `procesoReconexionAutomatica()` añadida a `inicializar()` |
+| A7 | 🟠 ALTO | ✅ **CORREGIDO** | Reset token eliminado de `console.log` y del body de respuesta |
+| A8 | 🟠 ALTO | ✅ **CORREGIDO** | `/register` protegido con `authenticateToken + requireRole('administrador')` |
+| A9 | 🟠 ALTO | ✅ **CORREGIDO** | Eliminados `console.log` que imprimían tokens JWT en cada request |
+| A10 | 🟠 ALTO | ✅ **CORREGIDO** | `/test-db` y `/system-info` requieren auth; `/health` reducido a info mínima |
 | A2 | 🟠 ALTO | ⏳ Pendiente | Ruta `/api/inventario` duplicada sin versioning |
 | A3 | 🟠 ALTO | ⏳ Pendiente | Validación duplicado no cubre período del mes siguiente |
 | A5 | 🟠 ALTO | ⏳ Pendiente | `actualizarConsecutivos` aún existe pero ya no se llama (el bug es en `ClienteCompletoService`) |
 | A6 | 🟠 ALTO | ⏳ Pendiente | "Backup diario" no realiza backup real |
-| A7 | 🟠 ALTO | ⏳ Pendiente | Reset token visible en logs |
-| A8 | 🟠 ALTO | ⏳ Pendiente | Registro público permite crear administradores |
-| A9 | 🟠 ALTO | ⏳ Pendiente | Logs de producción imprimen tokens JWT |
-| A10 | 🟠 ALTO | ⏳ Pendiente | Endpoints `/health`, `/test-db`, `/system-info` sin autenticación |
-| M1–M8 | 🟡 MEDIO | ⏳ Pendiente | Ver sección detallada |
+| M8 | 🟡 MEDIO | ✅ **CORREGIDO** | Eliminados `required_roles`/`user_role` de respuestas 403 |
+| M1–M7 | 🟡 MEDIO | ⏳ Pendiente | Ver sección detallada |
 
 ---
 
@@ -37,8 +38,8 @@
 | Criticidad | Total | Corregidos | Pendientes |
 |---|---|---|---|
 | 🔴 CRÍTICO | 6 | ✅ 6 | 0 |
-| 🟠 ALTO | 10 | ✅ 1 (A4) | 9 |
-| 🟡 MEDIO | 8 | 0 | 8 |
+| 🟠 ALTO | 10 | ✅ 6 (A1, A4, A7, A8, A9, A10) | 4 |
+| 🟡 MEDIO | 8 | ✅ 1 (M8) | 7 |
 | 🔵 BAJO | 6 | 0 | 6 |
 
 El sistema tiene una arquitectura general sólida (MVC, pool de conexiones, rate limiting, Helmet, Winston logger), pero presenta **bugs de producción activos** que causan fallos silenciosos en el motor de facturación, y **vulnerabilidades de seguridad graves** en la gestión de secretos y registros de log.
@@ -566,3 +567,49 @@ Un atacante con un token de bajo privilegio puede mapear toda la jerarquía de r
   - Si el marcado falla, la factura ya existe correctamente; los conceptos se incluirán en la próxima facturación (escenario recuperable vs. el bug anterior que era irrecuperable)
 
 - **Riesgo del cambio:** Medio — cambio sustancial pero conservador; los métodos `generarNumeroFactura()` y `actualizarConsecutivos()` se mantienen en el archivo para compatibilidad con código externo que los pudiera llamar directamente
+
+---
+
+### Sesión 2 — 15 de marzo de 2026 (Altos de seguridad)
+
+#### ✅ A9 — Tokens JWT expuestos en logs de producción
+- **Archivo modificado:** `backend/middleware/auth.js`
+- **Cambio:** Eliminados 4 `console.log` que imprimían el `Authorization` header completo, el token extraído, el payload decodificado y los datos del usuario autenticado en cada petición
+- **Impacto:** Los logs del servidor ya no exponen tokens JWT ni payloads decodificados. Todos los requests a recursos protegidos generaban estas líneas en producción
+- **Riesgo del cambio:** Mínimo — eliminación de logs de debug no necesarios en producción
+
+#### ✅ A8 — Registro público de usuarios permitía crear administradores
+- **Archivo modificado:** `backend/routes/auth.js`
+- **Cambio:** Añadidos middlewares `authenticateToken` + `requireRole('administrador')` a `POST /api/v1/auth/register`. Ahora solo un administrador autenticado puede crear nuevos usuarios
+- **Impacto:** Elimina el vector de ataque por el cual cualquier persona con acceso a la API podía crear cuentas con rol `administrador`
+- **Nota:** Requiere que el primer administrador se cree directamente en la base de datos (INSERT manual o seed). Las instalaciones existentes conservan sus cuentas sin cambios
+- **Riesgo del cambio:** Medio — cambio de comportamiento externo. Si hay scripts o front-ends que llamen a `/register` sin autenticación, necesitarán actualización
+
+#### ✅ A7 — Reset token visible en logs y body de respuesta
+- **Archivo modificado:** `backend/controllers/authController.js`
+- **Cambio:**
+  1. Eliminado `console.log('🔑 Token de recuperación para', email, ':', resetToken)` (línea 515)
+  2. Eliminado el bloque `...(process.env.NODE_ENV === 'development' && { resetToken })` del body de respuesta
+- **Impacto:** El token de recuperación de contraseña ya no aparece en logs del servidor ni en la respuesta de la API. El flujo completo requiere implementar el envío por email (TODO existente en el código)
+- **Riesgo del cambio:** Bajo — la funcionalidad de recuperación aún no enviaba emails reales; el flujo de reset continuará funcionando con el token generado
+
+#### ✅ A10 — Endpoints de diagnóstico públicos exponían información del sistema
+- **Archivo modificado:** `backend/index.js`
+- **Cambios:**
+  1. `GET /health` — Reducido a información mínima (`status`, `service`, `version`, `timestamp`). Eliminados `node_version`, `memory`, `environment`, `uptime`
+  2. `GET /test-db` — Añadido `authenticateToken`. Ahora requiere token válido. Eliminado `error.message` del body en caso de fallo
+  3. `GET /system-info` — Añadido `authenticateToken`. Ahora requiere token válido. Eliminados `pid`, `node_version`, `platform`, `architecture`
+- **Impacto:** Un atacante ya no puede obtener versión de Node.js, versión de MySQL, PID del proceso o uso de memoria sin autenticarse
+- **Riesgo del cambio:** Bajo — estos endpoints son de diagnóstico interno. Los load balancers que usen `/health` seguirán funcionando (respuesta 200 conservada)
+
+#### ✅ A1 — `procesoReconexionAutomatica()` nunca se invocaba
+- **Archivo modificado:** `backend/utils/cronJobs.js`
+- **Cambio:** Añadida llamada `this.procesoReconexionAutomatica()` al final del método `inicializar()`, después de `this.reportesMensuales()`
+- **Impacto:** El proceso de reconexión automática (cron día 3 de cada mes a las 02:00) ahora se registra y ejecuta al iniciar el servidor
+- **Riesgo del cambio:** Mínimo — el método estaba implementado completamente, solo faltaba invocarlo
+
+#### ✅ M8 — Respuesta 403 revelaba estructura de roles del sistema
+- **Archivo modificado:** `backend/middleware/auth.js`
+- **Cambio:** Eliminados campos `required_roles` y `user_role` del body de las respuestas 403
+- **Impacto:** Un atacante ya no puede descubrir la estructura de roles del sistema probando endpoints
+- **Riesgo del cambio:** Mínimo — los clientes que dependan de estos campos en 403 deberán actualizar su lógica, pero es comportamiento de error (no flujo normal)

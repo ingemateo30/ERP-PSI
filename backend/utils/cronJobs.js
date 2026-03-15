@@ -44,6 +44,9 @@ class CronJobs {
     // Reportes mensuales - día 2 de cada mes a las 07:00
     this.reportesMensuales();
 
+    // Proceso de reconexión automática - día 3 de cada mes a las 02:00
+    this.procesoReconexionAutomatica();
+
     console.log('✅ Todas las tareas programadas de facturación configuradas');
   }
 

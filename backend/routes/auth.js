@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const Joi = require('joi');
 const AuthController = require('../controllers/authController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 
 // Importar rateLimiter con manejo de errores
 let rateLimiter;
@@ -204,9 +204,11 @@ router.post('/login',
 /**
  * @route POST /api/v1/auth/register
  * @desc Registrar nuevo usuario
- * @access Public (solo en desarrollo) / Private (producción)
+ * @access Private (requiere autenticación de administrador)
  */
-router.post('/register', 
+router.post('/register',
+  authenticateToken,
+  requireRole('administrador'),
   rateLimiter.register,
   validate(registerSchema),
   registerHandler
