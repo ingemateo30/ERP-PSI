@@ -60,7 +60,8 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
     return colores[estado] || 'bg-gray-100 text-gray-800';
   };
 
-  const servicioActivo = servicios.find(s => s.estado === 'activo');
+  const serviciosActivos = servicios.filter(s => s.estado === 'activo');
+  const serviciosInactivos = servicios.filter(s => s.estado !== 'activo');
 
   if (loading) {
     return (
@@ -110,151 +111,145 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
             </div>
           )}
 
-          {/* Servicio Activo */}
-          {servicioActivo && (
+          {/* Servicios Activos */}
+          {serviciosActivos.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">
-                  Servicio Activo
+                  Servicios Activos ({serviciosActivos.length})
                 </h3>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowAgregarModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Agregar Servicio
-                  </button>
-                  <button
-                    onClick={() => handleCambiarPlan(servicioActivo)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                    Cambiar Plan
-                  </button>
-                </div>
+                <button
+                  onClick={() => setShowAgregarModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Agregar Servicio
+                </button>
               </div>
 
-              <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">{servicioActivo.plan_nombre}</h4>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <p><strong>Tipo:</strong> {servicioActivo.plan_tipo}</p>
-                      <p><strong>Estado:</strong> 
-                        <span className={`ml-2 px-2 py-1 rounded-full text-xs ${getEstadoColor(servicioActivo.estado)}`}>
-                          {servicioActivo.estado}
+              <div className="space-y-4">
+                {serviciosActivos.map(servicio => (
+                  <div key={servicio.id} className="bg-green-50 border border-green-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <h4 className="font-medium text-gray-900 text-lg">{servicio.plan_nombre}</h4>
+                        <span className={`px-2 py-1 rounded-full text-xs ${getEstadoColor(servicio.estado)}`}>
+                          {servicio.estado}
                         </span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h5 className="font-medium text-gray-900 mb-2">Características</h5>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      {servicioActivo.velocidad_bajada && (
-                        <p><strong>Descarga:</strong> {servicioActivo.velocidad_bajada} Mbps</p>
-                      )}
-                      {servicioActivo.velocidad_subida && (
-                        <p><strong>Subida:</strong> {servicioActivo.velocidad_subida} Mbps</p>
-                      )}
-                      {servicioActivo.canales_tv && (
-                        <p><strong>Canales:</strong> {servicioActivo.canales_tv}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h5 className="font-medium text-gray-900 mb-2">Facturación</h5>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <p><strong>Precio:</strong> 
-                        {clienteCompletoService.formatearMoneda(
-                          servicioActivo.precio_personalizado || servicioActivo.plan_precio
+                        {servicio.plan_tipo && (
+                          <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 capitalize">
+                            {servicio.plan_tipo}
+                          </span>
                         )}
-                      </p>
-                      <p><strong>Activado:</strong> 
-                        {clienteCompletoService.formatearFecha(servicioActivo.fecha_activacion)}
-                      </p>
-                      {servicioActivo.precio_personalizado && (
-                        <p className="text-blue-600"><strong>Precio personalizado aplicado</strong></p>
-                      )}
+                      </div>
+                      <button
+                        onClick={() => handleCambiarPlan(servicio)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        Cambiar Plan
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div>
+                        <h5 className="font-medium text-gray-700 mb-2 text-sm">Características</h5>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          {servicio.velocidad_bajada && (
+                            <p><strong>Descarga:</strong> {servicio.velocidad_bajada} Mbps</p>
+                          )}
+                          {servicio.velocidad_subida && (
+                            <p><strong>Subida:</strong> {servicio.velocidad_subida} Mbps</p>
+                          )}
+                          {servicio.canales_tv && (
+                            <p><strong>Canales TV:</strong> {servicio.canales_tv}</p>
+                          )}
+                          {!servicio.velocidad_bajada && !servicio.canales_tv && (
+                            <p className="text-gray-400 italic">Sin detalles adicionales</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h5 className="font-medium text-gray-700 mb-2 text-sm">Facturación</h5>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p><strong>Precio:</strong>{' '}
+                            {clienteCompletoService.formatearMoneda(
+                              servicio.precio_personalizado || servicio.plan_precio
+                            )}
+                          </p>
+                          <p><strong>Activado:</strong>{' '}
+                            {clienteCompletoService.formatearFecha(servicio.fecha_activacion)}
+                          </p>
+                          {servicio.precio_personalizado && (
+                            <p className="text-blue-600 text-xs font-medium">Precio personalizado</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h5 className="font-medium text-gray-700 mb-2 text-sm">Información</h5>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p><strong>ID Servicio:</strong> #{servicio.id}</p>
+                          <p><strong>Plan ID:</strong> #{servicio.plan_id}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {servicioActivo.observaciones && (
-                  <div className="mt-4 pt-4 border-t border-green-300">
-                    <p className="text-sm text-gray-600">
-                      <strong>Observaciones:</strong> {servicioActivo.observaciones}
-                    </p>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
           )}
 
-          {/* Historial de Servicios */}
-          {servicios.length > 1 && (
+          {/* Historial de Servicios (solo inactivos) */}
+          {serviciosInactivos.length > 0 && (
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
                 <History className="w-5 h-5" />
-                Historial de Servicios
+                Historial de Servicios ({serviciosInactivos.length})
               </h3>
 
               <div className="space-y-4">
-                {servicios
-                  .filter(s => s.estado !== 'activo')
-                  .map((servicio, index) => (
-                    <div key={servicio.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-medium text-gray-900">{servicio.plan_nombre}</h4>
-                            <span className={`px-2 py-1 rounded-full text-xs ${getEstadoColor(servicio.estado)}`}>
-                              {servicio.estado}
-                            </span>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                            <div>
-                              <p><strong>Período:</strong></p>
-                              <p>{clienteCompletoService.formatearFecha(servicio.fecha_activacion)}</p>
-                              {servicio.fecha_suspension && (
-                                <p>hasta {clienteCompletoService.formatearFecha(servicio.fecha_suspension)}</p>
-                              )}
-                            </div>
-                            
-                            <div>
-                              <p><strong>Precio:</strong></p>
-                              <p>{clienteCompletoService.formatearMoneda(
-                                servicio.precio_personalizado || servicio.plan_precio
-                              )}</p>
-                            </div>
-                            
-                            <div>
-                              <p><strong>Tipo:</strong> {servicio.plan_tipo}</p>
-                              {servicio.velocidad_bajada && (
-                                <p><strong>Velocidad:</strong> {servicio.velocidad_bajada} Mbps</p>
-                              )}
-                            </div>
-                          </div>
+                {serviciosInactivos.map(servicio => (
+                  <div key={servicio.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h4 className="font-medium text-gray-900">{servicio.plan_nombre}</h4>
+                      <span className={`px-2 py-1 rounded-full text-xs ${getEstadoColor(servicio.estado)}`}>
+                        {servicio.estado}
+                      </span>
+                    </div>
 
-                          {servicio.observaciones && (
-                            <p className="mt-2 text-sm text-gray-600">
-                              <strong>Observaciones:</strong> {servicio.observaciones}
-                            </p>
-                          )}
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                      <div>
+                        <p><strong>Período:</strong></p>
+                        <p>{clienteCompletoService.formatearFecha(servicio.fecha_activacion)}</p>
+                        {servicio.fecha_suspension && (
+                          <p>hasta {clienteCompletoService.formatearFecha(servicio.fecha_suspension)}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <p><strong>Precio:</strong></p>
+                        <p>{clienteCompletoService.formatearMoneda(
+                          servicio.precio_personalizado || servicio.plan_precio
+                        )}</p>
+                      </div>
+
+                      <div>
+                        <p><strong>Tipo:</strong> {servicio.plan_tipo}</p>
+                        {servicio.velocidad_bajada && (
+                          <p><strong>Velocidad:</strong> {servicio.velocidad_bajada} Mbps</p>
+                        )}
                       </div>
                     </div>
-                  ))
-                }
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
           {/* Estado sin servicios */}
-          {servicios.length === 0 && (
+          {servicios.length === 0 && serviciosActivos.length === 0 && (
             <div className="text-center py-12">
               <Wifi size={48} className="mx-auto text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -358,7 +353,10 @@ const ChangePlanModal = ({ cliente, servicioActual, planesDisponibles, onClose, 
       setLoading(true);
       setErrors({});
 
-      await clienteCompletoService.cambiarPlanCliente(cliente.id, formData);
+      await clienteCompletoService.cambiarPlanCliente(cliente.id, {
+        ...formData,
+        servicio_id: servicioActual.id
+      });
       
       onSuccess();
       

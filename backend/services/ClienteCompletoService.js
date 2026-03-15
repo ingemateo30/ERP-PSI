@@ -1108,15 +1108,18 @@ const observacionesContrato = JSON.stringify({
 
     try {
       const [servicios] = await conexion.execute(`
-        SELECT 
+        SELECT
           sc.*,
           ps.nombre as plan_nombre,
           ps.precio as plan_precio,
-          ps.tipo as plan_tipo
+          ps.tipo as plan_tipo,
+          ps.velocidad_bajada,
+          ps.velocidad_subida,
+          ps.canales_tv
         FROM servicios_cliente sc
         JOIN planes_servicio ps ON sc.plan_id = ps.id
         WHERE sc.cliente_id = ?
-        ORDER BY sc.created_at DESC
+        ORDER BY sc.estado = 'activo' DESC, sc.created_at DESC
       `, [clienteId]);
 
       return servicios;
@@ -2793,6 +2796,67 @@ static async generarNumeroFactura(conexion) {
     } finally {
       conexion.release();
     }
+  }
+
+  /**
+   * Cambiar el plan de un servicio específico de un cliente.
+   * Cancela el servicio actual e inserta uno nuevo con el plan indicado.
+   */
+  static async cambiarPlanCliente(clienteId, datos) {
+    return await Database.transaction(async (conexion) => {
+      const { plan_id, servicio_id, precio_personalizado, observaciones } = datos;
+
+      if (!plan_id) throw new Error('El ID del nuevo plan es requerido');
+
+      // Obtener el servicio a cambiar
+      let query = 'SELECT * FROM servicios_cliente WHERE cliente_id = ? AND estado = \'activo\'';
+      const params = [clienteId];
+
+      if (servicio_id) {
+        query += ' AND id = ?';
+        params.push(servicio_id);
+      }
+      query += ' ORDER BY created_at DESC LIMIT 1';
+
+      const [servicios] = await conexion.execute(query, params);
+      if (servicios.length === 0) throw new Error('No se encontró el servicio activo a cambiar');
+
+      const servicioActual = servicios[0];
+
+      // Obtener info del nuevo plan
+      const [planes] = await conexion.execute(
+        'SELECT * FROM planes_servicio WHERE id = ? AND activo = 1',
+        [plan_id]
+      );
+      if (planes.length === 0) throw new Error('Plan no encontrado o inactivo');
+
+      const nuevoPlan = planes[0];
+      const precioFinal = precio_personalizado ? parseFloat(precio_personalizado) : parseFloat(nuevoPlan.precio);
+
+      // Cancelar servicio actual
+      await conexion.execute(
+        `UPDATE servicios_cliente SET estado = 'cancelado', fecha_suspension = NOW(),
+         observaciones = CONCAT(COALESCE(observaciones,''), ' | PLAN CAMBIADO: ', ?)
+         WHERE id = ?`,
+        [observaciones || 'Cambio de plan', servicioActual.id]
+      );
+
+      // Crear nuevo servicio con el nuevo plan
+      const [resultado] = await conexion.execute(
+        `INSERT INTO servicios_cliente (cliente_id, plan_id, precio_personalizado, fecha_activacion, estado, observaciones)
+         VALUES (?, ?, ?, NOW(), 'activo', ?)`,
+        [clienteId, plan_id, precioFinal, observaciones || `Cambio desde plan ID ${servicioActual.plan_id}`]
+      );
+
+      console.log(`✅ Plan cambiado: servicio ${servicioActual.id} cancelado, nuevo servicio ${resultado.insertId} creado`);
+
+      return {
+        servicio_anterior_id: servicioActual.id,
+        servicio_nuevo_id: resultado.insertId,
+        nuevo_plan: nuevoPlan.nombre,
+        precio: precioFinal
+      };
+    });
   }
 }
 

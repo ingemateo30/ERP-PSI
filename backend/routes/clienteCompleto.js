@@ -422,7 +422,7 @@ router.put('/:id/cambiar-plan',
   async (req, res) => {
     try {
       const { id } = req.params;
-      const { plan_id, precio_personalizado, fecha_cambio, observaciones } = req.body;
+      const { plan_id, servicio_id, precio_personalizado, fecha_cambio, observaciones } = req.body;
 
       if (!plan_id) {
         return res.status(400).json({
@@ -433,6 +433,7 @@ router.put('/:id/cambiar-plan',
 
       const resultado = await ClienteCompletoService.cambiarPlanCliente(id, {
         plan_id,
+        servicio_id,
         precio_personalizado,
         fecha_cambio: fecha_cambio || new Date(),
         observaciones
