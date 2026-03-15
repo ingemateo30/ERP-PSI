@@ -432,7 +432,49 @@ const PQRManagement = () => {
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
                 ) : pqrs.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <>
+                        {/* Vista móvil: tarjetas */}
+                        <div className="block md:hidden divide-y divide-gray-200">
+                            {pqrs.map((pqr) => (
+                                <div key={pqr.id} className="p-4 hover:bg-gray-50">
+                                    <div className="flex items-start justify-between mb-2">
+                                        <div>
+                                            <p className="text-sm font-semibold text-gray-900">{pqr.numero_radicado}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">{pqr.cliente_nombre}</p>
+                                            <p className="text-xs text-gray-400">{pqr.cliente_identificacion}</p>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1">
+                                            {getTipoBadge(pqr.tipo)}
+                                            {getEstadoBadge(pqr.estado)}
+                                        </div>
+                                    </div>
+                                    <div className="mb-2">
+                                        <p className="text-sm text-gray-800 truncate" title={pqr.asunto}>{pqr.asunto}</p>
+                                        <p className="text-xs text-gray-500 capitalize">{pqr.categoria}</p>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            {getPrioridadBadge(pqr.prioridad)}
+                                            <span className="text-xs text-gray-500">{pqrService.formatFecha(pqr.fecha_recepcion)}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => abrirDetalle(pqr)} className="text-blue-600 hover:text-blue-900 p-1" title="Ver detalle">
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => abrirModal(pqr)} className="text-green-600 hover:text-green-900 p-1" title="Editar">
+                                                <Edit className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => eliminarPQR(pqr.id)} className="text-red-600 hover:text-red-900 p-1" title="Eliminar">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Vista desktop: tabla */}
+                        <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
                             <thead className="bg-gray-50">
                                 <tr>
@@ -531,7 +573,8 @@ const PQRManagement = () => {
                                 ))}
                             </tbody>
                         </table>
-                    </div>
+                        </div>
+                    </>
                 ) : (
                     <div className="text-center py-12">
                         <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />

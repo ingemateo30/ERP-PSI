@@ -494,6 +494,63 @@ const handleExportarCSV = () => {
                             </div>
                         </div>
                     ) : (
+                        <>
+                        {/* Vista móvil: tarjetas */}
+                        <div className="block md:hidden divide-y divide-gray-200">
+                            {users.map((user) => (
+                                <div key={user.id} className="p-4 hover:bg-gray-50">
+                                    <div className="flex items-start justify-between mb-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-full bg-[#0e6493]/10 flex items-center justify-center flex-shrink-0">
+                                                <Users size={16} className="text-[#0e6493]" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-900">{user.nombre}</p>
+                                                <p className="text-xs text-gray-500">{user.email}</p>
+                                            </div>
+                                        </div>
+                                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${user.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                            {user.activo ? 'Activo' : 'Inactivo'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.rol)}`}>
+                                                <Shield size={10} className="inline mr-1" />
+                                                {getRoleLabel(user.rol)}
+                                            </span>
+                                            <span className="text-xs text-gray-400">
+                                                {user.ultimo_acceso ? new Date(user.ultimo_acceso).toLocaleDateString() : 'Nunca'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <button onClick={() => handleViewUser(user)} className="text-gray-500 hover:text-[#0e6493] p-1" title="Ver detalles">
+                                                <Eye size={15} />
+                                            </button>
+                                            {hasPermission('administrador') && (
+                                                <>
+                                                    <button onClick={() => handleEditUser(user)} className="text-gray-500 hover:text-blue-600 p-1" title="Editar">
+                                                        <Edit2 size={15} />
+                                                    </button>
+                                                    <button onClick={() => handleToggleStatus(user)} className={`p-1 transition-colors ${user.activo ? 'text-gray-500 hover:text-red-600' : 'text-gray-500 hover:text-green-600'}`} title={user.activo ? 'Desactivar' : 'Activar'} disabled={user.id === currentUser.id}>
+                                                        {user.activo ? <ToggleRight size={15} /> : <ToggleLeft size={15} />}
+                                                    </button>
+                                                    <button onClick={() => handleChangePassword(user)} className="text-gray-500 hover:text-yellow-600 p-1" title="Cambiar contraseña">
+                                                        <Key size={15} />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteUser(user)} className="text-gray-500 hover:text-red-600 p-1" title="Eliminar" disabled={user.id === currentUser.id}>
+                                                        <Trash2 size={15} />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Vista desktop: tabla */}
+                        <div className="hidden md:block">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
@@ -610,6 +667,8 @@ const handleExportarCSV = () => {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
+                        </>
                     )}
                 </div>
 

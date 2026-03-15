@@ -53,7 +53,6 @@ const CruceMasivoBancos = lazy(() => import('./components/Facturas/CruceMasivoBa
 const MapaInstalaciones = lazy(() => import('./components/Mapa/MapaInstalaciones'));
 const MapaClientes = lazy(() => import('./components/Mapa/MapaClientes'));
 
-<Route path="/calendar" element={<ProtectedRoute><CalendarioManagement /></ProtectedRoute>} />
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -358,13 +357,7 @@ function App() {
 
               <Route
                 path="/clients/:id"
-                element={
-                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
-                    <MainLayout title="Detalle de Cliente" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Detalle de Cliente" />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
+                element={<Navigate to="/clients" replace />}
               />
               <Route
                 path="/facturas"
@@ -373,7 +366,7 @@ function App() {
                     <MainLayout title="Facturas" subtitle="Sistema de facturación mensual">
                       <FacturasManagement />
                     </MainLayout>
-                  </ ProtectedRoute>
+                  </ProtectedRoute>
                 }
               />
               <Route
@@ -383,7 +376,7 @@ function App() {
                     <MainLayout title="Facturación Automática" subtitle="Sistema automatizado de facturación mensual">
                       <FacturacionAutomatica />
                     </MainLayout>
-                  </ ProtectedRoute>
+                  </ProtectedRoute>
                 }
               />
               <Route
@@ -393,7 +386,7 @@ function App() {
                     <MainLayout title="Historial Facturacion cliente" subtitle="">
                       <HistorialFacturacionWrapper />
                     </MainLayout>
-                  </ ProtectedRoute>
+                  </ProtectedRoute>
                 }
               />
               <Route
@@ -449,13 +442,7 @@ function App() {
 
               <Route
                 path="/services"
-                element={
-                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
-                    <MainLayout title="Gestión de Servicios" subtitle="Esta funcionalidad está en desarrollo">
-                      <ComingSoon pageName="Gestión de Servicios" />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
+                element={<Navigate to="/clients" replace />}
               />
 
               <Route
@@ -505,10 +492,10 @@ function App() {
                 }
               />
               <Route
-                path="pqr"
+                path="/pqr"
                 element={
                   <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
-                    <MainLayout title="Gestión de Incidencias" subtitle="">
+                    <MainLayout title="Gestión de PQR" subtitle="">
                       <PQRManagement />
                     </MainLayout>
                   </ProtectedRoute>
@@ -516,7 +503,7 @@ function App() {
 
               {/* Incidencias */}
               <Route
-                path="incidencias"
+                path="/incidencias"
                 element={
                   <ProtectedRoute requiredRole="instalador,secretaria,supervisor,administrador">
                     <MainLayout title="Gestión de Incidencias" subtitle="">
@@ -528,7 +515,7 @@ function App() {
 
               {/* Reportes Regulatorios */}
               <Route
-                path="reportes-regulatorios"
+                path="/reportes-regulatorios"
                 element={
                   <ProtectedRoute requiredRole="administrador">
                     <MainLayout title="Gestión de Reportes" subtitle="">
@@ -537,7 +524,6 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              // ✅ DESPUÉS (CORRECTO) - Permite administrador y supervisor
               <Route
                 path="/reports"
                 element={

@@ -494,7 +494,59 @@ const cargarEstadisticas = async () => {
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
                 ) : incidencias.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <>
+                        {/* Vista móvil: tarjetas */}
+                        <div className="block md:hidden divide-y divide-gray-200">
+                            {incidencias.map((incidencia) => (
+                                <div key={incidencia.id} className="p-4 hover:bg-gray-50">
+                                    <div className="flex items-start justify-between mb-2">
+                                        <div>
+                                            <p className="text-sm font-semibold text-gray-900">{incidencia.numero_incidencia}</p>
+                                            <p className="text-xs text-gray-500 capitalize mt-0.5">{incidencia.categoria.replace('_', ' ')}</p>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1">
+                                            {getTipoBadge(incidencia.tipo_incidencia)}
+                                            {getEstadoBadge(incidencia.estado)}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1 mb-3">
+                                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                                            <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                            {incidencia.municipio_nombre || 'N/A'}
+                                        </div>
+                                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                                            <Calendar className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                            {incidenciasService.formatFecha(incidencia.fecha_inicio)}
+                                            {' · '}
+                                            {incidenciasService.formatearDuracion(
+                                                incidencia.tiempo_duracion_minutos || incidencia.duracion_minutos
+                                            )}
+                                        </div>
+                                        {user?.rol !== 'instalador' && (
+                                            <div className="text-xs text-gray-600">
+                                                {getImpactoBadge(incidencia.usuarios_afectados)}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center justify-end gap-2">
+                                        <button onClick={() => abrirDetalle(incidencia)} className="text-blue-600 hover:text-blue-900 p-1" title="Ver detalle">
+                                            <Eye className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={() => abrirModal(incidencia)} className="text-green-600 hover:text-green-900 p-1" title="Editar">
+                                            <Edit className="w-4 h-4" />
+                                        </button>
+                                        {incidencia.estado !== 'cerrado' && (
+                                            <button onClick={() => cerrarIncidencia(incidencia.id, {})} className="text-purple-600 hover:text-purple-900 p-1" title="Cerrar">
+                                                <CheckCircle className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Vista desktop: tabla */}
+                        <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
                             <thead className="bg-gray-50">
                                 <tr>
@@ -612,7 +664,8 @@ const cargarEstadisticas = async () => {
                                 ))}
                             </tbody>
                         </table>
-                    </div>
+                        </div>
+                    </>
                 ) : (
                     <div className="text-center py-12">
                         <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
