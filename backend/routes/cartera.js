@@ -1,5 +1,5 @@
 // backend/routes/cartera.js
-// Panel de cartera para clientes morosos (2+ facturas vencidas)
+// Panel de cartera para clientes morosos (1+ facturas vencidas)
 
 const express = require('express');
 const router = express.Router();
@@ -11,7 +11,7 @@ router.use(authenticateToken);
 
 /**
  * GET /api/v1/cartera/morosos
- * Clientes con 2 o más facturas vencidas (pendientes y pasada la fecha de vencimiento)
+ * Clientes con 1 o más facturas vencidas (pendientes y pasada la fecha de vencimiento)
  * Acceso: secretaria, supervisor, administrador
  */
 router.get('/morosos', requireRole('secretaria', 'supervisor', 'administrador'), async (req, res) => {
@@ -67,7 +67,7 @@ router.get('/morosos', requireRole('secretaria', 'supervisor', 'administrador'),
         ${sedeFilter}
         ${searchFilter}
       GROUP BY c.id
-      HAVING COUNT(f.id) >= 2
+      HAVING COUNT(f.id) >= 1
       ORDER BY total_deuda DESC, dias_mora_max DESC
     `, params);
 
@@ -92,7 +92,7 @@ router.get('/morosos', requireRole('secretaria', 'supervisor', 'administrador'),
           AND f.activo = 1
           ${sedeFilter ? sedeFilter.replace(/c\.ciudad_id = \?/, 'c.ciudad_id = ?') : ''}
         GROUP BY c.id
-        HAVING COUNT(f.id) >= 2
+        HAVING COUNT(f.id) >= 1
       ) sub
     `, statsParams);
 
