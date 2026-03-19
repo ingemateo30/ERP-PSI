@@ -840,7 +840,7 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
 
             // Obtener contrato existente
             const contratos = await Database.query(
-                'SELECT * FROM contratos WHERE id = ? AND activo = 1',
+                'SELECT * FROM contratos WHERE id = ?',
                 [id]
             );
 
@@ -903,8 +903,8 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
                     numero_contrato, cliente_id, servicio_id, tipo_contrato, tipo_permanencia,
                     permanencia_meses, fecha_generacion, fecha_inicio, fecha_fin,
                     fecha_vencimiento_permanencia, estado, observaciones, firmado_cliente,
-                    activo, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, 'activo', ?, 0, 1, NOW(), NOW())`,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, 'activo', ?, 0, NOW(), NOW())`,
                 [
                     nuevoNumero,
                     contratoOriginal.cliente_id,
