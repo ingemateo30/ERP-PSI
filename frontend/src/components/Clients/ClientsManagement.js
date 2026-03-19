@@ -171,7 +171,24 @@ const ClientsManagement = () => {
   };
 
   // Manejar eliminación de cliente
-  const handleDeleteClient = async () => {
+  const handleDeleteClient = async (clientId) => {
+    if (!clientId) {
+      refresh();
+      return;
+    }
+    try {
+      const response = await clientService.deleteClient(clientId);
+      if (response.success) {
+        if (window.showNotification) {
+          window.showNotification('success', response.message || 'Cliente eliminado exitosamente');
+        }
+      }
+    } catch (error) {
+      console.error('Error eliminando cliente:', error);
+      if (window.showNotification) {
+        window.showNotification('error', error.message || 'Error al eliminar el cliente');
+      }
+    }
     refresh();
   };
 
