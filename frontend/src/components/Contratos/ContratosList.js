@@ -143,18 +143,20 @@ const { hasPermission } = useAuth();
   };
 
   const handleAbrirRenovar = (contrato) => {
-    // Calcular días restantes de permanencia para pre-validar en el modal
+    // Regla: solo se puede renovar dentro de los 30 días anteriores al vencimiento
     let diasRestantes = null;
     let puedeRenovar = true;
     let fechaVencimiento = null;
+    let sinFechaFin = false;
 
-    if (contrato.tipo_permanencia === 'con_permanencia') {
-      const fechaRef = contrato.fecha_vencimiento_permanencia || contrato.fecha_fin;
-      if (fechaRef) {
-        fechaVencimiento = fechaRef;
-        diasRestantes = Math.ceil((new Date(fechaRef) - new Date()) / (1000 * 60 * 60 * 24));
-        puedeRenovar = diasRestantes <= 30;
-      }
+    const fechaFinRef = contrato.fecha_vencimiento_permanencia || contrato.fecha_fin;
+    if (!fechaFinRef) {
+      sinFechaFin = true;
+      puedeRenovar = false;
+    } else {
+      fechaVencimiento = fechaFinRef;
+      diasRestantes = Math.ceil((new Date(fechaFinRef) - new Date()) / (1000 * 60 * 60 * 24));
+      puedeRenovar = diasRestantes <= 30;
     }
 
     setRenovarForm({
@@ -163,7 +165,8 @@ const { hasPermission } = useAuth();
       terminar_anterior: true,
       _diasRestantes: diasRestantes,
       _puedeRenovar: puedeRenovar,
-      _fechaVencimiento: fechaVencimiento
+      _fechaVencimiento: fechaVencimiento,
+      _sinFechaFin: sinFechaFin
     });
     setModalRenovar({ visible: true, contrato });
   };
@@ -171,7 +174,7 @@ const { hasPermission } = useAuth();
   const handleRenovarContrato = async () => {
     try {
       setRenovarLoading(true);
-      const { _diasRestantes, _puedeRenovar, _fechaVencimiento, ...datosEnvio } = renovarForm;
+      const { _diasRestantes, _puedeRenovar, _fechaVencimiento, _sinFechaFin, ...datosEnvio } = renovarForm;
       const response = await contratosService.renovarContrato(
         modalRenovar.contrato.id,
         datosEnvio
@@ -678,43 +681,44 @@ const { hasPermission } = useAuth();
                 <p className="text-gray-500">{modalRenovar.contrato.plan_nombre}</p>
               </div>
 
-              {/* Alerta de permanencia — bloquear si quedan >30 días */}
-              {modalRenovar.contrato.tipo_permanencia === 'con_permanencia' && renovarForm._diasRestantes !== null && (
-                renovarForm._puedeRenovar ? (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
-                    <p className="font-medium">✅ Renovación disponible</p>
-                    <p>
-                      {renovarForm._diasRestantes <= 0
-                        ? 'La permanencia del contrato ya venció.'
-                        : `Quedan ${renovarForm._diasRestantes} día(s) de permanencia — dentro del período permitido de renovación (≤ 30 días).`}
+              {/* Bloque de estado de renovación — aplica a TODOS los contratos */}
+              {renovarForm._sinFechaFin ? (
+                <div className="bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-800">
+                  <p className="font-medium">🚫 Renovación no permitida</p>
+                  <p>Este contrato no tiene fecha de vencimiento definida. La renovación solo aplica a contratos con una fecha de fin establecida.</p>
+                </div>
+              ) : renovarForm._puedeRenovar ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
+                  <p className="font-medium">✅ Renovación disponible</p>
+                  <p>
+                    {renovarForm._diasRestantes <= 0
+                      ? 'El contrato ya venció — puede renovarse.'
+                      : `Quedan ${renovarForm._diasRestantes} día(s) para el vencimiento — dentro del período permitido (≤ 30 días).`}
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm text-amber-800">
+                  <p className="font-medium">⚠️ Renovación no disponible aún</p>
+                  <p>
+                    Quedan <strong>{renovarForm._diasRestantes} días</strong> para el vencimiento.
+                    Solo se puede renovar dentro de los <strong>30 días anteriores</strong> al vencimiento.
+                  </p>
+                  {renovarForm._fechaVencimiento && (
+                    <p className="mt-1">
+                      Fecha de vencimiento:{' '}
+                      <strong>
+                        {new Date(renovarForm._fechaVencimiento).toLocaleDateString('es-CO', {
+                          year: 'numeric', month: 'long', day: 'numeric'
+                        })}
+                      </strong>
                     </p>
-                  </div>
-                ) : (
-                  <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm text-amber-800">
-                    <p className="font-medium">⚠️ Renovación no disponible aún</p>
-                    <p>
-                      Quedan <strong>{renovarForm._diasRestantes} días</strong> de permanencia.
-                      Solo se puede renovar dentro de los <strong>30 días anteriores</strong> al vencimiento.
-                    </p>
-                    {renovarForm._fechaVencimiento && (
-                      <p className="mt-1">
-                        Fecha de vencimiento:{' '}
-                        <strong>
-                          {new Date(renovarForm._fechaVencimiento).toLocaleDateString('es-CO', {
-                            year: 'numeric', month: 'long', day: 'numeric'
-                          })}
-                        </strong>
-                      </p>
-                    )}
-                    <p className="mt-1 text-xs text-amber-600">
-                      Podrá renovar a partir del{' '}
-                      {renovarForm._fechaVencimiento
-                        ? new Date(new Date(renovarForm._fechaVencimiento).getTime() - 30 * 24 * 60 * 60 * 1000)
-                            .toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
-                        : '—'}
-                    </p>
-                  </div>
-                )
+                  )}
+                  <p className="mt-1 text-xs text-amber-600">
+                    Podrá renovar a partir del{' '}
+                    {new Date(new Date(renovarForm._fechaVencimiento).getTime() - 30 * 24 * 60 * 60 * 1000)
+                      .toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                </div>
               )}
 
               <div>
@@ -768,8 +772,8 @@ const { hasPermission } = useAuth();
               </button>
               <button
                 onClick={handleRenovarContrato}
-                disabled={renovarLoading || renovarForm._puedeRenovar === false}
-                title={renovarForm._puedeRenovar === false ? `Podrá renovar dentro de ${renovarForm._diasRestantes - 30} días más` : ''}
+                disabled={renovarLoading || !renovarForm._puedeRenovar}
+                title={!renovarForm._puedeRenovar && !renovarForm._sinFechaFin ? `Podrá renovar dentro de ${renovarForm._diasRestantes - 30} días más` : ''}
                 className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {renovarLoading ? (
