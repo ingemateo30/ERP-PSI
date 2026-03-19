@@ -130,11 +130,10 @@ router.get('/morosos/:clienteId/facturas', requireRole('secretaria', 'supervisor
         f.total,
         f.estado,
         f.periodo_facturacion,
-        DATEDIFF(CURDATE(), f.fecha_vencimiento) AS dias_vencida
+        GREATEST(0, DATEDIFF(CURDATE(), f.fecha_vencimiento)) AS dias_vencida
       FROM facturas f
       WHERE f.cliente_id = ?
         AND f.estado IN ('pendiente', 'vencida')
-        AND f.fecha_vencimiento < CURDATE()
         AND f.activo = 1
       ORDER BY f.fecha_vencimiento ASC
     `, [clienteId]);
@@ -164,7 +163,6 @@ router.post('/notificar/:clienteId', requireRole('secretaria', 'supervisor', 'ad
       INNER JOIN facturas f ON c.id = f.cliente_id
       WHERE c.id = ?
         AND f.estado IN ('pendiente', 'vencida')
-        AND f.fecha_vencimiento < CURDATE()
         AND f.activo = 1
       GROUP BY c.id
     `, [clienteId]);
