@@ -1,6 +1,6 @@
 // frontend/src/components/Instalaciones/IniciarInstalacion.js
 import apiService from '../../services/apiService';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X,
   Camera,
@@ -12,8 +12,20 @@ import {
   Save,
   Upload,
   Search,
-  AlertCircle
+  AlertCircle,
+  MapPin,
+  Navigation
 } from 'lucide-react';
+
+// Distancia Haversine en metros
+function distanciaMetros(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 
 const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
@@ -21,6 +33,13 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+
+  // Geofencing
+  const [posActual, setPosActual] = useState(null);      // {lat, lng, accuracy}
+  const [geoError, setGeoError] = useState(null);
+  const [distancia, setDistancia] = useState(null);      // metros al punto de instalación
+  const [fueraDeRango, setFueraDeRango] = useState(false);
+  const locationIntervalRef = useRef(null);
 
   // Estados para fotos
   const [fotoAntes, setFotoAntes] = useState(null);
@@ -74,6 +93,52 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       }
     }
   }, [instalacion]);
+
+  // ── GPS: obtener posición actual y calcular distancia ──────────────────────
+  const actualizarPosicion = useCallback((pos) => {
+    const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+    setPosActual({ lat, lng, accuracy: Math.round(accuracy) });
+    setGeoError(null);
+
+    if (instalacion.coordenadas_lat && instalacion.coordenadas_lng) {
+      const d = distanciaMetros(lat, lng,
+        parseFloat(instalacion.coordenadas_lat),
+        parseFloat(instalacion.coordenadas_lng));
+      setDistancia(Math.round(d));
+      setFueraDeRango(d > 500);
+    }
+
+    // Enviar posición al servidor
+    const token = localStorage.getItem('accessToken');
+    fetch(`${process.env.REACT_APP_API_URL}/instalador/ubicacion`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lat, lng,
+        precision: Math.round(accuracy),
+        instalacion_id: instalacion.id
+      })
+    }).catch(() => {});
+  }, [instalacion]);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setGeoError('Tu dispositivo no soporta geolocalización');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(actualizarPosicion, (e) => {
+      setGeoError('No se pudo obtener tu ubicación: ' + e.message);
+    }, { enableHighAccuracy: true, timeout: 10000 });
+
+    // Actualizar posición cada 30 s
+    locationIntervalRef.current = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(actualizarPosicion, () => {}, {
+        enableHighAccuracy: true, timeout: 10000
+      });
+    }, 30000);
+
+    return () => clearInterval(locationIntervalRef.current);
+  }, [actualizarPosicion]);
 
   const cargarEquiposDisponibles = async () => {
   try {
@@ -155,7 +220,7 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
   };
 
   // Iniciar instalación
- const iniciarInstalacion = async () => {
+  const iniciarInstalacion = async () => {
     if (!fotoAntes && !previsualizacionAntes) {
       setError('Debes subir una foto del lugar antes de comenzar');
       return;
@@ -166,21 +231,20 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       setError(null);
 
       const token = localStorage.getItem('accessToken');
-      const formData = new FormData();
 
-      if (fotoAntes) {
-        formData.append('foto_antes', fotoAntes);
+      // Enviar GPS + foto juntos como JSON (foto en base64 si la tenemos)
+      const payload = {};
+      if (posActual) {
+        payload.lat = posActual.lat;
+        payload.lng = posActual.lng;
       }
 
       const response = await fetch(
-  `${process.env.REACT_APP_API_URL}/instalador/instalacion/${instalacion.id}/iniciar`,
+        `${process.env.REACT_APP_API_URL}/instalador/instalacion/${instalacion.id}/iniciar`,
         {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-            // NO incluir Content-Type cuando envías FormData
-          },
-          body: formData
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
         }
       );
 
@@ -189,6 +253,11 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       if (data.success) {
         setSuccess('Instalación iniciada correctamente');
         setPaso(2);
+      } else if (data.fuera_de_rango) {
+        // El backend confirmó geofence violation
+        setError(`⚠️ ${data.message}`);
+        setFueraDeRango(true);
+        setDistancia(data.distancia_metros);
       } else {
         setError(data.message || 'Error iniciando instalación');
       }
@@ -395,6 +464,40 @@ if (data.success) {
           {/* PASO 1: Fotos de Inicio */}
           {paso === 1 && (
             <div className="space-y-6">
+
+              {/* Banner de geolocalización */}
+              {instalacion.coordenadas_lat && instalacion.coordenadas_lng ? (
+                <div className={`rounded-lg px-4 py-3 flex items-start gap-3 text-sm
+                  ${fueraDeRango ? 'bg-red-50 border border-red-300 text-red-800'
+                    : posActual ? 'bg-green-50 border border-green-300 text-green-800'
+                    : 'bg-gray-50 border border-gray-200 text-gray-600'}`}>
+                  <Navigation size={18} className="flex-shrink-0 mt-0.5" />
+                  <div>
+                    {!posActual && !geoError && (
+                      <p>Obteniendo tu ubicación GPS...</p>
+                    )}
+                    {geoError && (
+                      <p>{geoError}</p>
+                    )}
+                    {posActual && distancia !== null && (
+                      <>
+                        <p className="font-medium">
+                          {fueraDeRango
+                            ? `Estás a ${distancia} m del punto de instalación (máx. 500 m)`
+                            : `Estás a ${distancia} m del punto ✓`}
+                        </p>
+                        <p className="text-xs mt-0.5 opacity-75">Precisión GPS: ±{posActual.accuracy} m</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 text-sm flex items-center gap-2">
+                  <MapPin size={16} />
+                  <span>Esta instalación no tiene coordenadas registradas. Tu ubicación se guardará al iniciar.</span>
+                </div>
+              )}
+
               <div>
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Foto del Lugar (Antes)</h3>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
@@ -665,13 +768,20 @@ if (data.success) {
 
           <div className="flex space-x-3">
             {paso === 1 && (
-              <button
-                onClick={iniciarInstalacion}
-                disabled={procesando || (!fotoAntes && !previsualizacionAntes)}
-                className="flex items-center space-x-2 bg-[#0e6493] hover:bg-[#0a4d6e] text-white px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span>{procesando ? 'Iniciando...' : 'Iniciar Instalación'}</span>
-              </button>
+              <div className="flex flex-col items-end gap-2">
+                {fueraDeRango && (
+                  <p className="text-xs text-red-600 text-right">
+                    Estás fuera del rango de 500 m. Acércate al punto de instalación.
+                  </p>
+                )}
+                <button
+                  onClick={iniciarInstalacion}
+                  disabled={procesando || (!fotoAntes && !previsualizacionAntes) || fueraDeRango}
+                  className="flex items-center space-x-2 bg-[#0e6493] hover:bg-[#0a4d6e] text-white px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span>{procesando ? 'Iniciando...' : 'Iniciar Instalación'}</span>
+                </button>
+              </div>
             )}
 
             {paso === 2 && (

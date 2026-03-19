@@ -363,6 +363,39 @@ router.get('/seguimiento-tecnicos',
 );
 
 /**
+ * GET /api/v1/instalaciones/ubicaciones-en-vivo
+ * Posiciones GPS actuales de todos los técnicos (para mapa en tiempo real)
+ */
+router.get('/ubicaciones-en-vivo',
+  requireRole('administrador', 'supervisor', 'secretaria'),
+  async (req, res) => {
+    try {
+      const ubicaciones = await Database.query(`
+        SELECT
+          ut.instalador_id,
+          CONCAT(u.nombres, ' ', u.apellidos) AS nombre,
+          u.telefono,
+          ut.lat,
+          ut.lng,
+          ut.precision_metros,
+          ut.instalacion_activa_id,
+          ut.actualizado_at,
+          TIMESTAMPDIFF(MINUTE, ut.actualizado_at, NOW()) AS minutos_desde_actualizacion
+        FROM ubicaciones_tecnicos ut
+        INNER JOIN sistema_usuarios u ON ut.instalador_id = u.id
+        WHERE ut.actualizado_at >= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+        ORDER BY ut.actualizado_at DESC
+      `);
+
+      res.json({ success: true, data: ubicaciones });
+    } catch (error) {
+      console.error('❌ Error obteniendo ubicaciones en vivo:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+/**
  * 🆕 MOVIDA AQUÍ: Obtener equipos disponibles
  */
 router.get('/equipos/disponibles', async (req, res) => {
