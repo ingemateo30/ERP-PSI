@@ -79,11 +79,18 @@ const ElapsedTimer = ({ horaInicio }) => {
 
   useEffect(() => {
     if (!horaInicio) return;
+    const hh = horaInicio.slice(0, 2);
+    const mm = horaInicio.slice(3, 5);
+    const ss = horaInicio.slice(6, 8) || '00';
 
     const calcular = () => {
-      const hoy = new Date().toISOString().split('T')[0];
-      const inicio = new Date(`${hoy}T${horaInicio}`);
-      const diff = Math.max(0, Math.floor((Date.now() - inicio.getTime()) / 1000));
+      const ahora = new Date();
+      // Construir la hora de inicio en la fecha de hoy (hora LOCAL del cliente)
+      const inicio = new Date(
+        ahora.getFullYear(), ahora.getMonth(), ahora.getDate(),
+        parseInt(hh), parseInt(mm), parseInt(ss)
+      );
+      const diff = Math.max(0, Math.floor((ahora - inicio) / 1000));
       const h = Math.floor(diff / 3600);
       const m = Math.floor((diff % 3600) / 60);
       const s = diff % 60;
@@ -101,33 +108,41 @@ const ElapsedTimer = ({ horaInicio }) => {
   return (
     <span className="inline-flex items-center gap-1 text-xs font-mono text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-200">
       <Clock size={11} className="animate-pulse" />
-      {elapsed}
+      {elapsed || '…'}
     </span>
   );
 };
 
 // ─── Bloque de horas para cada instalación ───────────────────────────────────
 const BloqueHoras = ({ inst }) => {
-  const fmt = (t) => t ? t.slice(0, 5) : null;
+  const fmt = (t) => {
+    if (!t) return null;
+    // TIME puede venir como "HH:MM:SS" o "HH:MM"
+    const str = typeof t === 'string' ? t : String(t);
+    return str.slice(0, 5);
+  };
   const prog   = fmt(inst.hora_programada);
   const inicio = fmt(inst.hora_inicio);
   const fin    = fmt(inst.hora_fin);
 
   return (
-    <div className="flex flex-col items-end gap-0.5 text-xs font-mono flex-shrink-0">
+    <div className="flex flex-col items-end gap-0.5 text-xs flex-shrink-0 min-w-[90px]">
       {prog && (
-        <span className="text-gray-500 flex items-center gap-1" title="Hora programada">
-          <Calendar size={10} className="text-gray-400" />{prog}
+        <span className="flex items-center gap-1 text-gray-500" title="Hora programada">
+          <span className="text-gray-400 text-[10px] font-medium w-10 text-right">Prog.</span>
+          <span className="font-mono font-medium">{prog}</span>
         </span>
       )}
       {inicio && (
-        <span className="text-blue-600 flex items-center gap-1" title="Hora inicio">
-          <Play size={10} className="text-blue-500" />{inicio}
+        <span className="flex items-center gap-1 text-blue-700" title="Hora inicio">
+          <span className="text-blue-400 text-[10px] font-medium w-10 text-right">Inicio</span>
+          <span className="font-mono font-semibold">{inicio}</span>
         </span>
       )}
       {fin && (
-        <span className="text-green-700 flex items-center gap-1" title="Hora fin">
-          <CheckCircle size={10} className="text-green-600" />{fin}
+        <span className="flex items-center gap-1 text-green-700" title="Hora fin">
+          <span className="text-green-500 text-[10px] font-medium w-10 text-right">Fin</span>
+          <span className="font-mono font-semibold">{fin}</span>
         </span>
       )}
       {inst.estado === 'en_proceso' && inst.hora_inicio && (
@@ -290,7 +305,7 @@ const MapaEnVivo = ({ tecnicos, ubicacionesVivas }) => {
         </div>
       </div>
 
-      <MapContainer center={centro} zoom={12} style={{ height: '420px' }} className="z-0">
+      <MapContainer center={centro} zoom={puntos.length > 0 ? 13 : 7} style={{ height: '420px', width: '100%' }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

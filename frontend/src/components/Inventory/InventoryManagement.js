@@ -94,18 +94,48 @@ const loadEquipment = useCallback(async () => {
     try {
       setLoadingGrouped(true);
       setError('');
-      const data = await inventoryService.getGroupedEquipment({
-        tipo: filters.tipo,
-        search: filters.search
-      });
-      setEquiposAgrupados(Array.isArray(data) ? data : []);
+
+      if (user.rol === 'instalador') {
+        // Para instaladores: agrupar sus propios equipos localmente
+        const response = await inventoryService.getMisEquipos();
+        const lista = response.equipos || [];
+        const mapa = {};
+        lista.forEach(eq => {
+          const key = `${eq.tipo}||${eq.nombre}`;
+          if (!mapa[key]) {
+            mapa[key] = {
+              tipo: eq.tipo,
+              nombre: eq.nombre,
+              cantidad_total: 0,
+              disponibles: 0,
+              asignados: 0,
+              instalados: 0,
+              danados: 0,
+              otros: 0,
+            };
+          }
+          mapa[key].cantidad_total++;
+          if (eq.estado === 'disponible')  mapa[key].disponibles++;
+          else if (eq.estado === 'asignado') mapa[key].asignados++;
+          else if (eq.estado === 'instalado') mapa[key].instalados++;
+          else if (eq.estado === 'dañado')  mapa[key].danados++;
+          else mapa[key].otros++;
+        });
+        setEquiposAgrupados(Object.values(mapa));
+      } else {
+        const data = await inventoryService.getGroupedEquipment({
+          tipo: filters.tipo,
+          search: filters.search
+        });
+        setEquiposAgrupados(Array.isArray(data) ? data : []);
+      }
     } catch (error) {
       console.error('❌ Error cargando inventario agrupado:', error);
       setEquiposAgrupados([]);
     } finally {
       setLoadingGrouped(false);
     }
-  }, [filters.tipo, filters.search]);
+  }, [filters.tipo, filters.search, user.rol]);
 
   // Cargar estadísticas
 // frontend/src/components/Inventory/InventoryManagement.js
@@ -399,9 +429,15 @@ const loadStats = async () => {
           <div className="mb-4 lg:mb-0">
             <div className="flex items-center space-x-3 mb-2">
               <Package size={32} className="text-white" />
-              <h1 className="text-2xl md:text-3xl font-bold">Gestión de Inventarios</h1>
+              <h1 className="text-2xl md:text-3xl font-bold">
+                {user.rol === 'instalador' ? 'Mis Equipos' : 'Gestión de Inventarios'}
+              </h1>
             </div>
-            <p className="text-lg opacity-90">Administra equipos, asignaciones e instalaciones</p>
+            <p className="text-lg opacity-90">
+              {user.rol === 'instalador'
+                ? 'Equipos asignados a ti'
+                : 'Administra equipos, asignaciones e instalaciones'}
+            </p>
           </div>
           
           {user.rol === 'administrador' && (
