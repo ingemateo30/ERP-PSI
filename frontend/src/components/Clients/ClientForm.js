@@ -292,7 +292,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Cobro de instalación:</span>
                   <span className={`font-medium ${calculoCostos.cobrar ? 'text-green-600' : 'text-gray-500'}`}>
-                    {calculoCostos.cobrar ? `Sí - {formatCOP(calculoCostos.costo)}` : 'No se cobra'}
+                    {calculoCostos.cobrar ? `Sí - ${formatCOP(calculoCostos.costo)}` : 'No se cobra'}
                   </span>
                 </div>
 
@@ -302,7 +302,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                       <div className="flex justify-between items-center">
                         <span className="font-semibold text-gray-800">COSTO TOTAL INSTALACIÓN:</span>
                         <span className="text-xl font-bold text-green-600">
-                          ${calculoCostos.costo.toLocaleString()}
+                          {formatCOP(calculoCostos.costo)}
                         </span>
                       </div>
                     </div>
@@ -1198,9 +1198,9 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                         }}
                         onFocus={() => setMostrarSugerenciasBarrio(true)}
                         onBlur={() => setTimeout(() => setMostrarSugerenciasBarrio(false), 180)}
-                        disabled={modoAgregarServicio}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100"
-                        placeholder={formData.ciudad_id ? 'Escribe o selecciona un barrio' : 'Centro'}
+                        disabled={!formData.ciudad_id || modoAgregarServicio}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder={!formData.ciudad_id ? 'Primero seleccione una ciudad' : 'Escribe o selecciona un barrio'}
                         autoComplete="off"
                       />
                       {mostrarSugerenciasBarrio && barriosSugeridos.length > 0 && (
@@ -1354,7 +1354,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
               )}
 
               {/* ✅ SELECTOR DE PERMANENCIA - SIEMPRE VISIBLE PARA NUEVOS CLIENTES */}
-              {!client && <SelectorPermanenciaCompleto />}
+              {!client && SelectorPermanenciaCompleto()}
 
               {/* Precio personalizado */}
               <div>

@@ -1070,12 +1070,13 @@ router.post('/sectors', requireRole(['administrador']), async (req, res) => {
   try {
     console.log('🏘️ POST /config/sectors');
 
-    const { ciudad_id, codigo, nombre, activo = true } = req.body;
+    const { ciudad_id, nombre, activo = true } = req.body;
+    let { codigo } = req.body;
 
-    if (!codigo || !nombre) {
+    if (!nombre) {
       return res.status(400).json({
         success: false,
-        message: 'Código y nombre son requeridos'
+        message: 'El nombre del sector es requerido'
       });
     }
 
@@ -1094,23 +1095,34 @@ router.post('/sectors', requireRole(['administrador']), async (req, res) => {
       }
     }
 
-    // Verificar duplicados
+    // Auto-generar código si no se proporcionó
+    if (!codigo || !String(codigo).trim()) {
+      const filtro = ciudad_id ? 'WHERE ciudad_id = ?' : 'WHERE ciudad_id IS NULL';
+      const params = ciudad_id ? [ciudad_id] : [];
+      const [maxRow] = await Database.query(
+        `SELECT COALESCE(MAX(CAST(codigo AS UNSIGNED)), 0) + 1 AS siguiente FROM sectores ${filtro}`,
+        params
+      );
+      codigo = String(maxRow.siguiente || 1).padStart(3, '0');
+    }
+
+    // Verificar duplicados por código en la misma ciudad
     const existing = await Database.query(
-      'SELECT id FROM sectores WHERE codigo = ?',
-      [codigo]
+      'SELECT id FROM sectores WHERE codigo = ? AND (ciudad_id = ? OR (ciudad_id IS NULL AND ? IS NULL))',
+      [String(codigo).trim(), ciudad_id || null, ciudad_id || null]
     );
 
     if (existing.length > 0) {
       return res.status(409).json({
         success: false,
-        message: 'Ya existe un sector con ese código'
+        message: `Ya existe un sector con el código ${codigo} en esta ciudad`
       });
     }
 
     // Crear sector
     const result = await Database.query(
       'INSERT INTO sectores (ciudad_id, codigo, nombre, activo) VALUES (?, ?, ?, ?)',
-      [ciudad_id || null, codigo.trim(), nombre.trim(), activo ? 1 : 0]
+      [ciudad_id || null, String(codigo).trim(), nombre.trim(), activo ? 1 : 0]
     );
 
     // Obtener el sector creado con información relacionada
@@ -1148,12 +1160,13 @@ router.put('/sectors/:id', requireRole(['administrador']), async (req, res) => {
     console.log('🏘️ PUT /config/sectors/:id');
 
     const { id } = req.params;
-    const { ciudad_id, codigo, nombre, activo } = req.body;
+    const { ciudad_id, nombre, activo } = req.body;
+    const codigo = req.body.codigo; // el código no se edita pero se requiere para el UPDATE
 
-    if (!codigo || !nombre) {
+    if (!nombre) {
       return res.status(400).json({
         success: false,
-        message: 'Código y nombre son requeridos'
+        message: 'El nombre del sector es requerido'
       });
     }
 
