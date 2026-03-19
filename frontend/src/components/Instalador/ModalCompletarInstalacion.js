@@ -15,6 +15,8 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
   // ✅ NUEVOS CAMPOS
   const [ipAsignada, setIpAsignada] = useState('');
   const [tap, setTap] = useState('');
+  const [macAddress, setMacAddress] = useState('');
+  const [ontId, setOntId] = useState('');
   const [noAplicaIp, setNoAplicaIp] = useState(false);
 
   // Determina automáticamente si el tipo de orden/instalación requiere IP
@@ -38,6 +40,12 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
       }
       if (instalacion?.tap) {
         setTap(instalacion.tap);
+      }
+      if (instalacion?.mac_address) {
+        setMacAddress(instalacion.mac_address);
+      }
+      if (instalacion?.ont_id) {
+        setOntId(instalacion.ont_id);
       }
     }
   }, [isOpen, instalacion]);
@@ -158,13 +166,15 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
       // ✅ CAPTURAR FIRMA EN BASE64
       const firmaBase64 = sigCanvas.current.toDataURL();
 
-      // ✅ PAYLOAD CON IP, TAP Y FIRMA
+      // ✅ PAYLOAD CON IP, TAP, MAC, ONT Y FIRMA
       const formData = {
         equipos: equiposSeleccionados,
         foto: fotoPreview, // Base64
         observaciones,
         ip_asignada: ipAsignada.trim(),
         tap: tap.trim(),
+        mac_address: macAddress.trim() || undefined,
+        ont_id: ontId.trim() || undefined,
         firma_instalador: firmaBase64 // ✅ NUEVA FIRMA
       };
 
@@ -373,6 +383,44 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
               />
               <p className="text-xs text-gray-500 mt-1">Mínimo 8 caracteres</p>
+            </div>
+          )}
+
+          {/* ✅ CAMPO MAC ADDRESS */}
+          {requiereIp && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Wifi size={16} className="inline mr-1" />
+                MAC Address del ONT/Router
+                <span className="ml-2 text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Opcional</span>
+              </label>
+              <input
+                type="text"
+                value={macAddress}
+                onChange={(e) => setMacAddress(e.target.value)}
+                placeholder="AA:BB:CC:DD:EE:FF"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">Se usa para gestión de corte/reconexión en el OLT</p>
+            </div>
+          )}
+
+          {/* ✅ CAMPO ONT ID */}
+          {requiereIp && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Wifi size={16} className="inline mr-1" />
+                ID ONT / Puerto GPON
+                <span className="ml-2 text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Opcional</span>
+              </label>
+              <input
+                type="text"
+                value={ontId}
+                onChange={(e) => setOntId(e.target.value)}
+                placeholder="Ej: ZTEG-1A2B3C4D o slot/port/ont"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">Identificador del equipo ONT en el OLT (para redes FTTH/GPON)</p>
             </div>
           )}
 

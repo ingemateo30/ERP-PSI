@@ -140,26 +140,16 @@ router.post('/instalacion/:id/iniciar', async (req, res) => {
   }
 });
 
-// Completar instalación con foto y equipos
+// Completar instalación con foto, firma y equipos
 router.post('/instalacion/:id/completar', async (req, res) => {
   try {
     const { id } = req.params;
-    const { equipos, foto, observaciones, ip_asignada, tap, firma_instalador } = req.body;
-    
-    // ✅ LOGS DE DEBUG
-    console.log('🔍 ========== COMPLETAR INSTALACIÓN ==========');
-    console.log('📦 Body completo:', JSON.stringify(req.body, null, 2));
-    console.log('🔑 Instalación ID:', id);
-    console.log('🔑 Equipos:', equipos);
-    console.log('🔑 IP Asignada:', ip_asignada);
-    console.log('🔑 TAP:', tap);
-    console.log('🔑 Instalador ID:', req.user.id);
-    console.log('============================================');
-    
+    const { equipos, foto, observaciones, ip_asignada, tap, mac_address, ont_id, firma_instalador } = req.body;
+
     const horaFin = new Date().toTimeString().split(' ')[0];
     const fechaRealizada = new Date().toISOString().split('T')[0];
-    
-    // Actualizar instalación
+
+    // Actualizar instalación — firma guardada en columna dedicada
     await Database.query(`
       UPDATE instalaciones
       SET estado = 'completada',
@@ -167,10 +157,20 @@ router.post('/instalacion/:id/completar', async (req, res) => {
           fecha_realizada = ?,
           equipos_instalados = ?,
           fotos_instalacion = ?,
+          firma_instalador = ?,
           observaciones = CONCAT(COALESCE(observaciones, ''), '\n', ?)
       WHERE id = ? AND instalador_id = ?
-    `, [horaFin, fechaRealizada, JSON.stringify(equipos), JSON.stringify(firma_instalador ? [foto, firma_instalador] : [foto]), observaciones || '', id, req.user.id]);
-    
+    `, [
+      horaFin,
+      fechaRealizada,
+      JSON.stringify(equipos),
+      foto ? JSON.stringify([foto]) : null,
+      firma_instalador || null,
+      observaciones || '',
+      id,
+      req.user.id
+    ]);
+
     // Actualizar estado de equipos a 'instalado'
     if (equipos && equipos.length > 0) {
       for (const equipoId of equipos) {
@@ -182,56 +182,35 @@ router.post('/instalacion/:id/completar', async (req, res) => {
         `, [id, equipoId, req.user.id]);
       }
     }
-    
-    // ✅ ACTUALIZAR IP Y TAP EN LA TABLA CLIENTES
-    if (ip_asignada || tap) {
-      console.log('🔄 Actualizando cliente con IP y TAP...');
-      
-      // Obtener el cliente_id de la instalación
+
+    // Actualizar IP, TAP, MAC y ONT en la tabla clientes
+    if (ip_asignada || tap || mac_address || ont_id) {
       const [instalacion] = await Database.query(
         'SELECT cliente_id FROM instalaciones WHERE id = ?',
         [id]
       );
-      
+
       if (instalacion && instalacion.cliente_id) {
         const updateFields = [];
         const updateValues = [];
-        
-        if (ip_asignada) {
-          updateFields.push('ip_asignada = ?');
-          updateValues.push(ip_asignada);
-          console.log('📍 IP a actualizar:', ip_asignada);
-        }
-        
-        if (tap) {
-          updateFields.push('tap = ?');
-          updateValues.push(tap);
-          console.log('🔑 TAP a actualizar:', tap);
-        }
-        
+
+        if (ip_asignada) { updateFields.push('ip_asignada = ?'); updateValues.push(ip_asignada); }
+        if (tap)         { updateFields.push('tap = ?');         updateValues.push(tap); }
+        if (mac_address) { updateFields.push('mac_address = ?'); updateValues.push(mac_address); }
+        if (ont_id)      { updateFields.push('ont_id = ?');      updateValues.push(ont_id); }
+
         if (updateFields.length > 0) {
           updateValues.push(instalacion.cliente_id);
-          
-          const updateQuery = `UPDATE clientes SET ${updateFields.join(', ')} WHERE id = ?`;
-          console.log('📝 Query de actualización:', updateQuery);
-          console.log('📝 Valores:', updateValues);
-          
-          await Database.query(updateQuery, updateValues);
-          
-          console.log(`✅ Cliente ${instalacion.cliente_id} actualizado - IP: ${ip_asignada || 'N/A'}, TAP: ${tap || 'N/A'}`);
+          await Database.query(`UPDATE clientes SET ${updateFields.join(', ')} WHERE id = ?`, updateValues);
         }
-      } else {
-        console.error('❌ No se encontró cliente_id en la instalación');
       }
-    } else {
-      console.log('⚠️ No se recibieron IP ni TAP para actualizar');
     }
-    
+
     res.json({
       success: true,
       message: 'Instalación completada exitosamente'
     });
-    
+
   } catch (error) {
     console.error('❌ Error completando instalación:', error);
     res.status(500).json({

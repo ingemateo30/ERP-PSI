@@ -756,6 +756,7 @@ export const METODOS_PAGO = {
   TRANSFERENCIA: 'transferencia',
   TARJETA: 'tarjeta',
   CHEQUE: 'cheque',
+  EFECTY: 'efecty',
   PSE: 'pse',
   OTRO: 'otro'
 };

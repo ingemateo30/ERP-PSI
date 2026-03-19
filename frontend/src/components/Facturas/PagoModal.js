@@ -99,11 +99,9 @@ const PagoModal = ({ isOpen, onClose, onPagar, factura, loading, error }) => {
     switch (datosPago.metodo_pago) {
       case 'transferencia':
       case 'pse':
+      case 'efecty':
         if (!datosPago.referencia_pago) {
-          nuevosErrores.referencia_pago = 'La referencia de pago es requerida para transferencias';
-        }
-        if (!datosPago.banco) {
-          nuevosErrores.banco = 'El banco es requerido para transferencias';
+          nuevosErrores.referencia_pago = 'La referencia de pago es requerida';
         }
         break;
       case 'tarjeta':
@@ -163,6 +161,7 @@ const PagoModal = ({ isOpen, onClose, onPagar, factura, loading, error }) => {
     { value: 'transferencia', label: 'Transferencia Bancaria', icon: CreditCard },
     { value: 'tarjeta', label: 'Tarjeta de Crédito/Débito', icon: CreditCard },
     { value: 'cheque', label: 'Cheque', icon: FileText },
+    { value: 'efecty', label: 'Efecty', icon: DollarSign },
     { value: 'pse', label: 'PSE', icon: CreditCard },
     { value: 'otro', label: 'Otro', icon: DollarSign }
   ];

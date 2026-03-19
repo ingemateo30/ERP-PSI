@@ -15,6 +15,7 @@ router.use(authenticateToken);
  * Acceso: secretaria, supervisor, administrador
  */
 router.get('/morosos', requireRole('secretaria', 'supervisor', 'administrador'), async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   try {
     const { ciudad_id, search } = req.query;
 
@@ -214,7 +215,6 @@ router.post('/notificar-masivo', requireRole('supervisor', 'administrador'), asy
       FROM clientes c
       INNER JOIN facturas f ON c.id = f.cliente_id
       WHERE f.estado IN ('pendiente', 'vencida')
-        AND f.fecha_vencimiento < CURDATE()
         AND f.activo = 1
       GROUP BY c.id
       HAVING COUNT(f.id) >= 2

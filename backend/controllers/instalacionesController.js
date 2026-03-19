@@ -165,6 +165,8 @@ const selectQuery = `
         c.correo as cliente_email,
         c.ip_asignada,
         c.tap,
+        c.mac_address,
+        c.ont_id,
         u.nombre as instalador_nombre,
         ps.nombre as plan_nombre,
         ps.precio as plan_precio,
@@ -272,6 +274,8 @@ const selectQuery = `
           c.correo as cliente_email,
           c.ip_asignada,
           c.tap,
+          c.mac_address,
+          c.ont_id,
           -- Datos del instalador
           u.nombre as instalador_nombres,
           u.telefono as instalador_telefono,
@@ -815,10 +819,10 @@ const selectQuery = `
                     [instalacionActual.servicio_cliente_id]
                 );
                 // ✅✅✅ INSERTAR AQUÍ TODO EL CÓDIGO NUEVO ✅✅✅
-                // Actualizar IP y TAP en la tabla clientes si vienen en el request
-                const { ip_asignada, tap } = req.body;
+                // Actualizar IP, TAP, MAC y ONT en la tabla clientes si vienen en el request
+                const { ip_asignada, tap, mac_address, ont_id } = req.body;
 
-                if (ip_asignada || tap) {
+                if (ip_asignada || tap || mac_address || ont_id) {
                     const updateClienteFields = [];
                     const updateClienteValues = [];
 
@@ -826,10 +830,17 @@ const selectQuery = `
                         updateClienteFields.push('ip_asignada = ?');
                         updateClienteValues.push(ip_asignada);
                     }
-
                     if (tap) {
                         updateClienteFields.push('tap = ?');
                         updateClienteValues.push(tap);
+                    }
+                    if (mac_address) {
+                        updateClienteFields.push('mac_address = ?');
+                        updateClienteValues.push(mac_address);
+                    }
+                    if (ont_id) {
+                        updateClienteFields.push('ont_id = ?');
+                        updateClienteValues.push(ont_id);
                     }
 
                     if (updateClienteFields.length > 0) {
@@ -839,8 +850,6 @@ const selectQuery = `
                             `UPDATE clientes SET ${updateClienteFields.join(', ')} WHERE id = ?`,
                             updateClienteValues
                         );
-
-                        console.log(`✅ Actualizado cliente ${instalacionActual.cliente_id} - IP: ${ip_asignada || 'N/A'}, TAP: ${tap || 'N/A'}`);
                     }
                 }
                 // ✅✅✅ FIN DEL CÓDIGO NUEVO ✅✅✅
@@ -2030,9 +2039,22 @@ static async generarOrdenServicioPDF(req, res) {
         doc.text('FIRMA DEL CLIENTE', firmaLeftX, y, { width: firmaWidth, align: 'center' });
         doc.text('FIRMA DEL INSTALADOR', firmaRightX, y, { width: firmaWidth, align: 'center' });
 
-        y += 30;
+        y += 8;
 
-        // Líneas de firma
+        // Insertar firma digital del técnico si existe
+        if (instalacion.firma_instalador) {
+          try {
+            const firmaBase64 = instalacion.firma_instalador.replace(/^data:image\/\w+;base64,/, '');
+            const firmaBuffer = Buffer.from(firmaBase64, 'base64');
+            doc.image(firmaBuffer, firmaRightX, y, { width: firmaWidth, height: 40, fit: [firmaWidth, 40] });
+          } catch (e) {
+            // Si la imagen falla, dejar espacio en blanco
+          }
+        }
+
+        y += 42;
+
+        // Líneas de firma (cliente siempre en blanco; técnico debajo de la imagen si existe)
         doc.moveTo(firmaLeftX, y).lineTo(firmaLeftX + firmaWidth, y).stroke();
         doc.moveTo(firmaRightX, y).lineTo(firmaRightX + firmaWidth, y).stroke();
 
@@ -2041,15 +2063,18 @@ static async generarOrdenServicioPDF(req, res) {
         // Campos
         doc.font('Helvetica').fontSize(6.5);
         doc.text('Nombre: __________________________', firmaLeftX, y);
-        doc.text('Nombre: __________________________', firmaRightX, y);
+        doc.text(`Nombre: ${instalacion.instalador_nombre_completo || '__________________________'}`, firmaRightX, y);
         y += 9;
 
         doc.text('C.C.: _____________________________', firmaLeftX, y);
         doc.text('C.C.: _____________________________', firmaRightX, y);
         y += 9;
 
+        const fechaFirma = instalacion.fecha_realizada
+          ? new Date(instalacion.fecha_realizada).toLocaleDateString('es-CO')
+          : '____________________________';
         doc.text('Fecha: ____________________________', firmaLeftX, y);
-        doc.text('Fecha: ____________________________', firmaRightX, y);
+        doc.text(`Fecha: ${fechaFirma}`, firmaRightX, y);
 
         // Pie de página
         y += 15;

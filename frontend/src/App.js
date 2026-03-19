@@ -53,6 +53,8 @@ const CruceMasivoBancos = lazy(() => import('./components/Facturas/CruceMasivoBa
 const MapaInstalaciones = lazy(() => import('./components/Mapa/MapaInstalaciones'));
 const MapaClientes = lazy(() => import('./components/Mapa/MapaClientes'));
 const CarteraPanel = lazy(() => import('./components/Cartera/CarteraPanel'));
+const SeguimientoTecnicos = lazy(() => import('./components/Instalaciones/SeguimientoTecnicos'));
+const MisPQR = lazy(() => import('./components/PQR/MisPQR'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -232,6 +234,18 @@ function App() {
                   <ProtectedRoute requiredRole="instalador,secretaria,supervisor,administrador">
                     <MainLayout title="Mis Trabajos" subtitle="Gestión de instalaciones del día">
                       <MisTrabajos />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Mis PQR - Para técnicos y supervisores */}
+              <Route
+                path="/mis-pqr"
+                element={
+                  <ProtectedRoute allowedRoles={['instalador', 'secretaria', 'supervisor', 'administrador']}>
+                    <MainLayout title="Mis PQR" subtitle="PQRs asignadas a ti">
+                      <MisPQR />
                     </MainLayout>
                   </ProtectedRoute>
                 }
@@ -483,6 +497,17 @@ function App() {
               />
 
                <Route
+                path="/seguimiento-tecnicos"
+                element={
+                  <ProtectedRoute allowedRoles={['administrador', 'supervisor', 'secretaria']}>
+                    <MainLayout title="Seguimiento de Técnicos" subtitle="Agenda diaria y rutas">
+                      <SeguimientoTecnicos />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/mapa-instalaciones"
                 element={
                   <ProtectedRoute allowedRoles={['administrador', 'supervisor', 'secretaria']}>

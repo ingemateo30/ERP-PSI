@@ -8,7 +8,7 @@ import {
   DollarSign, TrendingUp, UserCheck, Wifi, Loader2,
   Building2, CreditCard, MapPin, PieChart as PieChartIcon,
   Package, FileText, Wrench, BarChart3, Home, Mail,
-  Clock, Zap, Hash, ArrowRight, Mic, MicOff, GitMerge
+  Clock, Zap, Hash, ArrowRight, Mic, MicOff, GitMerge, Navigation, MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -62,10 +62,12 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <Package size={18} />, label: 'Inventario', path: '/inventory', keywords: ['inventario', 'stock', 'productos'], color: 'indigo', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <Calendar size={18} />, label: 'Calendario', path: '/calendar', keywords: ['calendario', 'calendar', 'agenda'], color: 'pink', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <FileText size={18} />, label: 'PQR', path: '/pqr', keywords: ['pqr', 'quejas', 'reclamos', 'peticiones'], color: 'red', permission: 'secretaria,supervisor,administrador' },
+    { icon: <MessageSquare size={18} />, label: 'Mis PQR', path: '/mis-pqr', keywords: ['mis pqr', 'pqr asignadas', 'casos'], color: 'blue', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <Loader2 size={18} />, label: 'Incidencias', path: '/incidencias', keywords: ['incidencias', 'issues', 'problemas'], color: 'orange', permission: 'secretaria,supervisor,administrador' },
     { icon: <Mail size={18} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', keywords: ['correo', 'email', 'plantillas'], color: 'blue', permission: 'secretaria,supervisor,administrador' },
     { icon: <PieChartIcon size={18} />, label: 'Reportes', path: '/reportes-regulatorios', keywords: ['reportes', 'reports', 'regulatorios'], color: 'purple', permission: 'administrador' },
     { icon: <BarChart3 size={18} />, label: 'Estadísticas', path: '/reports', keywords: ['estadisticas', 'stats', 'analytics'], color: 'green', permission: 'administrador' },
+    { icon: <Navigation size={18} />, label: 'Seguimiento Técnicos', path: '/seguimiento-tecnicos', keywords: ['seguimiento', 'tecnicos', 'ruta', 'agenda', 'diaria', 'supervision'], color: 'green', permission: 'administrador,supervisor,secretaria' },
     { icon: <BarChart3 size={18} />, label: 'Mapa Instalaciones', path: '/mapa-instalaciones', keywords: ['mapa', 'map', 'ubicacion', 'instalaciones'], color: 'green', permission: 'instalador,administrador,supervisor,secretaria' },
     { icon: <MapPin size={18} />, label: 'Mapa Clientes', path: '/mapa-clientes', keywords: ['mapa', 'clientes', 'map', 'ciudad', 'ubicacion', 'general'], color: 'blue', permission: 'administrador,supervisor,secretaria' },
     { icon: <UserCheck size={18} />, label: 'Usuarios Sistema', path: '/admin/users', keywords: ['usuarios', 'admin', 'sistema'], color: 'blue', permission: 'administrador' },
@@ -481,6 +483,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const reportesAnalisis = [
     { icon: <PieChartIcon size={22} />, label: 'Reportes', path: '/reportes-regulatorios', permission: 'administrador' },
     { icon: <BarChart3 size={22} />, label: 'Estadísticas', path: '/reports', permission: 'administrador' },
+    { icon: <Navigation size={22} />, label: 'Seguimiento Técnicos', path: '/seguimiento-tecnicos', permission: 'administrador,supervisor,secretaria' },
     { icon: <BarChart3 size={22} />, label: 'Mapa Instalaciones', path: '/mapa-instalaciones', permission: 'instalador,administrador,supervisor,secretaria' },
     { icon: <MapPin size={22} />, label: 'Mapa Clientes', path: '/mapa-clientes', permission: 'administrador,supervisor,secretaria' }
   ];
