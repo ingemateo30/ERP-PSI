@@ -231,20 +231,35 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
             const procesarDatosHID = (event) => {
                 reportCount++;
                 const data = new Uint8Array(event.data.buffer);
-                
-                // Log cada 1000 reportes
+
+                // Log cada 1000 reportes (y el primero para diagnóstico)
                 if (reportCount === 1 || reportCount % 1000 === 0) {
-                    console.log(`📊 Reporte #${reportCount}:`, 
+                    console.log(`📊 Reporte #${reportCount} (len=${data.length}):`,
                                Array.from(data.slice(0, 10)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
                 }
 
-                if (data.length !== 63) return;
+                // Aceptar reportes con suficientes bytes para parsear coordenadas (≥7)
+                // El STU-540 puede enviar paquetes de 8 bytes o de 64 bytes según el modo.
+                // Antes se filtraba solo 63 bytes (=64-byte packet minus report ID), lo que
+                // rechazaba todos los paquetes de 8 bytes — bug crítico corregido aquí.
+                if (data.length < 7) return;
 
                 const status = data[0];
-                
-                // Detectar pen activo - simplificado
-                const isPenActive = status === 0x91 || status === 0x92;
-                
+
+                // Extraer coordenadas y presión primero para usarlas en la detección
+                let x = data[1] | (data[2] << 8);
+                let y = data[3] | (data[4] << 8);
+                let pressure = data[5] | (data[6] << 8);
+
+                // Detectar pen activo:
+                // - bit 7 del status (rdy) = pen en proximidad según Wacom STU protocol
+                // - status 0x01 o 0x81 = tip switch activo
+                // - fallback: si hay presión > 0, el pen está tocando
+                const isPenActive = (status & 0x80) !== 0 ||  // rdy bit
+                                    status === 0x91 || status === 0x92 || // valores previos (compatibilidad)
+                                    status === 0x01 || status === 0x81 || // tip switch
+                                    pressure > 0;                         // presión detectada
+
                 if (!isPenActive) {
                     // Si el pen no está activo y estábamos dibujando, finalizar trazo
                     if (isDrawing) {
@@ -253,21 +268,17 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     }
                     return;
                 }
-                
-                // Usar posiciones 1-2 y 3-4 según tus datos
-                let x = data[1] | (data[2] << 8);
-                let y = data[3] | (data[4] << 8);
-                let pressure = data[5] | (data[6] << 8);
-                
-                // Validación muy permisiva
-                if (x > 10000 || y > 10000) {
+
+                // Validación de rango de coordenadas
+                if (x > 65535 || y > 65535) {
                     return;
                 }
-                
-                // Mapear con rango realista para STU-540
-                // Basándome en documentación Wacom STU-540: resolución 800x480
-                const maxX = 4000;  // Rango amplio pero realista
-                const maxY = 4000;
+
+                // Rango de coordenadas del digitalizador STU-540 según Wacom STU SDK:
+                // 9600 × 5760 (equivalente al panel LCD 800×480 × escala 12)
+                // Anteriormente se usaba 4000×4000 lo que cortaba la firma en ~42% del área
+                const maxX = 9600;
+                const maxY = 5760;
                 
                 const canvasX = Math.min(canvas.width - 1, (x / maxX) * canvas.width);
                 const canvasY = Math.min(canvas.height - 1, (y / maxY) * canvas.height);
@@ -1179,9 +1190,10 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                                 <div className="border-2 border-dashed border-green-300 rounded-lg p-4 bg-green-50">
                                     <canvas
                                         ref={wacomCanvasRef}
-                                        width={400}
-                                        height={150}
+                                        width={480}
+                                        height={180}
                                         className="w-full border rounded bg-white mx-auto block"
+                                        style={{ aspectRatio: '8/3' }}
                                     />
                                     {!isCapturingWacom && (
                                         <p className="text-center text-sm text-green-700 mt-2">

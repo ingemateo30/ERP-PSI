@@ -1609,6 +1609,30 @@ const observacionesContrato = JSON.stringify({
         throw new Error('Estado no válido');
       }
 
+      // #8 - Bloquear retiro si hay contrato con permanencia vigente
+      if (nuevoEstado === 'retirado') {
+        const [contratosActivos] = await conexion.execute(`
+          SELECT id, numero_contrato,
+                 COALESCE(fecha_vencimiento_permanencia, fecha_fin) as fecha_vencimiento
+          FROM contratos
+          WHERE cliente_id = ?
+            AND estado = 'activo'
+            AND tipo_permanencia = 'con_permanencia'
+            AND COALESCE(fecha_vencimiento_permanencia, fecha_fin) > CURDATE()
+          LIMIT 1
+        `, [clienteId]);
+
+        if (contratosActivos.length > 0) {
+          const contrato = contratosActivos[0];
+          const fechaVenc = contrato.fecha_vencimiento
+            ? new Date(contrato.fecha_vencimiento).toLocaleDateString('es-CO')
+            : 'fecha desconocida';
+          throw new Error(
+            `No se puede retirar el cliente. Tiene el contrato ${contrato.numero_contrato} con permanencia vigente hasta el ${fechaVenc}. Debe esperar a que venza la permanencia o anular el contrato antes de proceder.`
+          );
+        }
+      }
+
       // Actualizar cliente
       await conexion.execute(`
         UPDATE clientes 
