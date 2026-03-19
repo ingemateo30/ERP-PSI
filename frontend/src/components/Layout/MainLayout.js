@@ -56,6 +56,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <GitMerge size={18} />, label: 'Cruce Masivo', path: '/cruce-masivo', keywords: ['cruce', 'masivo', 'bancos', 'bulk'], color: 'teal', permission: 'secretaria,supervisor,administrador' },
     { icon: <Building2 size={18} />, label: 'Formatos Bancos', path: '/formatos-bancos', keywords: ['formatos', 'bancos', 'recaudo', 'caja social'], color: 'blue', permission: 'secretaria,supervisor,administrador' },
     { icon: <FileText size={18} />, label: 'Historial Facturas', path: '/historial-facturas', keywords: ['historial', 'history'], color: 'gray', permission: 'secretaria,supervisor,administrador' },
+    { icon: <DollarSign size={18} />, label: 'Cartera Morosos', path: '/cartera', keywords: ['cartera', 'morosos', 'deuda', 'vencidas', 'cobro'], color: 'red', permission: 'secretaria,supervisor,administrador' },
     { icon: <Wifi size={18} />, label: 'Planes de Servicio', path: '/config/service-plans', keywords: ['planes', 'servicios', 'plans'], color: 'blue', permission: 'administrador' },
     { icon: <Wrench size={18} />, label: 'Instalaciones', path: '/instalaciones', keywords: ['instalaciones', 'installation', 'instalar'], color: 'red', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <Package size={18} />, label: 'Inventario', path: '/inventory', keywords: ['inventario', 'stock', 'productos'], color: 'indigo', permission: 'instalador,secretaria,supervisor,administrador' },
@@ -460,7 +461,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <CreditCard size={22} />, label: 'Pagos', path: '/cruce-pagos', permission: 'secretaria,supervisor,administrador' },
     { icon: <GitMerge size={22} />, label: 'Cruce Masivo', path: '/cruce-masivo', permission: 'secretaria,supervisor,administrador' },
     { icon: <Building2 size={22} />, label: 'Formatos Bancos', path: '/formatos-bancos', permission: 'secretaria,supervisor,administrador' },
-    { icon: <FileText size={22} />, label: 'Historial Facturas', path: '/historial-facturas', permission: 'secretaria,supervisor,administrador' }
+    { icon: <FileText size={22} />, label: 'Historial Facturas', path: '/historial-facturas', permission: 'secretaria,supervisor,administrador' },
+    { icon: <DollarSign size={22} />, label: 'Cartera Morosos', path: '/cartera', permission: 'secretaria,supervisor,administrador' }
   ];
 
   const serviciosOperaciones = [

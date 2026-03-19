@@ -635,17 +635,21 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     if (!client) return;
 
     try {
-      // Si es edición, cargar datos del cliente y sus servicios
-      const serviciosResponse = await clientService.getClientServices(client.id);
-      const serviciosActivos = serviciosResponse.data.filter(s => s.estado === 'activo');
-
       setFormData(prev => ({
         ...prev,
-        ...client,
-        // Si tiene servicios activos, cargar el primero
-        plan_id: serviciosActivos[0]?.plan_id || '',
-        precio_personalizado: serviciosActivos[0]?.precio_personalizado || '',
-        observaciones_servicio: serviciosActivos[0]?.observaciones || '',
+        // Datos básicos del cliente (mapear correo→email y telefono_2→telefono_fijo)
+        identificacion: client.identificacion || '',
+        tipo_documento: client.tipo_documento || 'cedula',
+        nombre: client.nombre || '',
+        email: client.correo || client.email || '',
+        telefono: client.telefono || '',
+        telefono_fijo: client.telefono_2 || client.telefono_fijo || '',
+        direccion: client.direccion || '',
+        barrio: client.barrio || '',
+        estrato: client.estrato || '3',
+        ciudad_id: client.ciudad_id || '',
+        sector_id: client.sector_id || '',
+        observaciones: client.observaciones || '',
         // En edición no generar documentos automáticamente
         generar_documentos: false,
         enviar_bienvenida: false,
@@ -926,14 +930,14 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       identificacion: formData.identificacion,
       tipo_documento: formData.tipo_documento,
       nombre: formData.nombre,
-      email: formData.email,
+      correo: formData.email,      // Backend usa 'correo' no 'email'
       telefono: formData.telefono,
-      telefono_fijo: formData.telefono_fijo,
+      telefono_2: formData.telefono_fijo, // Backend usa 'telefono_2'
       direccion: formData.direccion,
       barrio: formData.barrio,
       estrato: formData.estrato,
-      ciudad_id: formData.ciudad_id,
-      sector_id: formData.sector_id,
+      ciudad_id: formData.ciudad_id ? parseInt(formData.ciudad_id) : null,
+      sector_id: formData.sector_id ? parseInt(formData.sector_id) : null,
       observaciones: formData.observaciones
     };
 
@@ -1288,12 +1292,12 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
               </div>
             </div>  {/* ✅ CIERRE DE COLUMNA 1 (space-y-6) */}
 
-            {/* COLUMNA 2: DATOS DEL SERVICIO */}
+            {/* COLUMNA 2: DATOS DEL SERVICIO (solo en creación) / RESUMEN (en edición) */}
             <div className="space-y-6">
               <div className="border-b-2 border-[#0e6493]/20 pb-4">
                 <h3 className="text-lg font-semibold text-[#0e6493] flex items-center gap-2">
                   <Wifi className="w-5 h-5" />
-                  {client ? 'Cambiar Plan' : 'Asignar Servicio'}
+                  {client ? 'Información adicional' : 'Asignar Servicio'}
                 </h3>
                 {!client && (
                   <p className="text-sm text-gray-500 mt-1">
@@ -1301,6 +1305,64 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   </p>
                 )}
               </div>
+
+              {/* En modo edición: mostrar estado del cliente y observaciones */}
+              {client && (
+                <div className="space-y-5">
+                  {/* Estado del cliente */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Estado del cliente</label>
+                    <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                        client.estado === 'activo' ? 'bg-green-100 text-green-800' :
+                        client.estado === 'suspendido' ? 'bg-yellow-100 text-yellow-800' :
+                        client.estado === 'cortado' ? 'bg-red-100 text-red-800' :
+                        client.estado === 'retirado' ? 'bg-gray-100 text-gray-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {client.estado ? client.estado.charAt(0).toUpperCase() + client.estado.slice(1) : 'Activo'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Información de registro */}
+                  {(client.fecha_registro || client.numero_contrato) && (
+                    <div className="grid grid-cols-1 gap-3">
+                      {client.fecha_registro && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Fecha de registro</label>
+                          <p className="text-sm text-gray-800 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                            {new Date(client.fecha_registro).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </p>
+                        </div>
+                      )}
+                      {client.numero_contrato && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Número de contrato</label>
+                          <p className="text-sm text-gray-800 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg font-mono">{client.numero_contrato}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Observaciones */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
+                    <textarea
+                      value={formData.observaciones}
+                      onChange={(e) => handleInputChange('observaciones', e.target.value)}
+                      rows={5}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                      placeholder="Observaciones adicionales sobre el cliente..."
+                    />
+                  </div>
+
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                    <p className="font-medium mb-1">Nota:</p>
+                    <p>Para cambiar el plan o agregar servicios, use la opción <strong>"Agregar Servicio"</strong> desde el listado de clientes.</p>
+                  </div>
+                </div>
+              )}
 
               {/* Selección separada (Internet + TV) - SIEMPRE VISIBLE */}
               {!client && (
@@ -1356,67 +1418,72 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
               {/* ✅ SELECTOR DE PERMANENCIA - SIEMPRE VISIBLE PARA NUEVOS CLIENTES */}
               {!client && SelectorPermanenciaCompleto()}
 
-              {/* Precio personalizado */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Precio Personalizado (Opcional)
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                  <input
-                    type="number"
-                    value={formData.precio_personalizado}
-                    onChange={(e) => handleInputChange('precio_personalizado', e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
-                    placeholder="Dejar vacío para usar precio del plan"
-                    min="0"
-                    step="100"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Si se especifica, este precio se usará en lugar del precio del plan
-                </p>
-              </div>
+              {/* Precio personalizado, fecha activación y observaciones servicio: solo en creación */}
+              {!client && (
+                <>
+                  {/* Precio personalizado */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Precio Personalizado (Opcional)
+                    </label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                      <input
+                        type="number"
+                        value={formData.precio_personalizado}
+                        onChange={(e) => handleInputChange('precio_personalizado', e.target.value)}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                        placeholder="Dejar vacío para usar precio del plan"
+                        min="0"
+                        step="100"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Si se especifica, este precio se usará en lugar del precio del plan
+                    </p>
+                  </div>
 
-              {/* Fecha de activación */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Fecha de Activación
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                  <input
-                    type="date"
-                    value={formData.fecha_activacion}
-                    onChange={(e) => handleInputChange('fecha_activacion', e.target.value)}
-                    className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
-                      errors.fecha_activacion ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    min={new Date().toISOString().split('T')[0]}
-                    max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                  />
-                </div>
-                {errors.fecha_activacion && (
-                  <p className="mt-1 text-sm text-red-600">{errors.fecha_activacion}</p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  La fecha no puede superar un mes desde hoy
-                </p>
-              </div>
+                  {/* Fecha de activación */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Fecha de Activación
+                    </label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                      <input
+                        type="date"
+                        value={formData.fecha_activacion}
+                        onChange={(e) => handleInputChange('fecha_activacion', e.target.value)}
+                        className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
+                          errors.fecha_activacion ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        min={new Date().toISOString().split('T')[0]}
+                        max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                      />
+                    </div>
+                    {errors.fecha_activacion && (
+                      <p className="mt-1 text-sm text-red-600">{errors.fecha_activacion}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      La fecha no puede superar un mes desde hoy
+                    </p>
+                  </div>
 
-              {/* Observaciones del servicio */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Observaciones del Servicio
-                </label>
-                <textarea
-                  value={formData.observaciones_servicio}
-                  onChange={(e) => handleInputChange('observaciones_servicio', e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
-                  placeholder="Observaciones especiales sobre el servicio..."
-                />
-              </div>
+                  {/* Observaciones del servicio */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Observaciones del Servicio
+                    </label>
+                    <textarea
+                      value={formData.observaciones_servicio}
+                      onChange={(e) => handleInputChange('observaciones_servicio', e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                      placeholder="Observaciones especiales sobre el servicio..."
+                    />
+                  </div>
+                </>
+              )}
 
               {/* Opciones de creación automática (solo para cliente nuevo) */}
               {!client && (
@@ -1473,19 +1540,21 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                 </div>
               )}
 
-              {/* Observaciones generales */}
-              <div className="border-t-2 border-[#0e6493]/10 pt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Observaciones Generales
-                </label>
-                <textarea
-                  value={formData.observaciones}
-                  onChange={(e) => handleInputChange('observaciones', e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
-                  placeholder="Observaciones adicionales sobre el cliente..."
-                />
-              </div>
+              {/* Observaciones generales: solo en modo creación/agregar servicio (en edición están en el bloque de arriba) */}
+              {!client && (
+                <div className="border-t-2 border-[#0e6493]/10 pt-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Observaciones Generales
+                  </label>
+                  <textarea
+                    value={formData.observaciones}
+                    onChange={(e) => handleInputChange('observaciones', e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                    placeholder="Observaciones adicionales sobre el cliente..."
+                  />
+                </div>
+              )}
             </div>  {/* ✅ CIERRE DE COLUMNA 2 (space-y-6) */}
           </div>  {/* ✅ CIERRE DEL GRID DE 2 COLUMNAS */}
 

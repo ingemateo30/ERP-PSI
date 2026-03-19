@@ -52,6 +52,7 @@ const FormatosBancarios = lazy(() => import('./components/Facturas/FormatosBanca
 const CruceMasivoBancos = lazy(() => import('./components/Facturas/CruceMasivoBancos'));
 const MapaInstalaciones = lazy(() => import('./components/Mapa/MapaInstalaciones'));
 const MapaClientes = lazy(() => import('./components/Mapa/MapaClientes'));
+const CarteraPanel = lazy(() => import('./components/Cartera/CarteraPanel'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -350,6 +351,17 @@ function App() {
                   <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Clientes por Sector" subtitle="Listado de clientes agrupados por zona y sede">
                       <ClientesPorSector />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/cartera"
+                element={
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
+                    <MainLayout title="Panel de Cartera" subtitle="Clientes morosos con 2 o más facturas vencidas">
+                      <CarteraPanel />
                     </MainLayout>
                   </ProtectedRoute>
                 }
