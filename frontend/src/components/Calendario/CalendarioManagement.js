@@ -564,7 +564,7 @@ const load = useCallback(async () => {
             <div className="bg-blue-50 rounded-lg p-3">
               <p className="text-xs text-blue-600 font-semibold uppercase">Total Facturado</p>
               <p className="text-2xl font-bold text-blue-700">
-                ${formatCOP(reportes.totalFacturado)}
+                {formatCOP(reportes.totalFacturado)}
               </p>
               <p className="text-xs text-blue-500">{reportes.totalFacturas} facturas</p>
             </div>
@@ -572,7 +572,7 @@ const load = useCallback(async () => {
             <div className="bg-green-50 rounded-lg p-3">
               <p className="text-xs text-green-600 font-semibold uppercase">Pagado</p>
               <p className="text-2xl font-bold text-green-700">
-                ${formatCOP(reportes.totalPagado)}
+                {formatCOP(reportes.totalPagado)}
               </p>
               <p className="text-xs text-green-500">{reportes.porEstado.pagadas} facturas</p>
             </div>
@@ -580,7 +580,7 @@ const load = useCallback(async () => {
             <div className="bg-yellow-50 rounded-lg p-3">
               <p className="text-xs text-yellow-600 font-semibold uppercase">Pendiente</p>
               <p className="text-2xl font-bold text-yellow-700">
-                ${formatCOP(reportes.totalPendiente)}
+                {formatCOP(reportes.totalPendiente)}
               </p>
               <p className="text-xs text-yellow-500">{reportes.porEstado.pendientes} facturas</p>
             </div>
@@ -588,7 +588,7 @@ const load = useCallback(async () => {
             <div className="bg-red-50 rounded-lg p-3">
               <p className="text-xs text-red-600 font-semibold uppercase">Vencido</p>
               <p className="text-2xl font-bold text-red-700">
-                ${formatCOP(reportes.totalVencido)}
+                {formatCOP(reportes.totalVencido)}
               </p>
               <p className="text-xs text-red-500">{reportes.porEstado.vencidas} facturas</p>
             </div>

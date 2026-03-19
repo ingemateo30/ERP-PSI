@@ -205,7 +205,7 @@ const InstalacionesList = ({
                                         </div>
                                         {instalacion.costo_instalacion > 0 && (
                                             <div className="text-xs text-green-600 font-medium">
-                                                ${formatCOP(instalacion.costo_instalacion)}
+                                                {formatCOP(instalacion.costo_instalacion)}
                                             </div>
                                         )}
                                     </td>

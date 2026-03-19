@@ -394,21 +394,21 @@ router.get('/search',
 router.get('/barrios', async (req, res) => {
   try {
     const { ciudad_id } = req.query;
-    const pool = require('../config/database');
     let rows;
     if (ciudad_id) {
       [rows] = await pool.execute(
-        'SELECT DISTINCT barrio FROM clientes WHERE ciudad_id = ? AND barrio IS NOT NULL AND barrio != "" ORDER BY barrio',
-        [ciudad_id]
+        "SELECT DISTINCT barrio FROM clientes WHERE ciudad_id = ? AND barrio IS NOT NULL AND barrio != '' ORDER BY barrio",
+        [parseInt(ciudad_id)]
       );
     } else {
       [rows] = await pool.execute(
-        'SELECT DISTINCT barrio FROM clientes WHERE barrio IS NOT NULL AND barrio != "" ORDER BY barrio'
+        "SELECT DISTINCT barrio FROM clientes WHERE barrio IS NOT NULL AND barrio != '' ORDER BY barrio"
       );
     }
     res.json({ success: true, data: rows.map(r => r.barrio) });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Error obteniendo barrios:', error);
+    res.status(500).json({ success: false, message: error.message, data: [] });
   }
 });
 

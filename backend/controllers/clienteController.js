@@ -555,11 +555,13 @@ static async crear(req, res) {
         });
       }
 
-      await Cliente.eliminar(id);
+      const resultado = await Cliente.eliminar(id);
 
       res.json({
         success: true,
-        message: 'Cliente retirado del sistema exitosamente'
+        message: resultado.tipo === 'hard'
+          ? 'Cliente eliminado completamente del sistema'
+          : 'Cliente marcado como retirado (tiene historial financiero asociado)'
       });
     } catch (error) {
       console.error('Error al eliminar cliente:', error);

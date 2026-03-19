@@ -143,7 +143,7 @@ const SelectorSedesServicios = ({
               </span>
             </div>
             <span className="text-lg font-bold text-blue-900">
-              ${calcularTotalGeneral().toLocaleString()}
+              {formatCOP(calcularTotalGeneral())}
             </span>
           </div>
         </div>
@@ -185,7 +185,7 @@ const SelectorSedesServicios = ({
                   </div>
                   <div className="flex items-center space-x-4">
                     <span className="text-lg font-semibold text-green-600">
-                      ${calcularTotalSede(sede).toLocaleString()}
+                      {formatCOP(calcularTotalSede(sede))}
                     </span>
                     <button
                       type="button"
@@ -331,7 +331,7 @@ const SelectorSedesServicios = ({
                           <option value="">Sin internet</option>
                           {planesInternet.map(plan => (
                             <option key={plan.id} value={plan.id}>
-                              {plan.nombre} - ${formatCOP(plan.precio)}
+                              {plan.nombre} - {formatCOP(plan.precio)}
                               {plan.velocidad_bajada && ` (${plan.velocidad_bajada} Mbps)`}
                             </option>
                           ))}
@@ -373,7 +373,7 @@ const SelectorSedesServicios = ({
                           <option value="">Sin televisión</option>
                           {planesTelevision.map(plan => (
                             <option key={plan.id} value={plan.id}>
-                              {plan.nombre} - ${formatCOP(plan.precio)}
+                              {plan.nombre} - {formatCOP(plan.precio)}
                               {plan.canales_tv && ` (${plan.canales_tv} canales)`}
                             </option>
                           ))}
@@ -452,7 +452,7 @@ const SelectorSedesServicios = ({
                           <hr className="border-green-300" />
                           <div className="flex justify-between font-semibold text-green-900">
                             <span>Total Sede:</span>
-                            <span>${calcularTotalSede(sede).toLocaleString()}</span>
+                            <span>{formatCOP(calcularTotalSede(sede))}</span>
                           </div>
                           <div className="text-xs text-green-700">
                             • 1 contrato unificado • 1 factura mensual
@@ -497,7 +497,7 @@ const SelectorSedesServicios = ({
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">
-                ${calcularTotalGeneral().toLocaleString()}
+                {formatCOP(calcularTotalGeneral())}
               </div>
               <div className="text-sm text-gray-600">Total Mensual</div>
             </div>
@@ -511,7 +511,7 @@ const SelectorSedesServicios = ({
                     {sede.nombre_sede || `Sede ${index + 1}`} 
                     ({contarServiciosPorSede(sede)} servicio{contarServiciosPorSede(sede) !== 1 ? 's' : ''})
                   </span>
-                  <span className="font-medium">${calcularTotalSede(sede).toLocaleString()}</span>
+                  <span className="font-medium">{formatCOP(calcularTotalSede(sede))}</span>
                 </div>
               ))}
             </div>

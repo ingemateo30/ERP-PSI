@@ -359,7 +359,7 @@ const InstalacionForm = ({
                                         <option value="">Seleccionar plan</option>
                                         {planes.map(plan => (
                                             <option key={plan.id} value={plan.id}>
-                                                {plan.nombre} - ${formatCOP(plan.precio)}
+                                                {plan.nombre} - {formatCOP(plan.precio)}
                                             </option>
                                         ))}
                                     </select>
