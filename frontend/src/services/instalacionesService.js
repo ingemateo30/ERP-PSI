@@ -277,16 +277,13 @@ export const instalacionesService = {
     }
   },
 
-  async getInstaladores() {
+  async getInstaladores(sedeCiudadId = null) {
     try {
       console.log('👷 Obteniendo instaladores');
-      const response = await apiService.get('/users', { rol: 'instalador' });
-      console.log('👷 Respuesta completa instaladores:', response);
-      
-      // Los instaladores están en message.users
-      const instaladores = response.message?.users || response.data?.users || response.users || [];
-      console.log('👷 Instaladores extraídos:', instaladores);
-      
+      const params = sedeCiudadId ? { sede_id: sedeCiudadId } : {};
+      const response = await apiService.get(`${API_BASE}/instaladores`, params);
+      console.log('👷 Respuesta instaladores:', response);
+      const instaladores = response.data || response.instaladores || [];
       return {
         success: true,
         instaladores: Array.isArray(instaladores) ? instaladores : []

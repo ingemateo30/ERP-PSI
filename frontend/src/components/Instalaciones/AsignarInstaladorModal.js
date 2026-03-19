@@ -3,18 +3,21 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Search, UserCheck, AlertCircle } from 'lucide-react';
 
-const AsignarInstaladorModal = ({ 
-    visible, 
-    instalacion, 
-    instaladores = [], 
-    onAsignar, 
+const AsignarInstaladorModal = ({
+    visible,
+    instalacion,
+    instaladores = [],
+    onAsignar,
     onCerrar,
-    procesando = false 
+    procesando = false
 }) => {
     const [instaladorSeleccionado, setInstaladorSeleccionado] = useState('');
     const [busqueda, setBusqueda] = useState('');
     const [instaladoresFiltrados, setInstaladoresFiltrados] = useState([]);
     const [error, setError] = useState('');
+
+    // sede_id de la instalación (ciudad del cliente) para clasificar instaladores
+    const sedeCiudadId = instalacion?.cliente_ciudad || instalacion?.sede_id || null;
 
     useEffect(() => {
         if (visible) {
@@ -24,16 +27,14 @@ const AsignarInstaladorModal = ({
         }
     }, [visible, instalacion]);
 
-useEffect(() => {
-        if (busqueda.trim() === '') {
-            setInstaladoresFiltrados(instaladores);
-        } else {
-            const filtrados = instaladores.filter(instalador =>
-                (instalador.nombre?.toLowerCase().includes(busqueda.toLowerCase())) ||
-                (instalador.telefono?.includes(busqueda))
+    useEffect(() => {
+        const base = busqueda.trim() === ''
+            ? instaladores
+            : instaladores.filter(i =>
+                (i.nombre?.toLowerCase().includes(busqueda.toLowerCase())) ||
+                (i.telefono?.includes(busqueda))
             );
-            setInstaladoresFiltrados(filtrados);
-        }
+        setInstaladoresFiltrados(base);
     }, [busqueda, instaladores]);
 
     const handleAsignar = async () => {
@@ -121,16 +122,31 @@ useEffect(() => {
                         <div className="border border-gray-300 rounded-lg max-h-60 overflow-y-auto">
                             {instaladoresFiltrados.length === 0 ? (
                                 <div className="p-4 text-center text-gray-500">
-                                    {instaladores.length === 0 
-                                        ? 'No hay instaladores disponibles' 
+                                    {instaladores.length === 0
+                                        ? 'No hay instaladores disponibles'
                                         : 'No se encontraron instaladores'
                                     }
                                 </div>
                             ) : (
                                 <div className="space-y-1 p-2">
-                                    {instaladoresFiltrados.map((instalador) => (
+                                    {/* Separador visual: técnicos de la sede primero */}
+                                    {sedeCiudadId && instaladoresFiltrados.some(i => i.sede_id == sedeCiudadId) && (
+                                        <p className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-1 rounded">
+                                            — Técnicos de esta sede —
+                                        </p>
+                                    )}
+                                    {instaladoresFiltrados.map((instalador, idx) => {
+                                        const esSede = sedeCiudadId && instalador.sede_id == sedeCiudadId;
+                                        const anteriorEsSede = idx > 0 && sedeCiudadId && instaladoresFiltrados[idx-1].sede_id == sedeCiudadId;
+                                        const esPrimeroOtraSede = sedeCiudadId && !esSede && anteriorEsSede;
+                                        return (
+                                        <React.Fragment key={instalador.id}>
+                                        {esPrimeroOtraSede && (
+                                            <p className="text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-1 rounded mt-1">
+                                                — Otras sedes —
+                                            </p>
+                                        )}
                                         <div
-                                            key={instalador.id}
                                             className={`p-3 rounded-lg cursor-pointer transition-colors ${
                                                 instaladorSeleccionado == instalador.id
                                                     ? 'bg-blue-50 border-2 border-blue-200'
@@ -147,18 +163,24 @@ useEffect(() => {
                                                     )}
                                                 </div>
                                                 <div className="ml-3 flex-1">
-                                                    <div className="text-sm font-medium text-gray-900">
-                                                        {instalador.nombre }
+                                                    <div className="text-sm font-medium text-gray-900 flex items-center gap-1">
+                                                        {instalador.nombre}
+                                                        {esSede && <span className="text-xs bg-green-100 text-green-700 px-1 rounded">Esta sede</span>}
                                                     </div>
                                                     {instalador.telefono && (
                                                         <div className="text-sm text-gray-500">
                                                             Tel: {instalador.telefono}
                                                         </div>
                                                     )}
+                                                    {instalador.sede && !esSede && (
+                                                        <div className="text-xs text-gray-400">{instalador.sede}</div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
-                                    ))}
+                                        </React.Fragment>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

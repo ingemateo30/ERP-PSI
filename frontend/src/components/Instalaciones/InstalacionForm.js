@@ -1,3 +1,4 @@
+import { formatCOP } from '../../utils/formatCurrency';
 // frontend/src/components/Instalaciones/InstalacionForm.js
 
 import React, { useState, useEffect } from 'react';
@@ -358,7 +359,7 @@ const InstalacionForm = ({
                                         <option value="">Seleccionar plan</option>
                                         {planes.map(plan => (
                                             <option key={plan.id} value={plan.id}>
-                                                {plan.nombre} - ${plan.precio.toLocaleString()}
+                                                {plan.nombre} - ${formatCOP(plan.precio)}
                                             </option>
                                         ))}
                                     </select>

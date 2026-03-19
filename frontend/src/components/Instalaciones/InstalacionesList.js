@@ -1,3 +1,4 @@
+import { formatCOP } from '../../utils/formatCurrency';
 // frontend/src/components/Instalaciones/InstalacionesList.js
 
 import React from 'react';
@@ -204,7 +205,7 @@ const InstalacionesList = ({
                                         </div>
                                         {instalacion.costo_instalacion > 0 && (
                                             <div className="text-xs text-green-600 font-medium">
-                                                ${instalacion.costo_instalacion?.toLocaleString()}
+                                                ${formatCOP(instalacion.costo_instalacion)}
                                             </div>
                                         )}
                                     </td>

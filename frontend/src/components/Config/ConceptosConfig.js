@@ -1,3 +1,4 @@
+import { formatCOP } from '../../utils/formatCurrency';
 // frontend/src/components/Config/ConceptosConfig.js
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -501,7 +502,7 @@ const ConceptosConfig = () => {
                 <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                   <div className="text-center">
                     <span className="text-2xl font-bold text-[#0e6493]">
-                      ${concepto.valor_base.toLocaleString()}
+                      ${formatCOP(concepto.valor_base)}
                     </span>
                     <span className="text-sm text-gray-600 ml-1">
                       {concepto.aplica_iva ? `+ ${concepto.porcentaje_iva}% IVA` : 'Sin IVA'}

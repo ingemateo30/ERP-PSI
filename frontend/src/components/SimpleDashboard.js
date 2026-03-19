@@ -1,3 +1,4 @@
+import { formatCOP } from '../utils/formatCurrency';
 // frontend/src/components/SimpleDashboard.js
 import ModalDetalleInstalacion from './Instalaciones/ModalDetalleInstalacion';
 import ModalCompletarInstalacion from './Instalador/ModalCompletarInstalacion';
@@ -687,7 +688,7 @@ return (
                     />
                     <StatCard
                         title="Facturación Mes"
-                        value={`$${supervisorStats.facturacionMes.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+                        value={`$${formatCOP(supervisorStats.facturacionMes)}`}
                         icon={<DollarSign size={24} className="text-[#10b981]" />}
                         change="Mes actual"
                         color="#10b981"
@@ -816,11 +817,11 @@ return (
                                         Total Período ({ingresosMensuales.length} {ingresosMensuales.length === 1 ? 'día' : 'días'})
                                     </p>
                                     <p className="text-2xl font-bold text-[#0e6493]">
-                                        ${ingresosMensuales.reduce((acc, item) => acc + item.monto, 0).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        ${ingresosMensuales.reduce((acc, item) => acc + item.monto, formatCOP(0))}
                                     </p>
                                     {ingresosMensuales.length > 0 && ingresosMensuales.length <= 5 && (
                                         <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                                            {ingresosMensuales.map(i => `$${i.monto.toLocaleString('es-CO', { minimumFractionDigits: 0 })}`).join(' + ')}
+                                            {ingresosMensuales.map(i => `$${formatCOP(i.monto)}`).join(' + ')}
                                         </p>
                                     )}
                                 </div>
@@ -843,7 +844,7 @@ return (
                                 <div className="text-center p-4 bg-purple-50 rounded-lg hover:shadow-md transition-shadow">
                                     <p className="text-sm text-gray-600 mb-2">Día con Mayor Ingreso</p>
                                     <p className="text-2xl font-bold text-purple-700">
-                                        ${Math.max(...ingresosMensuales.map(i => i.monto)).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        ${Math.max(...ingresosMensuales.map(i => formatCOP(i.monto)))}
                                     </p>
                                     <p className="text-xs text-gray-500 mt-2">
                                         📅 {ingresosMensuales.find(i => i.monto === Math.max(...ingresosMensuales.map(m => m.monto)))?.fecha || 'N/A'}

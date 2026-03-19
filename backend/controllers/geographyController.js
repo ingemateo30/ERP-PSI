@@ -671,12 +671,13 @@ class GeographyController {
 
   static async createSector(req, res) {
     try {
-      const { ciudad_id, codigo, nombre, activo = true, tipo_zona = 'urbano' } = req.body;
+      const { ciudad_id, nombre, activo = true, tipo_zona = 'urbano' } = req.body;
+      let { codigo } = req.body;
 
-      if (!codigo || !nombre) {
+      if (!nombre) {
         return res.status(400).json({
           success: false,
-          message: 'Código y nombre son requeridos'
+          message: 'El nombre del sector es requerido'
         });
       }
 
@@ -698,17 +699,29 @@ class GeographyController {
         }
       }
 
+      // Auto-generar código si no se proporcionó
+      if (!codigo || !codigo.trim()) {
+        const filtro = ciudad_id ? 'WHERE ciudad_id = ?' : 'WHERE ciudad_id IS NULL';
+        const params = ciudad_id ? [ciudad_id] : [];
+        const [maxCodigo] = await connection.execute(
+          `SELECT COALESCE(MAX(CAST(codigo AS UNSIGNED)), 0) + 1 AS siguiente FROM sectores ${filtro}`,
+          params
+        );
+        const siguiente = maxCodigo[0].siguiente || 1;
+        codigo = String(siguiente).padStart(3, '0');
+      }
+
       // Verificar duplicados
       const [existing] = await connection.execute(
-        'SELECT id FROM sectores WHERE codigo = ?',
-        [codigo]
+        'SELECT id FROM sectores WHERE codigo = ? AND (ciudad_id = ? OR (ciudad_id IS NULL AND ? IS NULL))',
+        [codigo.trim(), ciudad_id || null, ciudad_id || null]
       );
 
       if (existing.length > 0) {
         connection.release();
         return res.status(409).json({
           success: false,
-          message: 'Ya existe un sector con ese código'
+          message: `Ya existe un sector con el código ${codigo} en esta ciudad`
         });
       }
 

@@ -364,42 +364,67 @@ class Cliente {
     }
   }
 
-  // Eliminar cliente
+  // Eliminar cliente (soft delete: cambia estado a 'retirado')
   static async eliminar(id) {
+    const connection = await pool.getConnection();
     try {
       // Verificar si el cliente existe
-      const clienteExistente = await this.obtenerPorId(id);
-      if (!clienteExistente) {
+      const [clientes] = await connection.execute(
+        'SELECT id, nombre, estado FROM clientes WHERE id = ? AND estado != "retirado"',
+        [id]
+      );
+      if (!clientes || clientes.length === 0) {
+        connection.release();
         throw new Error('Cliente no encontrado');
       }
 
-      // Verificar si tiene servicios activos (facturas, instalaciones, etc.)
-      const connection = await pool.getConnection();
-
+      // Verificar registros que impidan la eliminación
       const [facturas] = await connection.execute(
         'SELECT COUNT(*) as count FROM facturas WHERE cliente_id = ?',
         [id]
       );
-
       if (facturas[0].count > 0) {
         connection.release();
-        throw new Error('No se puede eliminar el cliente porque tiene facturas asociadas');
+        throw new Error(`No se puede eliminar el cliente porque tiene ${facturas[0].count} factura(s) asociada(s). Considera marcarlo como "retirado" en su estado.`);
       }
 
-      // Realizar eliminación
-      const [resultado] = await connection.execute(
-        'DELETE FROM clientes WHERE id = ?',
+      const [pagos] = await connection.execute(
+        'SELECT COUNT(*) as count FROM pagos WHERE cliente_id = ?',
+        [id]
+      );
+      if (pagos[0].count > 0) {
+        connection.release();
+        throw new Error(`No se puede eliminar el cliente porque tiene ${pagos[0].count} pago(s) registrado(s). El historial de pagos debe conservarse.`);
+      }
+
+      const [contratos] = await connection.execute(
+        'SELECT COUNT(*) as count FROM contratos WHERE cliente_id = ?',
+        [id]
+      );
+      if (contratos[0].count > 0) {
+        connection.release();
+        throw new Error(`No se puede eliminar el cliente porque tiene ${contratos[0].count} contrato(s) asociado(s).`);
+      }
+
+      // Soft delete: marcar como retirado y desactivar sus servicios
+      await connection.beginTransaction();
+
+      await connection.execute(
+        'UPDATE clientes SET estado = "retirado", updated_at = NOW() WHERE id = ?',
         [id]
       );
 
+      await connection.execute(
+        'UPDATE servicios_cliente SET estado = "cancelado" WHERE cliente_id = ? AND estado = "activo"',
+        [id]
+      );
+
+      await connection.commit();
       connection.release();
-
-      if (resultado.affectedRows === 0) {
-        throw new Error('No se pudo eliminar el cliente');
-      }
-
       return true;
     } catch (error) {
+      await connection.rollback().catch(() => {});
+      connection.release();
       throw new Error(`Error al eliminar cliente: ${error.message}`);
     }
   }

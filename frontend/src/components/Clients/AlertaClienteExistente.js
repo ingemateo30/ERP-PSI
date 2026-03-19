@@ -1,3 +1,4 @@
+import { formatCOP } from '../../utils/formatCurrency';
 // frontend/src/components/Clients/AlertaClienteExistente.js
 // Crear este archivo nuevo
 
@@ -209,7 +210,7 @@ const AlertaClienteExistente = ({
 
                       <div className="text-lg font-bold text-red-600 truncate">
 
-                        ${datosPendientes.valor_pendiente.toLocaleString()}
+                        ${formatCOP(datosPendientes.valor_pendiente)}
 
                       </div>
                     </div>
