@@ -854,20 +854,24 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
                 return res.status(400).json({ success: false, message: 'No se puede renovar un contrato anulado' });
             }
 
-            // #3 - Bloquear renovación si quedan más de 30 días de permanencia vigente
+            // #3 - Solo se puede renovar cuando el contrato está próximo a vencer
             const DIAS_MINIMOS_PARA_RENOVAR = 30;
-            if (contratoOriginal.tipo_permanencia === 'con_permanencia') {
-                const fechaVencimiento = contratoOriginal.fecha_vencimiento_permanencia || contratoOriginal.fecha_fin;
-                if (fechaVencimiento) {
-                    const diasRestantes = Math.ceil((new Date(fechaVencimiento) - new Date()) / (1000 * 60 * 60 * 24));
-                    if (diasRestantes > DIAS_MINIMOS_PARA_RENOVAR) {
-                        return res.status(400).json({
-                            success: false,
-                            message: `No se puede renovar el contrato. Aún quedan ${diasRestantes} días de permanencia. Solo se puede renovar dentro de los ${DIAS_MINIMOS_PARA_RENOVAR} días anteriores al vencimiento.`,
-                            data: { dias_restantes: diasRestantes, dias_minimos: DIAS_MINIMOS_PARA_RENOVAR, fecha_vencimiento: fechaVencimiento }
-                        });
-                    }
-                }
+            const fechaFinRef = contratoOriginal.fecha_vencimiento_permanencia || contratoOriginal.fecha_fin;
+
+            if (!fechaFinRef) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'No se puede renovar este contrato: no tiene fecha de vencimiento definida. Solo se pueden renovar contratos con una fecha de fin establecida.'
+                });
+            }
+
+            const diasRestantes = Math.ceil((new Date(fechaFinRef) - new Date()) / (1000 * 60 * 60 * 24));
+            if (diasRestantes > DIAS_MINIMOS_PARA_RENOVAR) {
+                return res.status(400).json({
+                    success: false,
+                    message: `No se puede renovar el contrato. Aún quedan ${diasRestantes} días para su vencimiento. Solo se puede renovar dentro de los ${DIAS_MINIMOS_PARA_RENOVAR} días anteriores al vencimiento.`,
+                    data: { dias_restantes: diasRestantes, dias_minimos: DIAS_MINIMOS_PARA_RENOVAR, fecha_vencimiento: fechaFinRef }
+                });
             }
 
             const meses = parseInt(permanencia_meses) || contratoOriginal.permanencia_meses || 12;
