@@ -33,26 +33,44 @@ Sistema de gestión para ISP (Proveedor de Servicios de Internet).
 
 | # | Ítem | Estado |
 |---|------|--------|
-| 3 | Renovación de contrato solo cuando está próximo a vencer | ✅ Completado |
+| 3 | Renovación de contrato solo cuando está próximo a vencer (30 días) | ✅ Completado |
+| 3b | Contratos sin fecha_fin (sin permanencia) no pueden renovarse | ✅ Completado |
+| 3c | Botón Renovar oculto en contratos terminados/anulados | ✅ Completado |
 | 8 | Bloquear retiro de servicio hasta que el contrato expire | ✅ Completado |
 | 9 | Firma Wacom en contratos | ✅ Completado |
 | 13 | Filtrado por sede en todas las vistas para técnicos/secretarias | ✅ Completado |
-| 19 | Panel de cartera morosa (clientes con 2+ facturas vencidas) | ✅ Completado |
+| 19 | Panel de cartera morosa — mostrar clientes con facturas pendientes | ✅ Completado |
 | 20 | Formulario de edición de cliente corregido | ✅ Completado |
+| — | Asignar instalador bloqueado en instalaciones completadas/canceladas | ✅ Completado |
 
 ---
 
-## 🔄 Fase 4 — Técnica (Pendiente)
+## ✅ Fase 4 — Facturación Automática (Completado)
 
-| # | Ítem | Descripción |
-|---|------|-------------|
-| 10 | Separar campos Efecty y PSE en conciliación de pagos | Dos campos independientes en el formulario de reconciliación |
-| 12 | Reemplazar lógica de IP con MAC/ONT para corte de servicio | Usar dirección MAC u ONT en lugar de IP para gestionar cortes |
-| 14 | Firma del técnico guardada e insertada en PDF | Capturar y almacenar firma del técnico, incluirla en documentos generados |
+| # | Ítem | Estado |
+|---|------|--------|
+| FA-1 | Ciclo de facturación: cron día 20 genera facturas del mes siguiente | ✅ Completado |
+| FA-2 | Primera factura: 30 días desde activación | ✅ Completado |
+| FA-3 | Segunda factura (nivelación): del día 31 al fin de mes | ✅ Completado |
+| FA-4 | Factura mensual estándar: mes completo (día 1 al último) | ✅ Completado |
+| FA-5 | Validación anti-duplicado por cobertura (fecha_hasta) en lugar de mes de emisión | ✅ Completado |
+| FA-6 | Endpoint manual: POST /api/v1/facturacion/automatica/generar-mensual | ✅ Completado |
+| FA-7 | Preview de facturación antes de ejecutar | ✅ Completado |
 
 ---
 
-## 🔄 Fase 5 — Nuevas Funcionalidades (Pendiente)
+## 🔄 Fase 5 — Pendientes / Bugs Reportados
+
+| # | Ítem | Descripción | Prioridad |
+|---|------|-------------|-----------|
+| P-1 | **Cartera requiere reinicio del servidor** | Los cambios al query de cartera (quitar filtro `fecha_vencimiento < CURDATE()`) requieren reiniciar el proceso Node.js para surtir efecto | 🔴 Alta |
+| P-2 | Separar campos Efecty y PSE en conciliación de pagos | Dos campos independientes en el formulario de reconciliación | 🟡 Media |
+| P-3 | Reemplazar lógica de IP con MAC/ONT para corte de servicio | Usar dirección MAC u ONT en lugar de IP para gestionar cortes | 🟡 Media |
+| P-4 | Firma del técnico guardada e insertada en PDF | Capturar y almacenar firma del técnico, incluirla en documentos generados | 🟡 Media |
+
+---
+
+## 🔄 Fase 6 — Nuevas Funcionalidades (Pendiente)
 
 | # | Ítem | Descripción |
 |---|------|-------------|
@@ -62,7 +80,7 @@ Sistema de gestión para ISP (Proveedor de Servicios de Internet).
 
 ---
 
-## 💡 Fase 6 — Ideas Adicionales (Backlog)
+## 💡 Fase 7 — Ideas Adicionales (Backlog)
 
 - Portal de autogestión para clientes (ver facturas, reportar averías)
 - Dashboard de métricas en tiempo real para administradores
