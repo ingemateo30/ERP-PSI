@@ -285,6 +285,12 @@ console.log('✅ Rutas de registro web cargadas: /api/v1/registro-web');
   app.use('/api/v1/soporte', soporteRoutes);
   console.log('✅ Rutas de soporte cargadas: /api/v1/soporte');
 
+  // Rutas de cartera morosos
+  console.log('💰 Cargando rutas de cartera...');
+  const carteraRoutes = require('./routes/cartera');
+  app.use('/api/v1/cartera', carteraRoutes);
+  console.log('✅ Rutas de cartera cargadas: /api/v1/cartera');
+
   //rutas de instalaciones
   console.log('🔧 Cargando rutas de instalaciones...');
   const instalacionesRoutes = require('./routes/instalaciones');

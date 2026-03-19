@@ -613,16 +613,26 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
     }
     static async obtenerEstadisticas(req, res) {
         try {
+            // Restricción por sede para no-administradores
+            let sedeJoin = '';
+            let sedeWhere = '';
+            const sedeParams = [];
+            if (req.user && req.user.rol !== 'administrador' && req.user.sede_id) {
+                sedeJoin = ' LEFT JOIN clientes cl ON c.cliente_id = cl.id';
+                sedeWhere = ' WHERE cl.ciudad_id = ?';
+                sedeParams.push(req.user.sede_id);
+            }
+
             const estadisticas = await Database.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total_contratos,
-          SUM(CASE WHEN estado = 'activo' THEN 1 ELSE 0 END) as contratos_activos,
-          SUM(CASE WHEN estado = 'vencido' THEN 1 ELSE 0 END) as contratos_vencidos,
-          SUM(CASE WHEN estado = 'terminado' THEN 1 ELSE 0 END) as contratos_terminados,
-          SUM(CASE WHEN estado = 'anulado' THEN 1 ELSE 0 END) as contratos_anulados,
-          SUM(CASE WHEN firmado_cliente = 1 THEN 1 ELSE 0 END) as contratos_firmados
-        FROM contratos
-      `);
+          SUM(CASE WHEN c.estado = 'activo' THEN 1 ELSE 0 END) as contratos_activos,
+          SUM(CASE WHEN c.estado = 'vencido' THEN 1 ELSE 0 END) as contratos_vencidos,
+          SUM(CASE WHEN c.estado = 'terminado' THEN 1 ELSE 0 END) as contratos_terminados,
+          SUM(CASE WHEN c.estado = 'anulado' THEN 1 ELSE 0 END) as contratos_anulados,
+          SUM(CASE WHEN c.firmado_cliente = 1 THEN 1 ELSE 0 END) as contratos_firmados
+        FROM contratos c${sedeJoin}${sedeWhere}
+      `, sedeParams);
 
             res.json({
                 success: true,
@@ -842,6 +852,22 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
 
             if (contratoOriginal.estado === 'anulado') {
                 return res.status(400).json({ success: false, message: 'No se puede renovar un contrato anulado' });
+            }
+
+            // #3 - Bloquear renovación si quedan más de 30 días de permanencia vigente
+            const DIAS_MINIMOS_PARA_RENOVAR = 30;
+            if (contratoOriginal.tipo_permanencia === 'con_permanencia') {
+                const fechaVencimiento = contratoOriginal.fecha_vencimiento_permanencia || contratoOriginal.fecha_fin;
+                if (fechaVencimiento) {
+                    const diasRestantes = Math.ceil((new Date(fechaVencimiento) - new Date()) / (1000 * 60 * 60 * 24));
+                    if (diasRestantes > DIAS_MINIMOS_PARA_RENOVAR) {
+                        return res.status(400).json({
+                            success: false,
+                            message: `No se puede renovar el contrato. Aún quedan ${diasRestantes} días de permanencia. Solo se puede renovar dentro de los ${DIAS_MINIMOS_PARA_RENOVAR} días anteriores al vencimiento.`,
+                            data: { dias_restantes: diasRestantes, dias_minimos: DIAS_MINIMOS_PARA_RENOVAR, fecha_vencimiento: fechaVencimiento }
+                        });
+                    }
+                }
             }
 
             const meses = parseInt(permanencia_meses) || contratoOriginal.permanencia_meses || 12;

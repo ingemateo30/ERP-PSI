@@ -206,31 +206,42 @@ class IncidenciasController {
         queryParams.push(searchTerm, searchTerm, searchTerm);
       }
 
+      // Restricción por sede para no-administradores
+      if (req.user && req.user.rol !== 'administrador' && req.user.sede_id) {
+        query += ' AND i.municipio_id = ?';
+        queryParams.push(req.user.sede_id);
+      }
+
       // Ordenar y paginar
-      // ✅ DESPUÉS:
       const offset = (page - 1) * limit;
-      query += ` LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`;
-     
+      query += ` ORDER BY i.fecha_inicio DESC LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`;
 
       const incidencias = await this.db.query(query, queryParams);
 
-      // Contar total para paginación
+      // Contar total para paginación — reconstruir params en orden correcto
       let countQuery = `
         SELECT COUNT(*) as total
         FROM incidencias_servicio i
         LEFT JOIN ciudades c ON i.municipio_id = c.id
         WHERE 1=1
       `;
-      
-      const countParams = queryParams.slice(0, -2); // Remover LIMIT y OFFSET
-      
-      if (tipo) countQuery += ' AND i.tipo = ?';
-      if (estado) countQuery += ' AND i.estado = ?';
-      if (municipio_id) countQuery += ' AND i.municipio_id = ?';
-      if (fecha_inicio) countQuery += ' AND DATE(i.fecha_inicio) >= ?';
-      if (fecha_fin) countQuery += ' AND DATE(i.fecha_inicio) <= ?';
-      if (responsable_id) countQuery += ' AND i.responsable_id = ?';
-      if (search) countQuery += ' AND (i.titulo LIKE ? OR i.descripcion LIKE ? OR c.nombre LIKE ?)';
+      const countParams = [];
+
+      if (tipo) { countQuery += ' AND i.tipo = ?'; countParams.push(tipo); }
+      if (estado) { countQuery += ' AND i.estado = ?'; countParams.push(estado); }
+      if (municipio_id) { countQuery += ' AND i.municipio_id = ?'; countParams.push(municipio_id); }
+      if (fecha_inicio) { countQuery += ' AND DATE(i.fecha_inicio) >= ?'; countParams.push(fecha_inicio); }
+      if (fecha_fin) { countQuery += ' AND DATE(i.fecha_inicio) <= ?'; countParams.push(fecha_fin); }
+      if (responsable_id) { countQuery += ' AND i.responsable_id = ?'; countParams.push(responsable_id); }
+      if (search) {
+        countQuery += ' AND (i.titulo LIKE ? OR i.descripcion LIKE ? OR c.nombre LIKE ?)';
+        const searchTerm = `%${search}%`;
+        countParams.push(searchTerm, searchTerm, searchTerm);
+      }
+      if (req.user && req.user.rol !== 'administrador' && req.user.sede_id) {
+        countQuery += ' AND i.municipio_id = ?';
+        countParams.push(req.user.sede_id);
+      }
 
       const [totalResult] = await this.db.query(countQuery, countParams);
       const total = totalResult.total;
