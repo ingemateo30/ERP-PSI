@@ -672,16 +672,17 @@ const GeographyConfig = () => {
               {/* Campo código */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Código {modalType === 'sector' ? <span className="text-gray-400 font-normal">(opcional — se genera automático)</span> : '*'}
+                  Código {modalType !== 'sector' && <span className="text-red-500">*</span>}
+                  {modalType === 'sector' && <span className="ml-1 text-xs text-gray-400 font-normal">— generado automáticamente</span>}
                 </label>
                 <input
                   type="text"
-                  value={formData.codigo || ''}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    codigo: e.target.value
-                  }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  value={modalType === 'sector' ? (editingItem ? (formData.codigo || '') : 'Automático') : (formData.codigo || '')}
+                  onChange={modalType !== 'sector' ? (e) => setFormData(prev => ({ ...prev, codigo: e.target.value })) : undefined}
+                  disabled={modalType === 'sector'}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent ${
+                    modalType === 'sector' ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200' : 'border-gray-300'
+                  }`}
                   placeholder={
                     modalType === 'department' ? '11' :
                       modalType === 'city' ? '11001' :
@@ -693,7 +694,8 @@ const GeographyConfig = () => {
                 <p className="text-xs text-gray-500 mt-1">
                   {modalType === 'department' && 'Código DANE del departamento (ej: 11 para Bogotá)'}
                   {modalType === 'city' && 'Código DANE de la ciudad (ej: 11001 para Bogotá)'}
-                  {modalType === 'sector' && 'Déjalo vacío para asignar el siguiente código disponible automáticamente'}
+                  {modalType === 'sector' && !editingItem && 'El sistema asignará el siguiente código disponible al guardar'}
+                  {modalType === 'sector' && editingItem && 'El código del sector no puede modificarse'}
                 </p>
               </div>
 

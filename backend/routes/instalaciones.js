@@ -199,6 +199,7 @@ router.get('/instaladores',
             console.log('👷 Obteniendo instaladores disponibles');
 
             const { sede_id } = req.query;
+            const sedeIdNum = sede_id ? parseInt(sede_id) : 0;
             const instaladores = await Database.query(`
                 SELECT
                     id,
@@ -209,12 +210,12 @@ router.get('/instaladores',
                     sede_id,
                     sede
                 FROM sistema_usuarios
-                WHERE rol IN ('instalador', 'secretaria')
+                WHERE rol = 'instalador'
                 AND activo = 1
                 ORDER BY
-                    CASE WHEN sede_id = ? THEN 0 ELSE 1 END,
+                    CASE WHEN ? > 0 AND sede_id = ? THEN 0 ELSE 1 END,
                     nombre
-            `, [sede_id ? parseInt(sede_id) : null]);
+            `, [sedeIdNum, sedeIdNum]);
 
             console.log(`✅ ${instaladores.length} instaladores encontrados`);
 

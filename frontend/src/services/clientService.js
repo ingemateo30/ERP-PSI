@@ -555,6 +555,17 @@ async getMisClientes() {
       };
     }
   }
+
+  async getBarriosPorCiudad(ciudadId) {
+    try {
+      if (!ciudadId) return { success: true, data: [] };
+      const response = await apiService.get(`/clientes/barrios?ciudad_id=${ciudadId}`);
+      return { success: true, data: response.data || [] };
+    } catch (error) {
+      return { success: false, data: [] };
+    }
+  }
+
 async createClientWithServices(data) {
     try {
       this.log('Creando cliente con múltiples servicios', data);

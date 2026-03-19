@@ -210,7 +210,7 @@ const AlertaClienteExistente = ({
 
                       <div className="text-lg font-bold text-red-600 truncate">
 
-                        ${formatCOP(datosPendientes.valor_pendiente)}
+                        {formatCOP(datosPendientes.valor_pendiente)}
 
                       </div>
                     </div>
@@ -298,7 +298,7 @@ const AlertaClienteExistente = ({
                       <span className="text-gray-600 text-xs">({servicio.tipo_servicio})</span>
                     </div>
                     <div className="flex items-center gap-3 sm:flex-shrink-0">
-                      <span className="font-medium">${(servicio.precio_personalizado || servicio.precio_plan).toLocaleString()}</span>
+                      <span className="font-medium">{formatCOP((servicio.precio_personalizado || servicio.precio_plan))}</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         servicio.estado === 'activo'
                           ? 'bg-green-100 text-green-800'

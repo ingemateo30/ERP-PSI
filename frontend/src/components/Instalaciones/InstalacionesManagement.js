@@ -317,11 +317,20 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
     }
   };
 
-  // ARREGLADO: Función de asignar instalador
-  const abrirAsignarInstalador = (instalacion) => {
-    console.log('👷‍♂️ Abriendo modal para asignar instalador a:', instalacion.id);
+  // ARREGLADO: Función de asignar instalador — carga instaladores con sede de la instalación
+  const abrirAsignarInstalador = async (instalacion) => {
     setInstalacionSeleccionada(instalacion);
     setMostrarAsignarModal(true);
+    // Recargar instaladores ordenando por sede de esta instalación
+    try {
+      const sedeCiudadId = instalacion?.cliente_ciudad || null;
+      const response = await instalacionesService.getInstaladores(sedeCiudadId);
+      if (response.success) {
+        setInstaladores(response.instaladores || []);
+      }
+    } catch (error) {
+      console.error('❌ Error cargando instaladores:', error);
+    }
   };
 
   const handleAsignarInstalador = async (instalacionId, instaladorId) => {

@@ -628,7 +628,7 @@ const EstadisticasGeneral = () => {
                     border: 'none',
                     boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
                   }}
-                  formatter={(value) => `${formatCOP(value)}`}
+                  formatter={(value) => `{formatCOP(value)}`}
                 />
                 <Legend wrapperStyle={{ fontSize: 13, fontWeight: 500 }} />
                 <Area

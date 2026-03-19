@@ -187,11 +187,18 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   Duración de la permanencia (meses) <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={formData.meses_permanencia || 6}
-                  onChange={(e) => handleInputChange('meses_permanencia', parseInt(e.target.value) || 1)}
+                  type="text"
+                  inputMode="numeric"
+                  value={formData.meses_permanencia === '' ? '' : formData.meses_permanencia}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '');
+                    handleInputChange('meses_permanencia', raw === '' ? '' : Number(raw));
+                  }}
+                  onBlur={() => {
+                    if (!formData.meses_permanencia || formData.meses_permanencia < 1) {
+                      handleInputChange('meses_permanencia', 6);
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   placeholder="6"
                 />
@@ -238,17 +245,24 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
                   <input
-                    type="number"
-                    value={formData.valor_instalacion}
-                    onChange={(e) => handleInputChange('valor_instalacion', parseFloat(e.target.value) || 0)}
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.valor_instalacion === '' ? '' : formData.valor_instalacion}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, '');
+                      handleInputChange('valor_instalacion', raw === '' ? '' : Number(raw));
+                    }}
+                    onBlur={(e) => {
+                      if (formData.valor_instalacion === '' || formData.valor_instalacion === 0) {
+                        handleInputChange('valor_instalacion', formData.tipo_permanencia === 'sin_permanencia' ? 150000 : 50000);
+                      }
+                    }}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
-                    placeholder="0"
-                    min="0"
-                    step="1000"
+                    placeholder={formData.tipo_permanencia === 'sin_permanencia' ? '150000' : '50000'}
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Valor sugerido: {formData.tipo_permanencia === 'sin_permanencia' ? '$150,000' : '$50,000'}
+                  Valor sugerido: {formData.tipo_permanencia === 'sin_permanencia' ? formatCOP(150000) : formatCOP(50000)}
                 </p>
               </div>
             )}
@@ -278,7 +292,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Cobro de instalación:</span>
                   <span className={`font-medium ${calculoCostos.cobrar ? 'text-green-600' : 'text-gray-500'}`}>
-                    {calculoCostos.cobrar ? `Sí - ${formatCOP(calculoCostos.costo)}` : 'No se cobra'}
+                    {calculoCostos.cobrar ? `Sí - {formatCOP(calculoCostos.costo)}` : 'No se cobra'}
                   </span>
                 </div>
 
@@ -542,17 +556,8 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   useEffect(() => {
     const cargarBarrios = async () => {
       if (formData.ciudad_id) {
-        try {
-          const API_URL = process.env.REACT_APP_API_URL;
-          const token = localStorage.getItem('accessToken');
-          const res = await fetch(`${API_URL}/clientes/barrios?ciudad_id=${formData.ciudad_id}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await res.json();
-          setBarriosSugeridos(data.data || []);
-        } catch {
-          setBarriosSugeridos([]);
-        }
+        const res = await clientService.getBarriosPorCiudad(formData.ciudad_id);
+        setBarriosSugeridos(res.data || []);
       } else {
         setBarriosSugeridos([]);
       }
@@ -1314,7 +1319,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                       <option value="">Sin internet</option>
                       {planesInternet.map(plan => (
                         <option key={plan.id} value={plan.id}>
-                          {plan.nombre} - ${formatCOP(plan.precio)}
+                          {plan.nombre} - {formatCOP(plan.precio)}
                           {plan.velocidad_bajada && ` (${plan.velocidad_bajada} Mbps)`}
                         </option>
                       ))}
@@ -1335,7 +1340,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                       <option value="">Sin televisión</option>
                       {planesTelevision.map(plan => (
                         <option key={plan.id} value={plan.id}>
-                          {plan.nombre} - ${formatCOP(plan.precio)}
+                          {plan.nombre} - {formatCOP(plan.precio)}
                           {plan.canales_tv && ` (${plan.canales_tv} canales)`}
                         </option>
                       ))}
