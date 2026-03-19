@@ -371,20 +371,45 @@ class FacturacionAutomaticaService {
           return { permitir: false, razon: 'No tiene servicios activos' };
         }
 
-        const mesActual = new Date().toISOString().slice(0, 7);
-        const [facturaExistente] = await conexion.execute(`
-          SELECT COUNT(*) as facturas_mes
-          FROM facturas 
-          WHERE cliente_id = ? 
-            AND DATE_FORMAT(fecha_emision, '%Y-%m') = ?
-            AND activo = 1
-        `, [clienteId, mesActual]);
+        // Verificar cobertura con base en fecha_hasta (no en fecha_emision del mes actual)
+        // Regla:
+        //   0 facturas → generar primera (siempre)
+        //   1 factura  → generar segunda/nivelación (siempre)
+        //   2+ facturas → solo generar si la última cobertura NO alcanza el próximo mes
+        const [coberturaData] = await conexion.execute(`
+          SELECT
+            COUNT(*) as total_facturas,
+            MAX(fecha_hasta) as ultima_cobertura
+          FROM facturas
+          WHERE cliente_id = ? AND activo = 1 AND estado != 'anulada'
+        `, [clienteId]);
 
-        if (facturaExistente[0].facturas_mes > 0) {
-          return { permitir: false, razon: 'Ya tiene factura generada este período' };
+        const totalFacturas = parseInt(coberturaData[0].total_facturas) || 0;
+
+        if (totalFacturas === 0) {
+          return { permitir: true, razon: 'Sin facturas previas — genera primera factura' };
         }
 
-        return { permitir: true, razon: 'Cliente apto para facturación' };
+        if (totalFacturas === 1) {
+          return { permitir: true, razon: 'Con primera factura — genera segunda (nivelación)' };
+        }
+
+        // 2+ facturas: billing mensual estándar
+        // Bloquear solo si ya hay cobertura desde el primer día del mes siguiente
+        const hoy = new Date();
+        const primerDiaMesSiguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+        const ultimaCobertura = coberturaData[0].ultima_cobertura
+          ? new Date(coberturaData[0].ultima_cobertura)
+          : null;
+
+        if (ultimaCobertura && ultimaCobertura >= primerDiaMesSiguiente) {
+          return {
+            permitir: false,
+            razon: `Ya tiene cobertura hasta ${coberturaData[0].ultima_cobertura} (mes siguiente cubierto)`
+          };
+        }
+
+        return { permitir: true, razon: 'Cliente apto para facturación mensual' };
 
       } finally {
         conexion.release();
