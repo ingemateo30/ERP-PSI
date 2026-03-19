@@ -1,3 +1,4 @@
+import { formatCOP } from '../../utils/formatCurrency';
 // frontend/src/components/Clients/SelectorSedesServicios.js
 // Componente para seleccionar servicios agrupados POR SEDE
 
@@ -330,7 +331,7 @@ const SelectorSedesServicios = ({
                           <option value="">Sin internet</option>
                           {planesInternet.map(plan => (
                             <option key={plan.id} value={plan.id}>
-                              {plan.nombre} - ${plan.precio?.toLocaleString()}
+                              {plan.nombre} - ${formatCOP(plan.precio)}
                               {plan.velocidad_bajada && ` (${plan.velocidad_bajada} Mbps)`}
                             </option>
                           ))}
@@ -372,7 +373,7 @@ const SelectorSedesServicios = ({
                           <option value="">Sin televisión</option>
                           {planesTelevision.map(plan => (
                             <option key={plan.id} value={plan.id}>
-                              {plan.nombre} - ${plan.precio?.toLocaleString()}
+                              {plan.nombre} - ${formatCOP(plan.precio)}
                               {plan.canales_tv && ` (${plan.canales_tv} canales)`}
                             </option>
                           ))}

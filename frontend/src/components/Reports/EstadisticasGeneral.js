@@ -1,3 +1,4 @@
+import { formatCOP } from '../../utils/formatCurrency';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   DollarSign, TrendingUp, TrendingDown, Users, Package,
@@ -627,7 +628,7 @@ const EstadisticasGeneral = () => {
                     border: 'none',
                     boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
                   }}
-                  formatter={(value) => `$${value.toLocaleString('es-CO')}`}
+                  formatter={(value) => `${formatCOP(value)}`}
                 />
                 <Legend wrapperStyle={{ fontSize: 13, fontWeight: 500 }} />
                 <Area

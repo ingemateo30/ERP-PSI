@@ -11,10 +11,16 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
   const [foto, setFoto] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
   const [observaciones, setObservaciones] = useState('');
-  
+
   // ✅ NUEVOS CAMPOS
   const [ipAsignada, setIpAsignada] = useState('');
   const [tap, setTap] = useState('');
+  const [noAplicaIp, setNoAplicaIp] = useState(false);
+
+  // Determina automáticamente si el tipo de orden/instalación requiere IP
+  const tipoNoRequiereIp = ['reparacion'].includes(instalacion?.tipo_instalacion) ||
+    ['mantenimiento', 'retiro'].includes(instalacion?.tipo_orden);
+  const requiereIp = !tipoNoRequiereIp && !noAplicaIp;
 
   // ✅ ESTADOS PARA FIRMA DEL INSTALADOR
   const sigCanvas = useRef(null);
@@ -113,25 +119,24 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
       return;
     }
 
-    // ✅ VALIDACIONES DE IP Y TAP
-    if (!ipAsignada.trim()) {
-      alert('❌ Debes ingresar la IP asignada al cliente');
-      return;
-    }
-
-    if (!validarIP(ipAsignada)) {
-      alert('❌ La IP ingresada no es válida (formato: 192.168.1.100)');
-      return;
-    }
-
-    if (!tap.trim()) {
-      alert('❌ Debes ingresar la contraseña del router (TAP)');
-      return;
-    }
-
-    if (tap.length < 8) {
-      alert('❌ La contraseña del router debe tener al menos 8 caracteres');
-      return;
+    // ✅ VALIDACIONES DE IP Y TAP (solo si aplica)
+    if (requiereIp) {
+      if (!ipAsignada.trim()) {
+        alert('❌ Debes ingresar la IP asignada al cliente');
+        return;
+      }
+      if (!validarIP(ipAsignada)) {
+        alert('❌ La IP ingresada no es válida (formato: 192.168.1.100)');
+        return;
+      }
+      if (!tap.trim()) {
+        alert('❌ Debes ingresar la contraseña del router (TAP)');
+        return;
+      }
+      if (tap.length < 8) {
+        alert('❌ La contraseña del router debe tener al menos 8 caracteres');
+        return;
+      }
     }
 
     // ✅ VALIDAR FIRMA DEL INSTALADOR
@@ -199,6 +204,7 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
     setObservaciones('');
     setIpAsignada('');
     setTap('');
+    setNoAplicaIp(false);
     // ✅ LIMPIAR FIRMA
     if (sigCanvas.current) {
       sigCanvas.current.clear();
@@ -311,37 +317,64 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
             )}
           </div>
 
+          {/* ✅ TOGGLE: No aplica IP (Solo TV / Revisión) */}
+          {!tipoNoRequiereIp && (
+            <div className="flex items-center space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="noAplicaIp"
+                checked={noAplicaIp}
+                onChange={(e) => setNoAplicaIp(e.target.checked)}
+                className="w-4 h-4 text-yellow-600 rounded"
+              />
+              <label htmlFor="noAplicaIp" className="text-sm text-yellow-800 cursor-pointer">
+                <Wifi size={14} className="inline mr-1" />
+                Esta instalación <strong>no requiere IP</strong> (Solo TV / Sin internet)
+              </label>
+            </div>
+          )}
+          {tipoNoRequiereIp && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+              <Wifi size={14} className="inline mr-1" />
+              <strong>Revisión / Mantenimiento:</strong> IP y contraseña del router no son obligatorias para este tipo de orden.
+            </div>
+          )}
+
           {/* ✅ CAMPO IP ASIGNADA */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Wifi size={16} className="inline mr-1" />
-              IP Asignada *
-            </label>
-            <input
-              type="text"
-              value={ipAsignada}
-              onChange={(e) => setIpAsignada(e.target.value)}
-              placeholder="Ej: 192.168.1.100"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-1">Formato: 192.168.X.X</p>
-          </div>
+          {requiereIp && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Wifi size={16} className="inline mr-1" />
+                IP Asignada *
+              </label>
+              <input
+                type="text"
+                value={ipAsignada}
+                onChange={(e) => setIpAsignada(e.target.value)}
+                placeholder="Ej: 192.168.1.100"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">Formato: 192.168.X.X</p>
+            </div>
+          )}
 
           {/* ✅ CAMPO CONTRASEÑA ROUTER (TAP) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Lock size={16} className="inline mr-1" />
-              Contraseña del Router (TAP) *
-            </label>
-            <input
-              type="text"
-              value={tap}
-              onChange={(e) => setTap(e.target.value)}
-              placeholder="Contraseña WiFi del router"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-1">Mínimo 8 caracteres</p>
-          </div>
+          {requiereIp && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Lock size={16} className="inline mr-1" />
+                Contraseña del Router (TAP) *
+              </label>
+              <input
+                type="text"
+                value={tap}
+                onChange={(e) => setTap(e.target.value)}
+                placeholder="Contraseña WiFi del router"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">Mínimo 8 caracteres</p>
+            </div>
+          )}
 
           {/* ✅ FIRMA DEL USUARIO */}
           <div>

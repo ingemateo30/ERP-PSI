@@ -120,8 +120,9 @@ const GeographyConfig = () => {
       editingItem
     });
 
-    // Validaciones básicas
-    if (!formData.codigo || !formData.nombre) {
+    // Validaciones básicas: para sectores el código es opcional (se autogenera)
+    const requiereCodigo = modalType !== 'sector';
+    if ((requiereCodigo && !formData.codigo) || !formData.nombre) {
       alert('Por favor completa todos los campos requeridos');
       return;
     }
@@ -671,7 +672,7 @@ const GeographyConfig = () => {
               {/* Campo código */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Código *
+                  Código {modalType === 'sector' ? <span className="text-gray-400 font-normal">(opcional — se genera automático)</span> : '*'}
                 </label>
                 <input
                   type="text"
@@ -684,15 +685,15 @@ const GeographyConfig = () => {
                   placeholder={
                     modalType === 'department' ? '11' :
                       modalType === 'city' ? '11001' :
-                        '001'
+                        'Automático'
                   }
                   maxLength={modalType === 'sector' ? 3 : 10}
-                  required
+                  required={modalType !== 'sector'}
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   {modalType === 'department' && 'Código DANE del departamento (ej: 11 para Bogotá)'}
                   {modalType === 'city' && 'Código DANE de la ciudad (ej: 11001 para Bogotá)'}
-                  {modalType === 'sector' && 'Código interno del sector (máximo 3 caracteres)'}
+                  {modalType === 'sector' && 'Déjalo vacío para asignar el siguiente código disponible automáticamente'}
                 </p>
               </div>
 
@@ -759,7 +760,7 @@ const GeographyConfig = () => {
                   type="submit"
                   disabled={
                     submitting ||
-                    !formData.codigo?.trim() ||
+                    (modalType !== 'sector' && !formData.codigo?.trim()) ||
                     !formData.nombre?.trim() ||
                     (modalType === 'city' && !formData.departamento_id)
                   }

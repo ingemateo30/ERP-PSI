@@ -559,29 +559,32 @@ static async crear(req, res) {
 
       res.json({
         success: true,
-        message: 'Cliente eliminado exitosamente'
+        message: 'Cliente retirado del sistema exitosamente'
       });
     } catch (error) {
       console.error('Error al eliminar cliente:', error);
 
-      if (error.message.includes('no encontrado')) {
-        return res.status(404).json({
-          success: false,
-          message: error.message
-        });
+      const msg = error.message || '';
+
+      if (msg.includes('no encontrado')) {
+        return res.status(404).json({ success: false, message: msg });
       }
 
-      if (error.message.includes('servicios activos')) {
-        return res.status(409).json({
-          success: false,
-          message: error.message
-        });
+      // Errores de integridad: facturas, pagos, contratos
+      if (
+        msg.includes('factura') ||
+        msg.includes('pago') ||
+        msg.includes('contrato') ||
+        msg.includes('servicios activos') ||
+        msg.includes('ER_ROW_IS_REFERENCED')
+      ) {
+        return res.status(409).json({ success: false, message: msg });
       }
 
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: 'Error interno del servidor al eliminar cliente',
+        error: process.env.NODE_ENV === 'development' ? msg : undefined
       });
     }
   }

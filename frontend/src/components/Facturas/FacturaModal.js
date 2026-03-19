@@ -1,3 +1,4 @@
+import { formatCOP } from '../../utils/formatCurrency';
 // frontend/src/components/Facturas/FacturaModal.js - VERSIÓN CORREGIDA FINAL
 import authService from '../../services/authService';
 import React, { useState, useEffect, useRef } from 'react';
@@ -513,7 +514,7 @@ const FacturaModal = ({
               <div className="flex justify-between items-center">
                 <span className="text-lg font-medium">Total de la Factura:</span>
                 <span className="text-2xl font-bold text-blue-600">
-                  ${parseFloat(formData.total || 0).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  ${parseFloat(formData.total || formatCOP(0))}
                 </span>
               </div>
             </div>

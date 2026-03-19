@@ -1,3 +1,4 @@
+import { formatCOP } from '../../utils/formatCurrency';
 // frontend/src/components/Clients/ClientForm.js
 // Formulario completo corregido con selector de permanencia
 
@@ -20,6 +21,8 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
   const [planesDisponibles, setPlanesDisponibles] = useState([]);
   const [sectores, setSectores] = useState([]);
   const [ciudades, setCiudades] = useState([]);
+  const [barriosSugeridos, setBarriosSugeridos] = useState([]);
+  const [mostrarSugerenciasBarrio, setMostrarSugerenciasBarrio] = useState(false);
   const [verificandoCliente, setVerificandoCliente] = useState(false);
   const [verificacionCliente, setVerificacionCliente] = useState(null);
   const [modoAgregarServicio, setModoAgregarServicio] = useState(false);
@@ -275,7 +278,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Cobro de instalación:</span>
                   <span className={`font-medium ${calculoCostos.cobrar ? 'text-green-600' : 'text-gray-500'}`}>
-                    {calculoCostos.cobrar ? `Sí - $${calculoCostos.costo.toLocaleString()}` : 'No se cobra'}
+                    {calculoCostos.cobrar ? `Sí - ${formatCOP(calculoCostos.costo)}` : 'No se cobra'}
                   </span>
                 </div>
 
@@ -533,6 +536,28 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     };
 
     cargarSectoresPorCiudad();
+  }, [formData.ciudad_id]);
+
+  // Cargar barrios sugeridos cuando cambia la ciudad
+  useEffect(() => {
+    const cargarBarrios = async () => {
+      if (formData.ciudad_id) {
+        try {
+          const API_URL = process.env.REACT_APP_API_URL;
+          const token = localStorage.getItem('accessToken');
+          const res = await fetch(`${API_URL}/clientes/barrios?ciudad_id=${formData.ciudad_id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          setBarriosSugeridos(data.data || []);
+        } catch {
+          setBarriosSugeridos([]);
+        }
+      } else {
+        setBarriosSugeridos([]);
+      }
+    };
+    cargarBarrios();
   }, [formData.ciudad_id]);
 
   const calcularFechaVencimiento = (fechaInicio, meses) => {
@@ -1155,18 +1180,42 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
+                    <div className="relative">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Barrio
                       </label>
                       <input
                         type="text"
                         value={formData.barrio}
-                        onChange={(e) => handleInputChange('barrio', e.target.value)}
+                        onChange={(e) => {
+                          handleInputChange('barrio', e.target.value);
+                          setMostrarSugerenciasBarrio(true);
+                        }}
+                        onFocus={() => setMostrarSugerenciasBarrio(true)}
+                        onBlur={() => setTimeout(() => setMostrarSugerenciasBarrio(false), 180)}
                         disabled={modoAgregarServicio}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100"
-                        placeholder="Centro"
+                        placeholder={formData.ciudad_id ? 'Escribe o selecciona un barrio' : 'Centro'}
+                        autoComplete="off"
                       />
+                      {mostrarSugerenciasBarrio && barriosSugeridos.length > 0 && (
+                        <ul className="absolute z-20 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto">
+                          {barriosSugeridos
+                            .filter(b => !formData.barrio || b.toLowerCase().includes(formData.barrio.toLowerCase()))
+                            .map(b => (
+                              <li
+                                key={b}
+                                className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer"
+                                onMouseDown={() => {
+                                  handleInputChange('barrio', b);
+                                  setMostrarSugerenciasBarrio(false);
+                                }}
+                              >
+                                {b}
+                              </li>
+                            ))}
+                        </ul>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1265,7 +1314,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                       <option value="">Sin internet</option>
                       {planesInternet.map(plan => (
                         <option key={plan.id} value={plan.id}>
-                          {plan.nombre} - ${plan.precio?.toLocaleString()}
+                          {plan.nombre} - ${formatCOP(plan.precio)}
                           {plan.velocidad_bajada && ` (${plan.velocidad_bajada} Mbps)`}
                         </option>
                       ))}
@@ -1286,7 +1335,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                       <option value="">Sin televisión</option>
                       {planesTelevision.map(plan => (
                         <option key={plan.id} value={plan.id}>
-                          {plan.nombre} - ${plan.precio?.toLocaleString()}
+                          {plan.nombre} - ${formatCOP(plan.precio)}
                           {plan.canales_tv && ` (${plan.canales_tv} canales)`}
                         </option>
                       ))}
