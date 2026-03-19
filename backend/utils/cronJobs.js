@@ -23,7 +23,7 @@ class CronJobs {
   static inicializar() {
     console.log('🕐 Inicializando tareas programadas de facturación...');
 
-    // Facturación mensual automática - cada día 1 del mes a las 06:00
+    // Facturación mensual automática - cada día 20 del mes a las 06:00 (genera facturas del mes siguiente)
     this.facturacionMensualAutomatica();
 
     // Actualización de estados de facturas - diario a las 02:00
@@ -156,7 +156,7 @@ class CronJobs {
       timezone: 'America/Bogota' // Zona horaria de Colombia
     });
 
-    console.log('📅 Tarea programada: Facturación mensual automática (día 1 de cada mes a las 06:00)');
+    console.log('📅 Tarea programada: Facturación mensual automática (día 20 de cada mes a las 06:00 — genera facturas del mes siguiente)');
   }
 
   /**

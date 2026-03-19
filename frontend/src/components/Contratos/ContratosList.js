@@ -546,7 +546,7 @@ const { hasPermission } = useAuth();
                       >
                         <Download className="w-4 h-4" />
                       </button>
-{(hasPermission('administrador') || hasPermission('supervisor') || hasPermission('secretaria')) && contrato.estado !== 'anulado' && (
+{(hasPermission('administrador') || hasPermission('supervisor') || hasPermission('secretaria')) && contrato.estado === 'activo' && (
   <button
     onClick={() => handleAbrirRenovar(contrato)}
     className="text-teal-600 hover:text-teal-900 p-1 rounded transition-colors"
