@@ -29,14 +29,16 @@ Sistema de gestión para ISP (Proveedor de Servicios de Internet).
 
 ---
 
-## 🔄 Fase 3 — Lógica de Negocio (Pendiente)
+## ✅ Fase 3 — Lógica de Negocio (Completado)
 
-| # | Ítem | Descripción |
-|---|------|-------------|
-| 3 | Renovación de contrato solo cuando está próximo a vencer | Bloquear renovación si aún queda más de X días |
-| 8 | Bloquear retiro de servicio hasta que el contrato expire | Validación en backend y UI |
-| 9 | Firma Wacom en contratos | Arreglar integración de tableta Wacom para firmas digitales |
-| 13 | Filtrado por sede en todas las vistas para técnicos/secretarias | Técnicos y secretarias ven solo datos de su sede |
+| # | Ítem | Estado |
+|---|------|--------|
+| 3 | Renovación de contrato solo cuando está próximo a vencer | ✅ Completado |
+| 8 | Bloquear retiro de servicio hasta que el contrato expire | ✅ Completado |
+| 9 | Firma Wacom en contratos | ✅ Completado |
+| 13 | Filtrado por sede en todas las vistas para técnicos/secretarias | ✅ Completado |
+| 19 | Panel de cartera morosa (clientes con 2+ facturas vencidas) | ✅ Completado |
+| 20 | Formulario de edición de cliente corregido | ✅ Completado |
 
 ---
 
