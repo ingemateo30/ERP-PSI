@@ -42,12 +42,20 @@ const BANCOS_ENTRADA = [
     placeholder: 'comultrasan_pagos.xlsx'
   },
   {
-    id: 'asobancaria',
-    nombre: 'Asobancaria (Efecty / PSE)',
-    descripcion: 'TXT formato fijo Asobancaria 220/221 caracteres (registros tipo 06)',
+    id: 'efecty',
+    nombre: 'Efecty',
+    descripcion: 'TXT formato fijo Asobancaria 221 caracteres — Convenio Efecty (registros tipo 06)',
     color: 'green',
     extensiones: '.txt',
-    placeholder: 'asobancaria_respuesta.txt'
+    placeholder: 'efecty_respuesta.txt'
+  },
+  {
+    id: 'pse',
+    nombre: 'PSE',
+    descripcion: 'TXT formato fijo Asobancaria 220 caracteres — PSE pago en línea (registros tipo 06)',
+    color: 'green',
+    extensiones: '.txt',
+    placeholder: 'pse_respuesta.txt'
   }
 ];
 

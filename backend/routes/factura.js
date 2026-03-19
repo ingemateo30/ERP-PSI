@@ -546,7 +546,7 @@ const validarPagoMejorado = [
   body('metodo_pago')
     .notEmpty()
     .withMessage('Método de pago requerido')
-    .isIn(['efectivo', 'transferencia', 'cheque', 'tarjeta_credito', 'tarjeta_debito'])
+    .isIn(['efectivo', 'transferencia', 'cheque', 'tarjeta_credito', 'tarjeta_debito', 'tarjeta', 'efecty', 'pse', 'otro'])
     .withMessage('Método de pago inválido'),
   
   body('fecha_pago')

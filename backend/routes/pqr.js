@@ -531,25 +531,117 @@ router.get('/cliente/:clienteId', async (req, res) => {
 router.get('/usuarios/disponibles', async (req, res) => {
     try {
         const query = `
-            SELECT id, nombre, correo, rol
-            FROM sistema_usuarios 
-            WHERE activo = 1 AND rol IN ('administrador', 'supervisor')
-            ORDER BY nombre
+            SELECT id, nombre, correo, rol, sede_id
+            FROM sistema_usuarios
+            WHERE activo = 1 AND rol IN ('administrador', 'supervisor', 'secretaria', 'instalador')
+            ORDER BY FIELD(rol,'administrador','supervisor','secretaria','instalador'), nombre
         `;
-        
+
         const usuarios = await db.query(query);
-        
+
         res.json({
             success: true,
             usuarios
         });
-        
+
     } catch (error) {
         console.error('Error obteniendo usuarios:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: 'Error obteniendo usuarios' 
+            error: 'Error obteniendo usuarios'
         });
+    }
+});
+
+/**
+ * GET /api/v1/pqr/mis-pqr
+ * PQRs asignadas al técnico autenticado + PQRs sin asignar de su sede
+ */
+router.get('/mis-pqr', async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { estado } = req.query;
+
+        let estadoFilter = '';
+        const params = [userId, userId];
+        if (estado) {
+            estadoFilter = 'AND p.estado = ?';
+            params.push(estado);
+        }
+
+        const pqrs = await db.query(`
+            SELECT
+                p.*,
+                c.nombre AS cliente_nombre,
+                c.telefono AS cliente_telefono,
+                c.identificacion AS cliente_identificacion,
+                ci.nombre AS ciudad_nombre,
+                u.nombre AS usuario_asignado_nombre
+            FROM pqr p
+            LEFT JOIN clientes c ON p.cliente_id = c.id
+            LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+            LEFT JOIN sistema_usuarios u ON p.usuario_asignado = u.id
+            WHERE (p.usuario_asignado = ? OR (p.usuario_asignado IS NULL AND p.estado = 'abierto'))
+              AND p.estado != 'cerrado'
+              ${estadoFilter}
+            ORDER BY
+                CASE p.prioridad WHEN 'alta' THEN 1 WHEN 'media' THEN 2 ELSE 3 END,
+                p.fecha_creacion DESC
+        `, params);
+
+        res.json({ success: true, data: pqrs, total: pqrs.length });
+
+    } catch (error) {
+        console.error('Error obteniendo mis PQRs:', error);
+        res.status(500).json({ success: false, error: 'Error obteniendo PQRs' });
+    }
+});
+
+/**
+ * PATCH /api/v1/pqr/:id/gestionar
+ * Técnico actualiza estado y agrega nota de gestión
+ */
+router.patch('/:id/gestionar', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { estado, nota_gestion } = req.body;
+        const userId = req.user.id;
+
+        const estadosPermitidos = ['en_proceso', 'resuelto', 'cerrado'];
+        if (!estado || !estadosPermitidos.includes(estado)) {
+            return res.status(400).json({ success: false, error: `Estado debe ser uno de: ${estadosPermitidos.join(', ')}` });
+        }
+
+        // Solo el técnico asignado o supervisor/admin puede gestionar
+        const [pqr] = await db.query('SELECT id, usuario_asignado FROM pqr WHERE id = ?', [id]);
+        if (!pqr) return res.status(404).json({ success: false, error: 'PQR no encontrada' });
+
+        const puedeGestionar = pqr.usuario_asignado === userId ||
+            ['administrador', 'supervisor'].includes(req.user.rol);
+        if (!puedeGestionar) {
+            return res.status(403).json({ success: false, error: 'No tienes permiso para gestionar esta PQR' });
+        }
+
+        const updateFields = ['estado = ?', 'fecha_actualizacion = NOW()'];
+        const updateValues = [estado];
+
+        if (nota_gestion) {
+            updateFields.push('respuesta = CONCAT(COALESCE(respuesta, ""), "\n[Gestión ", NOW(), "]: ", ?)');
+            updateValues.push(nota_gestion);
+        }
+        if (estado === 'cerrado' || estado === 'resuelto') {
+            updateFields.push('fecha_cierre = NOW()');
+        }
+
+        updateValues.push(id);
+        await db.query(`UPDATE pqr SET ${updateFields.join(', ')} WHERE id = ?`, updateValues);
+
+        const [pqrActualizada] = await db.query('SELECT * FROM pqr WHERE id = ?', [id]);
+        res.json({ success: true, data: pqrActualizada });
+
+    } catch (error) {
+        console.error('Error gestionando PQR:', error);
+        res.status(500).json({ success: false, error: 'Error gestionando PQR' });
     }
 });
 

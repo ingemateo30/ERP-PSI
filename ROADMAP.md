@@ -59,24 +59,24 @@ Sistema de gestión para ISP (Proveedor de Servicios de Internet).
 
 ---
 
-## 🔄 Fase 5 — Pendientes / Bugs Reportados
+## ✅ Fase 5 — Pendientes / Bugs Reportados (Completado)
 
-| # | Ítem | Descripción | Prioridad |
-|---|------|-------------|-----------|
-| P-1 | **Cartera requiere reinicio del servidor** | Los cambios al query de cartera (quitar filtro `fecha_vencimiento < CURDATE()`) requieren reiniciar el proceso Node.js para surtir efecto | 🔴 Alta |
-| P-2 | Separar campos Efecty y PSE en conciliación de pagos | Dos campos independientes en el formulario de reconciliación | 🟡 Media |
-| P-3 | Reemplazar lógica de IP con MAC/ONT para corte de servicio | Usar dirección MAC u ONT en lugar de IP para gestionar cortes | 🟡 Media |
-| P-4 | Firma del técnico guardada e insertada en PDF | Capturar y almacenar firma del técnico, incluirla en documentos generados | 🟡 Media |
+| # | Ítem | Estado |
+|---|------|--------|
+| P-1 | **Cartera: filtro `fecha_vencimiento < CURDATE()` eliminado + header `Cache-Control: no-store`** | ✅ Completado |
+| P-2 | Efecty y PSE separados como entradas independientes en cruce bancario y modal de pago | ✅ Completado |
+| P-3 | Campos `mac_address` y `ont_id` capturados al completar instalación y guardados en cliente | ✅ Completado |
+| P-4 | Firma del técnico guardada en columna dedicada e insertada en PDF de orden de servicio | ✅ Completado |
 
 ---
 
-## 🔄 Fase 6 — Nuevas Funcionalidades (Pendiente)
+## ✅ Fase 6 — Nuevas Funcionalidades (Completado)
 
-| # | Ítem | Descripción |
-|---|------|-------------|
-| 4 | Seguimiento de ubicación de técnico + control de agenda + ruta diaria (Google Maps) | Panel de supervisión de técnicos en tiempo real con rutas optimizadas |
-| 15 | PQR asignable a técnicos con flujo completo de resolución | Técnicos reciben, gestionan y cierran PQR desde su app |
-| 17 | Notificaciones push vía SMS usando LabsMobile | Integración con API LabsMobile para envío de SMS a clientes y técnicos |
+| # | Ítem | Estado |
+|---|------|--------|
+| 4 | Panel de seguimiento de técnicos: agenda diaria por técnico + botón ruta Google Maps + progreso del día | ✅ Completado |
+| 15 | PQR asignable a técnicos: técnicos incluidos en usuarios disponibles, vista `Mis PQR`, flujo gestionar/cerrar | ✅ Completado |
+| 17 | SMS vía LabsMobile: `SMSService`, endpoints de envío, notificación vencimientos, cortes e instalaciones | ✅ Completado |
 
 ---
 

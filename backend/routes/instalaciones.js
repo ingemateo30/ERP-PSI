@@ -235,6 +235,134 @@ router.get('/instaladores',
 );
 
 /**
+ * GET /api/v1/instalaciones/seguimiento-tecnicos
+ * Panel de supervisión: instalaciones del día agrupadas por técnico
+ * Acceso: supervisor, administrador
+ */
+router.get('/seguimiento-tecnicos',
+  requireRole('administrador', 'supervisor', 'secretaria'),
+  async (req, res) => {
+    try {
+      const { fecha, sede_id } = req.query;
+      const fechaConsulta = fecha || new Date().toISOString().split('T')[0];
+
+      let sedeFilter = '';
+      const params = [fechaConsulta, fechaConsulta];
+
+      if (req.user.rol !== 'administrador' && req.user.sede_id) {
+        sedeFilter = 'AND u.sede_id = ?';
+        params.push(req.user.sede_id);
+      } else if (sede_id) {
+        sedeFilter = 'AND u.sede_id = ?';
+        params.push(sede_id);
+      }
+
+      // Técnicos con sus instalaciones del día
+      const instalaciones = await Database.query(`
+        SELECT
+          u.id AS instalador_id,
+          u.nombre AS instalador_nombre,
+          u.telefono AS instalador_telefono,
+          u.sede_id,
+          i.id AS instalacion_id,
+          i.tipo_orden,
+          i.tipo_instalacion,
+          i.estado,
+          i.hora_programada,
+          i.hora_inicio,
+          i.hora_fin,
+          i.fecha_realizada,
+          i.direccion_instalacion,
+          i.barrio,
+          i.coordenadas_lat,
+          i.coordenadas_lng,
+          c.nombre AS cliente_nombre,
+          c.telefono AS cliente_telefono,
+          c.identificacion AS cliente_identificacion,
+          ci.nombre AS ciudad_nombre,
+          ps.nombre AS plan_nombre
+        FROM sistema_usuarios u
+        LEFT JOIN instalaciones i ON i.instalador_id = u.id
+          AND DATE(i.fecha_programada) = ?
+        LEFT JOIN clientes c ON i.cliente_id = c.id
+        LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+        LEFT JOIN servicios_cliente sc ON i.servicio_cliente_id = sc.id
+        LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+        WHERE u.rol = 'instalador'
+          AND u.activo = 1
+          AND DATE(i.fecha_programada) = ?
+          ${sedeFilter}
+        ORDER BY u.nombre, i.hora_programada
+      `, params);
+
+      // Agrupar por técnico
+      const tecnicosMap = {};
+      for (const row of instalaciones) {
+        if (!tecnicosMap[row.instalador_id]) {
+          tecnicosMap[row.instalador_id] = {
+            id: row.instalador_id,
+            nombre: row.instalador_nombre,
+            telefono: row.instalador_telefono,
+            sede_id: row.sede_id,
+            instalaciones: [],
+            resumen: { programadas: 0, en_proceso: 0, completadas: 0, canceladas: 0, total: 0 }
+          };
+        }
+        if (row.instalacion_id) {
+          tecnicosMap[row.instalador_id].instalaciones.push({
+            id: row.instalacion_id,
+            tipo_orden: row.tipo_orden,
+            tipo_instalacion: row.tipo_instalacion,
+            estado: row.estado,
+            hora_programada: row.hora_programada,
+            hora_inicio: row.hora_inicio,
+            hora_fin: row.hora_fin,
+            fecha_realizada: row.fecha_realizada,
+            direccion: row.direccion_instalacion,
+            barrio: row.barrio,
+            ciudad: row.ciudad_nombre,
+            coordenadas: row.coordenadas_lat && row.coordenadas_lng
+              ? { lat: parseFloat(row.coordenadas_lat), lng: parseFloat(row.coordenadas_lng) }
+              : null,
+            cliente_nombre: row.cliente_nombre,
+            cliente_telefono: row.cliente_telefono,
+            plan_nombre: row.plan_nombre,
+            // Link de navegación Google Maps
+            google_maps_url: row.coordenadas_lat && row.coordenadas_lng
+              ? `https://www.google.com/maps/dir/?api=1&destination=${row.coordenadas_lat},${row.coordenadas_lng}`
+              : row.direccion_instalacion
+                ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.direccion_instalacion + ', ' + (row.ciudad_nombre || ''))}`
+                : null
+          });
+          const t = tecnicosMap[row.instalador_id].resumen;
+          t.total++;
+          if (row.estado === 'completada') t.completadas++;
+          else if (row.estado === 'en_proceso') t.en_proceso++;
+          else if (row.estado === 'cancelada') t.canceladas++;
+          else t.programadas++;
+        }
+      }
+
+      const tecnicos = Object.values(tecnicosMap);
+
+      res.json({
+        success: true,
+        data: {
+          fecha: fechaConsulta,
+          tecnicos,
+          total_tecnicos: tecnicos.length,
+          total_instalaciones: tecnicos.reduce((s, t) => s + t.resumen.total, 0)
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error en seguimiento de técnicos:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+/**
  * 🆕 MOVIDA AQUÍ: Obtener equipos disponibles
  */
 router.get('/equipos/disponibles', async (req, res) => {

@@ -291,6 +291,10 @@ console.log('✅ Rutas de registro web cargadas: /api/v1/registro-web');
   app.use('/api/v1/cartera', carteraRoutes);
   console.log('✅ Rutas de cartera cargadas: /api/v1/cartera');
 
+  // Rutas de SMS (LabsMobile)
+  const smsRoutes = require('./routes/sms');
+  app.use('/api/v1/sms', smsRoutes);
+
   //rutas de instalaciones
   console.log('🔧 Cargando rutas de instalaciones...');
   const instalacionesRoutes = require('./routes/instalaciones');
