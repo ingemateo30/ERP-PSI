@@ -50,7 +50,7 @@ router.get('/morosos', requireRole('secretaria', 'supervisor', 'administrador'),
         COUNT(f.id) AS facturas_vencidas,
         SUM(f.total) AS total_deuda,
         MIN(f.fecha_vencimiento) AS primera_vencida,
-        MAX(DATEDIFF(CURDATE(), f.fecha_vencimiento)) AS dias_mora_max,
+        MAX(GREATEST(0, DATEDIFF(CURDATE(), f.fecha_vencimiento))) AS dias_mora_max,
         SUM(CASE WHEN DATEDIFF(CURDATE(), f.fecha_vencimiento) BETWEEN 1 AND 30 THEN f.total ELSE 0 END) AS mora_1_30,
         SUM(CASE WHEN DATEDIFF(CURDATE(), f.fecha_vencimiento) BETWEEN 31 AND 60 THEN f.total ELSE 0 END) AS mora_31_60,
         SUM(CASE WHEN DATEDIFF(CURDATE(), f.fecha_vencimiento) > 60 THEN f.total ELSE 0 END) AS mora_mayor_60,
@@ -62,13 +62,12 @@ router.get('/morosos', requireRole('secretaria', 'supervisor', 'administrador'),
       LEFT JOIN notificaciones n ON n.datos_adicionales LIKE CONCAT('%"cliente_id":', c.id, '%')
         AND n.tipo = 'cliente_moroso'
       WHERE f.estado IN ('pendiente', 'vencida')
-        AND f.fecha_vencimiento < CURDATE()
         AND f.activo = 1
         ${sedeFilter}
         ${searchFilter}
       GROUP BY c.id
       HAVING COUNT(f.id) >= 1
-      ORDER BY total_deuda DESC, dias_mora_max DESC
+      ORDER BY mora_mayor_60 DESC, mora_31_60 DESC, mora_1_30 DESC, total_deuda DESC
     `, params);
 
     // Estadísticas globales
@@ -88,7 +87,6 @@ router.get('/morosos', requireRole('secretaria', 'supervisor', 'administrador'),
         FROM clientes c
         INNER JOIN facturas f ON c.id = f.cliente_id
         WHERE f.estado IN ('pendiente', 'vencida')
-          AND f.fecha_vencimiento < CURDATE()
           AND f.activo = 1
           ${sedeFilter ? sedeFilter.replace(/c\.ciudad_id = \?/, 'c.ciudad_id = ?') : ''}
         GROUP BY c.id
