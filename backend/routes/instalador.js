@@ -111,32 +111,86 @@ router.get('/mis-instalaciones', async (req, res) => {
   }
 });
 
-// Iniciar instalación
+// Iniciar instalación (con validación de geofence 500 m)
 router.post('/instalacion/:id/iniciar', async (req, res) => {
   try {
     const { id } = req.params;
+    const { lat, lng } = req.body; // GPS del técnico al momento de iniciar
+
+    // Obtener coordenadas de la instalación para validar geofence
+    const [inst] = await Database.query(
+      'SELECT coordenadas_lat, coordenadas_lng FROM instalaciones WHERE id = ? AND instalador_id = ?',
+      [id, req.user.id]
+    );
+
+    if (!inst) {
+      return res.status(404).json({ success: false, message: 'Instalación no encontrada' });
+    }
+
+    // Validar geofence solo si la instalación tiene coordenadas Y el técnico envió su posición
+    if (lat && lng && inst.coordenadas_lat && inst.coordenadas_lng) {
+      const distancia = calcularDistanciaMetros(
+        parseFloat(lat), parseFloat(lng),
+        parseFloat(inst.coordenadas_lat), parseFloat(inst.coordenadas_lng)
+      );
+      if (distancia > 500) {
+        return res.status(422).json({
+          success: false,
+          fuera_de_rango: true,
+          distancia_metros: Math.round(distancia),
+          message: `Estás a ${Math.round(distancia)} m del punto de instalación. Debes estar a menos de 500 m para iniciar.`
+        });
+      }
+    }
+
     const horaInicio = new Date().toTimeString().split(' ')[0];
-    
+
     await Database.query(`
       UPDATE instalaciones
       SET estado = 'en_proceso',
           hora_inicio = ?
       WHERE id = ? AND instalador_id = ?
     `, [horaInicio, id, req.user.id]);
-    
-    res.json({
-      success: true,
-      message: 'Instalación iniciada',
-      hora_inicio: horaInicio
-    });
-    
+
+    // Guardar posición inicial del técnico
+    if (lat && lng) {
+      await Database.query(`
+        INSERT INTO ubicaciones_tecnicos (instalador_id, lat, lng, instalacion_activa_id)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE lat=VALUES(lat), lng=VALUES(lng),
+          instalacion_activa_id=VALUES(instalacion_activa_id), actualizado_at=NOW()
+      `, [req.user.id, lat, lng, id]);
+    }
+
+    res.json({ success: true, message: 'Instalación iniciada', hora_inicio: horaInicio });
+
   } catch (error) {
     console.error('Error iniciando instalación:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al iniciar instalación',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Error al iniciar instalación', error: error.message });
+  }
+});
+
+// Actualizar ubicación GPS del técnico (llamado periódicamente desde el móvil)
+router.post('/ubicacion', async (req, res) => {
+  try {
+    const { lat, lng, precision, instalacion_id } = req.body;
+    if (!lat || !lng) return res.status(400).json({ success: false, message: 'lat y lng requeridos' });
+
+    await Database.query(`
+      INSERT INTO ubicaciones_tecnicos (instalador_id, lat, lng, precision_metros, instalacion_activa_id)
+      VALUES (?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        lat = VALUES(lat),
+        lng = VALUES(lng),
+        precision_metros = VALUES(precision_metros),
+        instalacion_activa_id = VALUES(instalacion_activa_id),
+        actualizado_at = NOW()
+    `, [req.user.id, lat, lng, precision || null, instalacion_id || null]);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error guardando ubicación:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
@@ -466,5 +520,17 @@ router.get('/estadisticas', async (req, res) => {
     });
   }
 });
+
+// ─── Utilidad: distancia en metros entre dos coordenadas (Haversine) ──────────
+function calcularDistanciaMetros(lat1, lng1, lat2, lng2) {
+  const R = 6371000; // Radio de la Tierra en metros
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 module.exports = router;
