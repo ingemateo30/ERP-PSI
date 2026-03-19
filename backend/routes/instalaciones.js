@@ -1497,7 +1497,7 @@ router.put('/:id/completar', upload.single('foto_despues'), async (req, res) => 
  * 🆕 CORREGIDO: Asignar instalador (DEBE IR ANTES DE /:id)
  */
 router.patch('/:id/asignar-instalador',
-    requireRole('administrador', 'supervisor'),
+    requireRole('administrador', 'supervisor', 'secretaria'),
     async (req, res) => {
         try {
             const { id } = req.params;
