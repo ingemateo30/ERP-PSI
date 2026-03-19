@@ -618,7 +618,7 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
           instalacion.instalador_id === user.id &&
           instalacion.estado === 'programada';
       case 'asignar':
-        return (user.rol === 'administrador' || user.rol === 'supervisor');
+        return (user.rol === 'administrador' || user.rol === 'supervisor' || user.rol === 'secretaria');
       case 'editar':
         return (user.rol === 'administrador' || user.rol === 'supervisor');
       case 'eliminar':
