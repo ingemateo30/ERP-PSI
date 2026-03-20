@@ -37,6 +37,7 @@ const PQRManagement = () => {
         cerrados: 0,
         escalados: 0
     });
+    const [slaAlertas, setSlaAlertas] = useState({ vencidos: 0, proximos: 0, total: 0 });
 
     const tiposPQR = [
         { value: 'peticion', label: 'Petición', color: 'blue' },
@@ -80,6 +81,7 @@ const PQRManagement = () => {
     useEffect(() => {
         cargarPQRs();
         cargarEstadisticas();
+        cargarSLAAlertas();
     }, [filters]);
 
     const cargarPQRs = async () => {
@@ -113,6 +115,13 @@ const PQRManagement = () => {
         } catch (error) {
             console.error('Error cargando estadísticas:', error);
         }
+    };
+
+    const cargarSLAAlertas = async () => {
+        try {
+            const response = await pqrService.getSLAAlertas();
+            if (response.success) setSlaAlertas(response.resumen);
+        } catch (e) { /* silencioso */ }
     };
 
     const handleFilterChange = (key, value) => {
@@ -179,6 +188,29 @@ const PQRManagement = () => {
         } catch (error) {
             alert('Error exportando datos: ' + error.message);
         }
+    };
+
+    const getSLABadge = (pqr) => {
+        const sla = pqr.estado_sla;
+        const horas = pqr.horas_restantes_sla;
+        if (!sla || sla === 'ok') return null;
+        if (sla === 'vencido') {
+            const diasVenc = Math.abs(Math.ceil(horas / 24));
+            return (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700 border border-red-300" title={`SLA vencido hace ${diasVenc} día(s)`}>
+                    SLA ⚠ {diasVenc}d
+                </span>
+            );
+        }
+        // proximo
+        const diasRest = Math.floor(horas / 24);
+        const horasRest = horas % 24;
+        const label = diasRest > 0 ? `${diasRest}d ${horasRest}h` : `${horas}h`;
+        return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-700 border border-yellow-300" title={`SLA vence en ${label}`}>
+                SLA {label}
+            </span>
+        );
     };
 
     const getEstadoBadge = (estado) => {
@@ -291,6 +323,25 @@ const PQRManagement = () => {
                     <div className="text-sm text-gray-600">Escalados</div>
                 </div>
             </div>
+
+            {/* Alertas SLA */}
+            {(slaAlertas.vencidos > 0 || slaAlertas.proximos > 0) && (
+                <div className={`rounded-lg px-4 py-3 flex items-center gap-3 ${slaAlertas.vencidos > 0 ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'}`}>
+                    <AlertTriangle className={`w-5 h-5 flex-shrink-0 ${slaAlertas.vencidos > 0 ? 'text-red-500' : 'text-yellow-500'}`} />
+                    <div className="text-sm">
+                        {slaAlertas.vencidos > 0 && (
+                            <span className="font-semibold text-red-700 mr-3">
+                                {slaAlertas.vencidos} PQR{slaAlertas.vencidos > 1 ? 's' : ''} con SLA vencido
+                            </span>
+                        )}
+                        {slaAlertas.proximos > 0 && (
+                            <span className="font-medium text-yellow-700">
+                                {slaAlertas.proximos} PQR{slaAlertas.proximos > 1 ? 's' : ''} próximas a vencer (≤ 3 días)
+                            </span>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Filtros */}
             <div className="bg-white rounded-lg shadow p-6">
@@ -453,8 +504,9 @@ const PQRManagement = () => {
                                         <p className="text-xs text-gray-500 capitalize">{pqr.categoria}</p>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             {getPrioridadBadge(pqr.prioridad)}
+                                            {getSLABadge(pqr)}
                                             <span className="text-xs text-gray-500">{pqrService.formatFecha(pqr.fecha_recepcion)}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -497,6 +549,9 @@ const PQRManagement = () => {
                                         Prioridad
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        SLA
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Fecha
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -533,6 +588,9 @@ const PQRManagement = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             {getPrioridadBadge(pqr.prioridad)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {getSLABadge(pqr) || <span className="text-xs text-gray-400">—</span>}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm text-gray-900">

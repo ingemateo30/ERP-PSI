@@ -110,6 +110,17 @@ class PQRService {
         }
     }
 
+    // Obtener alertas SLA (PQRs vencidas o próximas a vencer)
+    async getSLAAlertas() {
+        try {
+            const url = `${this.baseURL}/sla-alertas`;
+            return await this.makeRequest(url);
+        } catch (error) {
+            console.error('❌ Error obteniendo alertas SLA:', error);
+            return { success: false, resumen: { vencidos: 0, proximos: 0, total: 0 } };
+        }
+    }
+
     // Obtener PQR por ID
     async getPQRById(id) {
         try {
