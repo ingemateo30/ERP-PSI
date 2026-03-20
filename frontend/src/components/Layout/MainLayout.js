@@ -8,7 +8,7 @@ import {
   DollarSign, TrendingUp, UserCheck, Wifi, Loader2,
   Building2, CreditCard, MapPin, PieChart as PieChartIcon,
   Package, FileText, Wrench, BarChart3, Home, Mail,
-  Clock, Zap, Hash, ArrowRight, Mic, MicOff, GitMerge, Navigation, MessageSquare
+  Clock, Zap, Hash, ArrowRight, Mic, MicOff, GitMerge, Navigation, MessageSquare, Shield
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -71,6 +71,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <BarChart3 size={18} />, label: 'Mapa Instalaciones', path: '/mapa-instalaciones', keywords: ['mapa', 'map', 'ubicacion', 'instalaciones'], color: 'green', permission: 'instalador,administrador,supervisor,secretaria' },
     { icon: <MapPin size={18} />, label: 'Mapa Clientes', path: '/mapa-clientes', keywords: ['mapa', 'clientes', 'map', 'ciudad', 'ubicacion', 'general'], color: 'blue', permission: 'administrador,supervisor,secretaria' },
     { icon: <UserCheck size={18} />, label: 'Usuarios Sistema', path: '/admin/users', keywords: ['usuarios', 'admin', 'sistema'], color: 'blue', permission: 'administrador' },
+    { icon: <Shield size={18} />, label: 'Auditoría', path: '/auditoria', keywords: ['auditoria', 'logs', 'audit', 'acciones', 'historial'], color: 'indigo', permission: 'administrador' },
     { icon: <FileText size={18} />, label: 'Firma de Contratos', path: '/firma-contratos', keywords: ['firma', 'signature', 'contratos'], color: 'indigo', permission: 'operador,secretaria,supervisor,administrador' },
     { icon: <Settings size={18} />, label: 'Configuración', path: '/config', keywords: ['configuracion', 'settings', 'config'], color: 'gray', permission: 'administrador' },
     { icon: <User size={18} />, label: 'Mi Perfil', path: '/profile', keywords: ['perfil', 'profile', 'cuenta'], color: 'blue', permission: null },
@@ -490,6 +491,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
 
   const administracion = [
     { icon: <UserCheck size={22} />, label: 'Usuarios Sistema', path: '/admin/users', permission: 'administrador' },
+    { icon: <Shield size={22} />, label: 'Auditoría', path: '/auditoria', permission: 'administrador' },
     { icon: <FileText size={22} />, label: 'Firma de Contratos', path: '/firma-contratos', permission: 'operador,secretaria,supervisor,administrador' },
     { icon: <Settings size={22} />, label: 'Configuración', path: '/config', permission: 'administrador' }
   ];

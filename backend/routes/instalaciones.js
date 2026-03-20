@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const { Database } = require('../models/Database');
+const { audit, metaFromReq } = require('../utils/auditLogger');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
@@ -1838,6 +1839,8 @@ router.patch('/:id/cambiar-estado',
             LEFT JOIN clientes c ON i.cliente_id = c.id
             WHERE i.id = ?
         `, [id]);
+
+        audit({ usuario_id: req.user.id, accion: `INSTALACION_${estado.toUpperCase()}`, tabla: 'instalaciones', registro_id: parseInt(id), datos_antes: { estado: instalacion.estado }, datos_nuevos: { estado, motivo_cancelacion: motivo_cancelacion || null, observaciones: observaciones || null }, ...metaFromReq(req) });
 
         res.json({
             success: true,

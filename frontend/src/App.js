@@ -18,6 +18,7 @@ const UserProfile = lazy(() => import('./components/UserProfile'));
 
 // CORREGIDO: Importación correcta del componente Users
 const UsersManagement = lazy(() => import('./components/Users/UsersManagement'));
+const AuditoriaLogs = lazy(() => import('./components/Auditoria/AuditoriaLogs'));
 //
 // Lazy loading de componentes de configuración
 const ConfigMain = lazy(() => import('./components/Config/ConfigMain'));
@@ -604,6 +605,18 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="administrador">
                     <UsersManagement />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Logs de auditoría — solo administradores */}
+              <Route
+                path="/auditoria"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Auditoría" subtitle="Logs de acciones críticas del sistema">
+                      <AuditoriaLogs />
+                    </MainLayout>
                   </ProtectedRoute>
                 }
               />

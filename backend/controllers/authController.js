@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const pool = require('../config/database');
+const { audit, metaFromReq } = require('../utils/auditLogger');
 
 // Importar utilidades con manejo de errores
 let logger, ApiResponse, PasswordUtils;
@@ -116,6 +117,7 @@ class AuthController {
           ip: clientIP,
           userAgent: userAgent
         });
+        audit({ accion: 'LOGIN_FALLIDO', datos_nuevos: { email }, ip: clientIP, user_agent: userAgent });
         return ApiResponse.unauthorized(res, 'Credenciales inválidas');
       }
 
@@ -153,6 +155,15 @@ class AuthController {
         rol: user.rol,
         ip: clientIP,
         userAgent: userAgent
+      });
+      audit({
+        usuario_id: user.id,
+        accion: 'LOGIN_OK',
+        tabla: 'sistema_usuarios',
+        registro_id: user.id,
+        datos_nuevos: { email: user.email, rol: user.rol },
+        ip: clientIP,
+        user_agent: userAgent,
       });
 
       // Configurar cookie segura para refresh token

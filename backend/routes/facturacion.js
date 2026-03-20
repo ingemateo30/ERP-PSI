@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const { audit, metaFromReq } = require('../utils/auditLogger');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const FacturacionAutomaticaController = require('../controllers/FacturacionAutomaticaController');
 const BancosFormatosController = require('../controllers/BancosFormatosController');
@@ -929,6 +930,15 @@ router.post('/facturas/:id/pagar', requireRole('administrador', 'supervisor'), a
         id
       ]);
     }
+
+    audit({
+      usuario_id,
+      accion: 'PAGO_REGISTRADO',
+      tabla: 'facturas',
+      registro_id: parseInt(id),
+      datos_nuevos: { valor_pagado, metodo_pago, referencia_pago, banco_id, nuevo_estado: nuevoEstado },
+      ...metaFromReq(req),
+    });
 
     res.json({
       success: true,
