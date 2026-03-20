@@ -100,8 +100,8 @@ Sistema de gestión para ISP (Proveedor de Servicios de Internet).
 
 | # | Ítem | Estado | Prioridad |
 |---|------|--------|-----------|
-| A-1 | Logs de auditoría: alimentar tabla `logs_sistema` en acciones críticas (login, pagos, cambios de estado) | 🔄 En curso | 🔴 Alta |
-| A-2 | SLA en PQR: configurar tiempos de respuesta por tipo y alertas de vencimiento | 🔄 En curso | 🔴 Alta |
+| A-1 | Logs de auditoría: alimentar tabla `logs_sistema` en acciones críticas (login, pagos, cambios de estado) | ✅ Completado | 🔴 Alta |
+| A-2 | SLA en PQR: configurar tiempos de respuesta por tipo y alertas de vencimiento | ✅ Completado | 🔴 Alta |
 | A-3 | Notas crédito formales: documento NC al anular factura (con número, motivo y PDF) | 🔄 En curso | 🔴 Alta |
 | A-4 | Alertas de stock bajo en inventario: umbral configurable por tipo de equipo | 🔄 En curso | 🟡 Media |
 | A-5 | Exportación de reportes a PDF: cartera vencida, instalaciones del día, PQR abiertos | 🔄 En curso | 🟡 Media |

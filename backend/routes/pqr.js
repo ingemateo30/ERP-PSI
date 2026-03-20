@@ -6,6 +6,34 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 
 const db = Database;
 
+// ─── SLA: días calendario según tipo (regulación CRC para ISPs) ───────────────
+const SLA_DIAS = {
+  peticion:   21,  // 15 días hábiles ≈ 21 calendario
+  queja:      21,
+  reclamo:    21,
+  sugerencia: 30
+};
+
+function calcularVencimientoSLA(tipo) {
+  const dias = SLA_DIAS[tipo] || 21;
+  const fecha = new Date();
+  fecha.setDate(fecha.getDate() + dias);
+  return fecha;
+}
+
+/**
+ * Devuelve: 'ok' | 'proximo' (≤ 3 días) | 'vencido'
+ */
+function estadoSLA(fechaVencimiento, estadoPQR) {
+  if (!fechaVencimiento || ['resuelto', 'cerrado'].includes(estadoPQR)) return 'ok';
+  const ahora = new Date();
+  const venc  = new Date(fechaVencimiento);
+  const diffMs = venc - ahora;
+  if (diffMs < 0) return 'vencido';
+  if (diffMs < 3 * 24 * 60 * 60 * 1000) return 'proximo'; // menos de 3 días
+  return 'ok';
+}
+
 // Middleware de autenticación para todas las rutas
 router.use(authenticateToken);
 
@@ -25,13 +53,21 @@ router.get('/', async (req, res) => {
         } = req.query;
         
         let query = `
-            SELECT 
+            SELECT
                 p.*,
                 c.nombre as cliente_nombre,
                 c.identificacion as cliente_identificacion,
                 c.telefono as cliente_telefono,
                 c.correo as cliente_correo,
-                u.nombre as usuario_asignado_nombre
+                u.nombre as usuario_asignado_nombre,
+                CASE
+                  WHEN p.estado IN ('resuelto','cerrado') THEN 'ok'
+                  WHEN p.fecha_vencimiento_sla IS NULL THEN 'ok'
+                  WHEN NOW() > p.fecha_vencimiento_sla THEN 'vencido'
+                  WHEN TIMESTAMPDIFF(HOUR, NOW(), p.fecha_vencimiento_sla) <= 72 THEN 'proximo'
+                  ELSE 'ok'
+                END AS estado_sla,
+                TIMESTAMPDIFF(HOUR, NOW(), p.fecha_vencimiento_sla) AS horas_restantes_sla
             FROM pqr p
             JOIN clientes c ON p.cliente_id = c.id
             LEFT JOIN sistema_usuarios u ON p.usuario_asignado = u.id
@@ -166,6 +202,44 @@ router.get('/estadisticas', async (req, res) => {
     }
 });
 
+// ─── SLA: PQRs vencidas o próximas a vencer ───────────────────────────────────
+router.get('/sla-alertas', async (req, res) => {
+    try {
+        const alertas = await db.query(`
+            SELECT
+                p.id, p.numero_radicado, p.tipo, p.prioridad, p.estado,
+                p.asunto, p.fecha_recepcion, p.fecha_vencimiento_sla,
+                c.nombre AS cliente_nombre,
+                u.nombre AS asignado_nombre,
+                TIMESTAMPDIFF(HOUR, NOW(), p.fecha_vencimiento_sla) AS horas_restantes,
+                CASE
+                  WHEN NOW() > p.fecha_vencimiento_sla THEN 'vencido'
+                  WHEN TIMESTAMPDIFF(HOUR, NOW(), p.fecha_vencimiento_sla) <= 72 THEN 'proximo'
+                  ELSE 'ok'
+                END AS estado_sla
+            FROM pqr p
+            JOIN clientes c ON p.cliente_id = c.id
+            LEFT JOIN sistema_usuarios u ON p.usuario_asignado = u.id
+            WHERE p.estado NOT IN ('resuelto', 'cerrado')
+              AND p.fecha_vencimiento_sla IS NOT NULL
+              AND (
+                NOW() > p.fecha_vencimiento_sla
+                OR TIMESTAMPDIFF(HOUR, NOW(), p.fecha_vencimiento_sla) <= 72
+              )
+            ORDER BY p.fecha_vencimiento_sla ASC
+            LIMIT 100
+        `);
+
+        const vencidos = alertas.filter(a => a.estado_sla === 'vencido').length;
+        const proximos = alertas.filter(a => a.estado_sla === 'proximo').length;
+
+        res.json({ success: true, data: alertas, resumen: { vencidos, proximos, total: alertas.length } });
+    } catch (error) {
+        console.error('Error obteniendo alertas SLA:', error);
+        res.status(500).json({ success: false, error: 'Error obteniendo alertas SLA' });
+    }
+});
+
 // Obtener PQR por ID
 router.get('/:id', async (req, res) => {
     try {
@@ -256,21 +330,21 @@ router.post('/', async (req, res) => {
             numeroRadicado = `${year}000001`;
         }
         
-        // Calcular fecha de vencimiento (15 días hábiles)
-        const fechaVencimiento = new Date();
-        fechaVencimiento.setDate(fechaVencimiento.getDate() + 15);
-        
+        // Calcular fecha de vencimiento SLA según tipo (regulación CRC)
+        const fechaVencimientoSLA = calcularVencimientoSLA(tipo);
+
         const query = `
             INSERT INTO pqr (
                 numero_radicado, cliente_id, tipo, categoria, servicio_afectado,
-                medio_recepcion, fecha_recepcion, asunto, 
-                descripcion, prioridad, estado
-            ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, 'abierto')
+                medio_recepcion, fecha_recepcion, asunto,
+                descripcion, prioridad, estado, fecha_vencimiento_sla
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, 'abierto', ?)
         `;
-        
+
         const result = await db.query(query, [
             numeroRadicado, cliente_id, tipo, categoria, servicio_afectado,
-            medio_recepcion, asunto, descripcion, prioridad
+            medio_recepcion, asunto, descripcion, prioridad,
+            fechaVencimientoSLA
         ]);
         
         res.status(201).json({ 
