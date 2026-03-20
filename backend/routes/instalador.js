@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Database } = require('../models/Database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { audit, metaFromReq } = require('../utils/auditLogger');
 
 // Aplicar autenticación a todas las rutas
 router.use(authenticateToken);
@@ -162,6 +163,8 @@ router.post('/instalacion/:id/iniciar', async (req, res) => {
       `, [req.user.id, lat, lng, id]);
     }
 
+    audit({ usuario_id: req.user.id, accion: 'INSTALACION_INICIADA', tabla: 'instalaciones', registro_id: parseInt(id), datos_nuevos: { hora_inicio: horaInicio, lat, lng }, ...metaFromReq(req) });
+
     res.json({ success: true, message: 'Instalación iniciada', hora_inicio: horaInicio });
 
   } catch (error) {
@@ -259,6 +262,8 @@ router.post('/instalacion/:id/completar', async (req, res) => {
         }
       }
     }
+
+    audit({ usuario_id: req.user.id, accion: 'INSTALACION_COMPLETADA', tabla: 'instalaciones', registro_id: parseInt(id), datos_nuevos: { hora_fin: horaFin, observaciones, ip_asignada, ont_id }, ...metaFromReq(req) });
 
     res.json({
       success: true,

@@ -331,6 +331,11 @@ const instaladorRoutes = require('./routes/instalador');
 app.use('/api/v1/instalador', instaladorRoutes);
 console.log('✅ Rutas de instalador cargadas: /api/v1/instalador');
 
+console.log('📋 Cargando rutas de auditoría...');
+const auditoriaRoutes = require('./routes/auditoria');
+app.use('/api/v1/auditoria', auditoriaRoutes);
+console.log('✅ Rutas de auditoría cargadas: /api/v1/auditoria');
+
   const inicializarFacturacionAutomatica = () => {
     const cronEnabled = process.env.NODE_ENV === 'production' ||
       process.env.FACTURACION_CRON_ENABLED === 'true';

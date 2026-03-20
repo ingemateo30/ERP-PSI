@@ -63,7 +63,7 @@ Sistema de gestión para ISP (Proveedor de Servicios de Internet).
 
 | # | Ítem | Estado |
 |---|------|--------|
-| P-1 | **Cartera: filtro `fecha_vencimiento < CURDATE()` eliminado + header `Cache-Control: no-store`** | ✅ Completado |
+| P-1 | Cartera: filtro `fecha_vencimiento < CURDATE()` eliminado + header `Cache-Control: no-store` | ✅ Completado |
 | P-2 | Efecty y PSE separados como entradas independientes en cruce bancario y modal de pago | ✅ Completado |
 | P-3 | Campos `mac_address` y `ont_id` capturados al completar instalación y guardados en cliente | ✅ Completado |
 | P-4 | Firma del técnico guardada en columna dedicada e insertada en PDF de orden de servicio | ✅ Completado |
@@ -74,20 +74,58 @@ Sistema de gestión para ISP (Proveedor de Servicios de Internet).
 
 | # | Ítem | Estado |
 |---|------|--------|
-| 4 | Panel de seguimiento de técnicos: agenda diaria por técnico + botón ruta Google Maps + progreso del día | ✅ Completado |
-| 15 | PQR asignable a técnicos: técnicos incluidos en usuarios disponibles, vista `Mis PQR`, flujo gestionar/cerrar | ✅ Completado |
-| 17 | SMS vía LabsMobile: `SMSService`, endpoints de envío, notificación vencimientos, cortes e instalaciones | ✅ Completado |
+| 4 | Panel de seguimiento de técnicos: agenda diaria + botón ruta Google Maps + progreso | ✅ Completado |
+| 15 | PQR asignable a técnicos: vista `Mis PQR`, flujo gestionar/cerrar | ✅ Completado |
+| 17 | SMS vía LabsMobile: `SMSService`, notificación vencimientos, cortes e instalaciones | ✅ Completado |
 
 ---
 
-## 💡 Fase 7 — Ideas Adicionales (Backlog)
+## ✅ Fase 7 — Campo y Geolocalización (Completado)
 
-- Portal de autogestión para clientes (ver facturas, reportar averías)
-- Dashboard de métricas en tiempo real para administradores
-- Exportación de reportes en PDF (cartera, instalaciones, PQR)
-- Integración con pasarela de pagos en línea
-- App móvil para técnicos (PWA o React Native)
-- Sistema de inventario con alertas de stock bajo
+| # | Ítem | Estado |
+|---|------|--------|
+| G-1 | Rastreo GPS en tiempo real de técnicos (tabla `ubicaciones_tecnicos`, polling 15 s) | ✅ Completado |
+| G-2 | Mapa Leaflet en panel de supervisión con marcadores por estado | ✅ Completado |
+| G-3 | Línea de ruta diaria en el mapa (polyline instalaciones completadas/en proceso) | ✅ Completado |
+| G-4 | Geofencing 500 m: bloquea inicio de instalación si técnico está fuera del rango | ✅ Completado |
+| G-5 | Técnico envía GPS cada 30 s; indicador de GPS activo en panel de supervisores | ✅ Completado |
+| G-6 | Tiempos con etiquetas claras: Prog. / Inicio / Fin por instalación | ✅ Completado |
+| G-7 | Reloj en vivo (horas·minutos·segundos) para instalaciones en proceso | ✅ Completado |
+| G-8 | Inventario del técnico filtrado: solo equipos asignados a él (vista agrupada) | ✅ Completado |
+| G-9 | Migraciones 006 (ont_id), 007 (firma_instalador), 008 (ubicaciones_tecnicos) | ✅ Completado |
+
+---
+
+## 🔄 Fase 8 — Calidad de Datos y Auditoría (En curso)
+
+| # | Ítem | Estado | Prioridad |
+|---|------|--------|-----------|
+| A-1 | Logs de auditoría: alimentar tabla `logs_sistema` en acciones críticas (login, pagos, cambios de estado) | 🔄 En curso | 🔴 Alta |
+| A-2 | SLA en PQR: configurar tiempos de respuesta por tipo y alertas de vencimiento | 🔄 En curso | 🔴 Alta |
+| A-3 | Notas crédito formales: documento NC al anular factura (con número, motivo y PDF) | 🔄 En curso | 🔴 Alta |
+| A-4 | Alertas de stock bajo en inventario: umbral configurable por tipo de equipo | 🔄 En curso | 🟡 Media |
+| A-5 | Exportación de reportes a PDF: cartera vencida, instalaciones del día, PQR abiertos | 🔄 En curso | 🟡 Media |
+
+---
+
+## 📋 Fase 9 — Portal y Autogestión (Pendiente)
+
+| # | Ítem | Estado | Prioridad |
+|---|------|--------|-----------|
+| B-1 | Portal de autogestión del cliente: ver facturas, descargar PDF, reportar avería | ❌ Pendiente | 🟡 Media |
+| B-2 | Notificación automática de corte 3 días antes del vencimiento (correo + SMS) | ❌ Pendiente | 🟡 Media |
+| B-3 | Dashboard de métricas en tiempo real para administradores (gráficas de ingresos, clientes, PQR) | ❌ Pendiente | 🟡 Media |
+| B-4 | Corte remoto por API OLT (FTTH/GPON) al marcar cliente en mora | ❌ Pendiente | 🔴 Alta |
+
+---
+
+## 📋 Fase 10 — Integraciones Externas (Pendiente)
+
+| # | Ítem | Estado | Prioridad |
+|---|------|--------|-----------|
+| C-1 | Facturación electrónica DIAN: paso a producción desde módulo de pruebas | ❌ Pendiente | 🔴 Alta |
+| C-2 | Pasarela de pagos en línea (PSE / Nequi / tarjeta) | ❌ Pendiente | 🟡 Media |
+| C-3 | App móvil PWA para técnicos (instalable en Android) | ❌ Pendiente | 🟢 Baja |
 
 ---
 

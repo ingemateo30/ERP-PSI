@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const FacturasController = require('../controllers/FacturasController');
 const FacturacionAutomaticaService = require('../services/FacturacionAutomaticaService');
+const { audit, metaFromReq } = require('../utils/auditLogger');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { validarCrearFactura, validarActualizarFactura, validarPagarFactura } = require('../middleware/validations');
 const { body, validationResult } = require('express-validator');
@@ -856,24 +857,21 @@ router.post('/utilidades/actualizar-estados',
  * Middleware para registrar acciones importantes en facturas
  */
 const auditarAccionFactura = (accion) => {
-  return async (req, res, next) => {
-    // Guardar referencia para logging posterior
-    const originalSend = res.json;
+  return (req, res, next) => {
+    const originalJson = res.json.bind(res);
     res.json = function(data) {
-      // Log de auditoría
-      if (data.success) {
-        console.log(`📋 AUDITORÍA FACTURAS - ${accion}: Usuario ${req.user?.id || 'N/A'} - ${new Date().toISOString()}`);
-        
-        // Aquí podrías enviar a un sistema de auditoría
-        // AuditoriaService.log({
-        //   usuario_id: req.user?.id,
-        //   accion,
-        //   modulo: 'facturas',
-        //   detalles: req.body,
-        //   timestamp: new Date()
-        // });
+      if (data && data.success) {
+        const idParam = parseInt(req.params?.id) || null;
+        audit({
+          usuario_id: req.user?.id || null,
+          accion,
+          tabla: 'facturas',
+          registro_id: idParam,
+          datos_nuevos: req.body || null,
+          ...metaFromReq(req),
+        });
       }
-      originalSend.call(this, data);
+      return originalJson(data);
     };
     next();
   };
