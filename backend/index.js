@@ -88,14 +88,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Parsers con límites ajustados
+// Parsers con límites ajustados — 20mb para fotos de móvil
 app.use(express.json({
-  limit: '10mb',
+  limit: '20mb',
   type: ['application/json', 'text/plain']
 }));
 app.use(express.urlencoded({
   extended: true,
-  limit: '10mb'
+  limit: '20mb'
 }));
 app.use(cookieParser());
 

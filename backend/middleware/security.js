@@ -36,8 +36,8 @@ const securityHeaders = (app) => {
     // Referrer policy
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     
-    // Permissions policy
-    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    // Permissions policy — camera permitida para que los técnicos puedan tomar fotos
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=()');
     
     // Cache control para endpoints sensibles
     if (req.path.includes('/auth') || req.path.includes('/user')) {

@@ -17,6 +17,27 @@ import {
   Navigation
 } from 'lucide-react';
 
+// Comprime imagen a máx 1024px y 70% calidad → reduce de ~5MB a ~300KB
+const comprimirImagen = (file) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.onload = () => {
+        const MAX = 1024;
+        const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 // Distancia Haversine en metros
 function distanciaMetros(lat1, lng1, lat2, lng2) {
   const R = 6371000;
@@ -160,28 +181,22 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
   }
 };
 
-  // Manejar selección de fotos
-  const manejarFotoAntes = (e) => {
+  // Manejar selección de fotos — comprime antes de guardar
+  const manejarFotoAntes = async (e) => {
     const archivo = e.target.files[0];
     if (archivo) {
       setFotoAntes(archivo);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPrevisualizacionAntes(reader.result);
-      };
-      reader.readAsDataURL(archivo);
+      const compressed = await comprimirImagen(archivo);
+      setPrevisualizacionAntes(compressed);
     }
   };
 
-  const manejarFotoDespues = (e) => {
+  const manejarFotoDespues = async (e) => {
     const archivo = e.target.files[0];
     if (archivo) {
       setFotoDespues(archivo);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPrevisualizacionDespues(reader.result);
-      };
-      reader.readAsDataURL(archivo);
+      const compressed = await comprimirImagen(archivo);
+      setPrevisualizacionDespues(compressed);
     }
   };
 
