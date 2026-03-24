@@ -121,6 +121,50 @@ router.post('/equipment/:id/install',
 // RUTAS DE UTILIDADES
 // ==========================================
 
+router.get('/alertas-stock',
+  requireRole(['supervisor', 'administrador']),
+  async (req, res) => {
+    try {
+      const umbral = Math.max(1, parseInt(req.query.umbral) || 2);
+      const { Database } = require('../models/Database');
+      // Reusar la misma lógica de getGrouped pero con filtro HAVING
+      const filas = await Database.query(`
+        SELECT
+          e.tipo,
+          e.nombre,
+          COUNT(*) AS cantidad_total,
+          SUM(CASE WHEN e.estado = 'disponible' THEN 1 ELSE 0 END) AS disponibles,
+          SUM(CASE WHEN e.estado = 'asignado' THEN 1 ELSE 0 END) AS asignados,
+          SUM(CASE WHEN e.estado = 'instalado' THEN 1 ELSE 0 END) AS instalados,
+          SUM(CASE WHEN e.estado = 'dañado' THEN 1 ELSE 0 END) AS daniados
+        FROM inventario_equipos e
+        GROUP BY e.tipo, e.nombre
+        HAVING disponibles <= ?
+        ORDER BY disponibles ASC, e.tipo ASC, e.nombre ASC
+      `, [umbral]);
+
+      const sinStock = filas.filter(f => f.disponibles === 0);
+      const pocosStock = filas.filter(f => f.disponibles > 0);
+
+      res.json({
+        success: true,
+        data: {
+          alertas: filas,
+          resumen: {
+            sin_stock: sinStock.length,
+            stock_bajo: pocosStock.length,
+            total_alertas: filas.length
+          },
+          umbral
+        }
+      });
+    } catch (err) {
+      console.error('❌ Error en alertas-stock:', err);
+      res.status(500).json({ success: false, message: 'Error obteniendo alertas de stock', error: err.message });
+    }
+  }
+);
+
 router.get('/stats',
   requireRole(['supervisor', 'administrador', 'instalador']),
   InventoryController.getStats

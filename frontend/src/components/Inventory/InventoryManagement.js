@@ -9,7 +9,7 @@ import EquipmentFilters from './EquipmentFilters';
 import EquipmentStats from './EquipmentStats';
 import AssignmentModal from './AssignmentModal';
 import HistoryModal from './HistoryModal';
-import { Package, Plus, CheckCircle, AlertCircle, Upload, Download, List, LayoutGrid } from 'lucide-react';
+import { Package, Plus, CheckCircle, AlertCircle, Upload, Download, List, LayoutGrid, AlertTriangle } from 'lucide-react';
 
 const InventoryManagement = () => {
   const { user } = useAuth();
@@ -38,6 +38,8 @@ const InventoryManagement = () => {
   const [viewMode, setViewMode] = useState('grouped'); // 'grouped' | 'detail'
   const [equiposAgrupados, setEquiposAgrupados] = useState([]);
   const [loadingGrouped, setLoadingGrouped] = useState(false);
+  const [alertasStock, setAlertasStock] = useState({ alertas: [], resumen: { sin_stock: 0, stock_bajo: 0, total_alertas: 0 } });
+  const [mostrarAlertasDetalle, setMostrarAlertasDetalle] = useState(false);
 
   // Cargar ciudades del sistema
   useEffect(() => {
@@ -45,6 +47,15 @@ const InventoryManagement = () => {
       if (Array.isArray(data)) setCiudades(data);
     });
   }, []);
+
+  // Cargar alertas de stock (solo admin/supervisor)
+  useEffect(() => {
+    if (user?.rol !== 'instalador') {
+      inventoryService.getAlertasStock(2).then(data => {
+        if (data?.alertas) setAlertasStock(data);
+      }).catch(() => {});
+    }
+  }, [equipos, equiposAgrupados]);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -492,6 +503,47 @@ const loadStats = async () => {
           )}
         </div>
       </div>
+
+      {/* ── Alertas de stock bajo ─────────────────────────────────────── */}
+      {user?.rol !== 'instalador' && alertasStock.resumen.total_alertas > 0 && (
+        <div className={`border rounded-lg p-4 shadow-sm ${alertasStock.resumen.sin_stock > 0 ? 'bg-red-50 border-red-300' : 'bg-yellow-50 border-yellow-300'}`}>
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={20} className={alertasStock.resumen.sin_stock > 0 ? 'text-red-500 mt-0.5 flex-shrink-0' : 'text-yellow-500 mt-0.5 flex-shrink-0'} />
+              <div>
+                <p className={`font-semibold ${alertasStock.resumen.sin_stock > 0 ? 'text-red-800' : 'text-yellow-800'}`}>
+                  Alertas de stock bajo
+                  {alertasStock.resumen.sin_stock > 0 && (
+                    <span className="ml-2 bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">{alertasStock.resumen.sin_stock} sin stock</span>
+                  )}
+                  {alertasStock.resumen.stock_bajo > 0 && (
+                    <span className="ml-1 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-full">{alertasStock.resumen.stock_bajo} bajo stock</span>
+                  )}
+                </p>
+                {mostrarAlertasDetalle && (
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {alertasStock.alertas.map((a, i) => (
+                      <div key={i} className={`text-xs rounded px-2 py-1 ${a.disponibles === 0 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        <span className="font-medium">{a.nombre}</span>
+                        <span className="text-gray-500 ml-1">({a.tipo})</span>
+                        {' — '}
+                        <span className="font-bold">{a.disponibles} disponibles</span>
+                        {' / '}{a.cantidad_total} total
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setMostrarAlertasDetalle(v => !v)}
+              className={`text-xs underline ml-4 flex-shrink-0 ${alertasStock.resumen.sin_stock > 0 ? 'text-red-700' : 'text-yellow-700'}`}
+            >
+              {mostrarAlertasDetalle ? 'Ocultar' : 'Ver detalle'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mensajes de estado con diseño mejorado */}
       {error && (
