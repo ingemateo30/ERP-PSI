@@ -97,8 +97,8 @@ const colorSv = est => ({
 }[est] || 'text-gray-400');
 
 const CACHE_KEY      = 'mapaClientes_geocache';
-const CACHE_KEY_IND  = 'mapaClientes_geocache_individual';
-const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 días
+const CACHE_KEY_BARRIO = 'mapaClientes_geocache_barrio'; // persistente en localStorage
+const CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 días
 
 const leerCache = () => {
   try {
@@ -112,6 +112,21 @@ const leerCache = () => {
 
 const guardarCache = (data) => {
   try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch {}
+};
+
+// Cache de barrios en localStorage (sobrevive recarga de página)
+const leerCacheBarrio = () => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY_BARRIO);
+    if (!raw) return {};
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) { localStorage.removeItem(CACHE_KEY_BARRIO); return {}; }
+    return data;
+  } catch { return {}; }
+};
+
+const guardarCacheBarrio = (data) => {
+  try { localStorage.setItem(CACHE_KEY_BARRIO, JSON.stringify({ ts: Date.now(), data })); } catch {}
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -139,7 +154,7 @@ const MapaClientes = () => {
     try {
       setLoading(true);
       setError(null);
-      if (limpiarCache) { sessionStorage.removeItem(CACHE_KEY); setCiudadesMapa([]); }
+      if (limpiarCache) { sessionStorage.removeItem(CACHE_KEY); localStorage.removeItem(CACHE_KEY_BARRIO); setCiudadesMapa([]); setClientesMapa([]); }
       const res = await apiService.get('/clients/mapa');
       if (res.success && Array.isArray(res.data)) {
         setCiudades(res.data);
@@ -161,13 +176,13 @@ const MapaClientes = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ciudades]);
 
-  // ── Generar marcadores individuales cuando se activa el modo ─────────────
+  // ── Geocodificar clientes individuales cuando se activa el modo ──────────
   useEffect(() => {
-    if (modoIndividual && ciudades.length > 0 && ciudadesMapa.length > 0) {
+    if (modoIndividual && ciudades.length > 0) {
       geocodificarClientesIndividuales();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modoIndividual, ciudades, ciudadesMapa]);
+  }, [modoIndividual, ciudades]);
 
   const geocodificarCiudades = async (listaCiudades) => {
     const cache = leerCache();
@@ -218,23 +233,76 @@ const MapaClientes = () => {
     } catch { return null; }
   };
 
-  // ── Desplegar clientes individuales usando coordenadas de ciudad + jitter ──
-  // No requiere llamadas a APIs externas — es instantáneo.
-  const geocodificarClientesIndividuales = useCallback(() => {
-    if (ciudades.length === 0 || ciudadesMapa.length === 0) return;
+  // ── Geocodificar clientes individuales por barrio (mucho más rápido) ────────
+  // En vez de una llamada por cliente (miles), hace una por barrio único (~10-30 por ciudad).
+  // Cache persistente en localStorage → solo geocodifica la primera vez.
+  const geocodificarClientesIndividuales = useCallback(async () => {
+    if (ciudades.length === 0) return;
 
-    // Mapa de ciudad_nombre → coords geocodificadas
-    const coordCiudad = {};
-    ciudadesMapa.forEach(c => { coordCiudad[c.ciudad_nombre] = { lat: c.lat, lng: c.lng }; });
+    // Cache persistente de barrios
+    let cacheBarrio = leerCacheBarrio();
 
-    const resultado = ciudades.flatMap(ciudad => {
-      const base = coordCiudad[ciudad.ciudad_nombre];
-      if (!base) return [];
-      return ciudad.clientes.map(cl => {
-        // Jitter determinista basado en el ID del cliente
-        // sin/cos distribuye los puntos en círculo alrededor del centro de la ciudad
-        const angle  = (cl.id * 137.508) % 360;           // ángulo único por cliente
-        const radius = 0.005 + (cl.id % 30) * 0.0012;     // radio 0.005°–0.041° (~0.5–4.5 km)
+    // Recopilar barrios únicos que aún no están en caché
+    const barriosPendientes = {};
+    ciudades.forEach(ciudad => {
+      ciudad.clientes.forEach(cl => {
+        const barrio = (cl.barrio || '').trim();
+        const key    = `${barrio}|${ciudad.ciudad_nombre}|${ciudad.departamento_nombre}`;
+        if (!cacheBarrio[key]) {
+          barriosPendientes[key] = { barrio, ciudad: ciudad.ciudad_nombre, depto: ciudad.departamento_nombre };
+        }
+      });
+    });
+
+    const pendientes = Object.entries(barriosPendientes);
+
+    if (pendientes.length > 0) {
+      setGeocodIndividual(true);
+      setProgreso({ actual: 0, total: pendientes.length });
+      let idx = 0;
+
+      for (const [key, info] of pendientes) {
+        idx++;
+        setProgreso({ actual: idx, total: pendientes.length });
+        try {
+          // Buscar barrio + ciudad (si no hay barrio, solo ciudad)
+          const q = [info.barrio || info.ciudad, info.ciudad, info.depto, 'Colombia']
+            .filter(Boolean).join(', ');
+          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=co`;
+          const res  = await fetch(url, { headers: { 'User-Agent': 'ERP-PSI/1.0' } });
+          const data = await res.json();
+          if (data?.length > 0) {
+            cacheBarrio[key] = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+          }
+        } catch { /* ignorar errores individuales */ }
+
+        // Actualizar mapa parcialmente cada 5 barrios para ver progreso
+        if (idx % 5 === 0 || idx === pendientes.length) {
+          guardarCacheBarrio(cacheBarrio);
+          aplicarCoordenadasIndividuales(ciudades, cacheBarrio);
+        }
+
+        if (idx < pendientes.length) await new Promise(r => setTimeout(r, 1050));
+      }
+
+      guardarCacheBarrio(cacheBarrio);
+      setGeocodIndividual(false);
+    }
+
+    aplicarCoordenadasIndividuales(ciudades, cacheBarrio);
+  }, [ciudades]); // eslint-disable-line
+
+  // Asigna coords a clientes: usa barrio → pequeño jitter por cliente dentro del barrio
+  const aplicarCoordenadasIndividuales = (listaCiudades, cacheBarrio) => {
+    const resultado = listaCiudades.flatMap(ciudad =>
+      ciudad.clientes.map(cl => {
+        const barrio = (cl.barrio || '').trim();
+        const key    = `${barrio}|${ciudad.ciudad_nombre}|${ciudad.departamento_nombre}`;
+        const base   = cacheBarrio[key];
+        if (!base) return null;
+        // Jitter pequeño dentro del barrio (~200m) para separar puntos superpuestos
+        const angle  = (cl.id * 137.508) % 360;
+        const radius = 0.0008 + (cl.id % 15) * 0.0003; // ~80–500m
         const rad    = (angle * Math.PI) / 180;
         return {
           ...cl,
@@ -243,11 +311,10 @@ const MapaClientes = () => {
           lat: base.lat + Math.sin(rad) * radius,
           lng: base.lng + Math.cos(rad) * radius,
         };
-      });
-    });
-
+      }).filter(Boolean)
+    );
     setClientesMapa(resultado);
-  }, [ciudades, ciudadesMapa]);
+  };
 
   // ── Stats globales ───────────────────────────────────────────────────────
   const stats = useMemo(() => {

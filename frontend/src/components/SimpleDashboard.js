@@ -923,16 +923,25 @@ const InstaladorDashboard = () => {
             if (dataTrabajos.success) {
                 const instalaciones = dataTrabajos.instalaciones || [];
 
-                // Filtrar solo instalaciones pendientes y en proceso (los "trabajos activos")
-                const trabajosActivos = instalaciones.filter(inst =>
-                    inst.estado === 'programada' || inst.estado === 'en_proceso'
-                );
+                // Filtrar trabajos activos de HOY (o pasados sin completar)
+                const hoy = new Date().toISOString().split('T')[0];
+                const trabajosActivos = instalaciones.filter(inst => {
+                    const esActivo = ['programada', 'en_proceso', 'reagendada'].includes(inst.estado);
+                    if (!esActivo) return false;
+                    // Mostrar instalaciones de hoy o anteriores sin completar
+                    const fechaProg = inst.fecha_programada
+                        ? (typeof inst.fecha_programada === 'string' ? inst.fecha_programada : inst.fecha_programada.toISOString()).split('T')[0]
+                        : null;
+                    return !fechaProg || fechaProg <= hoy;
+                });
 
                 setTrabajosHoy(trabajosActivos);
                 console.log('✅ DASHBOARD - Trabajos activos cargados:', trabajosActivos.length);
 
                 // Calcular estadísticas desde las instalaciones
-                const pendientes = instalaciones.filter(inst => inst.estado === 'programada').length;
+                const pendientes = instalaciones.filter(inst =>
+                    inst.estado === 'programada' || inst.estado === 'reagendada'
+                ).length;
 
                 // ✅ ARREGLADO: Calcular completadas de la semana actual (últimos 7 días)
                 const hace7Dias = new Date();
@@ -1117,8 +1126,9 @@ const InstaladorDashboard = () => {
                                 <div className="flex items-center space-x-3 flex-1">
                                     <div className={`w-3 h-3 rounded-full ${
                                         trabajo.estado === 'en_proceso' ? 'bg-yellow-500' :
+                                        trabajo.estado === 'reagendada' ? 'bg-orange-500' :
                                         trabajo.tipo_orden === 'instalacion' ? 'bg-blue-500' :
-                                        trabajo.tipo_orden === 'mantenimiento' ? 'bg-orange-500' : 'bg-red-500'
+                                        trabajo.tipo_orden === 'mantenimiento' ? 'bg-orange-400' : 'bg-red-500'
                                     }`}></div>
                                     <div className="flex-1">
                                         <p className="font-medium text-gray-900">{trabajo.cliente_nombre}</p>
@@ -1134,7 +1144,7 @@ const InstaladorDashboard = () => {
                                 <div className="text-right ml-4">
                                     <p className="font-medium text-[#0e6493]">{trabajo.hora}</p>
                                     <p className="text-sm text-gray-500 capitalize">{trabajo.tipo_orden?.replace('_', ' ')}</p>
-                                    {trabajo.estado === 'programada' && (
+                                    {(trabajo.estado === 'programada' || trabajo.estado === 'reagendada') && (
                                         <button
                                             onClick={() => iniciarTrabajo(trabajo.id)}
                                             className="mt-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
