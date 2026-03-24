@@ -293,12 +293,14 @@ router.get('/seguimiento-tecnicos',
           c.telefono AS cliente_telefono,
           c.identificacion AS cliente_identificacion,
           ci.nombre AS ciudad_nombre,
+          d.nombre  AS departamento_nombre,
           ps.nombre AS plan_nombre
         FROM sistema_usuarios u
         LEFT JOIN instalaciones i ON i.instalador_id = u.id
           AND DATE(i.fecha_programada) = ?
         LEFT JOIN clientes c ON i.cliente_id = c.id
         LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+        LEFT JOIN departamentos d ON ci.departamento_id = d.id
         LEFT JOIN servicios_cliente sc ON i.servicio_cliente_id = sc.id
         LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
         WHERE u.rol = 'instalador'
@@ -334,6 +336,7 @@ router.get('/seguimiento-tecnicos',
             direccion: row.direccion_instalacion,
             barrio: row.barrio,
             ciudad: row.ciudad_nombre,
+            departamento: row.departamento_nombre || null,
             coordenadas: row.coordenadas_lat && row.coordenadas_lng
               ? { lat: parseFloat(row.coordenadas_lat), lng: parseFloat(row.coordenadas_lng) }
               : null,
