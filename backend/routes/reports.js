@@ -58,7 +58,7 @@ function generarReportePDF({ title, subtitle, headers, rows, widths, empresa }) 
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      const PW = 756; // landscape usable width (792 - 2*40 + some)
+      const PW = 712; // landscape usable width (792 letter - 2×40 margins)
       const empresaNombre = empresa?.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.';
       const empresaNit = empresa?.empresa_nit || '901582657-3';
       const fechaHoy = new Date().toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' });
@@ -171,7 +171,7 @@ router.get('/pdf/cartera-vencida',
         title: 'Reporte de Cartera Vencida',
         subtitle: `Fecha de corte: ${new Date().toLocaleDateString('es-CO')}  |  Total cartera: ${fmt(total)}`,
         headers: ['Factura', 'Cliente', 'Identificación', 'F. Emisión', 'F. Vencimiento', 'Días Mora', 'Total', 'Ruta', 'Teléfono'],
-        widths:  [75,         140,      90,               72,           80,               56,          80,      60,    60],
+        widths:  [65,        135,      85,               65,           65,               55,          80,      60,    102],
         rows: facturas.map(f => [
           f.numero_factura, f.nombre_cliente, f.identificacion_cliente,
           new Date(f.fecha_emision).toLocaleDateString('es-CO'),
@@ -205,15 +205,16 @@ router.get('/pdf/instalaciones-dia',
       const { Database } = require('../models/Database');
       const instalaciones = await Database.query(`
         SELECT i.id, c.nombre AS cliente, c.identificacion, c.telefono,
-               c.direccion, i.estado,
-               i.fecha_programada,
-               CONCAT(u.nombre) AS tecnico,
+               COALESCE(i.direccion_instalacion, c.direccion) AS direccion,
+               i.estado, i.fecha_programada,
+               u.nombre AS tecnico,
                i.hora_inicio, i.hora_fin, i.observaciones,
-               s.nombre AS servicio
+               ps.nombre AS servicio
         FROM instalaciones i
         LEFT JOIN clientes c ON i.cliente_id = c.id
         LEFT JOIN sistema_usuarios u ON i.instalador_id = u.id
-        LEFT JOIN planes_servicio s ON i.plan_id = s.id
+        LEFT JOIN servicios_cliente sc ON sc.id = CAST(i.servicio_cliente_id AS UNSIGNED)
+        LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
         WHERE DATE(i.fecha_programada) = ?
         ORDER BY i.estado ASC, i.fecha_programada ASC
         LIMIT 200
@@ -226,7 +227,7 @@ router.get('/pdf/instalaciones-dia',
         title: `Instalaciones del día: ${new Date(fecha + 'T12:00:00').toLocaleDateString('es-CO', { dateStyle: 'full' })}`,
         subtitle: `Total: ${instalaciones.length} instalaciones`,
         headers: ['#', 'Cliente', 'Identificación', 'Teléfono', 'Dirección', 'Técnico', 'Estado', 'Inicio', 'Fin', 'Servicio'],
-        widths:  [28,  130,      88,               70,         145,         90,        75,      50,      50,    90],
+        widths:  [22,  105,      78,               65,         115,         85,        68,      42,      42,    90],
         rows: instalaciones.map((i, idx) => [
           idx + 1, i.cliente, i.identificacion, i.telefono || '',
           i.direccion || '', i.tecnico || '', estadoLabel[i.estado] || i.estado,
@@ -259,24 +260,28 @@ router.get('/pdf/pqr-abiertos',
       const { Database } = require('../models/Database');
       const pqrs = await Database.query(`
         SELECT p.numero_radicado, p.tipo, p.categoria,
-               COALESCE(c.nombre, p.cliente_nombre) AS cliente,
+               COALESCE(c.nombre, '') AS cliente,
                p.asunto, p.estado,
                p.fecha_recepcion,
-               p.fecha_vencimiento_sla,
+               DATE_ADD(p.fecha_recepcion, INTERVAL
+                 CASE p.tipo WHEN 'sugerencia' THEN 30 ELSE 21 END DAY
+               ) AS fecha_vencimiento_sla,
                CASE
                  WHEN p.estado IN ('resuelto','cerrado') THEN 'ok'
-                 WHEN p.fecha_vencimiento_sla IS NULL THEN 'ok'
-                 WHEN NOW() > p.fecha_vencimiento_sla THEN 'vencido'
-                 WHEN TIMESTAMPDIFF(HOUR, NOW(), p.fecha_vencimiento_sla) <= 72 THEN 'proximo'
+                 WHEN NOW() > DATE_ADD(p.fecha_recepcion, INTERVAL
+                   CASE p.tipo WHEN 'sugerencia' THEN 30 ELSE 21 END DAY) THEN 'vencido'
+                 WHEN TIMESTAMPDIFF(HOUR, NOW(), DATE_ADD(p.fecha_recepcion, INTERVAL
+                   CASE p.tipo WHEN 'sugerencia' THEN 30 ELSE 21 END DAY)) <= 72 THEN 'proximo'
                  ELSE 'ok'
                END AS sla,
                u.nombre AS asignado
         FROM pqr p
         LEFT JOIN clientes c ON p.cliente_id = c.id
-        LEFT JOIN sistema_usuarios u ON p.usuario_asignado_id = u.id
+        LEFT JOIN sistema_usuarios u ON p.usuario_asignado = u.id
         WHERE p.estado NOT IN ('resuelto','cerrado')
         ORDER BY
-          CASE WHEN NOW() > p.fecha_vencimiento_sla THEN 0 ELSE 1 END ASC,
+          CASE WHEN NOW() > DATE_ADD(p.fecha_recepcion, INTERVAL
+            CASE p.tipo WHEN 'sugerencia' THEN 30 ELSE 21 END DAY) THEN 0 ELSE 1 END ASC,
           p.fecha_recepcion ASC
         LIMIT 300
       `);
@@ -289,7 +294,7 @@ router.get('/pdf/pqr-abiertos',
         title: 'Reporte PQR Abiertos',
         subtitle: `Fecha: ${new Date().toLocaleDateString('es-CO')}  |  Total: ${pqrs.length} registros`,
         headers: ['Radicado', 'Tipo', 'Categoría', 'Cliente', 'Asunto', 'Estado', 'Recepción', 'Vence SLA', 'SLA', 'Asignado'],
-        widths:  [72,         55,     80,           120,       140,      65,       68,           68,          45,    70],
+        widths:  [65,         50,     68,           100,       110,      58,       60,           60,          40,    101],
         rows: pqrs.map(p => [
           p.numero_radicado,
           tipoLabel[p.tipo] || p.tipo,

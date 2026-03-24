@@ -150,7 +150,7 @@ const PQRCard = ({ pqr, onGestionar }) => {
         </div>
         <div className="flex flex-col items-end gap-2 flex-shrink-0">
           <span className="text-xs text-gray-400">
-            {pqr.fecha_creacion ? new Date(pqr.fecha_creacion).toLocaleDateString('es-CO') : ''}
+            {(pqr.fecha_recepcion || pqr.created_at) ? new Date(pqr.fecha_recepcion || pqr.created_at).toLocaleDateString('es-CO') : ''}
           </span>
           {expanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
         </div>
