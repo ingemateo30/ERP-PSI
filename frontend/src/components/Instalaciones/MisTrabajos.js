@@ -64,7 +64,7 @@ const MisTrabajos = () => {
       // Filtrar según el estado seleccionado
       let instalacionesFiltradas = todasInstalaciones;
       if (filtroEstado === 'pendiente') {
-        instalacionesFiltradas = todasInstalaciones.filter(inst => inst.estado === 'programada');
+        instalacionesFiltradas = todasInstalaciones.filter(inst => inst.estado === 'programada' || inst.estado === 'reagendada');
       } else if (filtroEstado === 'en_proceso') {
         instalacionesFiltradas = todasInstalaciones.filter(inst => inst.estado === 'en_proceso');
       } else if (filtroEstado === 'completada') {
@@ -76,7 +76,7 @@ const MisTrabajos = () => {
 
       // ✅ ARREGLADO: Calcular estadísticas con TODAS las instalaciones
       const stats = {
-        pendientes: todasInstalaciones.filter(inst => inst.estado === 'programada').length,
+        pendientes: todasInstalaciones.filter(inst => inst.estado === 'programada' || inst.estado === 'reagendada').length,
         en_proceso: todasInstalaciones.filter(inst => inst.estado === 'en_proceso').length,
         completadas_hoy: todasInstalaciones.filter(inst => {
           if (inst.estado !== 'completada') return false;
@@ -125,6 +125,7 @@ const cerrarModal = () => {
   const getEstadoColor = (estado) => {
     const colores = {
       'programada': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      'reagendada': 'bg-orange-100 text-orange-800 border-orange-300',
       'en_proceso': 'bg-blue-100 text-blue-800 border-blue-300',
       'completada': 'bg-green-100 text-green-800 border-green-300',
       'cancelada': 'bg-red-100 text-red-800 border-red-300'
@@ -135,6 +136,7 @@ const cerrarModal = () => {
   const getEstadoIcono = (estado) => {
     switch (estado) {
       case 'programada': return <Clock size={18} className="text-yellow-600" />;
+      case 'reagendada': return <AlertCircle size={18} className="text-orange-600" />;
       case 'en_proceso': return <Play size={18} className="text-blue-600" />;
       case 'completada': return <CheckCircle size={18} className="text-green-600" />;
       case 'cancelada': return <XCircle size={18} className="text-red-600" />;
@@ -345,7 +347,7 @@ const cerrarModal = () => {
 
                 {/* Acciones */}
                 <div className="flex flex-wrap gap-3 pt-4 border-t">
-                  {instalacion.estado === 'programada' && (
+                  {(instalacion.estado === 'programada' || instalacion.estado === 'reagendada') && (
                     <button
                       onClick={() => abrirModal(instalacion)}
                       className="flex items-center space-x-2 bg-[#0e6493] hover:bg-[#0a4d6e] text-white px-4 py-2 rounded-lg transition-colors font-medium"

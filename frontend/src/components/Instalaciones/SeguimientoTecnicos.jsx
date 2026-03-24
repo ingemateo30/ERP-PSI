@@ -292,12 +292,12 @@ const MapaEnVivo = ({ tecnicos, ubicacionesVivas }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
         <h2 className="font-semibold text-gray-800 flex items-center gap-2">
           <Radio size={16} className="text-green-500" />
           Mapa en tiempo real
         </h2>
-        <div className="flex items-center gap-3 text-xs text-gray-500">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-gray-500">
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-600 inline-block" /> Técnicos GPS</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-400 inline-block" /> En proceso</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-500 inline-block" /> Completada</span>
@@ -305,7 +305,7 @@ const MapaEnVivo = ({ tecnicos, ubicacionesVivas }) => {
         </div>
       </div>
 
-      <MapContainer center={centro} zoom={puntos.length > 0 ? 13 : 7} style={{ height: '420px', width: '100%' }}>
+      <MapContainer center={centro} zoom={puntos.length > 0 ? 13 : 7} style={{ height: 'clamp(280px, 50vw, 420px)', width: '100%' }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -465,7 +465,7 @@ const SeguimientoTecnicos = () => {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             type="date"
             value={fecha}
