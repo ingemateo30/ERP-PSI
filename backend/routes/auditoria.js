@@ -9,6 +9,26 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 router.use(authenticateToken);
 router.use(requireRole('administrador'));
 
+// Garantizar que la tabla existe con AUTO_INCREMENT correcto
+Database.query(`
+  CREATE TABLE IF NOT EXISTS logs_sistema (
+    id          INT          NOT NULL AUTO_INCREMENT,
+    usuario_id  INT          DEFAULT NULL,
+    accion      VARCHAR(255) NOT NULL,
+    tabla_afectada VARCHAR(100) DEFAULT NULL,
+    registro_id INT          DEFAULT NULL,
+    datos_anteriores LONGTEXT DEFAULT NULL,
+    datos_nuevos     LONGTEXT DEFAULT NULL,
+    ip_address  VARCHAR(45)  DEFAULT NULL,
+    user_agent  TEXT         DEFAULT NULL,
+    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+`).then(() =>
+  // Si ya existía sin AUTO_INCREMENT, arreglarlo
+  Database.query('ALTER TABLE logs_sistema MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT')
+).catch(() => {});
+
 // GET /api/v1/auditoria
 // Parámetros: page, limit, accion, usuario_id, tabla, fecha_desde, fecha_hasta, busqueda
 router.get('/', async (req, res) => {

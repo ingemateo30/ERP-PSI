@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
-const API = '/api/v1/pqr';
+const API = `${process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1'}/pqr`;
 
 const PRIORIDAD = {
   alta:  { label: 'Alta',  bg: 'bg-red-100',    text: 'text-red-800'    },

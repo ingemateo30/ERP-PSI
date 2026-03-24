@@ -476,6 +476,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   ];
 
   const atencionCliente = [
+    { icon: <MessageSquare size={22} />, label: 'Mis PQR', path: '/mis-pqr', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <FileText size={22} />, label: 'PQR', path: '/pqr', permission: 'secretaria,supervisor,administrador' },
     { icon: <Loader2 size={22} />, label: 'Incidencias', path: '/incidencias', permission: 'secretaria,supervisor,administrador' },
     { icon: <Mail size={22} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', permission: 'secretaria,supervisor,administrador' }

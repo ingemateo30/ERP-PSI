@@ -12,8 +12,9 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { geocodificarLote } from '../../services/geocodingService';
 
-const API       = '/api/v1/instalaciones/seguimiento-tecnicos';
-const API_VIVO  = '/api/v1/instalaciones/ubicaciones-en-vivo';
+const BASE      = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
+const API       = `${BASE}/instalaciones/seguimiento-tecnicos`;
+const API_VIVO  = `${BASE}/instalaciones/ubicaciones-en-vivo`;
 
 // ─── Iconos Leaflet ───────────────────────────────────────────────────────────
 const makeIcon = (color) =>
@@ -419,10 +420,10 @@ const SeguimientoTecnicos = () => {
           if (!inst.coordenadas?.lat) {
             sinCoords.push({
               id:          inst.id,
-              direccion:   inst.direccion_instalacion,
+              direccion:   inst.direccion,
               barrio:      inst.barrio,
-              ciudad:      inst.ciudad_nombre,
-              departamento:null
+              ciudad:      inst.ciudad,
+              departamento:inst.departamento || null
             });
           }
         });
