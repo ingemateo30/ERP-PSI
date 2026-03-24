@@ -4,6 +4,27 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Camera, Upload, Package, CheckCircle, Wifi, Lock, Pen, RotateCcw } from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
 
+// Comprime imagen a máx 1024px y 70% calidad → reduce de ~5MB a ~300KB
+const comprimirImagen = (file) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.onload = () => {
+        const MAX = 1024;
+        const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [equiposDisponibles, setEquiposDisponibles] = useState([]);
@@ -70,17 +91,13 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
     }
   };
 
-  const handleFotoChange = (e) => {
+  const handleFotoChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
       setFoto(file);
-      
-      // Crear preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFotoPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+      // Comprimir antes de guardar: reduce payload de ~5MB a ~300KB
+      const compressed = await comprimirImagen(file);
+      setFotoPreview(compressed);
     }
   };
 
@@ -200,8 +217,8 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
         alert('❌ Error: ' + (data.message || 'No se pudo completar la instalación'));
       }
     } catch (error) {
-      console.error('Error:', error);
-      alert('❌ Error de conexión');
+      console.error('Error completando instalación:', error);
+      alert('❌ Error: ' + (error.message || 'No se pudo conectar con el servidor. Verifica tu conexión.'));
     } finally {
       setLoading(false);
     }
