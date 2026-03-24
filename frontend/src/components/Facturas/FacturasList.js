@@ -1,13 +1,13 @@
 // frontend/src/components/Facturas/FacturasList.js - CORREGIDO: Sin alertas de mora en facturas pagadas
 import React, { useState } from 'react';
-import { 
-  FileText, 
-  Eye, 
-  Download, 
-  Edit, 
-  Copy, 
-  DollarSign, 
-  X, 
+import {
+  FileText,
+  Eye,
+  Download,
+  Edit,
+  Copy,
+  DollarSign,
+  X,
   Clock,
   CheckCircle,
   AlertTriangle,
@@ -16,8 +16,10 @@ import {
   User,
   MapPin,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  FileCheck
 } from 'lucide-react';
+import { facturasService } from '../../services/facturasService';
 
 const FacturasList = ({
   facturas = [],
@@ -158,6 +160,40 @@ const FacturasList = ({
         <IconComponent className="w-3 h-3 mr-1" />
         {badge.label}
       </span>
+    );
+  };
+
+  // ==========================================
+  // BADGE DE NOTA DE CRÉDITO (facturas anuladas)
+  // ==========================================
+  const [descargandoNC, setDescargandoNC] = useState(null);
+
+  const getNcBadge = (factura) => {
+    if (factura.estado !== 'anulada' || !factura.numero_nc) return null;
+    const handleDownload = async (e) => {
+      e.stopPropagation();
+      try {
+        setDescargandoNC(factura.id);
+        await facturasService.descargarNotaCreditoPDF(factura.id, factura.numero_nc);
+      } catch (err) {
+        console.error('Error descargando NC:', err);
+      } finally {
+        setDescargandoNC(null);
+      }
+    };
+    return (
+      <button
+        onClick={handleDownload}
+        title={`Descargar Nota de Crédito ${factura.numero_nc}`}
+        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors ml-1"
+      >
+        {descargandoNC === factura.id ? (
+          <div className="animate-spin rounded-full h-3 w-3 border-b border-blue-700 mr-1" />
+        ) : (
+          <FileCheck className="w-3 h-3 mr-1" />
+        )}
+        {factura.numero_nc}
+      </button>
     );
   };
 
@@ -508,6 +544,7 @@ const FacturasList = ({
                     
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getBadgeEstado(factura)}
+                      {getNcBadge(factura)}
                     </td>
                     
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -621,6 +658,7 @@ const FacturasList = ({
                   {factura.numero_factura}
                 </div>
                 {getBadgeEstado(factura)}
+                {getNcBadge(factura)}
               </div>
               
               <div className="text-sm text-gray-600 mb-2">

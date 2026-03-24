@@ -764,6 +764,125 @@ if (valorLegible.length % 2 !== 0) {
             }
         });
     }
+
+    /**
+     * Genera el PDF de una Nota de Crédito formal
+     * @param {object} nc - Datos de la nota de crédito
+     * @param {object} empresa - Datos de la empresa
+     * @returns {Promise<Buffer>}
+     */
+    static async generarNotaCredito(nc, empresa) {
+        return new Promise((resolve, reject) => {
+            try {
+                const doc = new PDFDocument({ size: 'letter', margin: 50 });
+                const chunks = [];
+                doc.on('data', chunk => chunks.push(chunk));
+                doc.on('end', () => resolve(Buffer.concat(chunks)));
+                doc.on('error', reject);
+
+                const pageW = 612 - 100; // usable width with margins
+
+                // --- Header ---
+                try {
+                    const logoPath = path.join(__dirname, '..', 'public', 'logo2.png');
+                    if (fs.existsSync(logoPath)) {
+                        doc.image(logoPath, 50, 40, { width: 80, height: 45 });
+                    }
+                } catch (_) {}
+
+                doc.fontSize(9).font('Helvetica')
+                    .text(empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.', 145, 45, { width: 280, align: 'center' })
+                    .fontSize(8)
+                    .text(`NIT: ${empresa.empresa_nit || '901582657-3'}`, 145, 57, { width: 280, align: 'center' })
+                    .text('Registro único de TIC No. 96006732', 145, 67, { width: 280, align: 'center' });
+
+                // Document title box
+                doc.rect(430, 40, 130, 50).stroke('#000');
+                doc.fontSize(11).font('Helvetica-Bold')
+                    .text('NOTA DE CRÉDITO', 430, 50, { width: 130, align: 'center' })
+                    .fontSize(13).text(nc.numero_nc, 430, 65, { width: 130, align: 'center' });
+
+                // Divider
+                doc.moveTo(50, 100).lineTo(562, 100).lineWidth(1.5).stroke('#000').lineWidth(1);
+
+                let y = 115;
+
+                // Date and reason
+                const fecha = new Date(nc.created_at || Date.now()).toLocaleDateString('es-CO', {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                });
+                doc.fontSize(9).font('Helvetica')
+                    .text(`Fecha de emisión:`, 50, y).font('Helvetica-Bold').text(fecha, 160, y)
+                    .font('Helvetica').text(`Factura anulada:`, 350, y).font('Helvetica-Bold').text(nc.numero_factura_original, 460, y);
+
+                y += 20;
+                doc.fontSize(8).font('Helvetica').fillColor('#555555')
+                    .text('Esta Nota de Crédito anula y deja sin efecto la factura referenciada arriba.', 50, y)
+                    .fillColor('#000000');
+
+                y += 30;
+
+                // Client data
+                doc.rect(50, y, pageW, 18).fill('#1a3c6e').stroke('#1a3c6e');
+                doc.fontSize(9).font('Helvetica-Bold').fillColor('#ffffff')
+                    .text('DATOS DEL CLIENTE', 55, y + 4);
+                doc.fillColor('#000000');
+                y += 22;
+
+                doc.rect(50, y, pageW, 60).stroke('#cccccc');
+                doc.fontSize(9).font('Helvetica')
+                    .text('Nombre:', 60, y + 8).font('Helvetica-Bold').text(nc.nombre_cliente, 130, y + 8)
+                    .font('Helvetica').text('Identificación:', 60, y + 24).font('Helvetica-Bold').text(nc.identificacion_cliente, 160, y + 24)
+                    .font('Helvetica').text('Usuario que anuló:', 60, y + 40).font('Helvetica-Bold').text(nc.usuario_nombre || 'Sistema', 180, y + 40);
+
+                y += 75;
+
+                // Motivo
+                doc.rect(50, y, pageW, 18).fill('#1a3c6e').stroke('#1a3c6e');
+                doc.fontSize(9).font('Helvetica-Bold').fillColor('#ffffff')
+                    .text('MOTIVO DE ANULACIÓN', 55, y + 4);
+                doc.fillColor('#000000');
+                y += 22;
+
+                const motivoTexto = nc.motivo_detalle || 'Sin detalle';
+                const motivoLines = Math.ceil(motivoTexto.length / 90) + 1;
+                const motivoHeight = Math.max(40, motivoLines * 14 + 10);
+                doc.rect(50, y, pageW, motivoHeight).stroke('#cccccc');
+                doc.fontSize(9).font('Helvetica-Bold').text(`Tipo: `, 60, y + 8, { continued: true })
+                    .font('Helvetica').text(nc.motivo_tipo || 'otro');
+                doc.fontSize(9).font('Helvetica').text(motivoTexto, 60, y + 22, { width: pageW - 20, lineGap: 2 });
+                y += motivoHeight + 15;
+
+                // Value table
+                doc.rect(50, y, pageW, 18).fill('#1a3c6e').stroke('#1a3c6e');
+                doc.fontSize(9).font('Helvetica-Bold').fillColor('#ffffff')
+                    .text('VALOR DE LA NOTA DE CRÉDITO', 55, y + 4);
+                doc.fillColor('#000000');
+                y += 22;
+
+                doc.rect(50, y, pageW, 30).stroke('#cccccc');
+                doc.rect(50, y, pageW * 0.7, 30).stroke('#cccccc');
+                doc.fontSize(9).font('Helvetica').text('Valor total de la factura anulada (IVA incluido)', 60, y + 10);
+                const valorFmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(nc.valor || 0);
+                doc.fontSize(11).font('Helvetica-Bold').text(valorFmt, 50 + pageW * 0.7 + 5, y + 8, { width: pageW * 0.3 - 10, align: 'right' });
+                y += 50;
+
+                // Legal note
+                doc.fontSize(8).font('Helvetica').fillColor('#555555')
+                    .text('Esta Nota de Crédito es un documento interno de control. La anulación de la factura referenciada queda registrada en el sistema de auditoría.', 50, y, { width: pageW, align: 'justify' });
+
+                // Footer
+                y = 680;
+                doc.moveTo(50, y).lineTo(562, y).lineWidth(0.5).stroke('#cccccc');
+                doc.fontSize(7).font('Helvetica').fillColor('#777777')
+                    .text(`${empresa.empresa_nombre || 'PROVEEDOR DE TELECOMUNICACIONES SAS.'} — NIT ${empresa.empresa_nit || '901582657-3'} — Documento generado el ${new Date().toLocaleString('es-CO')}`, 50, y + 6, { width: pageW, align: 'center' });
+
+                doc.end();
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
 }
 
 module.exports = PDFGenerator;

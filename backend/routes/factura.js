@@ -239,6 +239,72 @@ router.get('/historial-cliente', async (req, res) => {
   }
 });
 /**
+ * @route GET /api/v1/facturas/:id/nota-credito
+ * @desc Obtener datos de la Nota de Crédito asociada a una factura anulada
+ * @access Autenticado
+ */
+router.get('/:id/nota-credito', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { Database } = require('../models/Database');
+    const rows = await Database.query(`
+      SELECT nc.*,
+             u.nombre AS usuario_nombre
+      FROM notas_credito nc
+      LEFT JOIN sistema_usuarios u ON nc.usuario_id = u.id
+      WHERE nc.factura_id = ?
+      LIMIT 1
+    `, [id]);
+
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'Nota de Crédito no encontrada para esta factura' });
+    }
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Error obteniendo Nota de Crédito', error: err.message });
+  }
+});
+
+/**
+ * @route GET /api/v1/facturas/:id/nota-credito/pdf
+ * @desc Descargar PDF de la Nota de Crédito
+ * @access Autenticado
+ */
+router.get('/:id/nota-credito/pdf', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { Database } = require('../models/Database');
+    const PDFGenerator = require('../utils/pdfGenerator');
+
+    const [nc] = await Database.query(`
+      SELECT nc.*, u.nombre AS usuario_nombre
+      FROM notas_credito nc
+      LEFT JOIN sistema_usuarios u ON nc.usuario_id = u.id
+      WHERE nc.factura_id = ?
+      LIMIT 1
+    `, [id]);
+
+    if (!nc) {
+      return res.status(404).json({ success: false, message: 'Nota de Crédito no encontrada' });
+    }
+
+    const empresaRows = await Database.query('SELECT * FROM configuracion_empresa WHERE id = 1');
+    const empresa = empresaRows[0] || {};
+
+    const pdfBuffer = await PDFGenerator.generarNotaCredito(nc, empresa);
+    const filename = `${nc.numero_nc}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('❌ Error generando PDF de Nota de Crédito:', err);
+    res.status(500).json({ success: false, message: 'Error generando PDF', error: err.message });
+  }
+});
+
+/**
  * @route GET /api/v1/facturas/:id/pdf
  * @desc Descargar PDF de factura
  * @access Autenticado

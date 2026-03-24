@@ -1,18 +1,23 @@
-// components/Facturas/AnularModal.js - Corregido
+// components/Facturas/AnularModal.js
 import React, { useState, useEffect } from 'react';
-import { 
-  AlertTriangle, 
-  FileX, 
-  X, 
+import {
+  AlertTriangle,
+  FileX,
+  X,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Download,
+  FileCheck
 } from 'lucide-react';
+import { facturasService } from '../../services/facturasService';
 
 const AnularModal = ({ isOpen, onClose, onAnular, factura, loading, error }) => {
   const [motivo, setMotivo] = useState('');
   const [motivoDetallado, setMotivoDetallado] = useState('');
   const [confirmacion, setConfirmacion] = useState('');
   const [errores, setErrores] = useState({});
+  const [notaCredito, setNotaCredito] = useState(null);
+  const [descargandoPDF, setDescargandoPDF] = useState(false);
 
   // Motivos predefinidos
   const motivosPredefinidos = [
@@ -31,6 +36,7 @@ const AnularModal = ({ isOpen, onClose, onAnular, factura, loading, error }) => 
       setMotivoDetallado('');
       setConfirmacion('');
       setErrores({});
+      setNotaCredito(null);
     }
   }, [isOpen]);
 
@@ -86,20 +92,35 @@ const AnularModal = ({ isOpen, onClose, onAnular, factura, loading, error }) => 
   // Manejar envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validarFormulario()) {
       return;
     }
-    
+
     // Construir motivo completo
-    const motivoCompleto = motivo === 'otro' 
-      ? motivoDetallado 
+    const motivoCompleto = motivo === 'otro'
+      ? motivoDetallado
       : `${motivosPredefinidos.find(m => m.value === motivo)?.label}: ${motivoDetallado}`;
-    
+
     try {
-      await onAnular(motivoCompleto);
-    } catch (error) {
-      console.error('Error al anular factura:', error);
+      const resultado = await onAnular(motivoCompleto);
+      if (resultado?.data?.nota_credito) {
+        setNotaCredito(resultado.data.nota_credito);
+      }
+    } catch (err) {
+      console.error('Error al anular factura:', err);
+    }
+  };
+
+  const handleDescargarNC = async () => {
+    if (!notaCredito) return;
+    try {
+      setDescargandoPDF(true);
+      await facturasService.descargarNotaCreditoPDF(factura.id, notaCredito.numero_nc);
+    } catch (err) {
+      console.error('Error descargando NC PDF:', err);
+    } finally {
+      setDescargandoPDF(false);
     }
   };
 
@@ -116,6 +137,69 @@ const AnularModal = ({ isOpen, onClose, onAnular, factura, loading, error }) => 
   if (!isOpen) return null;
 
   const textoConfirmacion = `ANULAR-${factura?.numero_factura || 'FACTURA'}`;
+
+  // ── Pantalla de éxito con Nota de Crédito ──────────────────────────────
+  if (notaCredito) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+          <div className="p-6 text-center">
+            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <FileCheck className="h-8 w-8 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">Factura Anulada</h2>
+            <p className="text-gray-600 mb-6">
+              La factura <strong>{factura?.numero_factura}</strong> fue anulada y se generó la siguiente Nota de Crédito:
+            </p>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6 text-left">
+              <div className="flex items-center mb-3">
+                <CheckCircle className="h-5 w-5 text-blue-600 mr-2" />
+                <span className="font-semibold text-blue-900">Nota de Crédito generada</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-500">Número NC:</span>
+                  <p className="font-bold text-lg text-blue-800">{notaCredito.numero_nc}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Valor:</span>
+                  <p className="font-bold text-lg text-gray-900">
+                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(notaCredito.valor || 0)}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Factura original:</span>
+                  <p className="font-medium">{notaCredito.numero_factura_original || factura?.numero_factura}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={handleDescargarNC}
+                disabled={descargandoPDF}
+                className="flex items-center justify-center px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {descargandoPDF ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Descargar NC PDF
+              </button>
+              <button
+                onClick={onClose}
+                className="px-5 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

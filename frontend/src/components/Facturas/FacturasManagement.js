@@ -281,22 +281,24 @@ const { hasPermission } = useAuth();
       });
       
       const resultado = await anularFactura(modalState.facturaSeleccionada.id, motivo.trim());
-      
-      handleCerrarModal();
+
+      // Refrescar lista en segundo plano; el modal mostrará la NC generada
       refrescar();
       mostrarNotificacion(
-        `Factura ${modalState.facturaSeleccionada.numero_factura} anulada exitosamente`, 
+        `Factura ${modalState.facturaSeleccionada.numero_factura} anulada exitosamente`,
         'success'
       );
-      
+
+      return resultado;
+
     } catch (error) {
       console.error('❌ [FacturasManagement] Error al anular factura:', error);
       mostrarNotificacion(
-        error.message || 'Error al anular la factura', 
+        error.message || 'Error al anular la factura',
         'error'
       );
     }
-  }, [modalState.facturaSeleccionada, anularFactura, handleCerrarModal, refrescar, mostrarNotificacion]);
+  }, [modalState.facturaSeleccionada, anularFactura, refrescar, mostrarNotificacion]);
 
   const handleDuplicarFactura = useCallback(async (facturaId) => {
     if (!facturaId) {
