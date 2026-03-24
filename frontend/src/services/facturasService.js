@@ -535,6 +535,73 @@ export const facturasService = {
   // ENVÍO MASIVO DE FACTURAS POR EMAIL
   // ========================================
 
+  // ==========================================
+  // ANULACIÓN Y NOTAS DE CRÉDITO
+  // ==========================================
+
+  /**
+   * Anular una factura (genera Nota de Crédito automáticamente)
+   * @returns {Promise} Respuesta con datos de la NC generada
+   */
+  async anularFactura(id, motivo = '') {
+    try {
+      const response = await apiService.patch(`/facturas/${id}/anular`, { motivo_anulacion: motivo });
+      return response;
+    } catch (error) {
+      console.error('Error anulando factura:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener Nota de Crédito asociada a una factura
+   */
+  async getNotaCredito(facturaId) {
+    try {
+      return await apiService.get(`/facturas/${facturaId}/nota-credito`);
+    } catch (error) {
+      console.error('Error obteniendo Nota de Crédito:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Descargar PDF de Nota de Crédito
+   */
+  async descargarNotaCreditoPDF(facturaId, numeroNC) {
+    const token = authService.getToken();
+    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
+    const response = await fetch(`${API_BASE_URL}/facturas/${facturaId}/nota-credito/pdf`, {
+      headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Error ${response.status}`);
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${numeroNC || `NC-factura-${facturaId}`}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  /**
+   * Obtener todas las facturas (alias usado por useFacturas hook)
+   */
+  async getAll(params = {}) {
+    try {
+      const response = await apiService.get('/facturacion/facturas', params);
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo facturas:', error);
+      throw error;
+    }
+  },
+
   async iniciarEnvioMasivo(periodo) {
     return apiService.post('/facturacion/envio-masivo', { periodo });
   },

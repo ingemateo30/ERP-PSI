@@ -249,6 +249,16 @@ async getActiveInstallers() {
   /**
    * Obtener estadísticas del inventario
    */
+  async getAlertasStock(umbral = 2) {
+    try {
+      const response = await apiService.get(`/inventory/alertas-stock?umbral=${umbral}`);
+      return response.data || response;
+    } catch (error) {
+      console.error('Error obteniendo alertas de stock:', error);
+      throw this.handleError(error);
+    }
+  }
+
   async getStats() {
     try {
       const response = await apiService.get('/inventory/stats');

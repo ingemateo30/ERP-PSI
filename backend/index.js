@@ -680,6 +680,34 @@ async function startServer() {
     connection.release();
     console.log('✅ Conexión a base de datos verificada exitosamente');
 
+    // Auto-migración: tabla notas_credito (A-3 Roadmap)
+    try {
+      const migConn = await pool.getConnection();
+      await migConn.execute(`
+        CREATE TABLE IF NOT EXISTS notas_credito (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          numero_nc VARCHAR(20) NOT NULL UNIQUE COMMENT 'Número secuencial NC-YYYY-000001',
+          factura_id INT NOT NULL,
+          cliente_id INT NOT NULL,
+          nombre_cliente VARCHAR(255) NOT NULL,
+          identificacion_cliente VARCHAR(50) NOT NULL,
+          numero_factura_original VARCHAR(50) NOT NULL,
+          motivo_tipo VARCHAR(80) NOT NULL,
+          motivo_detalle TEXT NOT NULL,
+          valor DECIMAL(15,2) NOT NULL DEFAULT 0,
+          usuario_id INT NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_nc_factura (factura_id),
+          INDEX idx_nc_cliente (cliente_id),
+          INDEX idx_nc_numero (numero_nc)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT 'Notas de crédito generadas al anular facturas'
+      `);
+      migConn.release();
+      console.log('✅ Tabla notas_credito lista');
+    } catch (migErr) {
+      console.warn('⚠️  Auto-migración notas_credito:', migErr.message);
+    }
+
     // Verificar configuración de la empresa
     console.log('🏢 Verificando configuración de empresa...');
     try {

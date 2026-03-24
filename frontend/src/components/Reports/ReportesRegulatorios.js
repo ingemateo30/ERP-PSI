@@ -1,6 +1,6 @@
 // components/Reports/ReportesRegulatorios.js - VERSIÓN CORREGIDA
 import React, { useState, useEffect } from 'react';
-import { Download, FileSpreadsheet, Calendar, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Download, FileSpreadsheet, Calendar, AlertCircle, CheckCircle, XCircle, FileText } from 'lucide-react';
 import reportesService from '../../services/reportesService';
 
 const ReportesRegulatorios = () => {
@@ -10,6 +10,8 @@ const ReportesRegulatorios = () => {
     const [parameters, setParameters] = useState({});
     const [errors, setErrors] = useState({});
     const [notification, setNotification] = useState(null);
+    const [pdfLoading, setPdfLoading] = useState({});
+    const [fechaInstalaciones, setFechaInstalaciones] = useState(new Date().toISOString().slice(0, 10));
 
     useEffect(() => {
         cargarReportesDisponibles();
@@ -290,6 +292,19 @@ const ReportesRegulatorios = () => {
 
     const selectedReportData = reportes.find(r => r.id === selectedReport);
 
+    const handleDescargarPDF = async (tipo) => {
+        try {
+            setPdfLoading(prev => ({ ...prev, [tipo]: true }));
+            if (tipo === 'cartera') await reportesService.descargarPDFCarteraVencida();
+            else if (tipo === 'instalaciones') await reportesService.descargarPDFInstalacionesDia(fechaInstalaciones);
+            else if (tipo === 'pqr') await reportesService.descargarPDFPQRAbiertos();
+        } catch (err) {
+            setNotification({ type: 'error', message: `Error generando PDF: ${err.message}` });
+        } finally {
+            setPdfLoading(prev => ({ ...prev, [tipo]: false }));
+        }
+    };
+
     return (
         <div className="p-6">
             {/* Notificación */}
@@ -314,6 +329,84 @@ const ReportesRegulatorios = () => {
                 <p className="text-gray-600">
                     Generación de reportes para entidades regulatorias (CRC) y contabilidad
                 </p>
+            </div>
+
+            {/* ── Reportes PDF operativos ── */}
+            <div className="bg-white rounded-lg shadow p-5 mb-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-red-600" />
+                    Reportes PDF Operativos
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Cartera vencida */}
+                    <div className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-start mb-3">
+                            <div className="p-2 bg-red-100 rounded-lg mr-3">
+                                <FileText className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-gray-900 text-sm">Cartera Vencida</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Facturas pendientes con fecha de vencimiento superada</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => handleDescargarPDF('cartera')}
+                            disabled={pdfLoading.cartera}
+                            className="w-full flex items-center justify-center px-3 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors"
+                        >
+                            {pdfLoading.cartera ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+                            {pdfLoading.cartera ? 'Generando...' : 'Descargar PDF'}
+                        </button>
+                    </div>
+
+                    {/* Instalaciones del día */}
+                    <div className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-start mb-3">
+                            <div className="p-2 bg-blue-100 rounded-lg mr-3">
+                                <Calendar className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-gray-900 text-sm">Instalaciones del Día</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Lista de instalaciones programadas para la fecha seleccionada</p>
+                            </div>
+                        </div>
+                        <input
+                            type="date"
+                            value={fechaInstalaciones}
+                            onChange={e => setFechaInstalaciones(e.target.value)}
+                            className="w-full mb-2 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                        />
+                        <button
+                            onClick={() => handleDescargarPDF('instalaciones')}
+                            disabled={pdfLoading.instalaciones}
+                            className="w-full flex items-center justify-center px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                        >
+                            {pdfLoading.instalaciones ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+                            {pdfLoading.instalaciones ? 'Generando...' : 'Descargar PDF'}
+                        </button>
+                    </div>
+
+                    {/* PQR abiertos */}
+                    <div className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-start mb-3">
+                            <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+                                <AlertCircle className="w-5 h-5 text-yellow-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-gray-900 text-sm">PQR Abiertos</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Peticiones, quejas y reclamos pendientes de resolver</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => handleDescargarPDF('pqr')}
+                            disabled={pdfLoading.pqr}
+                            className="w-full flex items-center justify-center mt-8 px-3 py-2 bg-yellow-600 text-white text-sm rounded-md hover:bg-yellow-700 disabled:opacity-50 transition-colors"
+                        >
+                            {pdfLoading.pqr ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+                            {pdfLoading.pqr ? 'Generando...' : 'Descargar PDF'}
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

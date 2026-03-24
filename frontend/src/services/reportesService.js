@@ -308,6 +308,46 @@ class ReportesService {
     return `${filename}.xlsx`;
   }
 
+  // ============================================================
+  // REPORTES PDF (A-5)
+  // ============================================================
+
+  async _descargarPDF(endpoint, filename) {
+    const token = authService.getToken();
+    const url = `${API_BASE_URL}${endpoint}`;
+    const response = await fetch(url, {
+      headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Error ${response.status}`);
+    }
+    const blob = await response.blob();
+    const objUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(objUrl);
+  }
+
+  async descargarPDFCarteraVencida() {
+    const fecha = new Date().toISOString().slice(0, 10);
+    return this._descargarPDF('/reports/pdf/cartera-vencida', `cartera_vencida_${fecha}.pdf`);
+  }
+
+  async descargarPDFInstalacionesDia(fecha = null) {
+    const f = fecha || new Date().toISOString().slice(0, 10);
+    return this._descargarPDF(`/reports/pdf/instalaciones-dia?fecha=${f}`, `instalaciones_${f}.pdf`);
+  }
+
+  async descargarPDFPQRAbiertos() {
+    const fecha = new Date().toISOString().slice(0, 10);
+    return this._descargarPDF('/reports/pdf/pqr-abiertos', `pqr_abiertos_${fecha}.pdf`);
+  }
+
   // Descargar blob como archivo
   downloadBlob(blob, filename) {
     try {

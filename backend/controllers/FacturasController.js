@@ -101,7 +101,7 @@ static async obtenerTodas(req, res) {
 
     // ✅ CONSTRUCCIÓN DINÁMICA DE QUERY
     let query = `
-  SELECT 
+  SELECT
     f.id,
     f.numero_factura,
     f.cliente_id,
@@ -132,15 +132,19 @@ static async obtenerTodas(req, res) {
     f.observaciones,
     f.created_at,
     f.updated_at,
-    
+
     -- Información adicional del cliente desde tabla clientes
     c.telefono as cliente_telefono,
     c.direccion as cliente_direccion,
     c.correo as cliente_email,
     c.estrato as cliente_estrato,
-    
+
+    -- Nota de Crédito (si existe)
+    nc.id as nota_credito_id,
+    nc.numero_nc,
+
     DATEDIFF(NOW(), f.fecha_vencimiento) as dias_vencido,
-    CASE 
+    CASE
       WHEN f.estado = 'pagada' THEN 'Pagada'
       WHEN f.estado = 'anulada' THEN 'Anulada'
       WHEN DATEDIFF(NOW(), f.fecha_vencimiento) > 0 AND f.estado != 'pagada' THEN 'Vencida'
@@ -148,6 +152,7 @@ static async obtenerTodas(req, res) {
     END as estado_descripcion
   FROM facturas f
   LEFT JOIN clientes c ON f.cliente_id = c.id
+  LEFT JOIN notas_credito nc ON f.id = nc.factura_id
       WHERE f.activo = 1
     `;
 
@@ -1164,10 +1169,66 @@ static async anular(req, res) {
 
     console.log('✅ Factura anulada:', id);
 
+    // --- Generar Nota de Crédito formal ---
+    let notaCredito = null;
+    try {
+      // Número secuencial NC-YYYY-NNNNNN
+      const year = new Date().getFullYear();
+      const lastNC = await Database.query(
+        'SELECT numero_nc FROM notas_credito ORDER BY id DESC LIMIT 1'
+      );
+      let consecutivo = 1;
+      if (lastNC.length > 0) {
+        const match = lastNC[0].numero_nc.match(/(\d+)$/);
+        if (match) consecutivo = parseInt(match[1]) + 1;
+      }
+      const numero_nc = `NC-${year}-${consecutivo.toString().padStart(6, '0')}`;
+
+      // Separar tipo y detalle del motivo
+      let motivo_tipo = 'otro';
+      let motivo_detalle = motivo_anulacion || 'Sin motivo especificado';
+      const colonIdx = motivo_detalle.indexOf(': ');
+      if (colonIdx > -1) {
+        motivo_tipo = motivo_detalle.substring(0, colonIdx).toLowerCase().replace(/\s+/g, '_').substring(0, 80);
+        motivo_detalle = motivo_detalle.substring(colonIdx + 2);
+      }
+
+      const ncResult = await Database.query(`
+        INSERT INTO notas_credito
+          (numero_nc, factura_id, cliente_id, nombre_cliente, identificacion_cliente,
+           numero_factura_original, motivo_tipo, motivo_detalle, valor, usuario_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        numero_nc,
+        parseInt(id),
+        factura.cliente_id,
+        factura.nombre_cliente,
+        factura.identificacion_cliente,
+        factura.numero_factura,
+        motivo_tipo,
+        motivo_detalle,
+        parseFloat(factura.total) || 0,
+        req.user?.id || null
+      ]);
+
+      notaCredito = {
+        id: ncResult.insertId,
+        numero_nc,
+        factura_id: parseInt(id),
+        numero_factura_original: factura.numero_factura,
+        valor: parseFloat(factura.total) || 0
+      };
+
+      console.log('📄 Nota de Crédito generada:', numero_nc);
+    } catch (ncError) {
+      // NC failure is non-fatal — factura was already anulada
+      console.error('⚠️ Error generando Nota de Crédito (factura ya anulada):', ncError.message);
+    }
+
     res.json({
       success: true,
       message: 'Factura anulada exitosamente',
-      data: { id, estado: 'anulada' }
+      data: { id, estado: 'anulada', nota_credito: notaCredito }
     });
 
   } catch (error) {
