@@ -379,16 +379,16 @@ const load = useCallback(async () => {
   const closeModal = () => setSelected(null);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-8">
       {/* Header con botones de acción */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">📅 Calendario de Gestión ISP</h1>
-          <p className="text-sm text-gray-600 mt-1">
+          <h1 className="text-lg sm:text-2xl font-bold text-gray-900">📅 Calendario de Gestión ISP</h1>
+          <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">
             Instalaciones, contratos y facturación electrónica en tiempo real
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowAlerts(!showAlerts)}
             className={`relative px-3 py-2 border rounded-md text-sm transition ${
@@ -442,7 +442,7 @@ const load = useCallback(async () => {
       </button>
     </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
       {/* Instalaciones hoy */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <div className="flex items-center justify-between mb-2">
@@ -560,7 +560,7 @@ const load = useCallback(async () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4">
             <div className="bg-blue-50 rounded-lg p-3">
               <p className="text-xs text-blue-600 font-semibold uppercase">Total Facturado</p>
               <p className="text-2xl font-bold text-blue-700">
@@ -663,7 +663,7 @@ const load = useCallback(async () => {
         </div>
       )}
 {/* Estadísticas rápidas */}
-      <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -748,7 +748,7 @@ const load = useCallback(async () => {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-white rounded-lg shadow p-2 sm:p-4 overflow-x-auto">
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-4"></div>
@@ -766,10 +766,11 @@ const load = useCallback(async () => {
             locale={esLocale}
             events={eventosFiltrados}
             eventClick={handleEventClick}
-            height="78vh"
+            height="auto"
+            aspectRatio={1.4}
             nowIndicator={true}
             eventDisplay="block"
-            dayMaxEventRows={true}
+            dayMaxEventRows={3}
             eventTimeFormat={{
               hour: '2-digit',
               minute: '2-digit',

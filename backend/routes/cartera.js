@@ -62,8 +62,11 @@ router.get('/morosos', requireRole('secretaria', 'supervisor', 'administrador'),
       LEFT JOIN sectores s ON c.sector_id = s.id
       LEFT JOIN notificaciones n ON n.datos_adicionales LIKE CONCAT('%"cliente_id":', c.id, '%')
         AND n.tipo = 'cliente_moroso'
-      WHERE f.estado IN ('pendiente', 'vencida')
-        AND f.activo = 1
+      WHERE (
+        f.estado = 'vencida'
+        OR (f.estado = 'pendiente' AND f.fecha_vencimiento IS NOT NULL AND f.fecha_vencimiento < CURDATE())
+      )
+        AND COALESCE(f.activo, 1) = 1
         ${sedeFilter}
         ${searchFilter}
       GROUP BY c.id
@@ -87,8 +90,11 @@ router.get('/morosos', requireRole('secretaria', 'supervisor', 'administrador'),
           COUNT(f.id) AS facturas_vencidas
         FROM clientes c
         INNER JOIN facturas f ON c.id = f.cliente_id
-        WHERE f.estado IN ('pendiente', 'vencida')
-          AND f.activo = 1
+        WHERE (
+          f.estado = 'vencida'
+          OR (f.estado = 'pendiente' AND f.fecha_vencimiento IS NOT NULL AND f.fecha_vencimiento < CURDATE())
+        )
+          AND COALESCE(f.activo, 1) = 1
           ${sedeFilter ? sedeFilter.replace(/c\.ciudad_id = \?/, 'c.ciudad_id = ?') : ''}
         GROUP BY c.id
         HAVING COUNT(f.id) >= 1
@@ -134,8 +140,11 @@ router.get('/morosos/:clienteId/facturas', requireRole('secretaria', 'supervisor
         GREATEST(0, DATEDIFF(CURDATE(), f.fecha_vencimiento)) AS dias_vencida
       FROM facturas f
       WHERE f.cliente_id = ?
-        AND f.estado IN ('pendiente', 'vencida')
-        AND f.activo = 1
+        AND (
+          f.estado = 'vencida'
+          OR (f.estado = 'pendiente' AND f.fecha_vencimiento IS NOT NULL AND f.fecha_vencimiento < CURDATE())
+        )
+        AND COALESCE(f.activo, 1) = 1
       ORDER BY f.fecha_vencimiento ASC
     `, [clienteId]);
 

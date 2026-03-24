@@ -154,11 +154,11 @@ const cerrarModal = () => {
   }
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-3 sm:p-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="mb-6 bg-gradient-to-r from-[#0e6493] to-[#0e6493]/80 rounded-xl p-6 shadow-lg text-white">
-        <h1 className="text-3xl font-bold mb-2">Mis Trabajos del Día</h1>
-        <p className="text-lg opacity-90">
+      <div className="mb-4 sm:mb-6 bg-gradient-to-r from-[#0e6493] to-[#0e6493]/80 rounded-xl p-4 sm:p-6 shadow-lg text-white">
+        <h1 className="text-xl sm:text-3xl font-bold mb-1 sm:mb-2">Mis Trabajos del Día</h1>
+        <p className="text-sm sm:text-lg opacity-90">
           {new Date().toLocaleDateString('es-ES', { 
             weekday: 'long', 
             year: 'numeric', 
@@ -169,34 +169,34 @@ const cerrarModal = () => {
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-md p-5 border-l-4 border-yellow-500">
-          <div className="flex items-center justify-between">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+        <div className="bg-white rounded-lg shadow-md p-3 sm:p-5 border-l-4 border-yellow-500">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
             <div>
-              <p className="text-gray-600 text-sm font-medium">Pendientes</p>
-              <p className="text-3xl font-bold text-gray-800">{estadisticas.pendientes}</p>
+              <p className="text-gray-600 text-xs sm:text-sm font-medium">Pendientes</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800">{estadisticas.pendientes}</p>
             </div>
-            <Clock className="text-yellow-500" size={40} />
+            <Clock className="text-yellow-500 hidden sm:block" size={40} />
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-5 border-l-4 border-blue-500">
-          <div className="flex items-center justify-between">
+        <div className="bg-white rounded-lg shadow-md p-3 sm:p-5 border-l-4 border-blue-500">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
             <div>
-              <p className="text-gray-600 text-sm font-medium">En Proceso</p>
-              <p className="text-3xl font-bold text-gray-800">{estadisticas.en_proceso}</p>
+              <p className="text-gray-600 text-xs sm:text-sm font-medium">En Proceso</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800">{estadisticas.en_proceso}</p>
             </div>
-            <Play className="text-blue-500" size={40} />
+            <Play className="text-blue-500 hidden sm:block" size={40} />
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-5 border-l-4 border-green-500">
-          <div className="flex items-center justify-between">
+        <div className="bg-white rounded-lg shadow-md p-3 sm:p-5 border-l-4 border-green-500">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
             <div>
-              <p className="text-gray-600 text-sm font-medium">Completadas Hoy</p>
-              <p className="text-3xl font-bold text-gray-800">{estadisticas.completadas_hoy}</p>
+              <p className="text-gray-600 text-xs sm:text-sm font-medium">Completadas Hoy</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800">{estadisticas.completadas_hoy}</p>
             </div>
-            <CheckCircle className="text-green-500" size={40} />
+            <CheckCircle className="text-green-500 hidden sm:block" size={40} />
           </div>
         </div>
       </div>
@@ -269,12 +269,12 @@ const cerrarModal = () => {
               key={instalacion.id}
               className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
             >
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 {/* Header del trabajo */}
-                <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start justify-between mb-3 sm:mb-4">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-xl font-bold text-gray-800">
+                    <div className="flex flex-wrap items-center gap-2 mb-1 sm:mb-2">
+                      <h3 className="text-base sm:text-xl font-bold text-gray-800">
                         {instalacion.cliente_nombre}
                       </h3>
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getEstadoColor(instalacion.estado)}`}>
