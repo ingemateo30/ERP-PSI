@@ -1,6 +1,6 @@
 // frontend/src/components/Instalador/ModalCompletarInstalacion.js
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Camera, Upload, Package, CheckCircle, Wifi, Lock, Pen, RotateCcw } from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
 
@@ -32,6 +32,7 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
   const [foto, setFoto] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
   const [observaciones, setObservaciones] = useState('');
+  const gpsIntervalRef = useRef(null);
 
   // ✅ NUEVOS CAMPOS
   const [ipAsignada, setIpAsignada] = useState('');
@@ -49,9 +50,36 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
   const sigCanvas = useRef(null);
   const [firmaCompleta, setFirmaCompleta] = useState(false);
 
+  // ── GPS: enviar ubicación al servidor ────────────────────────────────────
+  const enviarPosicionGPS = useCallback((pos) => {
+    const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+    const token = localStorage.getItem('accessToken');
+    fetch(`${process.env.REACT_APP_API_URL}/instalador/ubicacion`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng, precision: Math.round(accuracy), instalacion_id: instalacion?.id || null })
+    }).catch(() => {});
+  }, [instalacion?.id]);
+
+  const iniciarGPS = useCallback(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(enviarPosicionGPS, () => {}, { enableHighAccuracy: true, timeout: 10000 });
+    gpsIntervalRef.current = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(enviarPosicionGPS, () => {}, { enableHighAccuracy: true, timeout: 10000 });
+    }, 30000);
+  }, [enviarPosicionGPS]);
+
+  const detenerGPS = useCallback(() => {
+    if (gpsIntervalRef.current) {
+      clearInterval(gpsIntervalRef.current);
+      gpsIntervalRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       cargarEquiposDisponibles();
+      iniciarGPS();
       // Cargar datos existentes si los hay
       if (instalacion?.observaciones) {
         setObservaciones(instalacion.observaciones);
@@ -68,7 +96,10 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
       if (instalacion?.ont_id) {
         setOntId(instalacion.ont_id);
       }
+    } else {
+      detenerGPS();
     }
+    return () => detenerGPS();
   }, [isOpen, instalacion]);
 
   const cargarEquiposDisponibles = async () => {
@@ -225,6 +256,7 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
   };
 
   const handleClose = () => {
+    detenerGPS();
     setFoto(null);
     setFotoPreview(null);
     setEquiposSeleccionados([]);

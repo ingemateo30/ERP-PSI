@@ -72,6 +72,13 @@ const ReagendarInstalacionModal = ({
     }
   };
 
+  // Parsea una cadena 'YYYY-MM-DD' como fecha LOCAL (evita desfase horario UTC)
+  const parsearFechaLocal = (fechaStr) => {
+    const str = (typeof fechaStr === 'string' ? fechaStr : (fechaStr?.toISOString?.() ?? '')).split('T')[0];
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+
   const validarFormulario = () => {
     const nuevosErrores = {};
 
@@ -79,17 +86,16 @@ const ReagendarInstalacionModal = ({
     if (!formData.nueva_fecha) {
       nuevosErrores.nueva_fecha = 'La nueva fecha es obligatoria';
     } else {
-      const fechaNueva = new Date(formData.nueva_fecha);
+      const fechaNueva = parsearFechaLocal(formData.nueva_fecha);
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
-      
+
       if (fechaNueva < hoy) {
         nuevosErrores.nueva_fecha = 'La fecha no puede ser anterior a hoy';
       }
 
       // Verificar que no sea la misma fecha actual
-      const fechaActual = new Date(instalacion?.fecha_programada);
-      fechaActual.setHours(0, 0, 0, 0);
+      const fechaActual = parsearFechaLocal(instalacion?.fecha_programada);
       
       if (fechaNueva.getTime() === fechaActual.getTime() && 
           formData.nueva_hora === instalacion?.hora_programada) {
@@ -161,9 +167,9 @@ const ReagendarInstalacionModal = ({
 
   const obtenerDiferenciaDias = () => {
     if (!formData.nueva_fecha || !instalacion?.fecha_programada) return 0;
-    
-    const fechaActual = new Date(instalacion.fecha_programada);
-    const fechaNueva = new Date(formData.nueva_fecha);
+
+    const fechaActual = parsearFechaLocal(instalacion.fecha_programada);
+    const fechaNueva = parsearFechaLocal(formData.nueva_fecha);
     
     const diferencia = Math.ceil((fechaNueva - fechaActual) / (1000 * 60 * 60 * 24));
     return diferencia;

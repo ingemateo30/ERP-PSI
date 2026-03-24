@@ -19,6 +19,31 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
 });
 
+// ── Icono de marcador individual por cliente ────────────────────────────────
+const crearIconoCliente = (estado) => {
+  const colores = {
+    activo:    '#10B981',
+    suspendido:'#F59E0B',
+    cortado:   '#EF4444',
+    retirado:  '#6B7280',
+  };
+  const color = colores[estado] || '#6B7280';
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      background:${color};
+      width:14px;height:14px;
+      border-radius:50%;
+      border:2px solid #fff;
+      box-shadow:0 2px 6px rgba(0,0,0,.4);
+      cursor:pointer;
+    "></div>`,
+    iconSize:   [14, 14],
+    iconAnchor: [7, 7],
+    popupAnchor:[0, -10]
+  });
+};
+
 // ── Icono de marcador por ciudad ────────────────────────────────────────────
 const crearIconoCiudad = (total, activos) => {
   const pct   = total > 0 ? activos / total : 0;
@@ -71,7 +96,8 @@ const colorSv = est => ({
   cortado:'text-red-600', cancelado:'text-gray-400',
 }[est] || 'text-gray-400');
 
-const CACHE_KEY = 'mapaClientes_geocache';
+const CACHE_KEY      = 'mapaClientes_geocache';
+const CACHE_KEY_IND  = 'mapaClientes_geocache_individual';
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 días
 
 const leerCache = () => {
@@ -90,18 +116,21 @@ const guardarCache = (data) => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 const MapaClientes = () => {
-  const [ciudades,       setCiudades]       = useState([]);
-  const [ciudadesMapa,   setCiudadesMapa]   = useState([]);
-  const [loading,        setLoading]        = useState(true);
-  const [geocodificando, setGeocodificando] = useState(false);
-  const [progreso,       setProgreso]       = useState({ actual: 0, total: 0 });
-  const [error,          setError]          = useState(null);
-  const [vistaActual,    setVistaActual]    = useState('mapa');
-  const [busqueda,       setBusqueda]       = useState('');
-  const [filtroEstado,   setFiltroEstado]   = useState('');
-  const [ciudadExpandida,setCiudadExpandida]= useState(null);
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
-  const [panelCiudad,    setPanelCiudad]    = useState(null); // ciudad seleccionada en el mapa
+  const [ciudades,          setCiudades]          = useState([]);
+  const [ciudadesMapa,      setCiudadesMapa]      = useState([]);
+  const [clientesMapa,      setClientesMapa]      = useState([]); // vista individual
+  const [loading,           setLoading]           = useState(true);
+  const [geocodificando,    setGeocodificando]    = useState(false);
+  const [geocodIndividual,  setGeocodIndividual]  = useState(false);
+  const [progreso,          setProgreso]          = useState({ actual: 0, total: 0 });
+  const [error,             setError]             = useState(null);
+  const [vistaActual,       setVistaActual]       = useState('mapa');
+  const [modoIndividual,    setModoIndividual]    = useState(false); // marcadores individuales
+  const [busqueda,          setBusqueda]          = useState('');
+  const [filtroEstado,      setFiltroEstado]      = useState('');
+  const [ciudadExpandida,   setCiudadExpandida]   = useState(null);
+  const [mostrarFiltros,    setMostrarFiltros]    = useState(false);
+  const [panelCiudad,       setPanelCiudad]       = useState(null);
 
   const CENTRO = [6.4667, -73.2667];
 
@@ -125,12 +154,20 @@ const MapaClientes = () => {
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
 
-  // ── Auto-geocodificar al tener ciudades ──────────────────────────────────
+  // ── Auto-geocodificar ciudades al cargar ─────────────────────────────────
   useEffect(() => {
     if (ciudades.length === 0) return;
     geocodificarCiudades(ciudades);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ciudades]);
+
+  // ── Geocodificar clientes individuales cuando se activa el modo ──────────
+  useEffect(() => {
+    if (modoIndividual && ciudades.length > 0 && clientesMapa.length === 0) {
+      geocodificarClientesIndividuales();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modoIndividual, ciudades]);
 
   const geocodificarCiudades = async (listaCiudades) => {
     const cache = leerCache();
@@ -180,6 +217,67 @@ const MapaClientes = () => {
       return null;
     } catch { return null; }
   };
+
+  // ── Geocodificar clientes individuales ──────────────────────────────────
+  const geocodificarClientesIndividuales = useCallback(async () => {
+    if (ciudades.length === 0) return;
+
+    let cache = {};
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY_IND);
+      if (raw) {
+        const { ts, data } = JSON.parse(raw);
+        if (Date.now() - ts <= CACHE_TTL) cache = data;
+        else sessionStorage.removeItem(CACHE_KEY_IND);
+      }
+    } catch {}
+
+    // Obtener todos los clientes con su info de ciudad
+    const todosClientes = ciudades.flatMap(c =>
+      c.clientes.map(cl => ({ ...cl, ciudad_nombre: c.ciudad_nombre, departamento_nombre: c.departamento_nombre }))
+    );
+
+    // Agrupar por dirección única para minimizar llamadas a Nominatim
+    const direccionesUnicas = {};
+    todosClientes.forEach(cl => {
+      const key = `${cl.direccion || ''}|${cl.barrio || ''}|${cl.ciudad_nombre || ''}`;
+      if (!cache[key] && cl.direccion) {
+        direccionesUnicas[key] = { direccion: cl.direccion, barrio: cl.barrio, ciudad: cl.ciudad_nombre, depto: cl.departamento_nombre };
+      }
+    });
+
+    const pendientes = Object.entries(direccionesUnicas);
+    if (pendientes.length > 0) {
+      setGeocodIndividual(true);
+      setProgreso({ actual: 0, total: pendientes.length });
+      let idx = 0;
+      for (const [key, info] of pendientes) {
+        idx++;
+        setProgreso({ actual: idx, total: pendientes.length });
+        try {
+          const q = [info.direccion, info.barrio, info.ciudad, info.depto, 'Colombia'].filter(Boolean).join(', ');
+          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=co`;
+          const res  = await fetch(url, { headers: { 'User-Agent': 'ERP-PSI/1.0' } });
+          const data = await res.json();
+          if (data?.length > 0) cache[key] = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        } catch {}
+        if (idx < pendientes.length) await new Promise(r => setTimeout(r, 1100));
+      }
+      try { sessionStorage.setItem(CACHE_KEY_IND, JSON.stringify({ ts: Date.now(), data: cache })); } catch {}
+      setGeocodIndividual(false);
+    }
+
+    // Asignar coordenadas a cada cliente
+    const resultado = todosClientes
+      .map(cl => {
+        const key = `${cl.direccion || ''}|${cl.barrio || ''}|${cl.ciudad_nombre || ''}`;
+        if (cache[key]) return { ...cl, ...cache[key] };
+        return null;
+      })
+      .filter(Boolean);
+
+    setClientesMapa(resultado);
+  }, [ciudades]);
 
   // ── Stats globales ───────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -243,9 +341,14 @@ const MapaClientes = () => {
             </h1>
             <p className="text-xs text-gray-500 mt-0.5">
               {stats.total} clientes · {stats.totalCiudades} ciudades
-              {geocodificando && (
+              {(geocodificando || geocodIndividual) && (
                 <span className="ml-2 text-blue-600 font-medium">
                   · Geocodificando {progreso.actual}/{progreso.total}...
+                </span>
+              )}
+              {modoIndividual && !geocodIndividual && clientesMapa.length > 0 && (
+                <span className="ml-2 text-green-600 font-medium">
+                  · {clientesMapa.length} clientes georeferenciados
                 </span>
               )}
             </p>
@@ -280,6 +383,20 @@ const MapaClientes = () => {
             >
               <Filter className="w-3.5 h-3.5" /> Filtros
             </button>
+            {vistaActual === 'mapa' && (
+              <button
+                onClick={() => setModoIndividual(m => !m)}
+                className={`px-3 py-1.5 border rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                  modoIndividual
+                    ? 'bg-green-50 border-green-400 text-green-700'
+                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+                title="Alternar entre marcadores por ciudad e individuales por cliente"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                {modoIndividual ? 'Por ciudad' : 'Individual'}
+              </button>
+            )}
             <button
               onClick={() => cargarDatos(true)}
               className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 flex items-center gap-1.5"
@@ -349,11 +466,11 @@ const MapaClientes = () => {
         <div className="flex flex-1 relative overflow-hidden" style={{ minHeight: '520px' }}>
 
           {/* Overlay de progreso geocodificación */}
-          {geocodificando && (
+          {(geocodificando || geocodIndividual) && (
             <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-[1000] flex flex-col items-center justify-center gap-3 pointer-events-none">
               <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
               <p className="text-sm font-semibold text-gray-700">
-                Localizando ciudades en el mapa...
+                {geocodIndividual ? 'Localizando clientes en el mapa...' : 'Localizando ciudades en el mapa...'}
               </p>
               <div className="w-48 bg-gray-200 rounded-full h-2 overflow-hidden">
                 <div
@@ -361,7 +478,9 @@ const MapaClientes = () => {
                   style={{ width: `${progreso.total > 0 ? (progreso.actual / progreso.total) * 100 : 0}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-500">{progreso.actual} / {progreso.total} ciudades</p>
+              <p className="text-xs text-gray-500">
+                {progreso.actual} / {progreso.total} {geocodIndividual ? 'direcciones' : 'ciudades'}
+              </p>
             </div>
           )}
 
@@ -377,9 +496,11 @@ const MapaClientes = () => {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               />
-              {ciudadesMapa.length > 0 && <AjustarVista puntos={ciudadesMapa} />}
+              {!modoIndividual && ciudadesMapa.length > 0 && <AjustarVista puntos={ciudadesMapa} />}
+              {modoIndividual && clientesMapa.length > 0 && <AjustarVista puntos={clientesMapa} />}
 
-              {ciudadesMapa.map((ciudad, idx) => (
+              {/* Marcadores agrupados por ciudad */}
+              {!modoIndividual && ciudadesMapa.map((ciudad, idx) => (
                 <Marker
                   key={idx}
                   position={[ciudad.lat, ciudad.lng]}
@@ -423,6 +544,42 @@ const MapaClientes = () => {
                   </Popup>
                 </Marker>
               ))}
+
+              {/* Marcadores individuales por cliente */}
+              {modoIndividual && clientesMapa.map(c => (
+                <Marker
+                  key={c.id}
+                  position={[c.lat, c.lng]}
+                  icon={crearIconoCliente(c.estado)}
+                >
+                  <Popup minWidth={220} maxWidth={280}>
+                    <div className="text-sm">
+                      <div className="font-bold text-gray-900 mb-1">{c.nombre}</div>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full border ${badgeEstado(c.estado)}`}>{c.estado}</span>
+                      {c.identificacion && <p className="text-gray-500 text-xs mt-1">{c.identificacion}</p>}
+                      {c.direccion && <p className="text-gray-600 text-xs mt-0.5 flex items-center gap-1"><MapPin className="w-3 h-3 flex-shrink-0"/>{c.direccion}{c.barrio ? `, ${c.barrio}` : ''}</p>}
+                      {c.ciudad_nombre && <p className="text-gray-500 text-xs mt-0.5">{c.ciudad_nombre}</p>}
+                      {c.telefono && <p className="text-gray-600 text-xs mt-0.5 flex items-center gap-1"><Phone className="w-3 h-3 flex-shrink-0"/>{c.telefono}</p>}
+                      {c.servicios?.length > 0 && (
+                        <div className="mt-1 space-y-0.5">
+                          {c.servicios.map(sv => (
+                            <div key={sv.id} className={`text-xs flex items-center gap-1 ${colorSv(sv.estado)}`}>
+                              {sv.tipo === 'television' ? '📺' : '📶'} {sv.plan_nombre}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+
+              {/* Leyenda modo individual */}
+              {modoIndividual && clientesMapa.length === 0 && !geocodIndividual && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-600 z-[500] pointer-events-none">
+                  No hay clientes con dirección geocodificable
+                </div>
+              )}
             </MapContainer>
           </div>
 

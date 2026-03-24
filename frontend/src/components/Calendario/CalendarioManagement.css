@@ -1,9 +1,28 @@
-/* Altura fija de las celdas */
+/* Altura fija de las celdas (escritorio) */
 .fc-daygrid-day {
   height: 120px;
   min-height: 120px;
   max-height: 120px;
   position: relative;
+}
+
+/* En móvil reducir altura de celdas */
+@media (max-width: 640px) {
+  .fc-daygrid-day {
+    height: 60px;
+    min-height: 60px;
+    max-height: 60px;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 1rem;
+  }
+  .fc .fc-button {
+    padding: 0.2em 0.5em;
+    font-size: 0.8em;
+  }
+  .fc-event-title {
+    font-size: 0.65rem;
+  }
 }
 
 /* Contenedor de eventos con scroll */
