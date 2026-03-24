@@ -938,30 +938,32 @@ const InstaladorDashboard = () => {
                 setTrabajosHoy(trabajosActivos);
                 console.log('✅ DASHBOARD - Trabajos activos cargados:', trabajosActivos.length);
 
-                // Calcular estadísticas desde las instalaciones
-                const pendientes = instalaciones.filter(inst =>
-                    inst.estado === 'programada' || inst.estado === 'reagendada'
-                ).length;
+                // Parsear fecha local (YYYY-MM-DD) sin conversión UTC para evitar desfase de zona horaria
+                const parseFechaLocal = (str) => {
+                    if (!str) return null;
+                    const s = (typeof str === 'string' ? str : str.toISOString?.() ?? '').split('T')[0];
+                    const [y, m, d] = s.split('-').map(Number);
+                    return new Date(y, m - 1, d);
+                };
 
-                // ✅ ARREGLADO: Calcular completadas de la semana actual (últimos 7 días)
-                const hace7Dias = new Date();
+                // Fecha de hoy en Colombia (sin zona horaria)
+                const hoyLocal = parseFechaLocal(hoy);
+
+                // Pendientes HOY: solo instalaciones programadas para hoy (no todas las pendientes)
+                const pendientes = instalaciones.filter(inst => {
+                    if (inst.estado !== 'programada' && inst.estado !== 'reagendada') return false;
+                    const f = parseFechaLocal(inst.fecha_programada);
+                    return f && f.getTime() === hoyLocal.getTime();
+                }).length;
+
+                // Completadas en los últimos 7 días (usando fecha local, no UTC)
+                const hace7Dias = new Date(hoyLocal);
                 hace7Dias.setDate(hace7Dias.getDate() - 7);
-                hace7Dias.setHours(0, 0, 0, 0);
 
                 const completadasSemana = instalaciones.filter(inst => {
                     if (inst.estado !== 'completada') return false;
-
-                    // Usar fecha_completada o fecha_realizada
-                    const fechaStr = inst.fecha_completada || inst.fecha_realizada;
-                    if (!fechaStr) return false;
-
-                    try {
-                        const fecha = new Date(fechaStr);
-                        return fecha >= hace7Dias;
-                    } catch (error) {
-                        console.error('Error parseando fecha:', fechaStr);
-                        return false;
-                    }
+                    const f = parseFechaLocal(inst.fecha_completada || inst.fecha_realizada);
+                    return f && f >= hace7Dias;
                 }).length;
 
                 console.log('📊 DASHBOARD - Completadas en la semana:', completadasSemana);

@@ -135,6 +135,26 @@ router.get('/mapa', async (req, res) => {
         });
       }
 
+      // Query 3: coordenadas GPS reales desde instalaciones completadas
+      const [coordsInstalaciones] = await connection.query(`
+        SELECT i.cliente_id,
+               i.coordenadas_lat AS lat,
+               i.coordenadas_lng AS lng
+        FROM instalaciones i
+        WHERE i.coordenadas_lat IS NOT NULL
+          AND i.coordenadas_lng IS NOT NULL
+          AND i.estado = 'completada'
+        ORDER BY i.id DESC
+      `);
+
+      // Tomar la coordenada más reciente por cliente
+      const coordsPorCliente = {};
+      for (const row of coordsInstalaciones) {
+        if (!coordsPorCliente[row.cliente_id]) {
+          coordsPorCliente[row.cliente_id] = { lat: parseFloat(row.lat), lng: parseFloat(row.lng) };
+        }
+      }
+
       // Agrupar clientes por ciudad
       const ciudadesMap = {};
       for (const c of clientes) {
@@ -147,6 +167,7 @@ router.get('/mapa', async (req, res) => {
             clientes: []
           };
         }
+        const coords = coordsPorCliente[c.id] || {};
         ciudadesMap[ciudadKey].clientes.push({
           id: c.id,
           identificacion: c.identificacion,
@@ -163,7 +184,9 @@ router.get('/mapa', async (req, res) => {
           poste: c.poste,
           ruta: c.ruta,
           sector_nombre: c.sector_nombre,
-          servicios: serviciosPorCliente[c.id] || []
+          servicios: serviciosPorCliente[c.id] || [],
+          lat: coords.lat || null,   // GPS exacto de la instalación
+          lng: coords.lng || null
         });
       }
 

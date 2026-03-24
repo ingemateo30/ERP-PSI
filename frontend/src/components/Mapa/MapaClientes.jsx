@@ -233,87 +233,79 @@ const MapaClientes = () => {
     } catch { return null; }
   };
 
-  // ── Geocodificar clientes individuales por barrio (mucho más rápido) ────────
-  // En vez de una llamada por cliente (miles), hace una por barrio único (~10-30 por ciudad).
-  // Cache persistente en localStorage → solo geocodifica la primera vez.
+  // ── Clientes individuales en el mapa ───────────────────────────────────────
+  // Prioridad:
+  //   1. Clientes con coordenadas GPS reales capturadas en la instalación → exacto
+  //   2. Resto sin GPS → geocodificación barrio+ciudad via Nominatim (cache localStorage)
   const geocodificarClientesIndividuales = useCallback(async () => {
     if (ciudades.length === 0) return;
 
-    // Cache persistente de barrios
-    let cacheBarrio = leerCacheBarrio();
-
-    // Recopilar barrios únicos que aún no están en caché
-    const barriosPendientes = {};
+    const conGPS = [];
+    const sinGPS = [];
     ciudades.forEach(ciudad => {
       ciudad.clientes.forEach(cl => {
-        const barrio = (cl.barrio || '').trim();
-        const key    = `${barrio}|${ciudad.ciudad_nombre}|${ciudad.departamento_nombre}`;
-        if (!cacheBarrio[key]) {
-          barriosPendientes[key] = { barrio, ciudad: ciudad.ciudad_nombre, depto: ciudad.departamento_nombre };
-        }
+        const c = { ...cl, ciudad_nombre: ciudad.ciudad_nombre, departamento_nombre: ciudad.departamento_nombre };
+        if (cl.lat != null && cl.lng != null) conGPS.push(c);
+        else sinGPS.push(c);
       });
     });
 
-    const pendientes = Object.entries(barriosPendientes);
+    // Mostrar inmediatamente los que tienen GPS real
+    setClientesMapa(conGPS);
 
+    if (sinGPS.length === 0) return;
+
+    let cacheBarrio = leerCacheBarrio();
+
+    const barriosPendientes = {};
+    sinGPS.forEach(cl => {
+      const barrio = (cl.barrio || '').trim();
+      const key    = `${barrio || cl.ciudad_nombre}|${cl.ciudad_nombre}|${cl.departamento_nombre}`;
+      if (!cacheBarrio[key]) {
+        barriosPendientes[key] = { barrio, ciudad: cl.ciudad_nombre, depto: cl.departamento_nombre };
+      }
+    });
+
+    const pendientes = Object.entries(barriosPendientes);
     if (pendientes.length > 0) {
       setGeocodIndividual(true);
       setProgreso({ actual: 0, total: pendientes.length });
       let idx = 0;
-
       for (const [key, info] of pendientes) {
         idx++;
         setProgreso({ actual: idx, total: pendientes.length });
         try {
-          // Buscar barrio + ciudad (si no hay barrio, solo ciudad)
-          const q = [info.barrio || info.ciudad, info.ciudad, info.depto, 'Colombia']
-            .filter(Boolean).join(', ');
+          const q = [info.barrio || info.ciudad, info.ciudad, info.depto, 'Colombia'].filter(Boolean).join(', ');
           const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=co`;
           const res  = await fetch(url, { headers: { 'User-Agent': 'ERP-PSI/1.0' } });
           const data = await res.json();
-          if (data?.length > 0) {
-            cacheBarrio[key] = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-          }
-        } catch { /* ignorar errores individuales */ }
-
-        // Actualizar mapa parcialmente cada 5 barrios para ver progreso
+          if (data?.length > 0) cacheBarrio[key] = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        } catch { /* ignorar */ }
         if (idx % 5 === 0 || idx === pendientes.length) {
           guardarCacheBarrio(cacheBarrio);
-          aplicarCoordenadasIndividuales(ciudades, cacheBarrio);
+          aplicarCoordenadasIndividuales(conGPS, sinGPS, cacheBarrio);
         }
-
         if (idx < pendientes.length) await new Promise(r => setTimeout(r, 1050));
       }
-
       guardarCacheBarrio(cacheBarrio);
       setGeocodIndividual(false);
     }
 
-    aplicarCoordenadasIndividuales(ciudades, cacheBarrio);
+    aplicarCoordenadasIndividuales(conGPS, sinGPS, cacheBarrio);
   }, [ciudades]); // eslint-disable-line
 
-  // Asigna coords a clientes: usa barrio → pequeño jitter por cliente dentro del barrio
-  const aplicarCoordenadasIndividuales = (listaCiudades, cacheBarrio) => {
-    const resultado = listaCiudades.flatMap(ciudad =>
-      ciudad.clientes.map(cl => {
-        const barrio = (cl.barrio || '').trim();
-        const key    = `${barrio}|${ciudad.ciudad_nombre}|${ciudad.departamento_nombre}`;
-        const base   = cacheBarrio[key];
-        if (!base) return null;
-        // Jitter pequeño dentro del barrio (~200m) para separar puntos superpuestos
-        const angle  = (cl.id * 137.508) % 360;
-        const radius = 0.0008 + (cl.id % 15) * 0.0003; // ~80–500m
-        const rad    = (angle * Math.PI) / 180;
-        return {
-          ...cl,
-          ciudad_nombre:       ciudad.ciudad_nombre,
-          departamento_nombre: ciudad.departamento_nombre,
-          lat: base.lat + Math.sin(rad) * radius,
-          lng: base.lng + Math.cos(rad) * radius,
-        };
-      }).filter(Boolean)
-    );
-    setClientesMapa(resultado);
+  const aplicarCoordenadasIndividuales = (conGPS, sinGPS, cacheBarrio) => {
+    const barrioPuntos = sinGPS.map(cl => {
+      const barrio = (cl.barrio || '').trim();
+      const key    = `${barrio || cl.ciudad_nombre}|${cl.ciudad_nombre}|${cl.departamento_nombre}`;
+      const base   = cacheBarrio[key];
+      if (!base) return null;
+      const angle  = (cl.id * 137.508) % 360;
+      const radius = 0.0006 + (cl.id % 15) * 0.0002;
+      const rad    = (angle * Math.PI) / 180;
+      return { ...cl, lat: base.lat + Math.sin(rad) * radius, lng: base.lng + Math.cos(rad) * radius };
+    }).filter(Boolean);
+    setClientesMapa([...conGPS, ...barrioPuntos]);
   };
 
   // ── Stats globales ───────────────────────────────────────────────────────
