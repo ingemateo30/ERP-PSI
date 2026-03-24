@@ -386,7 +386,7 @@ router.get('/ubicaciones-en-vivo',
       const ubicaciones = await Database.query(`
         SELECT
           ut.instalador_id,
-          CONCAT(u.nombres, ' ', u.apellidos) AS nombre,
+          u.nombre,
           u.telefono,
           ut.lat,
           ut.lng,

@@ -49,9 +49,9 @@ router.get('/', async (req, res) => {
       params.push(fecha_hasta);
     }
     if (busqueda) {
-      where += ' AND (l.accion LIKE ? OR l.ip_address LIKE ? OR u.nombre LIKE ? OR CONCAT(u.nombres," ",u.apellidos) LIKE ?)';
+      where += ' AND (l.accion LIKE ? OR l.ip_address LIKE ? OR u.nombre LIKE ?)';
       const t = `%${busqueda}%`;
-      params.push(t, t, t, t);
+      params.push(t, t, t);
     }
 
     const [{ total }] = await Database.query(
@@ -74,7 +74,7 @@ router.get('/', async (req, res) => {
          l.user_agent,
          l.created_at,
          l.usuario_id,
-         COALESCE(CONCAT(u.nombres,' ',u.apellidos), u.nombre, 'Sistema') AS usuario_nombre,
+         COALESCE(u.nombre, 'Sistema') AS usuario_nombre,
          u.rol AS usuario_rol
        FROM logs_sistema l
        LEFT JOIN sistema_usuarios u ON l.usuario_id = u.id
