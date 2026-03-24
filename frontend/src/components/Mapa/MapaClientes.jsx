@@ -161,13 +161,13 @@ const MapaClientes = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ciudades]);
 
-  // ── Geocodificar clientes individuales cuando se activa el modo ──────────
+  // ── Generar marcadores individuales cuando se activa el modo ─────────────
   useEffect(() => {
-    if (modoIndividual && ciudades.length > 0 && clientesMapa.length === 0) {
+    if (modoIndividual && ciudades.length > 0 && ciudadesMapa.length > 0) {
       geocodificarClientesIndividuales();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modoIndividual, ciudades]);
+  }, [modoIndividual, ciudades, ciudadesMapa]);
 
   const geocodificarCiudades = async (listaCiudades) => {
     const cache = leerCache();
@@ -218,66 +218,36 @@ const MapaClientes = () => {
     } catch { return null; }
   };
 
-  // ── Geocodificar clientes individuales ──────────────────────────────────
-  const geocodificarClientesIndividuales = useCallback(async () => {
-    if (ciudades.length === 0) return;
+  // ── Desplegar clientes individuales usando coordenadas de ciudad + jitter ──
+  // No requiere llamadas a APIs externas — es instantáneo.
+  const geocodificarClientesIndividuales = useCallback(() => {
+    if (ciudades.length === 0 || ciudadesMapa.length === 0) return;
 
-    let cache = {};
-    try {
-      const raw = sessionStorage.getItem(CACHE_KEY_IND);
-      if (raw) {
-        const { ts, data } = JSON.parse(raw);
-        if (Date.now() - ts <= CACHE_TTL) cache = data;
-        else sessionStorage.removeItem(CACHE_KEY_IND);
-      }
-    } catch {}
+    // Mapa de ciudad_nombre → coords geocodificadas
+    const coordCiudad = {};
+    ciudadesMapa.forEach(c => { coordCiudad[c.ciudad_nombre] = { lat: c.lat, lng: c.lng }; });
 
-    // Obtener todos los clientes con su info de ciudad
-    const todosClientes = ciudades.flatMap(c =>
-      c.clientes.map(cl => ({ ...cl, ciudad_nombre: c.ciudad_nombre, departamento_nombre: c.departamento_nombre }))
-    );
-
-    // Agrupar por dirección única para minimizar llamadas a Nominatim
-    const direccionesUnicas = {};
-    todosClientes.forEach(cl => {
-      const key = `${cl.direccion || ''}|${cl.barrio || ''}|${cl.ciudad_nombre || ''}`;
-      if (!cache[key] && cl.direccion) {
-        direccionesUnicas[key] = { direccion: cl.direccion, barrio: cl.barrio, ciudad: cl.ciudad_nombre, depto: cl.departamento_nombre };
-      }
+    const resultado = ciudades.flatMap(ciudad => {
+      const base = coordCiudad[ciudad.ciudad_nombre];
+      if (!base) return [];
+      return ciudad.clientes.map(cl => {
+        // Jitter determinista basado en el ID del cliente
+        // sin/cos distribuye los puntos en círculo alrededor del centro de la ciudad
+        const angle  = (cl.id * 137.508) % 360;           // ángulo único por cliente
+        const radius = 0.005 + (cl.id % 30) * 0.0012;     // radio 0.005°–0.041° (~0.5–4.5 km)
+        const rad    = (angle * Math.PI) / 180;
+        return {
+          ...cl,
+          ciudad_nombre:       ciudad.ciudad_nombre,
+          departamento_nombre: ciudad.departamento_nombre,
+          lat: base.lat + Math.sin(rad) * radius,
+          lng: base.lng + Math.cos(rad) * radius,
+        };
+      });
     });
 
-    const pendientes = Object.entries(direccionesUnicas);
-    if (pendientes.length > 0) {
-      setGeocodIndividual(true);
-      setProgreso({ actual: 0, total: pendientes.length });
-      let idx = 0;
-      for (const [key, info] of pendientes) {
-        idx++;
-        setProgreso({ actual: idx, total: pendientes.length });
-        try {
-          const q = [info.direccion, info.barrio, info.ciudad, info.depto, 'Colombia'].filter(Boolean).join(', ');
-          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=co`;
-          const res  = await fetch(url, { headers: { 'User-Agent': 'ERP-PSI/1.0' } });
-          const data = await res.json();
-          if (data?.length > 0) cache[key] = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-        } catch {}
-        if (idx < pendientes.length) await new Promise(r => setTimeout(r, 1100));
-      }
-      try { sessionStorage.setItem(CACHE_KEY_IND, JSON.stringify({ ts: Date.now(), data: cache })); } catch {}
-      setGeocodIndividual(false);
-    }
-
-    // Asignar coordenadas a cada cliente
-    const resultado = todosClientes
-      .map(cl => {
-        const key = `${cl.direccion || ''}|${cl.barrio || ''}|${cl.ciudad_nombre || ''}`;
-        if (cache[key]) return { ...cl, ...cache[key] };
-        return null;
-      })
-      .filter(Boolean);
-
     setClientesMapa(resultado);
-  }, [ciudades]);
+  }, [ciudades, ciudadesMapa]);
 
   // ── Stats globales ───────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -341,14 +311,14 @@ const MapaClientes = () => {
             </h1>
             <p className="text-xs text-gray-500 mt-0.5">
               {stats.total} clientes · {stats.totalCiudades} ciudades
-              {(geocodificando || geocodIndividual) && (
+              {geocodificando && (
                 <span className="ml-2 text-blue-600 font-medium">
                   · Geocodificando {progreso.actual}/{progreso.total}...
                 </span>
               )}
-              {modoIndividual && !geocodIndividual && clientesMapa.length > 0 && (
+              {modoIndividual && clientesMapa.length > 0 && (
                 <span className="ml-2 text-green-600 font-medium">
-                  · {clientesMapa.length} clientes georeferenciados
+                  · {clientesMapa.length} clientes en mapa
                 </span>
               )}
             </p>

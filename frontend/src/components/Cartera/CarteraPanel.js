@@ -14,14 +14,14 @@ const API_BASE = '/api/v1/cartera';
 const fetchCartera = async (params = {}) => {
   const query = new URLSearchParams(params).toString();
   const res = await fetch(`${API_BASE}/morosos${query ? '?' + query : ''}`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
   });
   return res.json();
 };
 
 const fetchFacturasCliente = async (clienteId) => {
   const res = await fetch(`${API_BASE}/morosos/${clienteId}/facturas`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
   });
   return res.json();
 };
@@ -31,7 +31,7 @@ const enviarNotificacion = async (clienteId, observaciones) => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${localStorage.getItem('token')}`
+      Authorization: `Bearer ${localStorage.getItem('accessToken')}`
     },
     body: JSON.stringify({ observaciones })
   });
@@ -41,7 +41,7 @@ const enviarNotificacion = async (clienteId, observaciones) => {
 const notificarMasivo = async () => {
   const res = await fetch(`${API_BASE}/notificar-masivo`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
   });
   return res.json();
 };

@@ -4,6 +4,19 @@ const { Database } = require('../models/Database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { audit, metaFromReq } = require('../utils/auditLogger');
 
+// Auto-crear tabla ubicaciones_tecnicos si no existe
+Database.query(`
+  CREATE TABLE IF NOT EXISTS ubicaciones_tecnicos (
+    instalador_id        INT           NOT NULL,
+    lat                  DECIMAL(10,8) NOT NULL,
+    lng                  DECIMAL(11,8) NOT NULL,
+    precision_metros     INT           DEFAULT NULL,
+    instalacion_activa_id INT          DEFAULT NULL,
+    actualizado_at       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (instalador_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+`).catch(err => console.warn('⚠️ No se pudo crear tabla ubicaciones_tecnicos:', err.message));
+
 // Aplicar autenticación a todas las rutas
 router.use(authenticateToken);
 
