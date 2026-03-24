@@ -17,16 +17,17 @@ Database.query(`
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 `).catch(err => console.warn('⚠️ No se pudo crear tabla ubicaciones_tecnicos:', err.message));
 
-// Hora actual en zona horaria Colombia (UTC-5)
+// Hora / fecha en zona Colombia (UTC-5, sin horario de verano)
+// Usamos resta explícita de ms en vez de toLocaleString para mayor fiabilidad en cualquier servidor
 const horaColombia = () => {
-  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+  const d = new Date(Date.now() - 5 * 3600000);
   const p = n => String(n).padStart(2, '0');
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
 };
 const fechaColombia = () => {
-  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+  const d = new Date(Date.now() - 5 * 3600000);
   const p = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}`;
 };
 
 // Aplicar autenticación a todas las rutas
@@ -174,11 +175,13 @@ router.post('/instalacion/:id/iniciar', async (req, res) => {
     await Database.query(`
       UPDATE instalaciones
       SET estado = 'en_proceso',
-          hora_inicio = ?
+          hora_inicio = ?,
+          coordenadas_lat = COALESCE(coordenadas_lat, ?),
+          coordenadas_lng = COALESCE(coordenadas_lng, ?)
       WHERE id = ? AND instalador_id = ?
-    `, [horaInicio, id, req.user.id]);
+    `, [horaInicio, lat || null, lng || null, id, req.user.id]);
 
-    // Guardar posición inicial del técnico
+    // Guardar posición del técnico en tabla de tracking en vivo
     if (lat && lng) {
       await Database.query(`
         INSERT INTO ubicaciones_tecnicos (instalador_id, lat, lng, instalacion_activa_id)

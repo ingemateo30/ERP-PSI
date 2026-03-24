@@ -3,16 +3,16 @@
 const express = require('express');
 const router = express.Router();
 
-// Hora / fecha en zona horaria Colombia
+// Hora / fecha en zona Colombia (UTC-5, sin horario de verano)
 const horaColombia = () => {
-  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+  const d = new Date(Date.now() - 5 * 3600000);
   const p = n => String(n).padStart(2, '0');
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
 };
 const fechaColombia = () => {
-  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+  const d = new Date(Date.now() - 5 * 3600000);
   const p = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}`;
 };
 const { Database } = require('../models/Database');
 const { audit, metaFromReq } = require('../utils/auditLogger');
