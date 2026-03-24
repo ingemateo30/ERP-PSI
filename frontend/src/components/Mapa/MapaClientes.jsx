@@ -1,5 +1,5 @@
 // frontend/src/components/Mapa/MapaClientes.jsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -10,6 +10,7 @@ import {
   XCircle, AlertCircle, Clock, List
 } from 'lucide-react';
 import apiService from '../../services/apiService';
+import { geocodificarLote } from '../../services/geocodingService';
 
 // ── Fix iconos Leaflet ──────────────────────────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
@@ -233,80 +234,72 @@ const MapaClientes = () => {
     } catch { return null; }
   };
 
-  // ── Clientes individuales en el mapa ───────────────────────────────────────
-  // Prioridad:
-  //   1. Clientes con coordenadas GPS reales capturadas en la instalación → exacto
-  //   2. Resto sin GPS → geocodificación barrio+ciudad via Nominatim (cache localStorage)
+  // ── Clientes individuales ─────────────────────────────────────────────────
+  // 1. Clientes con GPS real de instalación → exacto (sin llamada API)
+  // 2. Resto → geocodificación por dirección completa via servicio compartido
+  //            (con cache localStorage persistente, solo geocodifica una vez)
+  const señalAbortRef = useRef(null);
+
   const geocodificarClientesIndividuales = useCallback(async () => {
     if (ciudades.length === 0) return;
 
-    const conGPS = [];
-    const sinGPS = [];
-    ciudades.forEach(ciudad => {
-      ciudad.clientes.forEach(cl => {
-        const c = { ...cl, ciudad_nombre: ciudad.ciudad_nombre, departamento_nombre: ciudad.departamento_nombre };
-        if (cl.lat != null && cl.lng != null) conGPS.push(c);
-        else sinGPS.push(c);
-      });
+    // Cancelar geocodificación previa si el usuario alterna el modo
+    señalAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    señalAbortRef.current = ctrl;
+
+    const todosConCiudad = ciudades.flatMap(ciudad =>
+      ciudad.clientes.map(cl => ({
+        ...cl,
+        ciudad_nombre:       ciudad.ciudad_nombre,
+        departamento_nombre: ciudad.departamento_nombre
+      }))
+    );
+
+    // Mapa mutable id → coords para actualización en streaming
+    const coordsMap = {};
+
+    // Clientes con GPS real desde BD
+    todosConCiudad.forEach(cl => {
+      if (cl.lat != null && cl.lng != null) coordsMap[cl.id] = { lat: cl.lat, lng: cl.lng };
     });
 
-    // Mostrar inmediatamente los que tienen GPS real
-    setClientesMapa(conGPS);
+    // Mostrar de inmediato los que tienen GPS real
+    setClientesMapa(todosConCiudad.filter(cl => coordsMap[cl.id]).map(cl => ({ ...cl, ...coordsMap[cl.id] })));
 
+    const sinGPS = todosConCiudad.filter(cl => cl.lat == null || cl.lng == null);
     if (sinGPS.length === 0) return;
 
-    let cacheBarrio = leerCacheBarrio();
+    // Prepara lote para el servicio de geocodificación
+    const lote = sinGPS.map(cl => ({
+      id:          cl.id,
+      direccion:   cl.direccion,
+      barrio:      cl.barrio,
+      ciudad:      cl.ciudad_nombre,
+      departamento:cl.departamento_nombre
+    }));
 
-    const barriosPendientes = {};
-    sinGPS.forEach(cl => {
-      const barrio = (cl.barrio || '').trim();
-      const key    = `${barrio || cl.ciudad_nombre}|${cl.ciudad_nombre}|${cl.departamento_nombre}`;
-      if (!cacheBarrio[key]) {
-        barriosPendientes[key] = { barrio, ciudad: cl.ciudad_nombre, depto: cl.departamento_nombre };
+    setGeocodIndividual(true);
+
+    await geocodificarLote(lote, {
+      señalAbort: ctrl.signal,
+      onProgreso: (actual, total) => setProgreso({ actual, total }),
+      onResultado: (id, coords) => {
+        coordsMap[id] = coords;
+        // Actualizar mapa en streaming: ya geocodificados + pendientes sin coords aún
+        setClientesMapa(
+          todosConCiudad
+            .filter(cl => coordsMap[cl.id])
+            .map(cl => ({ ...cl, lat: coordsMap[cl.id].lat, lng: coordsMap[cl.id].lng }))
+        );
       }
     });
 
-    const pendientes = Object.entries(barriosPendientes);
-    if (pendientes.length > 0) {
-      setGeocodIndividual(true);
-      setProgreso({ actual: 0, total: pendientes.length });
-      let idx = 0;
-      for (const [key, info] of pendientes) {
-        idx++;
-        setProgreso({ actual: idx, total: pendientes.length });
-        try {
-          const q = [info.barrio || info.ciudad, info.ciudad, info.depto, 'Colombia'].filter(Boolean).join(', ');
-          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=co`;
-          const res  = await fetch(url, { headers: { 'User-Agent': 'ERP-PSI/1.0' } });
-          const data = await res.json();
-          if (data?.length > 0) cacheBarrio[key] = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-        } catch { /* ignorar */ }
-        if (idx % 5 === 0 || idx === pendientes.length) {
-          guardarCacheBarrio(cacheBarrio);
-          aplicarCoordenadasIndividuales(conGPS, sinGPS, cacheBarrio);
-        }
-        if (idx < pendientes.length) await new Promise(r => setTimeout(r, 1050));
-      }
-      guardarCacheBarrio(cacheBarrio);
+    if (!ctrl.signal.aborted) {
       setGeocodIndividual(false);
+      setProgreso({ actual: 0, total: 0 });
     }
-
-    aplicarCoordenadasIndividuales(conGPS, sinGPS, cacheBarrio);
   }, [ciudades]); // eslint-disable-line
-
-  const aplicarCoordenadasIndividuales = (conGPS, sinGPS, cacheBarrio) => {
-    const barrioPuntos = sinGPS.map(cl => {
-      const barrio = (cl.barrio || '').trim();
-      const key    = `${barrio || cl.ciudad_nombre}|${cl.ciudad_nombre}|${cl.departamento_nombre}`;
-      const base   = cacheBarrio[key];
-      if (!base) return null;
-      const angle  = (cl.id * 137.508) % 360;
-      const radius = 0.0006 + (cl.id % 15) * 0.0002;
-      const rad    = (angle * Math.PI) / 180;
-      return { ...cl, lat: base.lat + Math.sin(rad) * radius, lng: base.lng + Math.cos(rad) * radius };
-    }).filter(Boolean);
-    setClientesMapa([...conGPS, ...barrioPuntos]);
-  };
 
   // ── Stats globales ───────────────────────────────────────────────────────
   const stats = useMemo(() => {

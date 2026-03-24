@@ -10,6 +10,7 @@ import {
   Play, XCircle, ExternalLink, Map, Radio
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { geocodificarLote } from '../../services/geocodingService';
 
 const API       = '/api/v1/instalaciones/seguimiento-tecnicos';
 const API_VIVO  = '/api/v1/instalaciones/ubicaciones-en-vivo';
@@ -407,7 +408,44 @@ const SeguimientoTecnicos = () => {
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || 'Error cargando datos');
-      setDatos(json.data);
+
+      const datosBase = json.data;
+      setDatos(datosBase);
+
+      // Geocodificar instalaciones que no tienen coordenadas guardadas
+      const sinCoords = [];
+      datosBase?.tecnicos?.forEach(t => {
+        t.instalaciones.forEach(inst => {
+          if (!inst.coordenadas?.lat) {
+            sinCoords.push({
+              id:          inst.id,
+              direccion:   inst.direccion_instalacion,
+              barrio:      inst.barrio,
+              ciudad:      inst.ciudad_nombre,
+              departamento:null
+            });
+          }
+        });
+      });
+
+      if (sinCoords.length > 0) {
+        await geocodificarLote(sinCoords, {
+          onResultado: (id, coords) => {
+            setDatos(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                tecnicos: prev.tecnicos.map(t => ({
+                  ...t,
+                  instalaciones: t.instalaciones.map(inst =>
+                    inst.id === id ? { ...inst, coordenadas: coords } : inst
+                  )
+                }))
+              };
+            });
+          }
+        });
+      }
     } catch (e) {
       setError(e.message);
     } finally {

@@ -8,6 +8,7 @@ import MainLayout from './components/Layout/MainLayout';
 import { Loader2 } from 'lucide-react';
 import CalendarioManagement from './components/Calendario/CalendarioManagement';
 import MisTrabajos from './components/Instalaciones/MisTrabajos';
+import GpsTrackerGlobal from './components/GpsTrackerGlobal';
 
 const EstadisticasGeneral = lazy(() => import('./components/Reports/EstadisticasGeneral'));
 
@@ -187,6 +188,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
+        <GpsTrackerGlobal />
         <div className="App">
           <Suspense fallback={<LoadingFallback message="Cargando aplicación..." />}>
             <Routes>
