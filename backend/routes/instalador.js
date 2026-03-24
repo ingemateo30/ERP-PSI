@@ -17,6 +17,18 @@ Database.query(`
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 `).catch(err => console.warn('⚠️ No se pudo crear tabla ubicaciones_tecnicos:', err.message));
 
+// Hora actual en zona horaria Colombia (UTC-5)
+const horaColombia = () => {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+};
+const fechaColombia = () => {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+};
+
 // Aplicar autenticación a todas las rutas
 router.use(authenticateToken);
 
@@ -157,7 +169,7 @@ router.post('/instalacion/:id/iniciar', async (req, res) => {
       }
     }
 
-    const horaInicio = new Date().toTimeString().split(' ')[0];
+    const horaInicio = horaColombia();
 
     await Database.query(`
       UPDATE instalaciones
@@ -192,6 +204,19 @@ router.post('/ubicacion', async (req, res) => {
     const { lat, lng, precision, instalacion_id } = req.body;
     if (!lat || !lng) return res.status(400).json({ success: false, message: 'lat y lng requeridos' });
 
+    // Garantizar que la tabla exista (por si el servidor no se reinició tras la migración)
+    await Database.query(`
+      CREATE TABLE IF NOT EXISTS ubicaciones_tecnicos (
+        instalador_id         INT           NOT NULL,
+        lat                   DECIMAL(10,8) NOT NULL,
+        lng                   DECIMAL(11,8) NOT NULL,
+        precision_metros      INT           DEFAULT NULL,
+        instalacion_activa_id INT           DEFAULT NULL,
+        actualizado_at        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (instalador_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
     await Database.query(`
       INSERT INTO ubicaciones_tecnicos (instalador_id, lat, lng, precision_metros, instalacion_activa_id)
       VALUES (?, ?, ?, ?, ?)
@@ -216,8 +241,8 @@ router.post('/instalacion/:id/completar', async (req, res) => {
     const { id } = req.params;
     const { equipos, foto, observaciones, ip_asignada, tap, mac_address, ont_id, firma_instalador } = req.body;
 
-    const horaFin = new Date().toTimeString().split(' ')[0];
-    const fechaRealizada = new Date().toISOString().split('T')[0];
+    const horaFin = horaColombia();
+    const fechaRealizada = fechaColombia();
 
     // Actualizar instalación — firma guardada en columna dedicada
     await Database.query(`

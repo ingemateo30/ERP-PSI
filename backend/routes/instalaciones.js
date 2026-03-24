@@ -2,6 +2,18 @@
 
 const express = require('express');
 const router = express.Router();
+
+// Hora / fecha en zona horaria Colombia
+const horaColombia = () => {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+};
+const fechaColombia = () => {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+};
 const { Database } = require('../models/Database');
 const { audit, metaFromReq } = require('../utils/auditLogger');
 const puppeteer = require('puppeteer');
@@ -1414,7 +1426,7 @@ router.put('/:id/iniciar', upload.single('foto_antes'), async (req, res) => {
     }
 
     // Preparar datos de actualización
-    const horaInicio = new Date().toTimeString().split(' ')[0];
+    const horaInicio = horaColombia();
     let fotosArray = [];
 
     // Si ya hay fotos, parsearlas
@@ -1560,8 +1572,8 @@ router.put('/:id/completar', upload.single('foto_despues'), async (req, res) => 
       });
     }
 
-    const horaFin = new Date().toTimeString().split(' ')[0];
-    const fechaRealizada = new Date().toISOString().split('T')[0];
+    const horaFin = horaColombia();
+    const fechaRealizada = fechaColombia();
     let fotosArray = [];
 
     // Si ya hay fotos, parsearlas
