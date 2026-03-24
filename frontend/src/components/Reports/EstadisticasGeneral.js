@@ -628,7 +628,7 @@ const EstadisticasGeneral = () => {
                     border: 'none',
                     boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
                   }}
-                  formatter={(value) => `{formatCOP(value)}`}
+                  formatter={(value) => formatCOP(value)}
                 />
                 <Legend wrapperStyle={{ fontSize: 13, fontWeight: 500 }} />
                 <Area
@@ -776,6 +776,144 @@ const EstadisticasGeneral = () => {
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      </div>
+
+      {/* ========================================= */}
+      {/* TOP DEUDORES + SALUD FINANCIERA */}
+      {/* ========================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Salud Financiera */}
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-[#0e6493]" />
+            Salud Financiera
+          </h3>
+          <div className="space-y-3">
+            {[
+              {
+                label: 'Tasa de Recaudo',
+                valor: financieras?.periodo?.tasa_recaudo || 0,
+                meta: 85,
+                formato: '%',
+                colorOk: 'text-green-600',
+                colorWarn: 'text-yellow-600',
+                colorBad: 'text-red-600',
+                umbralOk: 85,
+                umbralWarn: 65,
+                invert: false
+              },
+              {
+                label: '% Cartera Vencida / Facturado',
+                valor: financieras?.periodo?.total_facturado > 0
+                  ? ((financieras?.cartera?.cartera_vencida || 0) / financieras.periodo.total_facturado) * 100
+                  : 0,
+                meta: 10,
+                formato: '%',
+                umbralOk: 10,
+                umbralWarn: 20,
+                invert: true
+              },
+              {
+                label: 'Tasa de Retención',
+                valor: metricas_gerenciales?.retencion?.tasa || 0,
+                meta: 90,
+                formato: '%',
+                umbralOk: 90,
+                umbralWarn: 75,
+                invert: false
+              },
+              {
+                label: 'DSO (Días Promedio Cobro)',
+                valor: metricas_gerenciales?.cobro?.dso || 0,
+                meta: 30,
+                formato: ' días',
+                umbralOk: 30,
+                umbralWarn: 60,
+                invert: true
+              },
+              {
+                label: 'Tasa de Abandono (Churn)',
+                valor: clientes?.churn?.tasa_churn || 0,
+                meta: 3,
+                formato: '%',
+                umbralOk: 3,
+                umbralWarn: 7,
+                invert: true
+              }
+            ].map((ind, i) => {
+              const v = parseFloat(ind.valor.toFixed(1));
+              const isOk = ind.invert ? v <= ind.umbralOk : v >= ind.umbralOk;
+              const isWarn = ind.invert
+                ? v > ind.umbralOk && v <= ind.umbralWarn
+                : v < ind.umbralOk && v >= ind.umbralWarn;
+              const color = isOk ? 'text-green-600 bg-green-50 border-green-200'
+                           : isWarn ? 'text-yellow-700 bg-yellow-50 border-yellow-200'
+                           : 'text-red-600 bg-red-50 border-red-200';
+              const dot = isOk ? 'bg-green-500' : isWarn ? 'bg-yellow-500' : 'bg-red-500';
+              return (
+                <div key={i} className={`flex items-center justify-between p-3 rounded-lg border ${color}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${dot}`}></span>
+                    <span className="text-sm font-medium">{ind.label}</span>
+                  </div>
+                  <span className="text-base font-bold">{v.toLocaleString('es-CO')}{ind.formato}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Top Deudores */}
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+            Top 10 Deudores
+          </h3>
+          {financieras?.top_deudores?.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 text-xs text-gray-500 uppercase">
+                    <th className="py-2 text-left">Cliente</th>
+                    <th className="py-2 text-right">Deuda</th>
+                    <th className="py-2 text-right">Mora</th>
+                    <th className="py-2 text-center">Ruta</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {financieras.top_deudores.map((d, i) => (
+                    <tr key={i} className="hover:bg-red-50 transition-colors">
+                      <td className="py-2 pr-2">
+                        <div className="font-medium text-gray-900 truncate max-w-[140px]">{d.nombre}</div>
+                        <div className="text-xs text-gray-400">{d.identificacion}</div>
+                      </td>
+                      <td className="py-2 text-right font-bold text-red-600 whitespace-nowrap">
+                        ${(d.deuda_total).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                      </td>
+                      <td className="py-2 text-right">
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                          d.max_dias_mora > 60 ? 'bg-red-100 text-red-700'
+                          : d.max_dias_mora > 30 ? 'bg-orange-100 text-orange-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {d.max_dias_mora}d
+                        </span>
+                      </td>
+                      <td className="py-2 text-center text-gray-500 text-xs">{d.ruta || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-32 text-gray-400">
+              <div className="text-center">
+                <CheckCircle className="w-10 h-10 mx-auto mb-2 text-green-400" />
+                <p className="text-sm">Sin deudores vencidos</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -171,7 +171,7 @@ class EstadisticasController {
           AVG(costo_instalacion) as costo_promedio_instalacion
         FROM instalaciones
         WHERE estado = 'completada'
-          AND fecha_instalacion BETWEEN ? AND ?
+          AND fecha_realizada BETWEEN ? AND ?
       `, [fechaDesde, fechaHasta]);
 
       // Ingresos proyectados (basado en contratos activos)
@@ -191,9 +191,9 @@ class EstadisticasController {
           COUNT(CASE WHEN estado = 'completada' THEN 1 END) as instalaciones_completadas,
           COUNT(*) as total_instalaciones,
           COUNT(CASE WHEN estado = 'completada' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0) as tasa_exito_instalaciones,
-          AVG(CASE WHEN estado = 'completada' THEN DATEDIFF(fecha_instalacion, fecha_programada) END) as dias_promedio_instalacion
+          AVG(CASE WHEN estado = 'completada' THEN DATEDIFF(fecha_realizada, fecha_programada) END) as dias_promedio_instalacion
         FROM instalaciones
-        WHERE created_at BETWEEN ? AND ?
+        WHERE fecha_programada BETWEEN ? AND ?
       `, [fechaDesde, fechaHasta]);
 
       // Satisfacción del cliente (basado en PQRs resueltas vs escaladas)
@@ -319,7 +319,7 @@ class EstadisticasController {
 
       // Facturación por método de pago
       const facturacionPorMetodo = await Database.query(`
-        SELECT 
+        SELECT
           metodo_pago,
           COUNT(*) as cantidad,
           SUM(total) as monto_total
@@ -330,6 +330,26 @@ class EstadisticasController {
         GROUP BY metodo_pago
         ORDER BY monto_total DESC
       `, [fechaDesde, fechaHasta]);
+
+      // Top 10 deudores con cartera vencida
+      const topDeudores = await Database.query(`
+        SELECT
+          c.nombre,
+          c.identificacion,
+          c.telefono,
+          c.ruta,
+          COUNT(f.id)                               AS facturas_vencidas,
+          SUM(f.total)                              AS deuda_total,
+          MAX(DATEDIFF(CURDATE(), f.fecha_vencimiento)) AS max_dias_mora
+        FROM facturas f
+        INNER JOIN clientes c ON f.cliente_id = c.id
+        WHERE f.estado IN ('pendiente','vencida')
+          AND f.activo = '1'
+          AND f.fecha_vencimiento < CURDATE()
+        GROUP BY c.id, c.nombre, c.identificacion, c.telefono, c.ruta
+        ORDER BY deuda_total DESC
+        LIMIT 10
+      `);
 
       return {
         periodo: {
@@ -354,7 +374,16 @@ class EstadisticasController {
           monto_total_pagos: parseFloat(pagos.monto_total_pagos) || 0,
           clientes_pagaron: parseInt(pagos.clientes_pagaron) || 0,
           por_metodo: facturacionPorMetodo
-        }
+        },
+        top_deudores: topDeudores.map(d => ({
+          nombre: d.nombre,
+          identificacion: d.identificacion,
+          telefono: d.telefono || '',
+          ruta: d.ruta || '',
+          facturas_vencidas: parseInt(d.facturas_vencidas) || 0,
+          deuda_total: parseFloat(d.deuda_total) || 0,
+          max_dias_mora: parseInt(d.max_dias_mora) || 0
+        }))
       };
     } catch (error) {
       console.error('❌ Error obteniendo estadísticas financieras:', error);
