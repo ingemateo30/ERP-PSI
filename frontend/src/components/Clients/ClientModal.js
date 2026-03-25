@@ -15,6 +15,7 @@ const TABS = [
   { id: 'tecnico',   label: 'Técnico',     icon: Settings },
   { id: 'servicios', label: 'Servicios',   icon: Wifi },
   { id: 'facturas',  label: 'Facturas',    icon: DollarSign },
+  { id: 'contratos', label: 'Contratos',   icon: FileText },
 ];
 
 const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
@@ -83,11 +84,21 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
     if (!client?.id) return;
     setLoadingCompleto(true);
     const token = localStorage.getItem('accessToken');
-    fetch(`${process.env.REACT_APP_API_URL}/clientes-completo/${client.id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(r => r.json())
-      .then(data => { if (data.success) setClienteCompleto(data.data); })
+    const base = process.env.REACT_APP_API_URL;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    Promise.all([
+      fetch(`${base}/clientes-completo/${client.id}/servicios`, { headers }).then(r => r.json()),
+      fetch(`${base}/clientes-completo/facturas?cliente_id=${client.id}&limit=20`, { headers }).then(r => r.json()),
+      fetch(`${base}/clientes-completo/contratos?cliente_id=${client.id}&limit=20`, { headers }).then(r => r.json()),
+    ])
+      .then(([srvRes, facRes, conRes]) => {
+        setClienteCompleto({
+          servicios: srvRes.success ? (srvRes.data || []) : [],
+          facturas:  facRes.success ? (facRes.data?.facturas || []) : [],
+          contratos: conRes.success ? (conRes.data?.contratos || conRes.data || []) : [],
+        });
+      })
       .catch(() => {})
       .finally(() => setLoadingCompleto(false));
   }, [client?.id]);
@@ -322,13 +333,18 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
               <InfoRow label="Precio mensual"
                 value={srv.precio_personalizado
                   ? formatCurrency(srv.precio_personalizado)
-                  : srv.precio
-                    ? formatCurrency(srv.precio)
+                  : (srv.plan_precio || srv.precio)
+                    ? formatCurrency(srv.plan_precio || srv.precio)
                     : 'Según plan'
                 }
               />
-              {srv.tipo_plan && <InfoRow label="Tipo" value={srv.tipo_plan} />}
-              {srv.velocidad && <InfoRow label="Velocidad" value={srv.velocidad} />}
+              {(srv.plan_tipo || srv.tipo_plan) && <InfoRow label="Tipo" value={srv.plan_tipo || srv.tipo_plan} />}
+              {(srv.velocidad_bajada || srv.velocidad) && (
+                <InfoRow label="Velocidad"
+                  value={srv.velocidad_bajada
+                    ? `${srv.velocidad_bajada}/${srv.velocidad_subida || srv.velocidad_bajada} Mbps`
+                    : srv.velocidad}
+                />}
               {srv.direccion_servicio && <InfoRow label="Dirección servicio" value={srv.direccion_servicio} className="col-span-2" />}
               {srv.fecha_activacion && <InfoRow label="Activación" value={formatDate(srv.fecha_activacion)} />}
               {srv.fecha_suspension && <InfoRow label="Suspendido" value={formatDate(srv.fecha_suspension)} />}
@@ -348,7 +364,7 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
       </div>
     );
 
-    const facturas = clienteCompleto?.facturas_recientes || clienteCompleto?.facturas || [];
+    const facturas = clienteCompleto?.facturas || [];
 
     if (!facturas.length) return (
       <div className="text-center py-12">
@@ -382,6 +398,50 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
               {fac.fecha_vencimiento && (
                 <p className="text-xs text-gray-500">Vence: {formatDate(fac.fecha_vencimiento)}</p>
               )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const TabContratos = () => {
+    if (loadingCompleto) return (
+      <div className="flex items-center justify-center py-12">
+        <Loader className="w-6 h-6 text-[#0e6493] animate-spin mr-2" />
+        <span className="text-gray-500">Cargando contratos...</span>
+      </div>
+    );
+
+    const contratos = clienteCompleto?.contratos || [];
+
+    if (!contratos.length) return (
+      <div className="text-center py-12">
+        <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+        <p className="text-gray-500 text-sm">No hay contratos registrados</p>
+      </div>
+    );
+
+    return (
+      <div className="space-y-3">
+        {contratos.map((con, i) => (
+          <div key={i} className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[#0e6493]" />
+                <span className="text-sm font-semibold text-gray-800">
+                  {con.numero_contrato || con.numero || `Contrato #${con.id}`}
+                </span>
+              </div>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStateBadge(con.estado)}`}>
+                {con.estado?.charAt(0).toUpperCase() + con.estado?.slice(1)}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
+              {con.tipo_contrato && <InfoRow label="Tipo" value={con.tipo_contrato} />}
+              {con.fecha_inicio && <InfoRow label="Inicio" value={formatDate(con.fecha_inicio)} />}
+              {con.fecha_fin && <InfoRow label="Fin" value={formatDate(con.fecha_fin)} />}
+              {con.valor_mensual && <InfoRow label="Valor mensual" value={formatCurrency(con.valor_mensual)} />}
             </div>
           </div>
         ))}
@@ -483,6 +543,7 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
             {activeTab === 'tecnico'   && <TabTecnico />}
             {activeTab === 'servicios' && <TabServicios />}
             {activeTab === 'facturas'  && <TabFacturas />}
+            {activeTab === 'contratos' && <TabContratos />}
           </div>
 
           {/* ── Delete confirm overlay ── */}

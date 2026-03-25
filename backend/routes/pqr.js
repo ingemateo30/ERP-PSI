@@ -779,7 +779,7 @@ router.patch('/:id/gestionar', async (req, res) => {
             return res.status(403).json({ success: false, error: 'No tienes permiso para gestionar esta PQR' });
         }
 
-        const updateFields = ['estado = ?', 'fecha_actualizacion = NOW()'];
+        const updateFields = ['estado = ?'];
         const updateValues = [estado];
 
         if (nota_gestion) {

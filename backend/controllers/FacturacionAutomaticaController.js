@@ -46,9 +46,10 @@ class FacturacionAutomaticaController {
 
       // 2. Procesar cada cliente y obtener detalles completos
       const detallesClientes = [];
+      const excluidos = [];
       let montoTotalEstimado = 0;
       let serviciosTotales = 0;
-      
+
       const estadisticas = {
         primera: 0,
         segunda: 0,
@@ -61,6 +62,7 @@ class FacturacionAutomaticaController {
           const validacion = await FacturacionAutomaticaService.validarClienteParaFacturacion(cliente.id);
           if (!validacion.permitir) {
             console.log(`⏭️ Cliente ${cliente.nombre} omitido: ${validacion.razon}`);
+            excluidos.push({ cliente_id: cliente.id, nombre: cliente.nombre, identificacion: cliente.identificacion, razon: validacion.razon });
             continue;
           }
 
@@ -72,6 +74,7 @@ class FacturacionAutomaticaController {
 
           if (servicios.length === 0) {
             console.log(`⚠️ Cliente ${cliente.nombre} sin servicios activos`);
+            excluidos.push({ cliente_id: cliente.id, nombre: cliente.nombre, identificacion: cliente.identificacion, razon: 'Sin servicios activos' });
             continue;
           }
 
@@ -158,16 +161,18 @@ class FacturacionAutomaticaController {
           monto_total_estimado: Math.round(montoTotalEstimado),
           servicios_totales: serviciosTotales,
           detalles: detallesClientes,
+          excluidos,
           resumen: {
             total_clientes: detallesClientes.length,
+            clientes_excluidos: excluidos.length,
             monto_total_estimado: Math.round(montoTotalEstimado),
             servicios_totales: serviciosTotales,
             por_tipo_factura: estadisticas,
-            promedio_por_cliente: detallesClientes.length > 0 ? 
+            promedio_por_cliente: detallesClientes.length > 0 ?
               Math.round(montoTotalEstimado / detallesClientes.length) : 0
           }
         },
-        message: `Preview generado: ${detallesClientes.length} clientes listos para facturación`
+        message: `Preview generado: ${detallesClientes.length} clientes listos para facturación${excluidos.length > 0 ? `, ${excluidos.length} excluidos` : ''}`
       };
 
       console.log('✅ Preview generado exitosamente:', {

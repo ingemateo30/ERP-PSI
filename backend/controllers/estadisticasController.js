@@ -423,8 +423,8 @@ class EstadisticasController {
           CAST(SUM(CASE WHEN cl.estado = 'activo' THEN 1 ELSE 0 END) AS UNSIGNED) as clientes_activos
         FROM clientes cl
         LEFT JOIN sectores s ON cl.sector_id = s.id
-        LEFT JOIN ciudades c ON s.ciudad_id = c.id
-        GROUP BY s.id, s.codigo, s.nombre, c.nombre
+        LEFT JOIN ciudades c ON cl.ciudad_id = c.id
+        GROUP BY s.id, s.codigo, s.nombre, c.id, c.nombre
         HAVING total_clientes > 0
         ORDER BY total_clientes DESC
         LIMIT 10
