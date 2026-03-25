@@ -64,6 +64,10 @@ const { authenticateToken } = require('./middleware/auth');
 // Comprimir respuestas
 app.use(compression());
 
+// Servir archivos estáticos (fotos de instalaciones, etc.)
+const path = require('path');
+app.use('/uploads', require('express').static(path.join(__dirname, 'uploads')));
+
 // Ocultar información del servidor
 app.use(hideServerInfo);
 
