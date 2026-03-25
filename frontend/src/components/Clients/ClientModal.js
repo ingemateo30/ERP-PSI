@@ -49,7 +49,7 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
   };
 
   const formatCurrency = (val) =>
-    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(val) || 0);
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(Number(val) || 0));
 
   const getStateBadge = (state) => {
     const map = {

@@ -120,25 +120,39 @@ router.get('/contratos',
   async (req, res) => {
     try {
       const { page = 1, limit = 10, cliente_id } = req.query;
+      const pageNum = Math.max(1, parseInt(page) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 10));
+      const offsetNum = (pageNum - 1) * limitNum;
 
-      const contratos = await ClienteCompletoService.obtenerContratosGenerados({
-        page: parseInt(page),
-        limit: parseInt(limit),
-        cliente_id
-      });
+      const { Database } = require('../models/Database');
+      let where = 'WHERE 1=1';
+      const params = [];
+      if (cliente_id) {
+        where += ' AND c.cliente_id = ?';
+        params.push(parseInt(cliente_id));
+      }
 
-      res.json({
-        success: true,
-        data: contratos
-      });
+      const contratos = await Database.query(`
+        SELECT
+          c.id, c.numero_contrato, c.tipo_contrato, c.tipo_permanencia,
+          c.permanencia_meses, c.costo_instalacion, c.fecha_generacion,
+          c.fecha_inicio, c.fecha_fin, c.estado, c.valor_mensual, c.observaciones,
+          cl.nombre AS cliente_nombre, cl.identificacion AS cliente_identificacion,
+          ps.nombre AS plan_nombre, ps.tipo AS plan_tipo, ps.precio AS plan_precio
+        FROM contratos c
+        LEFT JOIN clientes cl ON c.cliente_id = cl.id
+        LEFT JOIN servicios_cliente sc ON sc.cliente_id = c.cliente_id AND sc.estado = 'activo'
+        LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+        ${where}
+        ORDER BY c.fecha_generacion DESC
+        LIMIT ${limitNum} OFFSET ${offsetNum}
+      `, params);
+
+      res.json({ success: true, data: { contratos, pagination: { page: pageNum, limit: limitNum } } });
 
     } catch (error) {
       console.error('❌ Error obteniendo contratos:', error);
-
-      res.status(500).json({
-        success: false,
-        message: error.message || 'Error obteniendo contratos'
-      });
+      res.status(500).json({ success: false, message: error.message || 'Error obteniendo contratos' });
     }
   }
 );
