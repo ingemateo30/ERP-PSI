@@ -1010,18 +1010,27 @@ const validarFormulario = () => {
   const renderPestañaFotos = () => {
     const fotos = formData.fotos_instalacion || [];
 
-    // Construir URL absoluta para cada foto.
-    // Las fotos pueden ser strings ("/uploads/...") o objetos {url, tipo, fecha, descripcion}
-    const resolverUrl = (foto) => {
+    // Construir URL/src para cada foto.
+    // Las fotos pueden ser:
+    //   - strings base64 "data:image/...;base64,..."  (guardadas directamente en BD)
+    //   - objetos { url: '/uploads/...', tipo, fecha } (subidas como archivo)
+    //   - strings "/uploads/..." (rutas relativas)
+    const resolverSrc = (foto) => {
       const ruta = (typeof foto === 'object' && foto !== null) ? foto.url : foto;
       if (!ruta) return null;
+      // data URI → usar directamente (no enviar a nginx)
+      if (ruta.startsWith('data:')) return ruta;
       if (ruta.startsWith('http://') || ruta.startsWith('https://')) return ruta;
+      // Ruta relativa → construir URL absoluta al backend
       const limpio = ruta.replace(/^\/+/, '');
-      // Base = origin del API sin el prefijo /api/v1
       const apiUrl = process.env.REACT_APP_API_URL || '';
       const base = apiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '') || window.location.origin;
       return `${base}/${limpio}`;
     };
+
+    // Para el href del <a> no podemos usar data URIs directos (navegadores bloquean o es lento)
+    // Convertimos a blob URL on-demand o simplemente no enlazamos data URIs
+    const esDataUri = (src) => src && src.startsWith('data:');
 
     return (
       <div className="space-y-4">
@@ -1035,22 +1044,34 @@ const validarFormulario = () => {
             <p className="text-sm text-gray-500 mb-3">{fotos.length} foto(s) adjunta(s)</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {fotos.map((foto, idx) => {
-                const src = resolverUrl(foto);
+                const src = resolverSrc(foto);
+                const label = (typeof foto === 'object' && foto !== null && foto.tipo)
+                  ? foto.tipo : `Foto ${idx + 1}`;
+                // Para data URIs: abrir en ventana nueva con blob para evitar 414
+                const handleAmpliar = (e) => {
+                  if (esDataUri(src)) {
+                    e.preventDefault();
+                    const w = window.open('', '_blank');
+                    if (w) { w.document.write(`<html><body style="margin:0;background:#000"><img src="${src}" style="max-width:100%;max-height:100vh;display:block;margin:auto"></body></html>`); w.document.close(); }
+                  }
+                };
                 return (
-                  <a key={idx} href={src} target="_blank" rel="noopener noreferrer"
-                    className="block border border-gray-200 rounded-lg overflow-hidden hover:opacity-90 transition-opacity bg-gray-50">
+                  <a key={idx} href={esDataUri(src) ? '#' : src} target="_blank"
+                    rel="noopener noreferrer" onClick={handleAmpliar}
+                    className="block border border-gray-200 rounded-lg overflow-hidden hover:opacity-90 transition-opacity bg-gray-50 cursor-zoom-in">
                     <img
                       src={src}
-                      alt={`Foto ${idx + 1}`}
+                      alt={label}
                       className="w-full h-40 object-cover"
                       onError={(e) => {
                         e.target.style.display = 'none';
                         const div = document.createElement('div');
-                        div.className = 'w-full h-40 flex flex-col items-center justify-center text-gray-400';
-                        div.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span style="font-size:12px">No disponible</span>`;
+                        div.style.cssText = 'width:100%;height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;gap:4px';
+                        div.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span>No disponible</span>';
                         e.target.parentNode.appendChild(div);
                       }}
                     />
+                    <p className="text-xs text-center text-gray-500 py-1 bg-gray-50 capitalize">{label}</p>
                   </a>
                 );
               })}
