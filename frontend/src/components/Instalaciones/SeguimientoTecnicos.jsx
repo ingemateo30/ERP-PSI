@@ -56,6 +56,17 @@ const FitBounds = ({ points }) => {
   return null;
 };
 
+// ─── Volar a una coordenada específica ───────────────────────────────────────
+const FlyTo = ({ target, zoom = 17 }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (target) {
+      map.flyTo(target, zoom, { duration: 1.2 });
+    }
+  }, [map, target, zoom]);
+  return null;
+};
+
 // ─── Constantes de estado ────────────────────────────────────────────────────
 const ESTADO_CONFIG = {
   programada: { label: 'Programada',  bg: 'bg-blue-100',   text: 'text-blue-800',   dot: 'bg-blue-500'   },
@@ -283,6 +294,8 @@ const TecnicoCard = ({ tecnico, vivoData }) => {
 
 // ─── Mapa en tiempo real ──────────────────────────────────────────────────────
 const MapaEnVivo = ({ tecnicos, ubicacionesVivas }) => {
+  const [flyTarget, setFlyTarget] = useState(null);
+
   // Recoger todos los puntos con coordenadas
   const puntos = [];
   tecnicos.forEach(t => t.instalaciones.forEach(i => {
@@ -313,6 +326,7 @@ const MapaEnVivo = ({ tecnicos, ubicacionesVivas }) => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
         {puntos.length > 0 && <FitBounds points={puntos} />}
+        {flyTarget && <FlyTo target={flyTarget} />}
 
         {/* Marcadores de instalaciones */}
         {tecnicos.map(t =>
@@ -322,6 +336,7 @@ const MapaEnVivo = ({ tecnicos, ubicacionesVivas }) => {
                 key={`inst-${inst.id}`}
                 position={[inst.coordenadas.lat, inst.coordenadas.lng]}
                 icon={iconInstalacion[inst.estado] || iconInstalacion.programada}
+                eventHandlers={{ click: () => setFlyTarget([inst.coordenadas.lat, inst.coordenadas.lng]) }}
               >
                 <Popup>
                   <div className="text-sm">
@@ -367,14 +382,13 @@ const MapaEnVivo = ({ tecnicos, ubicacionesVivas }) => {
         {ubicacionesVivas.map(v => {
           const lat = parseFloat(v.lat);
           const lng = parseFloat(v.lng);
-          const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}&zoom=17`;
           return (
             <Marker
               key={`vivo-${v.instalador_id}`}
               position={[lat, lng]}
               icon={iconTecnico(v.nombre)}
               eventHandlers={{
-                click: () => window.open(mapsUrl, '_blank', 'noopener,noreferrer')
+                click: () => setFlyTarget([lat, lng])
               }}
             >
               <Popup>
@@ -389,16 +403,9 @@ const MapaEnVivo = ({ tecnicos, ubicacionesVivas }) => {
                     GPS hace {v.minutos_desde_actualizacion} min
                     {v.precision_metros ? ` · ±${v.precision_metros}m` : ''}
                   </p>
-                  <a
-                    href={mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors justify-center"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <Navigation size={12} />
-                    Abrir en Google Maps
-                  </a>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {lat.toFixed(5)}, {lng.toFixed(5)}
+                  </p>
                 </div>
               </Popup>
             </Marker>

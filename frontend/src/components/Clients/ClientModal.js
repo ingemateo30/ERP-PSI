@@ -1,548 +1,533 @@
-// frontend/src/components/Clients/ClientModal.js - VERSIÓN CORREGIDA
+// frontend/src/components/Clients/ClientModal.js
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X, Edit, Trash2, Phone, Mail, MapPin, Calendar,
   User, CreditCard, Wifi, Settings, AlertTriangle,
-  CheckCircle, Clock, XCircle
+  CheckCircle, Clock, XCircle, FileText, DollarSign,
+  Package, Activity, ChevronRight, Loader
 } from 'lucide-react';
 import { clientService } from '../../services/clientService';
 import ClientServiceManager from './ClientServiceManager';
 
+const TABS = [
+  { id: 'personal',  label: 'Personal',   icon: User },
+  { id: 'tecnico',   label: 'Técnico',     icon: Settings },
+  { id: 'servicios', label: 'Servicios',   icon: Wifi },
+  { id: 'facturas',  label: 'Facturas',    icon: DollarSign },
+];
+
 const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
-  const [deleting, setDeleting] = useState(false);
+  const [deleting, setDeleting]                   = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showServiceManager, setShowServiceManager] = useState(false);
+  const [activeTab, setActiveTab]                 = useState('personal');
+  const [clienteCompleto, setClienteCompleto]     = useState(null);
+  const [loadingCompleto, setLoadingCompleto]     = useState(false);
 
-  // Función para formatear fechas
-const formatDate = (dateString) => {
-  if (!dateString) return 'No especificada';
+  /* ──────────────────── helpers ──────────────────── */
 
-  try {
-    // Si viene con hora (por ejemplo: "2025-11-07T15:11:08Z" o "2025-11-07 15:11:08")
-    // tomamos solo la parte de la fecha para evitar desfaces por zona horaria
-    const datePart = dateString.split('T')[0].split(' ')[0];
-    const [year, month, day] = datePart.split('-').map(Number);
+  const formatDate = (dateString) => {
+    if (!dateString) return 'No especificada';
+    try {
+      const datePart = dateString.split('T')[0].split(' ')[0];
+      const [year, month, day] = datePart.split('-').map(Number);
+      if (!year || !month || !day) return 'Fecha inválida';
+      return new Date(year, month - 1, day).toLocaleDateString('es-CO', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      });
+    } catch { return 'Fecha inválida'; }
+  };
 
-    if (!year || !month || !day) return 'Fecha inválida';
-
-    // Crear fecha sin usar zona horaria (local fija)
-    const date = new Date(year, month - 1, day);
-
-    // Validar que sea una fecha válida
-    if (isNaN(date.getTime())) return 'Fecha inválida';
-
-    // Formato colombiano legible
-    return date.toLocaleDateString('es-CO', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  } catch (error) {
-    return 'Fecha inválida';
-  }
-};
-
-
-
-  // Función para formatear teléfonos
   const formatPhone = (phone) => {
     if (!phone) return '';
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 10 && cleaned.startsWith('3')) {
-      return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6)}`;
-    }
-    return phone;
+    const c = phone.replace(/\D/g, '');
+    return (c.length === 10 && c.startsWith('3'))
+      ? `${c.slice(0, 3)} ${c.slice(3, 6)} ${c.slice(6)}`
+      : phone;
   };
 
-  // Función para obtener el color del estado
-  const getStateColor = (state) => {
-    const colors = {
-      'activo': 'bg-green-100 text-green-800 border-green-200',
-      'suspendido': 'bg-yellow-100 text-yellow-800 border-yellow-200', 
-      'cortado': 'bg-red-100 text-red-800 border-red-200',
-      'inactivo': 'bg-gray-100 text-gray-800 border-gray-200'
+  const formatCurrency = (val) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(val) || 0);
+
+  const getStateBadge = (state) => {
+    const map = {
+      activo:     'bg-green-100 text-green-800 border-green-200',
+      suspendido: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      cortado:    'bg-red-100 text-red-800 border-red-200',
+      inactivo:   'bg-gray-100 text-gray-800 border-gray-200',
+      cancelado:  'bg-gray-100 text-gray-800 border-gray-200',
     };
-    return colors[state] || 'bg-gray-100 text-gray-800 border-gray-200';
+    return map[state] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
-  // Función para obtener el icono del estado
   const getStateIcon = (state) => {
-    const icons = {
-      'activo': CheckCircle,
-      'suspendido': Clock,
-      'cortado': XCircle,
-      'inactivo': AlertTriangle
-    };
-    const IconComponent = icons[state] || AlertTriangle;
-    return <IconComponent className="w-4 h-4" />;
+    const icons = { activo: CheckCircle, suspendido: Clock, cortado: XCircle, inactivo: AlertTriangle };
+    const I = icons[state] || AlertTriangle;
+    return <I className="w-4 h-4" />;
   };
 
-  // Manejar eliminación
-  const handleDelete = async () => {
-    if (!permissions.canDelete) {
-      alert('No tienes permisos para eliminar clientes');
-      return;
-    }
+  const getFacturaBadge = (estado) => {
+    const map = {
+      pendiente: 'bg-yellow-100 text-yellow-800',
+      pagada:    'bg-green-100 text-green-800',
+      vencida:   'bg-red-100 text-red-800',
+      anulada:   'bg-gray-100 text-gray-600',
+    };
+    return map[estado] || 'bg-gray-100 text-gray-800';
+  };
 
+  /* ──────────────────── data fetch ──────────────────── */
+
+  useEffect(() => {
+    if (!client?.id) return;
+    setLoadingCompleto(true);
+    const token = localStorage.getItem('accessToken');
+    fetch(`${process.env.REACT_APP_API_URL}/clientes-completo/${client.id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => { if (data.success) setClienteCompleto(data.data); })
+      .catch(() => {})
+      .finally(() => setLoadingCompleto(false));
+  }, [client?.id]);
+
+  /* ──────────────────── delete ──────────────────── */
+
+  const handleDelete = async () => {
+    if (!permissions.canDelete) { alert('No tienes permisos para eliminar clientes'); return; }
     setDeleting(true);
-    
     try {
       const response = await clientService.deleteClient(client.id);
-      
       if (response.success) {
-        // Mostrar notificación de éxito
-        if (window.showNotification) {
-          window.showNotification('success', response.message || 'Cliente eliminado exitosamente');
-        }
-        
-        onDelete();
-        onClose();
-      } else {
-        throw new Error(response.message || 'Error al eliminar cliente');
-      }
+        window.showNotification?.('success', response.message || 'Cliente eliminado exitosamente');
+        onDelete(); onClose();
+      } else throw new Error(response.message || 'Error al eliminar cliente');
     } catch (error) {
-      console.error('Error eliminando cliente:', error);
-      
-      // Mostrar notificación de error
-      if (window.showNotification) {
-        window.showNotification('error', error.message || 'Error al eliminar cliente');
-      } else {
-        alert(error.message || 'Error al eliminar cliente');
-      }
+      window.showNotification
+        ? window.showNotification('error', error.message)
+        : alert(error.message);
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
     }
   };
 
-  return (
-    <>
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <h2 className="text-xl font-semibold text-gray-900">{client.nombre}</h2>
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-sm text-gray-600">
-                  {client.tipo_documento === 'cedula' ? 'CC' : 
-                   client.tipo_documento === 'nit' ? 'NIT' : 
-                   client.tipo_documento?.toUpperCase()} {client.identificacion}
-                </span>
-                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getStateColor(client.estado)}`}>
-                  {getStateIcon(client.estado)}
-                  {client.estado?.charAt(0).toUpperCase() + client.estado?.slice(1)}
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {permissions.canEdit && (
-              <button
-                onClick={() => setShowServiceManager(true)}
-                className="flex items-center gap-2 px-3 py-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-              >
-                <Wifi className="w-4 h-4" />
-                Servicios
-              </button>
-            )}
+  /* ──────────────────── render helpers ──────────────────── */
 
-            {permissions.canEdit && (
-              <button
-                onClick={onEdit}
-                className="flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              >
-                <Edit className="w-4 h-4" />
-                Editar
-              </button>
-            )}
-            
-            {permissions.canDelete && (
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={deleting}
-                className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <Trash2 className="w-4 h-4" />
-                Eliminar
-              </button>
-            )}
-            
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-            >
-              <X className="w-5 h-5" />
-            </button>
+  const InfoRow = ({ label, value, className = '' }) => (
+    <div className={className}>
+      <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">{label}</p>
+      <p className="text-sm font-medium text-gray-900">{value || <span className="text-gray-400 italic">No especificado</span>}</p>
+    </div>
+  );
+
+  /* ════════════════════════════ TABS ════════════════════════════ */
+
+  const TabPersonal = () => (
+    <div className="space-y-6">
+      {/* Datos personales */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          <User className="w-4 h-4 text-[#0e6493]" /> Datos Personales
+        </h4>
+        <div className="grid grid-cols-2 gap-4">
+          <InfoRow label="Nombre completo" value={client.nombre} className="col-span-2" />
+          <InfoRow label="Tipo documento"
+            value={
+              client.tipo_documento === 'cedula' ? 'Cédula de Ciudadanía' :
+              client.tipo_documento === 'nit' ? 'NIT' :
+              client.tipo_documento === 'pasaporte' ? 'Pasaporte' :
+              client.tipo_documento === 'extranjeria' ? 'Cédula Extranjería' :
+              client.tipo_documento
+            }
+          />
+          <InfoRow label="Identificación" value={client.identificacion} />
+          {client.estrato && <InfoRow label="Estrato" value={`Estrato ${client.estrato}`} />}
+        </div>
+      </div>
+
+      {/* Contacto */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          <Phone className="w-4 h-4 text-[#0e6493]" /> Contacto
+        </h4>
+        <div className="space-y-3">
+          {client.telefono && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Teléfono principal</p>
+                <p className="text-sm font-medium text-gray-900">{formatPhone(client.telefono)}</p>
+              </div>
+              <a href={`tel:${client.telefono}`} className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs hover:bg-blue-100 transition-colors">
+                <Phone className="w-3.5 h-3.5" /> Llamar
+              </a>
+            </div>
+          )}
+          {client.telefono_2 && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Teléfono secundario</p>
+                <p className="text-sm font-medium text-gray-900">{formatPhone(client.telefono_2)}</p>
+              </div>
+              <a href={`tel:${client.telefono_2}`} className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs hover:bg-blue-100 transition-colors">
+                <Phone className="w-3.5 h-3.5" /> Llamar
+              </a>
+            </div>
+          )}
+          {client.email && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Email</p>
+                <p className="text-sm font-medium text-gray-900">{client.email}</p>
+              </div>
+              <a href={`mailto:${client.email}`} className="flex items-center gap-1 px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-xs hover:bg-purple-100 transition-colors">
+                <Mail className="w-3.5 h-3.5" /> Correo
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Ubicación */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-[#0e6493]" /> Ubicación
+        </h4>
+        <div className="grid grid-cols-2 gap-4">
+          <InfoRow label="Dirección" value={client.direccion} className="col-span-2" />
+          {client.barrio && <InfoRow label="Barrio" value={client.barrio} />}
+          {client.sector_nombre && <InfoRow label="Sector" value={`${client.sector_codigo ? client.sector_codigo + ' - ' : ''}${client.sector_nombre}`} />}
+          {client.ciudad_nombre && (
+            <InfoRow label="Ciudad / Departamento"
+              value={`${client.ciudad_nombre}${client.departamento_nombre ? ` · ${client.departamento_nombre}` : ''}`}
+              className="col-span-2"
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Fechas */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-[#0e6493]" /> Fechas
+        </h4>
+        <div className="grid grid-cols-2 gap-4">
+          <InfoRow label="Fecha registro" value={formatDate(client.fecha_registro)} />
+          {client.fecha_inicio_servicio && <InfoRow label="Inicio servicio" value={formatDate(client.fecha_inicio_servicio)} />}
+          {client.fecha_fin_servicio && <InfoRow label="Fin servicio" value={formatDate(client.fecha_fin_servicio)} />}
+          <InfoRow label="Creado" value={formatDate(client.created_at)} />
+          <InfoRow label="Última actualización" value={formatDate(client.updated_at)} />
+        </div>
+      </div>
+
+      {/* Observaciones */}
+      {client.observaciones && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
+          <h4 className="text-sm font-semibold text-yellow-800 mb-2 flex items-center gap-2">
+            <FileText className="w-4 h-4" /> Observaciones
+          </h4>
+          <p className="text-sm text-yellow-900 whitespace-pre-wrap">{client.observaciones}</p>
+        </div>
+      )}
+    </div>
+  );
+
+  const TabTecnico = () => (
+    <div className="space-y-6">
+      {/* Conectividad */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          <Wifi className="w-4 h-4 text-[#0e6493]" /> Conectividad
+        </h4>
+        <div className="grid grid-cols-2 gap-4">
+          <InfoRow label="IP asignada" value={client.ip_asignada} />
+          <InfoRow label="Contraseña WiFi" value={client.tap} />
+          <InfoRow label="Código usuario" value={client.codigo_usuario} />
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Requiere reconexión</p>
+            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${client.requiere_reconexion ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+              {client.requiere_reconexion ? '⚠ Sí' : '✓ No'}
+            </span>
           </div>
         </div>
+      </div>
 
-        {/* Contenido */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            {/* Información Personal */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-blue-600" />
-                Información Personal
-              </h3>
-
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-500">Nombre Completo</p>
-                  <p className="text-sm font-medium text-gray-900">{client.nombre}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Tipo de Documento</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {client.tipo_documento === 'cedula' ? 'Cédula de Ciudadanía' : 
-                       client.tipo_documento === 'nit' ? 'NIT' : 
-                       client.tipo_documento === 'pasaporte' ? 'Pasaporte' : 
-                       client.tipo_documento === 'extranjeria' ? 'Cédula de Extranjería' :
-                       client.tipo_documento}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-gray-500">Identificación</p>
-                    <p className="text-sm font-medium text-gray-900">{client.identificacion}</p>
-                  </div>
-                </div>
-
-                {client.estrato && (
-                  <div>
-                    <p className="text-sm text-gray-500">Estrato</p>
-                    <p className="text-sm font-medium text-gray-900">Estrato {client.estrato}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Información de Contacto */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <Phone className="w-5 h-5 text-blue-600" />
-                Contacto
-              </h3>
-
-              <div className="space-y-3">
-                {client.telefono && (
-                  <div>
-                    <p className="text-sm text-gray-500">Teléfono Principal</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900">
-                        {formatPhone(client.telefono)}
-                      </p>
-                      <a 
-                        href={`tel:${client.telefono}`}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <Phone className="w-4 h-4" />
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {client.telefono_2 && (
-                  <div>
-                    <p className="text-sm text-gray-500">Teléfono Secundario</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900">
-                        {formatPhone(client.telefono_2)}
-                      </p>
-                      <a 
-                        href={`tel:${client.telefono_2}`}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <Phone className="w-4 h-4" />
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {client.email && (
-                  <div>
-                    <p className="text-sm text-gray-500">Email</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900">{client.email}</p>
-                      <a 
-                        href={`mailto:${client.email}`}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <Mail className="w-4 h-4" />
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Ubicación */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-blue-600" />
-                Ubicación
-              </h3>
-
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-500">Dirección</p>
-                  <p className="text-sm font-medium text-gray-900">{client.direccion}</p>
-                </div>
-
-                {client.barrio && (
-                  <div>
-                    <p className="text-sm text-gray-500">Barrio</p>
-                    <p className="text-sm font-medium text-gray-900">{client.barrio}</p>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  {client.sector_nombre && (
-                    <div>
-                      <p className="text-sm text-gray-500">Sector</p>
-                      <p className="text-sm font-medium text-gray-900">
-                        {client.sector_codigo} - {client.sector_nombre}
-                      </p>
-                    </div>
-                  )}
-
-                  {client.estrato && (
-                    <div>
-                      <p className="text-sm text-gray-500">Estrato</p>
-                      <p className="text-sm font-medium text-gray-900">
-                        Estrato {client.estrato}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {client.ciudad_nombre && (
-                  <div>
-                    <p className="text-sm text-gray-500">Ciudad</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {client.ciudad_nombre}
-                      {client.departamento_nombre && ` - ${client.departamento_nombre}`}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* CORRECCIÓN: Información Técnica Completa */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <Settings className="w-5 h-5 text-blue-600" />
-                Información Técnica
-              </h3>
-
-              <div className="space-y-3">
-                {/* Conectividad */}
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                    <Wifi className="w-4 h-4" />
-                    Conectividad
-                  </h4>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-gray-500">IP Asignada</p>
-                      <p className="font-medium text-gray-900">
-                        {client.ip_asignada || 'No asignada'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Infraestructura Física */}
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">
-                    Infraestructura Física
-                  </h4>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-gray-500">Contraseña Wifi</p>
-                      <p className="font-medium text-gray-900">
-                        {client.tap || 'No asignado'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Información Contractual */}
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4" />
-                    Información Contractual
-                  </h4>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    
-                    <div>
-                      <p className="text-gray-500">Código de Usuario</p>
-                      <p className="font-medium text-gray-900">
-                        {client.codigo_usuario || 'No asignado'}
-                      </p>
-                    </div>
-
-                    
-                    <div>
-                      <p className="text-gray-500">Requiere Reconexión</p>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${
-                          client.requiere_reconexion ? 'bg-red-500' : 'bg-green-500'
-                        }`}></div>
-                        <p className="font-medium text-gray-900">
-                          {client.requiere_reconexion ? 'Sí' : 'No'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Fechas de Servicio */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-blue-600" />
-                Fechas de Servicio
-              </h3>
-
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-500">Fecha de Registro</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {formatDate(client.fecha_registro)}
-                  </p>
-                </div>
-
-                {client.fecha_inicio_servicio && (
-                  <div>
-                    <p className="text-sm text-gray-500">Inicio de Servicio</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {formatDate(client.fecha_inicio_servicio)}
-                    </p>
-                  </div>
-                )}
-
-                {client.fecha_fin_servicio && (
-                  <div>
-                    <p className="text-sm text-gray-500">Fin de Servicio</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {formatDate(client.fecha_fin_servicio)}
-                    </p>
-                  </div>
-                )}
-
-                {/* Fechas de Sistema */}
-                <div className="pt-3 border-t border-gray-200">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-500">
-                    <div>
-                      <p>Creado</p>
-                      <p>{client.created_at ? formatDate(client.created_at) : 'No disponible'}</p>
-                    </div>
-                    <div>
-                      <p>Última Actualización</p>
-                      <p>{client.updated_at ? formatDate(client.updated_at) : 'No disponible'}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Observaciones */}
-            {client.observaciones && (
-              <div className="lg:col-span-2">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Observaciones
-                </h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                    {client.observaciones}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+      {/* Estado del servicio */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-[#0e6493]" /> Estado del Servicio
+        </h4>
+        <div className="flex items-center gap-3">
+          <span className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${getStateBadge(client.estado)}`}>
+            {getStateIcon(client.estado)}
+            {client.estado?.charAt(0).toUpperCase() + client.estado?.slice(1)}
+          </span>
         </div>
-
-        {/* Modal de confirmación de eliminación */}
-        {showDeleteConfirm && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-shrink-0">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
-                </div>
+        {clienteCompleto?.servicios && clienteCompleto.servicios.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {clienteCompleto.servicios.map((srv, i) => (
+              <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900">
-                    Confirmar Eliminación
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Esta acción no se puede deshacer.
-                  </p>
+                  <p className="text-sm font-medium text-gray-900">{srv.plan_nombre || srv.nombre_plan || 'Plan sin nombre'}</p>
+                  <p className="text-xs text-gray-500">{srv.tipo_plan || 'Internet'} · {srv.velocidad || ''}</p>
                 </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStateBadge(srv.estado)}`}>
+                  {srv.estado}
+                </span>
               </div>
-
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                <p className="text-sm text-red-700">
-                  ¿Estás seguro de que deseas eliminar al cliente <strong>{client.nombre}</strong>?
-                </p>
-                <p className="text-xs text-red-600 mt-1">
-                  Esto eliminará toda la información asociada al cliente.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={deleting}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                >
-                  {deleting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Eliminando...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4" />
-                      Eliminar Cliente
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
         )}
       </div>
     </div>
+  );
 
-    {/* Modal de gestión de servicios */}
-    {showServiceManager && (
-      <ClientServiceManager
-        cliente={client}
-        onClose={() => setShowServiceManager(false)}
-        onUpdate={() => setShowServiceManager(false)}
-      />
-    )}
+  const TabServicios = () => {
+    if (loadingCompleto) return (
+      <div className="flex items-center justify-center py-12">
+        <Loader className="w-6 h-6 text-[#0e6493] animate-spin mr-2" />
+        <span className="text-gray-500">Cargando servicios...</span>
+      </div>
+    );
+
+    const servicios = clienteCompleto?.servicios || [];
+
+    if (!servicios.length) return (
+      <div className="text-center py-12">
+        <Wifi className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+        <p className="text-gray-500 text-sm">No hay servicios registrados</p>
+      </div>
+    );
+
+    return (
+      <div className="space-y-4">
+        {servicios.map((srv, i) => (
+          <div key={i} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-gray-50 px-5 py-3 flex items-center justify-between border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-[#0e6493]" />
+                <span className="text-sm font-semibold text-gray-800">
+                  {srv.plan_nombre || srv.nombre_plan || `Servicio #${i + 1}`}
+                </span>
+              </div>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStateBadge(srv.estado)}`}>
+                {srv.estado?.charAt(0).toUpperCase() + srv.estado?.slice(1)}
+              </span>
+            </div>
+            {/* Body */}
+            <div className="p-5 grid grid-cols-2 gap-4">
+              <InfoRow label="Plan" value={srv.plan_nombre || srv.nombre_plan} />
+              <InfoRow label="Precio mensual"
+                value={srv.precio_personalizado
+                  ? formatCurrency(srv.precio_personalizado)
+                  : srv.precio
+                    ? formatCurrency(srv.precio)
+                    : 'Según plan'
+                }
+              />
+              {srv.tipo_plan && <InfoRow label="Tipo" value={srv.tipo_plan} />}
+              {srv.velocidad && <InfoRow label="Velocidad" value={srv.velocidad} />}
+              {srv.direccion_servicio && <InfoRow label="Dirección servicio" value={srv.direccion_servicio} className="col-span-2" />}
+              {srv.fecha_activacion && <InfoRow label="Activación" value={formatDate(srv.fecha_activacion)} />}
+              {srv.fecha_suspension && <InfoRow label="Suspendido" value={formatDate(srv.fecha_suspension)} />}
+              {srv.tipo_permanencia && <InfoRow label="Permanencia" value={srv.tipo_permanencia} />}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const TabFacturas = () => {
+    if (loadingCompleto) return (
+      <div className="flex items-center justify-center py-12">
+        <Loader className="w-6 h-6 text-[#0e6493] animate-spin mr-2" />
+        <span className="text-gray-500">Cargando facturas...</span>
+      </div>
+    );
+
+    const facturas = clienteCompleto?.facturas_recientes || clienteCompleto?.facturas || [];
+
+    if (!facturas.length) return (
+      <div className="text-center py-12">
+        <DollarSign className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+        <p className="text-gray-500 text-sm">No hay facturas registradas</p>
+      </div>
+    );
+
+    return (
+      <div className="space-y-3">
+        {facturas.map((fac, i) => (
+          <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-semibold text-gray-800">
+                  {fac.numero_factura || fac.numero || `#${fac.id}`}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getFacturaBadge(fac.estado)}`}>
+                  {fac.estado}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500">
+                {fac.periodo_facturacion || (fac.fecha_desde && fac.fecha_hasta
+                  ? `${formatDate(fac.fecha_desde)} → ${formatDate(fac.fecha_hasta)}`
+                  : formatDate(fac.fecha_emision || fac.created_at)
+                )}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-bold text-gray-900">{formatCurrency(fac.total || fac.monto || 0)}</p>
+              {fac.fecha_vencimiento && (
+                <p className="text-xs text-gray-500">Vence: {formatDate(fac.fecha_vencimiento)}</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  /* ════════════════════════════ RETURN ════════════════════════════ */
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
+
+          {/* ── Header ── */}
+          <div className="bg-gradient-to-r from-[#0e6493] to-[#1a7ab5] text-white px-6 py-5 flex-shrink-0">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-bold leading-tight">{client.nombre}</h2>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <span className="text-sm text-white/80">
+                    {client.tipo_documento === 'cedula' ? 'CC' :
+                     client.tipo_documento === 'nit' ? 'NIT' :
+                     client.tipo_documento?.toUpperCase()} {client.identificacion}
+                  </span>
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStateBadge(client.estado)}`}>
+                    {getStateIcon(client.estado)}
+                    {client.estado?.charAt(0).toUpperCase() + client.estado?.slice(1)}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                {permissions.canEdit && (
+                  <button onClick={() => setShowServiceManager(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-lg text-xs transition-colors">
+                    <Wifi className="w-3.5 h-3.5" /> Servicios
+                  </button>
+                )}
+                {permissions.canEdit && (
+                  <button onClick={onEdit}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-lg text-xs transition-colors">
+                    <Edit className="w-3.5 h-3.5" /> Editar
+                  </button>
+                )}
+                {permissions.canDelete && (
+                  <button onClick={() => setShowDeleteConfirm(true)} disabled={deleting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/70 hover:bg-red-500 rounded-lg text-xs transition-colors disabled:opacity-50">
+                    <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                  </button>
+                )}
+                <button onClick={onClose} className="ml-1 p-1.5 hover:bg-white/20 rounded-lg transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick stats */}
+            <div className="flex gap-4 mt-4">
+              {client.ciudad_nombre && (
+                <div className="flex items-center gap-1.5 text-white/80 text-xs">
+                  <MapPin className="w-3.5 h-3.5" /> {client.ciudad_nombre}
+                </div>
+              )}
+              {client.telefono && (
+                <div className="flex items-center gap-1.5 text-white/80 text-xs">
+                  <Phone className="w-3.5 h-3.5" /> {formatPhone(client.telefono)}
+                </div>
+              )}
+              {client.fecha_registro && (
+                <div className="flex items-center gap-1.5 text-white/80 text-xs">
+                  <Calendar className="w-3.5 h-3.5" /> Desde {formatDate(client.fecha_registro)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Tabs nav ── */}
+          <div className="flex border-b border-gray-200 bg-gray-50 flex-shrink-0">
+            {TABS.map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors flex-1 justify-center
+                    ${activeTab === tab.id
+                      ? 'border-[#0e6493] text-[#0e6493] bg-white'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    }`}
+                >
+                  <Icon className="w-4 h-4" /> {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Tab content ── */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {activeTab === 'personal'  && <TabPersonal />}
+            {activeTab === 'tecnico'   && <TabTecnico />}
+            {activeTab === 'servicios' && <TabServicios />}
+            {activeTab === 'facturas'  && <TabFacturas />}
+          </div>
+
+          {/* ── Delete confirm overlay ── */}
+          {showDeleteConfirm && (
+            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Confirmar Eliminación</h3>
+                    <p className="text-sm text-gray-500 mt-0.5">Esta acción no se puede deshacer.</p>
+                  </div>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-red-700">
+                    ¿Eliminar al cliente <strong>{client.nombre}</strong>?
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">Se eliminará toda la información asociada.</p>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting}
+                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
+                    Cancelar
+                  </button>
+                  <button onClick={handleDelete} disabled={deleting}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50">
+                    {deleting
+                      ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Eliminando...</>
+                      : <><Trash2 className="w-4 h-4" />Eliminar Cliente</>
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showServiceManager && (
+        <ClientServiceManager
+          cliente={client}
+          onClose={() => setShowServiceManager(false)}
+          onUpdate={() => setShowServiceManager(false)}
+        />
+      )}
     </>
   );
 };

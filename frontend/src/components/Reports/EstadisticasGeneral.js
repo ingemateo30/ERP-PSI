@@ -173,10 +173,11 @@ const EstadisticasGeneral = () => {
 
     const resumen = estadisticas.clientes.resumen;
     return [
-      { name: 'Activos', value: resumen.activos || 0, color: COLORS.success },
-      { name: 'Suspendidos', value: resumen.suspendidos || 0, color: COLORS.warning },
-      { name: 'Cortados', value: resumen.cortados || 0, color: COLORS.danger },
-      { name: 'Retirados', value: resumen.retirados || 0, color: COLORS.info }
+      { name: 'Activos',     value: parseInt(resumen.activos)     || 0, color: COLORS.success },
+      { name: 'Suspendidos', value: parseInt(resumen.suspendidos) || 0, color: COLORS.warning },
+      { name: 'Cortados',    value: parseInt(resumen.cortados)    || 0, color: COLORS.danger  },
+      { name: 'Retirados',   value: parseInt(resumen.retirados)   || 0, color: COLORS.info    },
+      { name: 'Inactivos',   value: parseInt(resumen.inactivos)   || 0, color: '#9ca3af'      },
     ].filter(item => item.value > 0);
   }, [estadisticas]);
 
@@ -492,7 +493,7 @@ const EstadisticasGeneral = () => {
               <div>
                 <p className="text-sm text-gray-600 mb-1">MRR - Ingreso Mensual Recurrente</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  ${(metricas_gerenciales?.proyeccion?.mrr || 0).toLocaleString('es-CO')}
+                  ${Math.round(metricas_gerenciales?.proyeccion?.mrr || 0).toLocaleString('es-CO')}
                 </p>
               </div>
               <TrendingUp className="w-8 h-8 text-blue-600" />
@@ -501,7 +502,7 @@ const EstadisticasGeneral = () => {
               <div>
                 <p className="text-sm text-gray-600 mb-1">ARR - Ingreso Anual Proyectado</p>
                 <p className="text-2xl font-bold text-green-600">
-                  ${(metricas_gerenciales?.proyeccion?.arr || 0).toLocaleString('es-CO')}
+                  ${Math.round(metricas_gerenciales?.proyeccion?.arr || 0).toLocaleString('es-CO')}
                 </p>
               </div>
               <Award className="w-8 h-8 text-green-600" />
@@ -743,7 +744,7 @@ const EstadisticasGeneral = () => {
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-600">Total Cartera Vencida</span>
               <span className="text-lg font-bold text-gray-900">
-                ${(financieras?.cartera?.cartera_vencida || 0).toLocaleString('es-CO')}
+                ${Math.round(financieras?.cartera?.cartera_vencida || 0).toLocaleString('es-CO')}
               </span>
             </div>
           </div>
@@ -889,7 +890,7 @@ const EstadisticasGeneral = () => {
                         <div className="text-xs text-gray-400">{d.identificacion}</div>
                       </td>
                       <td className="py-2 text-right font-bold text-red-600 whitespace-nowrap">
-                        ${(d.deuda_total).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                        ${Math.round(d.deuda_total || 0).toLocaleString('es-CO')}
                       </td>
                       <td className="py-2 text-right">
                         <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
@@ -938,7 +939,7 @@ const EstadisticasGeneral = () => {
                 <div className="text-right">
                   <div className="text-xs text-gray-500">{metodo.cantidad} pagos</div>
                   <div className="text-sm font-bold text-gray-900">
-                    ${(metodo.monto_total || 0).toLocaleString('es-CO')}
+                    ${Math.round(metodo.monto_total || 0).toLocaleString('es-CO')}
                   </div>
                 </div>
               </div>
@@ -984,17 +985,17 @@ const EstadisticasGeneral = () => {
                           {index + 1}
                         </div>
                         <div>
-                          <div className="font-medium text-gray-900">{sector.codigo}</div>
-                          <div className="text-xs text-gray-500">{sector.sector}</div>
+                          <div className="font-medium text-gray-900">{sector.codigo || 'S/C'}</div>
+                          <div className="text-xs text-gray-500">{sector.sector || 'Sin sector'}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{sector.ciudad}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{sector.ciudad || 'Sin ciudad'}</td>
                     <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                      {sector.total_clientes}
+                      {parseInt(sector.total_clientes) || 0}
                     </td>
                     <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">
-                      {sector.clientes_activos}
+                      {parseInt(sector.clientes_activos) || 0}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -1122,7 +1123,7 @@ const KPICard = ({ title, value, prefix = '', suffix = '', icon, color, variacio
 
         <h3 className="text-sm font-medium mb-2 opacity-90">{title}</h3>
         <p className="text-3xl font-bold mb-2 font-mono">
-          {prefix}{value.toLocaleString('es-CO')}{suffix}
+          {prefix}{Math.round(value || 0).toLocaleString('es-CO')}{suffix}
         </p>
 
         <div className="flex items-center justify-between text-sm">
@@ -1151,7 +1152,7 @@ const MetricaGerencialCard = ({ title, subtitle, value, prefix = '', suffix = ''
       </div>
       <p className="text-xs font-medium opacity-90 mb-1">{title}</p>
       <p className="text-xs opacity-75 mb-2">{subtitle}</p>
-      <p className="text-2xl font-bold mb-1">{prefix}{value.toLocaleString('es-CO')}{suffix}</p>
+      <p className="text-2xl font-bold mb-1">{prefix}{Math.round(value || 0).toLocaleString('es-CO')}{suffix}</p>
       {description && (
         <p className="text-xs opacity-75">{description}</p>
       )}
@@ -1191,7 +1192,7 @@ const CarteraBar = ({ label, value, color, max }) => {
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium text-gray-700">{label}</span>
         <span className="text-sm font-bold text-gray-900">
-          ${value.toLocaleString('es-CO')}
+          ${Math.round(value || 0).toLocaleString('es-CO')}
         </span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">

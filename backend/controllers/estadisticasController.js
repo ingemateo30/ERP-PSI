@@ -415,12 +415,12 @@ class EstadisticasController {
 
       // Distribución por sectores
       const distribucionSectores = await Database.query(`
-        SELECT 
-          s.codigo,
-          s.nombre as sector,
-          c.nombre as ciudad,
+        SELECT
+          COALESCE(s.codigo, 'S/C') as codigo,
+          COALESCE(s.nombre, 'Sin sector') as sector,
+          COALESCE(c.nombre, 'Sin ciudad') as ciudad,
           COUNT(cl.id) as total_clientes,
-          SUM(CASE WHEN cl.estado = 'activo' THEN 1 ELSE 0 END) as clientes_activos
+          CAST(SUM(CASE WHEN cl.estado = 'activo' THEN 1 ELSE 0 END) AS UNSIGNED) as clientes_activos
         FROM clientes cl
         LEFT JOIN sectores s ON cl.sector_id = s.id
         LEFT JOIN ciudades c ON s.ciudad_id = c.id
