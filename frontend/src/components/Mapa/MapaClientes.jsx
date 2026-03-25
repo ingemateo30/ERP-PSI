@@ -295,11 +295,12 @@ const MapaClientes = () => {
       .map(cl => ({ ...cl, lat: coordsMap[cl.id].lat, lng: coordsMap[cl.id].lng, _exacto: coordsMap[cl.id]._exacto }));
     setClientesMapa(mostrar);
 
-    // 3. Intentar geocodificar por dirección solo los que NO tienen GPS real ni ciudad conocida
-    const sinCoordsAlguna = todosConCiudad.filter(cl => !coordsMap[cl.id]);
-    if (sinCoordsAlguna.length === 0) return;
+    // 3. Geocodificar por dirección todos los que NO tienen GPS exacto
+    //    (incluyendo quienes ya tienen fallback de ciudad — la geocodificación irá mejorando su posición)
+    const sinGpsExacto = todosConCiudad.filter(cl => !coordsMap[cl.id]?._exacto && cl.direccion);
+    if (sinGpsExacto.length === 0) return;
 
-    const lote = sinCoordsAlguna.map(cl => ({
+    const lote = sinGpsExacto.map(cl => ({
       id:          cl.id,
       direccion:   cl.direccion,
       barrio:      cl.barrio,

@@ -1,6 +1,6 @@
 // frontend/src/components/Inventory/EquipmentStats.js
 
-import React, { useState } from 'react';
+import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Componente de paginación reutilizable
@@ -55,12 +55,7 @@ const Paginator = ({ page, totalPages, onChange }) => {
   );
 };
 
-const PAGE_SIZE_INSTALLERS = 10;
-const PAGE_SIZE_MOVEMENTS  = 15;
-
 const EquipmentStats = ({ stats }) => {
-  const [pageInstaladores, setPageInstaladores] = useState(1);
-  const [pageMovimientos, setPageMovimientos]   = useState(1);
 
   if (!stats) return null;
 
@@ -84,29 +79,6 @@ const EquipmentStats = ({ stats }) => {
     { label: 'Dañados',          value: stats.general?.dañados || 0,          icon: '❌', color: 'text-red-600'    },
     { label: 'Perdidos',         value: stats.general?.perdidos || 0,          icon: '❓', color: 'text-gray-600'   },
   ];
-
-  // Datos para paginación
-  const instaladoresAll = stats.por_instalador || [];
-  const totalPagesInstaladores = Math.max(1, Math.ceil(instaladoresAll.length / PAGE_SIZE_INSTALLERS));
-  const instaladoresPagina = instaladoresAll.slice(
-    (pageInstaladores - 1) * PAGE_SIZE_INSTALLERS,
-    pageInstaladores * PAGE_SIZE_INSTALLERS
-  );
-
-  const movimientosAll = stats.movimientos_recientes || [];
-  const totalPagesMovimientos = Math.max(1, Math.ceil(movimientosAll.length / PAGE_SIZE_MOVEMENTS));
-  const movimientosPagina = movimientosAll.slice(
-    (pageMovimientos - 1) * PAGE_SIZE_MOVEMENTS,
-    pageMovimientos * PAGE_SIZE_MOVEMENTS
-  );
-
-  const actionInfo = {
-    'asignado':  { icon: '👤', color: 'bg-blue-500'   },
-    'devuelto':  { icon: '↩️', color: 'bg-yellow-500' },
-    'instalado': { icon: '🏠', color: 'bg-green-500'  },
-    'retirado':  { icon: '📤', color: 'bg-orange-500' },
-    'dañado':    { icon: '🔧', color: 'bg-red-500'    },
-  };
 
   return (
     <div className="space-y-6">
@@ -199,8 +171,8 @@ const EquipmentStats = ({ stats }) => {
         </div>
       )}
 
-      {/* Instaladores — con paginación completa */}
-      {instaladoresAll.length > 0 && (
+      {/* Instaladores y movimientos recientes ya están en sus propias páginas (/inventory/instaladores y /inventory/movimientos) */}
+      {false && (
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium text-gray-900">
@@ -255,8 +227,7 @@ const EquipmentStats = ({ stats }) => {
         </div>
       )}
 
-      {/* Movimientos Recientes — con paginación completa */}
-      {movimientosAll.length > 0 && (
+      {false && (
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium text-gray-900">

@@ -182,8 +182,9 @@ router.get('/movimientos',
         SELECT
           h.id,
           h.accion,
-          h.descripcion,
-          h.fecha_movimiento,
+          h.notas        AS descripcion,
+          h.fecha_accion AS fecha_movimiento,
+          h.ubicacion,
           e.codigo   AS equipo_codigo,
           e.nombre   AS equipo_nombre,
           e.tipo     AS equipo_tipo,
@@ -192,10 +193,10 @@ router.get('/movimientos',
           u.rol      AS usuario_rol,
           ins.nombre AS instalador_nombre
         FROM inventario_historial h
-        JOIN inventario_equipos   e   ON h.equipo_id    = e.id
-        LEFT JOIN sistema_usuarios u   ON h.usuario_id   = u.id
-        LEFT JOIN sistema_usuarios ins ON h.instalador_id = ins.id
-        ORDER BY h.fecha_movimiento DESC
+        JOIN inventario_equipos   e   ON h.equipo_id      = e.id
+        LEFT JOIN sistema_usuarios u   ON h.created_by     = u.id
+        LEFT JOIN sistema_usuarios ins ON h.instalador_id  = ins.id
+        ORDER BY h.fecha_accion DESC
         LIMIT ${limit} OFFSET ${offset}
       `);
       const [{ total }] = await Database.query('SELECT COUNT(*) AS total FROM inventario_historial');
