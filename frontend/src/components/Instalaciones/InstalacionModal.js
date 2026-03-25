@@ -533,42 +533,70 @@ const validarFormulario = () => {
   <label className="block text-sm font-medium text-gray-700 mb-2">
     Cliente *
   </label>
-  {/* Search filter for client selector */}
-  <input
-    type="text"
-    value={busquedaCliente}
-    onChange={e => setBusquedaCliente(e.target.value)}
-    placeholder="Filtrar por nombre o identificación..."
-    className="w-full px-3 py-2 mb-1 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-400"
-  />
-  <select
-    value={formData.cliente_id}
-    onChange={(e) => {
-      handleChange('cliente_id', e.target.value);
-      const found = clientes.find(c => String(c.id) === String(e.target.value));
-      if (found) setClienteSeleccionado(found);
-    }}
-    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-    size={8}
-  >
-    <option value="">— Seleccionar cliente —</option>
-    {clientes
-      .filter(c => {
-        if (!busquedaCliente.trim()) return true;
-        const q = busquedaCliente.toLowerCase();
-        return (c.nombre || '').toLowerCase().includes(q) ||
-               (c.identificacion || '').toLowerCase().includes(q);
-      })
-      .map(cliente => (
-        <option key={cliente.id} value={cliente.id}>
-          {cliente.nombre} — {cliente.identificacion}
-        </option>
-      ))}
-  </select>
-  {formData.cliente_id && clienteSeleccionado && (
-    <p className="mt-1 text-xs text-green-600 font-medium">
-      ✓ {clienteSeleccionado.nombre} ({clienteSeleccionado.identificacion})
-    </p>
+  {/* Combobox de búsqueda de cliente */}
+  {clienteSeleccionado ? (
+    // Cliente ya elegido — mostrar chip con opción de cambiar
+    <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-300 rounded-lg">
+      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+      <span className="text-sm font-medium text-green-800 flex-1 truncate">
+        {clienteSeleccionado.nombre} <span className="font-normal text-green-600">({clienteSeleccionado.identificacion})</span>
+      </span>
+      <button
+        type="button"
+        onClick={() => { setClienteSeleccionado(null); handleChange('cliente_id', ''); setBusquedaCliente(''); }}
+        className="text-green-500 hover:text-green-700 flex-shrink-0"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  ) : (
+    // Input de búsqueda + lista desplegable
+    <div className="relative">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          value={busquedaCliente}
+          onChange={e => setBusquedaCliente(e.target.value)}
+          placeholder={cargando ? 'Cargando clientes...' : `Buscar entre ${clientes.length} clientes...`}
+          disabled={cargando}
+          autoComplete="off"
+          className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50"
+        />
+      </div>
+      {busquedaCliente.trim().length >= 2 && (
+        <ul className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+          {clientes
+            .filter(c => {
+              const q = busquedaCliente.toLowerCase();
+              return (c.nombre || '').toLowerCase().includes(q) ||
+                     (c.identificacion || '').toLowerCase().includes(q);
+            })
+            .slice(0, 40)
+            .map(cliente => (
+              <li
+                key={cliente.id}
+                onMouseDown={(e) => {
+                  e.preventDefault(); // evitar que el input pierda foco antes del click
+                  handleChange('cliente_id', String(cliente.id));
+                  setClienteSeleccionado(cliente);
+                  setBusquedaCliente('');
+                }}
+                className="px-4 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-800 border-b border-gray-50 last:border-0"
+              >
+                <span className="font-medium">{cliente.nombre}</span>
+                <span className="text-gray-400 ml-2">{cliente.identificacion}</span>
+              </li>
+            ))}
+          {clientes.filter(c => {
+            const q = busquedaCliente.toLowerCase();
+            return (c.nombre || '').toLowerCase().includes(q) || (c.identificacion || '').toLowerCase().includes(q);
+          }).length === 0 && (
+            <li className="px-4 py-3 text-sm text-gray-400 text-center">Sin resultados</li>
+          )}
+        </ul>
+      )}
+    </div>
   )}
   {errores.cliente_id && (
     <p className="mt-1 text-sm text-red-600">{errores.cliente_id}</p>
@@ -982,16 +1010,17 @@ const validarFormulario = () => {
   const renderPestañaFotos = () => {
     const fotos = formData.fotos_instalacion || [];
 
-    // Construir URL absoluta para cada foto
+    // Construir URL absoluta para cada foto.
+    // Las fotos pueden ser strings ("/uploads/...") o objetos {url, tipo, fecha, descripcion}
     const resolverUrl = (foto) => {
-      if (!foto) return null;
-      if (foto.startsWith('http://') || foto.startsWith('https://')) return foto;
-      // Quitar leading slash para concatenar limpio
-      const ruta = foto.replace(/^\/+/, '');
-      // Usar origin del backend: la misma IP/puerto que la API pero sin el prefijo /api/v1
-      const apiUrl = process.env.REACT_APP_API_URL || window.location.origin;
-      const base = apiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
-      return `${base}/${ruta}`;
+      const ruta = (typeof foto === 'object' && foto !== null) ? foto.url : foto;
+      if (!ruta) return null;
+      if (ruta.startsWith('http://') || ruta.startsWith('https://')) return ruta;
+      const limpio = ruta.replace(/^\/+/, '');
+      // Base = origin del API sin el prefijo /api/v1
+      const apiUrl = process.env.REACT_APP_API_URL || '';
+      const base = apiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '') || window.location.origin;
+      return `${base}/${limpio}`;
     };
 
     return (
