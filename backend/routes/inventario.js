@@ -170,6 +170,43 @@ router.get('/stats',
   InventoryController.getStats
 );
 
+// Movimientos recientes de inventario (historial global)
+router.get('/movimientos',
+  requireRole(['supervisor', 'administrador']),
+  async (req, res) => {
+    try {
+      const limit  = Math.min(200, parseInt(req.query.limit)  || 50);
+      const offset = Math.max(0,   parseInt(req.query.offset) || 0);
+      const { Database } = require('../models/Database');
+      const filas = await Database.query(`
+        SELECT
+          h.id,
+          h.accion,
+          h.descripcion,
+          h.fecha_movimiento,
+          e.codigo   AS equipo_codigo,
+          e.nombre   AS equipo_nombre,
+          e.tipo     AS equipo_tipo,
+          e.estado   AS equipo_estado_actual,
+          u.nombre   AS usuario_nombre,
+          u.rol      AS usuario_rol,
+          ins.nombre AS instalador_nombre
+        FROM inventario_historial h
+        JOIN inventario_equipos   e   ON h.equipo_id    = e.id
+        LEFT JOIN sistema_usuarios u   ON h.usuario_id   = u.id
+        LEFT JOIN sistema_usuarios ins ON h.instalador_id = ins.id
+        ORDER BY h.fecha_movimiento DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `);
+      const [{ total }] = await Database.query('SELECT COUNT(*) AS total FROM inventario_historial');
+      res.json({ success: true, data: { movimientos: filas, total: Number(total), limit, offset } });
+    } catch (err) {
+      console.error('❌ Error en movimientos:', err);
+      res.status(500).json({ success: false, message: 'Error obteniendo movimientos', error: err.message });
+    }
+  }
+);
+
 router.get('/available',
   requireRole(['supervisor', 'administrador', 'instalador']),
   InventoryController.getAvailableEquipment

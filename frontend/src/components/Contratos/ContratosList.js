@@ -26,16 +26,21 @@ import contratosService from '../../services/contratosService';
 // DonutChart – SVG donut chart for contract states
 // ──────────────────────────────────────────────
 const DonutChart = ({ activos = 0, vencidos = 0, terminados = 0, anulados = 0 }) => {
-  const total = activos + vencidos + terminados + anulados;
+  // Parse to numbers to avoid string concatenation from MySQL responses
+  const _activos   = Number(activos)   || 0;
+  const _vencidos  = Number(vencidos)  || 0;
+  const _terminados= Number(terminados)|| 0;
+  const _anulados  = Number(anulados)  || 0;
+  const total = _activos + _vencidos + _terminados + _anulados;
   if (total === 0) return (
     <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Sin datos</div>
   );
 
   const segments = [
-    { value: activos,    color: '#22c55e', label: 'Activos'    },
-    { value: vencidos,   color: '#f97316', label: 'Vencidos'   },
-    { value: terminados, color: '#6b7280', label: 'Terminados' },
-    { value: anulados,   color: '#ef4444', label: 'Anulados'   },
+    { value: _activos,    color: '#22c55e', label: 'Activos'    },
+    { value: _vencidos,   color: '#f97316', label: 'Vencidos'   },
+    { value: _terminados, color: '#6b7280', label: 'Terminados' },
+    { value: _anulados,   color: '#ef4444', label: 'Anulados'   },
   ];
 
   const R = 50, cx = 70, cy = 70;
@@ -51,7 +56,7 @@ const DonutChart = ({ activos = 0, vencidos = 0, terminados = 0, anulados = 0 })
     return { ...seg, dash, gap, offset };
   });
 
-  const pctActivos = Math.round((activos / total) * 100);
+  const pctActivos = Math.round((_activos / total) * 100);
 
   return (
     <div className="flex items-center gap-6">
@@ -86,9 +91,9 @@ const DonutChart = ({ activos = 0, vencidos = 0, terminados = 0, anulados = 0 })
             </div>
             <div className="flex items-center gap-2">
               <div className="w-20 bg-gray-100 rounded-full h-1.5">
-                <div className="h-1.5 rounded-full" style={{ width: `${(s.value/total)*100}%`, backgroundColor: s.color }} />
+                <div className="h-1.5 rounded-full" style={{ width: total > 0 ? `${(s.value/total)*100}%` : '0%', backgroundColor: s.color }} />
               </div>
-              <span className="font-semibold text-gray-800 w-6 text-right">{s.value}</span>
+              <span className="font-semibold text-gray-800 w-8 text-right">{s.value}</span>
             </div>
           </div>
         ))}

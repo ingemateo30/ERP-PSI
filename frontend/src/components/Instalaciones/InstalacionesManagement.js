@@ -39,7 +39,10 @@ import authService from '../../services/authService';
 // MiniDonut – pequeño gráfico SVG de estados
 // ──────────────────────────────────────────────
 const MiniDonut = ({ stats }) => {
-  const { programadas = 0, en_proceso = 0, completadas = 0, canceladas = 0 } = stats;
+  const programadas  = Number(stats?.programadas)  || 0;
+  const en_proceso   = Number(stats?.en_proceso)   || 0;
+  const completadas  = Number(stats?.completadas)  || 0;
+  const canceladas   = Number(stats?.canceladas)   || 0;
   const total = programadas + en_proceso + completadas + canceladas;
   if (total === 0) return null;
 

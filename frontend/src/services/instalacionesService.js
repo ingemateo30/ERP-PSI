@@ -250,12 +250,13 @@ export const instalacionesService = {
   async getClientes(params = {}) {
     try {
       console.log('📋 Obteniendo clientes con params:', params);
-      const response = await apiService.get('/clients', params);
+      // Fetch all clients for the selector — use a high limit so all 800+ clients appear
+      const response = await apiService.get('/clients', { limit: 2000, ...params });
       console.log('📋 Respuesta completa clientes:', response);
-      
+
       const clientes = response.data || response.clientes || [];
-      console.log('📋 Clientes extraídos:', clientes);
-      
+      console.log('📋 Clientes extraídos:', clientes.length || 0, 'registros');
+
       return {
         success: true,
         clientes: Array.isArray(clientes) ? clientes : []

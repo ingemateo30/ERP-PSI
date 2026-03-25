@@ -178,12 +178,19 @@ const MapaClientes = () => {
   }, [ciudades]);
 
   // ── Geocodificar clientes individuales cuando se activa el modo ──────────
+  // Esperar a que ciudadesMapa tenga las coords geocodificadas para usarlas como fallback
   useEffect(() => {
     if (modoIndividual && ciudades.length > 0) {
-      geocodificarClientesIndividuales();
+      // Enriquecer ciudades con las coords geocodificadas antes de procesar
+      const ciudadesConCoords = ciudades.map(c => {
+        const geo = ciudadesMapa.find(m => m.ciudad_nombre === c.ciudad_nombre);
+        return geo ? { ...c, lat: geo.lat, lng: geo.lng } : c;
+      });
+      // Reemplazar ref temporal con versión enriquecida
+      geocodificarClientesIndividualesConCiudades(ciudadesConCoords);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modoIndividual, ciudades]);
+  }, [modoIndividual, ciudadesMapa]);
 
   const geocodificarCiudades = async (listaCiudades) => {
     const cache = leerCache();
@@ -240,38 +247,59 @@ const MapaClientes = () => {
   //            (con cache localStorage persistente, solo geocodifica una vez)
   const señalAbortRef = useRef(null);
 
-  const geocodificarClientesIndividuales = useCallback(async () => {
-    if (ciudades.length === 0) return;
+  const geocodificarClientesIndividualesConCiudades = async (ciudadesParam) => {
+    const listaCiudades = ciudadesParam || ciudades;
+    if (listaCiudades.length === 0) return;
 
     // Cancelar geocodificación previa si el usuario alterna el modo
     señalAbortRef.current?.abort();
     const ctrl = new AbortController();
     señalAbortRef.current = ctrl;
 
-    const todosConCiudad = ciudades.flatMap(ciudad =>
+    const todosConCiudad = listaCiudades.flatMap(ciudad =>
       ciudad.clientes.map(cl => ({
         ...cl,
         ciudad_nombre:       ciudad.ciudad_nombre,
-        departamento_nombre: ciudad.departamento_nombre
+        departamento_nombre: ciudad.departamento_nombre,
+        _ciudad_lat:         ciudad.lat,
+        _ciudad_lng:         ciudad.lng,
       }))
     );
 
     // Mapa mutable id → coords para actualización en streaming
     const coordsMap = {};
 
-    // Clientes con GPS real desde BD
+    // 1. Clientes con GPS real desde BD (instalación completada)
     todosConCiudad.forEach(cl => {
-      if (cl.lat != null && cl.lng != null) coordsMap[cl.id] = { lat: cl.lat, lng: cl.lng };
+      if (cl.lat != null && cl.lng != null) {
+        coordsMap[cl.id] = { lat: cl.lat, lng: cl.lng, _exacto: true };
+      }
     });
 
-    // Mostrar de inmediato los que tienen GPS real
-    setClientesMapa(todosConCiudad.filter(cl => coordsMap[cl.id]).map(cl => ({ ...cl, ...coordsMap[cl.id] })));
+    // 2. Clientes SIN GPS → asignar coords de ciudad como fallback inmediato
+    //    (con pequeño jitter para que no se superpongan)
+    todosConCiudad.forEach(cl => {
+      if (!coordsMap[cl.id] && cl._ciudad_lat != null && cl._ciudad_lng != null) {
+        const jitter = () => (Math.random() - 0.5) * 0.012; // ~600m dispersión
+        coordsMap[cl.id] = {
+          lat: cl._ciudad_lat + jitter(),
+          lng: cl._ciudad_lng + jitter(),
+          _exacto: false
+        };
+      }
+    });
 
-    const sinGPS = todosConCiudad.filter(cl => cl.lat == null || cl.lng == null);
-    if (sinGPS.length === 0) return;
+    // Mostrar TODOS los clientes con coords disponibles (GPS real + fallback ciudad)
+    const mostrar = todosConCiudad
+      .filter(cl => coordsMap[cl.id])
+      .map(cl => ({ ...cl, lat: coordsMap[cl.id].lat, lng: coordsMap[cl.id].lng, _exacto: coordsMap[cl.id]._exacto }));
+    setClientesMapa(mostrar);
 
-    // Prepara lote para el servicio de geocodificación
-    const lote = sinGPS.map(cl => ({
+    // 3. Intentar geocodificar por dirección solo los que NO tienen GPS real ni ciudad conocida
+    const sinCoordsAlguna = todosConCiudad.filter(cl => !coordsMap[cl.id]);
+    if (sinCoordsAlguna.length === 0) return;
+
+    const lote = sinCoordsAlguna.map(cl => ({
       id:          cl.id,
       direccion:   cl.direccion,
       barrio:      cl.barrio,
@@ -285,12 +313,11 @@ const MapaClientes = () => {
       señalAbort: ctrl.signal,
       onProgreso: (actual, total) => setProgreso({ actual, total }),
       onResultado: (id, coords) => {
-        coordsMap[id] = coords;
-        // Actualizar mapa en streaming: ya geocodificados + pendientes sin coords aún
+        coordsMap[id] = { ...coords, _exacto: false };
         setClientesMapa(
           todosConCiudad
             .filter(cl => coordsMap[cl.id])
-            .map(cl => ({ ...cl, lat: coordsMap[cl.id].lat, lng: coordsMap[cl.id].lng }))
+            .map(cl => ({ ...cl, lat: coordsMap[cl.id].lat, lng: coordsMap[cl.id].lng, _exacto: coordsMap[cl.id]._exacto }))
         );
       }
     });
@@ -299,7 +326,7 @@ const MapaClientes = () => {
       setGeocodIndividual(false);
       setProgreso({ actual: 0, total: 0 });
     }
-  }, [ciudades]); // eslint-disable-line
+  }; // geocodificarClientesIndividualesConCiudades
 
   // ── Stats globales ───────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -582,6 +609,9 @@ const MapaClientes = () => {
                       {c.direccion && <p className="text-gray-600 text-xs mt-0.5 flex items-center gap-1"><MapPin className="w-3 h-3 flex-shrink-0"/>{c.direccion}{c.barrio ? `, ${c.barrio}` : ''}</p>}
                       {c.ciudad_nombre && <p className="text-gray-500 text-xs mt-0.5">{c.ciudad_nombre}</p>}
                       {c.telefono && <p className="text-gray-600 text-xs mt-0.5 flex items-center gap-1"><Phone className="w-3 h-3 flex-shrink-0"/>{c.telefono}</p>}
+                      <p className={`text-xs mt-1 font-medium ${c._exacto ? 'text-green-600' : 'text-orange-500'}`}>
+                        {c._exacto ? '📍 GPS exacto' : '~ Ubicación aproximada'}
+                      </p>
                       {c.servicios?.length > 0 && (
                         <div className="mt-1 space-y-0.5">
                           {c.servicios.map(sv => (
@@ -597,9 +627,11 @@ const MapaClientes = () => {
               ))}
 
               {/* Leyenda modo individual */}
-              {modoIndividual && clientesMapa.length === 0 && !geocodIndividual && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-600 z-[500] pointer-events-none">
-                  No hay clientes con dirección geocodificable
+              {modoIndividual && clientesMapa.length > 0 && (
+                <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-600 z-[500] pointer-events-none shadow-sm">
+                  <p className="font-semibold text-gray-700 mb-1">{clientesMapa.length} clientes en mapa</p>
+                  <p className="text-green-600">📍 GPS exacto: instalación completada</p>
+                  <p className="text-orange-500">~ Aproximado: posición en ciudad</p>
                 </div>
               )}
             </MapContainer>

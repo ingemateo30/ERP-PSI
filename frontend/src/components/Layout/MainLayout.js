@@ -8,7 +8,8 @@ import {
   DollarSign, TrendingUp, UserCheck, Wifi, Loader2,
   Building2, CreditCard, MapPin, PieChart as PieChartIcon,
   Package, FileText, Wrench, BarChart3, Home, Mail,
-  Clock, Zap, Hash, ArrowRight, Mic, MicOff, GitMerge, Navigation, MessageSquare, Shield
+  Clock, Zap, Hash, ArrowRight, Mic, MicOff, GitMerge, Navigation, MessageSquare, Shield,
+  ArrowRightLeft
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -60,6 +61,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <Wifi size={18} />, label: 'Planes de Servicio', path: '/config/service-plans', keywords: ['planes', 'servicios', 'plans'], color: 'blue', permission: 'administrador' },
     { icon: <Wrench size={18} />, label: 'Instalaciones', path: '/instalaciones', keywords: ['instalaciones', 'installation', 'instalar'], color: 'red', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <Package size={18} />, label: 'Inventario', path: '/inventory', keywords: ['inventario', 'stock', 'productos'], color: 'indigo', permission: 'instalador,secretaria,supervisor,administrador' },
+    { icon: <ArrowRightLeft size={18} />, label: 'Movimientos Recientes', path: '/inventory/movimientos', keywords: ['movimientos', 'historial', 'inventario'], color: 'indigo', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Users size={18} />, label: 'Instaladores (Inventario)', path: '/inventory/instaladores', keywords: ['instaladores', 'inventario', 'equipos'], color: 'indigo', permission: 'secretaria,supervisor,administrador' },
     { icon: <Calendar size={18} />, label: 'Calendario', path: '/calendar', keywords: ['calendario', 'calendar', 'agenda'], color: 'pink', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <FileText size={18} />, label: 'PQR', path: '/pqr', keywords: ['pqr', 'quejas', 'reclamos', 'peticiones'], color: 'red', permission: 'secretaria,supervisor,administrador' },
     { icon: <MessageSquare size={18} />, label: 'Mis PQR', path: '/mis-pqr', keywords: ['mis pqr', 'pqr asignadas', 'casos'], color: 'blue', permission: 'instalador,secretaria,supervisor,administrador' },
@@ -472,6 +475,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <Wifi size={22} />, label: 'Planes de Servicio', path: '/config/service-plans', permission: 'administrador' },
     { icon: <Wrench size={22} />, label: 'Instalaciones', path: '/instalaciones', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <Package size={22} />, label: 'Inventario', path: '/inventory', permission: 'instalador,secretaria,supervisor,administrador' },
+    { icon: <ArrowRightLeft size={18} />, label: 'Movimientos Recientes', path: '/inventory/movimientos', permission: 'secretaria,supervisor,administrador', subitem: true },
+    { icon: <Users size={18} />, label: 'Instaladores', path: '/inventory/instaladores', permission: 'secretaria,supervisor,administrador', subitem: true },
     { icon: <Calendar size={22} />, label: 'Calendario', path: '/calendar', permission: 'instalador,secretaria,supervisor,administrador' }
   ];
 
@@ -571,16 +576,27 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
               {grupo.items.map((item, index) => (
                 <div
                   key={`${grupoIndex}-${index}`}
-                  className={`flex items-center px-4 py-3 my-1 rounded-xl transition duration-300 cursor-pointer ${isActivePath(item.path)
-                    ? 'bg-white/20 text-white'
-                    : 'hover:bg-[#0e6493]/50 hover:text-white text-white/80'
+                  className={`flex items-center rounded-xl transition duration-300 cursor-pointer
+                    ${item.subitem ? 'px-3 py-2 my-0.5 ml-4' : 'px-4 py-3 my-1'}
+                    ${isActivePath(item.path)
+                      ? 'bg-white/20 text-white'
+                      : item.subitem
+                        ? 'hover:bg-white/10 text-white/60 hover:text-white/90'
+                        : 'hover:bg-[#0e6493]/50 hover:text-white text-white/80'
                     }`}
                   onClick={() => handleMenuClick(item.path)}
                 >
-                  <div className="flex items-center justify-center">
+                  {item.subitem && sidebarOpen && (
+                    <span className="w-4 h-px bg-white/20 mr-1 flex-shrink-0" />
+                  )}
+                  <div className="flex items-center justify-center flex-shrink-0">
                     {item.icon}
                   </div>
-                  {sidebarOpen && <span className="ml-3 whitespace-nowrap">{item.label}</span>}
+                  {sidebarOpen && (
+                    <span className={`ml-2 whitespace-nowrap ${item.subitem ? 'text-sm' : ''}`}>
+                      {item.label}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
