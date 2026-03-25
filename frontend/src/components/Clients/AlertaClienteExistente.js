@@ -350,7 +350,7 @@ const AlertaClienteExistente = ({
               <div className="space-y-2 text-gray-700">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Fecha registro:</span>
-                  <span className="font-medium">{new Date(cliente.fecha_registro).toLocaleDateString()}</span>
+                  <span className="font-medium">{new Date(String(cliente.fecha_registro).split('T')[0] + 'T12:00:00').toLocaleDateString('es-CO')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Estado:</span>

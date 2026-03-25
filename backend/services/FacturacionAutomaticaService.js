@@ -213,14 +213,16 @@ class FacturacionAutomaticaService {
         const totalFacturas = cliente.total_facturas || 0;
 
         // ✅ DETERMINAR FECHA BASE (fecha de inicio del contrato/instalación)
+        // Parsear con T12:00:00 para evitar el desfase UTC-5 que devuelve un día antes
+        const parseFecha = (f) => new Date(String(f).split('T')[0] + 'T12:00:00');
         let fechaBaseFacturacion;
 
         if (cliente.fecha_instalacion_real) {
-          fechaBaseFacturacion = new Date(cliente.fecha_instalacion_real);
+          fechaBaseFacturacion = parseFecha(cliente.fecha_instalacion_real);
         } else if (cliente.fecha_activacion_servicios) {
-          fechaBaseFacturacion = new Date(cliente.fecha_activacion_servicios);
+          fechaBaseFacturacion = parseFecha(cliente.fecha_activacion_servicios);
         } else {
-          fechaBaseFacturacion = new Date(cliente.fecha_registro);
+          fechaBaseFacturacion = parseFecha(cliente.fecha_registro);
         }
 
         console.log(`📅 Cliente: ${cliente.nombre}`);
@@ -236,10 +238,13 @@ class FacturacionAutomaticaService {
         if (totalFacturas === 0) {
           esPrimeraFactura = true;
           tipoFacturacion = 'Primera facturación';
-          
+
           fechaDesde = new Date(fechaBaseFacturacion);
-          fechaHasta = new Date(fechaBaseFacturacion);
-          fechaHasta.setDate(fechaHasta.getDate() + 29); // 30 días (0-29)
+          // 1ra factura: desde registro hasta el día antes de un mes después
+          // Ej: 24 mar → 23 abr  |  24 ene → 23 feb  |  31 ene → 27/28 feb
+          fechaHasta = new Date(fechaDesde);
+          fechaHasta.setMonth(fechaHasta.getMonth() + 1);
+          fechaHasta.setDate(fechaHasta.getDate() - 1);
 
           console.log(`   🆕 1ra Factura: ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
         }
@@ -256,28 +261,22 @@ class FacturacionAutomaticaService {
             throw new Error('No se encontró la fecha de la última factura');
           }
 
-          const ultimaFechaFacturada = new Date(cliente.ultima_fecha_facturada);
+          const ultimaFechaFacturada = parseFecha(cliente.ultima_fecha_facturada);
 
           // Desde: día siguiente a la última factura
-          // Ejemplo: Si la primera factura terminó el 26 julio, empezamos el 27 julio
+          // Ej: 1ra terminó 23 abr → 2da empieza 24 abr
           fechaDesde = new Date(ultimaFechaFacturada);
           fechaDesde.setDate(fechaDesde.getDate() + 1);
 
-          // ✅ CORRECCIÓN CRÍTICA: Calcular 30 días después de fechaDesde
-          // Ejemplo: 27 julio + 30 días = 26 agosto
-          const fecha30DiasDepues = new Date(fechaDesde);
-          fecha30DiasDepues.setDate(fecha30DiasDepues.getDate() + 29); // +29 porque ya estamos en el día siguiente
-
-          // ✅ Hasta: último día del mes en que caen los 30 días
-          // Ejemplo: Si los 30 días terminan el 26 agosto, nivelamos hasta el 31 agosto
+          // 2da factura (nivelación): desde fechaDesde hasta el ÚLTIMO DÍA DE ESE MISMO MES
+          // Ej: 24 abr → 30 abr  (NO 30 días más, solo completar el mes)
           fechaHasta = new Date(
-            fecha30DiasDepues.getFullYear(),
-            fecha30DiasDepues.getMonth() + 1,
-            0 // Último día del mes en que caen los 30 días
+            fechaDesde.getFullYear(),
+            fechaDesde.getMonth() + 1,
+            0 // Último día del mes de fechaDesde
           );
 
           console.log(`   🔄 2da Factura (nivelación): ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
-          console.log(`      (30 días terminarían el ${fecha30DiasDepues.toLocaleDateString('es-CO')}, nivelando hasta fin de mes)`);
         }
         
         // ========================================================================

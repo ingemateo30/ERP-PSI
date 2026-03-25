@@ -660,7 +660,7 @@ router.get('/mis-pqr', async (req, res) => {
               ${estadoFilter}
             ORDER BY
                 CASE p.prioridad WHEN 'alta' THEN 1 WHEN 'media' THEN 2 ELSE 3 END,
-                p.fecha_creacion DESC
+                p.fecha_recepcion DESC
         `, params);
 
         res.json({ success: true, data: pqrs, total: pqrs.length });

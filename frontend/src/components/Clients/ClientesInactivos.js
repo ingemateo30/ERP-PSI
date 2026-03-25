@@ -58,7 +58,7 @@ const ClientesInactivos = ({ onVolver, permissions }) => {
 
   const formatearFecha = (fecha) => {
     if (!fecha) return '-';
-    return new Date(fecha).toLocaleDateString('es-ES');
+    return new Date(String(fecha).split('T')[0] + 'T12:00:00').toLocaleDateString('es-CO');
   };
 
   const calcularTiempoInactivo = (dias) => {
