@@ -28,6 +28,13 @@ import {
   ChevronUp
 } from 'lucide-react';
 
+import { instalacionesService } from '../../services/instalacionesService';
+import { useAuth } from '../../contexts/AuthContext';
+import InstalacionModal from './InstalacionModal';
+import AsignarInstaladorModal from './AsignarInstaladorModal';
+import ReagendarInstalacionModal from './ReagendarInstalacionModal';
+import authService from '../../services/authService';
+
 // ──────────────────────────────────────────────
 // MiniDonut – pequeño gráfico SVG de estados
 // ──────────────────────────────────────────────
@@ -80,13 +87,6 @@ const MiniDonut = ({ stats }) => {
     </div>
   );
 };
-
-import { instalacionesService } from '../../services/instalacionesService';
-import { useAuth } from '../../contexts/AuthContext';
-import InstalacionModal from './InstalacionModal';
-import AsignarInstaladorModal from './AsignarInstaladorModal';
-import ReagendarInstalacionModal from './ReagendarInstalacionModal'; // NUEVO IMPORT
-import authService from '../../services/authService';
 
 // Constantes
 const ESTADOS_INSTALACION = {
