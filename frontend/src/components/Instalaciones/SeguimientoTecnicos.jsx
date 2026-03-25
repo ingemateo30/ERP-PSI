@@ -364,24 +364,46 @@ const MapaEnVivo = ({ tecnicos, ubicacionesVivas }) => {
         })}
 
         {/* Marcadores GPS en vivo de técnicos */}
-        {ubicacionesVivas.map(v => (
-          <Marker
-            key={`vivo-${v.instalador_id}`}
-            position={[parseFloat(v.lat), parseFloat(v.lng)]}
-            icon={iconTecnico(v.nombre)}
-          >
-            <Popup>
-              <div className="text-sm">
-                <p className="font-semibold">{v.nombre}</p>
-                {v.telefono && <p className="text-gray-600">{v.telefono}</p>}
-                <p className="text-gray-500 mt-1">
-                  GPS actualizado hace {v.minutos_desde_actualizacion} min
-                  {v.precision_metros ? ` · ±${v.precision_metros}m` : ''}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {ubicacionesVivas.map(v => {
+          const lat = parseFloat(v.lat);
+          const lng = parseFloat(v.lng);
+          const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}&zoom=17`;
+          return (
+            <Marker
+              key={`vivo-${v.instalador_id}`}
+              position={[lat, lng]}
+              icon={iconTecnico(v.nombre)}
+              eventHandlers={{
+                click: () => window.open(mapsUrl, '_blank', 'noopener,noreferrer')
+              }}
+            >
+              <Popup>
+                <div className="text-sm min-w-[180px]">
+                  <p className="font-semibold text-gray-900">{v.nombre}</p>
+                  {v.telefono && (
+                    <a href={`tel:${v.telefono}`} className="text-blue-600 hover:underline block">
+                      {v.telefono}
+                    </a>
+                  )}
+                  <p className="text-gray-500 mt-1">
+                    GPS hace {v.minutos_desde_actualizacion} min
+                    {v.precision_metros ? ` · ±${v.precision_metros}m` : ''}
+                  </p>
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors justify-center"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <Navigation size={12} />
+                    Abrir en Google Maps
+                  </a>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
       </MapContainer>
     </div>
   );

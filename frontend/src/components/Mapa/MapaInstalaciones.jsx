@@ -157,45 +157,82 @@ const MapaInstalaciones = () => {
     });
   };
 
-  const construirDireccion = (i) => {
-    const dir = i.direccion_instalacion || i.cliente_direccion || i.direccion || '';
-    const barrio = i.barrio || '';
-    const ciudad = i.ciudad_nombre || '';
-    const depto = i.departamento_nombre || '';
+  // Cache de geocodificación en sessionStorage
+  const CACHE_KEY = 'geo_cache_v2';
+  const leerCache = () => { try { return JSON.parse(sessionStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; } };
+  const guardarCache = (cache) => { try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch {} };
 
-    const partes = [dir, barrio, ciudad, depto, 'Colombia'].filter(p => p);
-    const direccionCompleta = partes.join(', ');
-
-    console.log(`📍 Dirección construida para instalación ${i.id}:`, direccionCompleta);
-    return direccionCompleta;
+  // Normalizador: quita el número exacto de la calle ("Calle 5 # 3-45" → "") porque Nominatim no lo conoce
+  const normalizarDireccion = (dir) => {
+    if (!dir) return '';
+    // Remover coordenadas exactas tipo "# 3-45", "No. 3-45", etc.
+    return dir.replace(/#\s*[\d\-]+/g, '').replace(/No\.\s*[\d\-]+/g, '').trim();
   };
 
-  const geocodificar = async (direccion) => {
+  // Llama a Nominatim con pausa y retorna {lat,lng} o null
+  let _ultimaLlamada = 0;
+  const llamarNominatim = async (q) => {
+    const ahora = Date.now();
+    const espera = Math.max(0, _ultimaLlamada + 1100 - ahora);
+    if (espera > 0) await new Promise(r => setTimeout(r, espera));
+    _ultimaLlamada = Date.now();
     try {
-      console.log(`🔍 Geocodificando: ${direccion}`);
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(direccion)}&limit=1&countrycodes=co`;
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=co`;
       const res = await fetch(url, { headers: { 'User-Agent': 'ERP-PSI/1.0' } });
       const data = await res.json();
-      
-      if (data?.length > 0) {
-        const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-        console.log(`✅ Coordenadas obtenidas:`, coords);
-        return coords;
+      if (data?.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    } catch {}
+    return null;
+  };
+
+  /**
+   * Geocodifica con múltiples intentos en cascada:
+   * 1. Barrio + Ciudad + Depto, Colombia
+   * 2. Ciudad + Depto, Colombia
+   * 3. Solo Ciudad, Colombia
+   */
+  const geocodificarInstancia = async (inst) => {
+    const ciudad = inst.ciudad_nombre || inst.ciudad || '';
+    const barrio = inst.barrio || '';
+    const depto  = inst.departamento_nombre || inst.departamento || '';
+
+    const intentos = [
+      [barrio, ciudad, depto, 'Colombia'].filter(Boolean).join(', '),
+      [ciudad, depto, 'Colombia'].filter(Boolean).join(', '),
+      [ciudad, 'Colombia'].filter(Boolean).join(', '),
+    ].filter(q => q && q !== 'Colombia');
+
+    const cache = leerCache();
+    for (const q of intentos) {
+      const key = q.toLowerCase().trim();
+      if (cache[key] !== undefined) {
+        if (cache[key]) return cache[key];
+        continue; // null cacheado → saltar
       }
-      
-      console.warn(`⚠️ No se encontraron coordenadas para: ${direccion}`);
-      return null;
-    } catch (error) {
-      console.error(`❌ Error geocodificando:`, error);
-      return null;
+      const coords = await llamarNominatim(q);
+      cache[key] = coords;
+      guardarCache(cache);
+      if (coords) return coords;
     }
+    return null;
+  };
+
+  const construirDireccion = (i) => {
+    const partes = [
+      i.direccion_instalacion || i.cliente_direccion || i.direccion,
+      i.barrio,
+      i.ciudad_nombre,
+      i.departamento_nombre,
+      'Colombia'
+    ].filter(Boolean);
+    return partes.join(', ');
   };
 
   const geocodificarTodas = async () => {
-    console.log(`🚀 Iniciando geocodificación de ${instalaciones.length} instalaciones`);
+    console.log(`🚀 Geocodificando ${instalaciones.length} instalaciones`);
     setGeocodificando(true);
     setProgreso({ actual: 0, total: instalaciones.length });
-    
+
     const resultados = [];
     let exitos = 0;
     let fallos = 0;
@@ -203,44 +240,30 @@ const MapaInstalaciones = () => {
     for (let i = 0; i < instalaciones.length; i++) {
       const inst = instalaciones[i];
       setProgreso({ actual: i + 1, total: instalaciones.length });
-      
-      const dir = construirDireccion(inst);
-      
-      if (!dir || dir === 'Colombia') {
-        console.warn(`⚠️ Instalación ${inst.id} sin dirección válida`);
+
+      if (!inst.ciudad_nombre && !inst.barrio) {
         fallos++;
         continue;
       }
 
-      const coords = await geocodificar(dir);
-      
+      const coords = await geocodificarInstancia(inst);
+
       if (coords) {
-        resultados.push({ 
-          ...inst, 
-          coordenadas: coords,
-          direccion_completa: dir
-        });
+        resultados.push({ ...inst, coordenadas: coords, direccion_completa: construirDireccion(inst) });
         exitos++;
-        console.log(`✅ [${i+1}/${instalaciones.length}] Geocodificado: ${inst.cliente_nombre}`);
       } else {
         fallos++;
-        console.warn(`❌ [${i+1}/${instalaciones.length}] Fallo: ${inst.cliente_nombre}`);
+        console.warn(`❌ Sin coords: ${inst.cliente_nombre} (${inst.ciudad_nombre})`);
       }
-      
-      // Pausa de 1 segundo entre peticiones (requerimiento de Nominatim)
-      await new Promise(r => setTimeout(r, 1000));
     }
 
-    console.log(`📊 Resumen: ${exitos} exitosas, ${fallos} fallidas de ${instalaciones.length} totales`);
-    
+    console.log(`📊 Geocodificación: ${exitos} exitosas, ${fallos} fallidas`);
     setInstalacionesMapa(resultados);
     setGeocodificando(false);
-    
-    alert(`✅ Geocodificación completada:\n${exitos} exitosas\n${fallos} fallidas de ${instalaciones.length} total`);
-    
-    if (resultados.length > 0) {
-      setVistaActual('mapa');
-    }
+
+    alert(`✅ Geocodificación completada:\n${exitos} ubicadas\n${fallos} sin coordenadas\nTotal: ${instalaciones.length}`);
+
+    if (resultados.length > 0) setVistaActual('mapa');
   };
 
   const colorEstado = (e) => ({

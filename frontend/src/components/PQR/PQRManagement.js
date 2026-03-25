@@ -7,7 +7,7 @@ import {
     ExternalLink, History, Star, Download, RefreshCw,
     Pen, RotateCcw
 } from 'lucide-react';
-import SignatureCanvas from 'react-signature-canvas';
+import SignaturePad from '../ui/SignaturePad';
 import pqrService from '../../services/pqrService';
 
 const PQRManagement = () => {
@@ -1144,11 +1144,15 @@ const PQRModal = ({ pqr, onClose, onSave }) => {
 
                             {/* Canvas de firma - SIEMPRE VISIBLE para permitir edición */}
                             <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
-                                <SignatureCanvas
+                                <SignaturePad
                                     ref={sigCanvas}
-                                    canvasProps={{
-                                        className: 'signature-canvas w-full h-40 bg-white rounded cursor-crosshair',
-                                    }}
+                                    width={500}
+                                    height={160}
+                                    backgroundColor="rgb(255,255,255)"
+                                    penColor="#1a1a2e"
+                                    minWidth={1.5}
+                                    maxWidth={4}
+                                    className="signature-canvas w-full bg-white rounded cursor-crosshair"
                                     onBegin={handleFirmaInicio}
                                 />
                             </div>

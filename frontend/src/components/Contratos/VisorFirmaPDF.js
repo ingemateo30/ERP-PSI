@@ -1,6 +1,6 @@
 // frontend/src/components/Contratos/VisorFirmaPDF.js - COMPLETO CON WACOM
 import React, { useState, useRef, useEffect } from 'react';
-import SignatureCanvas from 'react-signature-canvas';
+import SignaturePad from '../ui/SignaturePad';
 import {
     FileText,
     PenTool,
@@ -1219,14 +1219,15 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                                 Firma digital (mouse/touch)
                             </label>
                             <div className="border-2 border-dashed border-gray-300 rounded-lg p-2">
-                                <SignatureCanvas
+                                <SignaturePad
                                     ref={sigCanvas}
-                                    canvasProps={{
-                                        width: 400,
-                                        height: 150,
-                                        className: 'w-full border rounded bg-white'
-                                    }}
-                                    backgroundColor="rgb(255, 255, 255)"
+                                    width={400}
+                                    height={160}
+                                    backgroundColor="rgb(255,255,255)"
+                                    penColor="#1a1a2e"
+                                    minWidth={1.5}
+                                    maxWidth={4}
+                                    className="w-full border rounded bg-white"
                                 />
                             </div>
                             <p className="mt-1 text-sm text-gray-600">

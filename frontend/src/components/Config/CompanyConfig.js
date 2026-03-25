@@ -3,13 +3,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Loader2, Building2, FileText, Settings, Shield } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Building2, FileText, Settings, Shield, Lock, Globe, Phone } from 'lucide-react';
 import configService from '../../services/configService';
 
 const CompanyConfig = () => {
   const navigate = useNavigate();
   const [config, setConfig] = useState({
-    licencia: '',
+    // Información básica
     empresa_nombre: '',
     empresa_nit: '',
     empresa_direccion: '',
@@ -17,22 +17,32 @@ const CompanyConfig = () => {
     empresa_departamento: '',
     empresa_telefono: '',
     empresa_email: '',
-    resolucion_facturacion: '',
-    licencia_internet: '',
-    vigilado: '',
-    vigilado_internet: '',
-    comentario: '',
+    empresa_web: '',
+    empresa_whatsapp: '',
+    // Facturación
     prefijo_factura: 'FAC',
-    codigo_gs1: '',
     valor_reconexion: 15000,
     dias_mora_corte: 30,
+    factura_dias_vencimiento: 30,
     porcentaje_iva: 19,
     porcentaje_interes: 0,
+    // Contratos y órdenes
     prefijo_contrato: 'CONT',
     consecutivo_contrato: 1,
     consecutivo_orden: 1,
     prefijo_orden: 'ORD',
+    // Regulatorio (solo lectura)
+    licencia: '',
+    resolucion_facturacion: '',
+    licencia_internet: '',
+    vigilado: '',
+    vigilado_internet: '',
+    codigo_gs1: '',
+    comentario: '',
   });
+
+  // Campos que no se pueden editar desde la UI
+  const CAMPOS_PROTEGIDOS = new Set(['licencia', 'resolucion_facturacion']);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -264,7 +274,7 @@ const CompanyConfig = () => {
                   value={config.empresa_ciudad}
                   onChange={(e) => handleChange('empresa_ciudad', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                  placeholder="Bogotá"
+                  placeholder="Socorro"
                 />
               </div>
 
@@ -281,6 +291,34 @@ const CompanyConfig = () => {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                  <Globe size={14} />
+                  Página Web
+                </label>
+                <input
+                  type="url"
+                  value={config.empresa_web || ''}
+                  onChange={(e) => handleChange('empresa_web', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="https://www.empresa.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                  <Phone size={14} />
+                  WhatsApp
+                </label>
+                <input
+                  type="tel"
+                  value={config.empresa_whatsapp || ''}
+                  onChange={(e) => handleChange('empresa_whatsapp', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="+57 300 123 4567"
+                />
+              </div>
+
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Dirección
@@ -288,7 +326,7 @@ const CompanyConfig = () => {
                 <textarea
                   value={config.empresa_direccion}
                   onChange={(e) => handleChange('empresa_direccion', e.target.value)}
-                  rows={3}
+                  rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                   placeholder="Dirección completa de la empresa"
                 />
@@ -377,6 +415,21 @@ const CompanyConfig = () => {
                   min="0"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Días Vencimiento Factura
+                </label>
+                <input
+                  type="number"
+                  value={config.factura_dias_vencimiento || 30}
+                  onChange={(e) => handleChange('factura_dias_vencimiento', parseInt(e.target.value) || 30)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
+                  placeholder="30"
+                  min="1"
+                />
+                <p className="text-xs text-gray-500 mt-1">Días desde emisión hasta vencimiento de la factura</p>
+              </div>
             </div>
 
             {/* Configuración de Contratos y Órdenes */}
@@ -460,17 +513,34 @@ const CompanyConfig = () => {
 
               {showAdvanced && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Campos protegidos — solo lectura */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Licencia
+                    <label className="block text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
+                      <Lock size={13} className="text-gray-400" />
+                      Licencia del Sistema
+                      <span className="ml-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Solo lectura</span>
                     </label>
                     <input
                       type="text"
-                      value={config.licencia}
-                      onChange={(e) => handleChange('licencia', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                      placeholder="DEMO2025"
+                      value={config.licencia || ''}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
+                      <Lock size={13} className="text-gray-400" />
+                      Resolución Facturación
+                      <span className="ml-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Solo lectura</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={config.resolucion_facturacion || ''}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Contacta al administrador del sistema para modificar</p>
                   </div>
 
                   <div>
@@ -479,7 +549,7 @@ const CompanyConfig = () => {
                     </label>
                     <input
                       type="text"
-                      value={config.codigo_gs1}
+                      value={config.codigo_gs1 || ''}
                       onChange={(e) => handleChange('codigo_gs1', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
                       placeholder="Código GS1"
@@ -489,27 +559,14 @@ const CompanyConfig = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Resolución Facturación
+                      Licencia Internet (MinTIC)
                     </label>
                     <input
                       type="text"
-                      value={config.resolucion_facturacion}
-                      onChange={(e) => handleChange('resolucion_facturacion', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                      placeholder="Pendiente"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Licencia Internet
-                    </label>
-                    <input
-                      type="text"
-                      value={config.licencia_internet}
+                      value={config.licencia_internet || ''}
                       onChange={(e) => handleChange('licencia_internet', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-                      placeholder="Pendiente"
+                      placeholder="Número de licencia MinTIC"
                     />
                   </div>
 

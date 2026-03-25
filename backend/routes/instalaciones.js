@@ -800,9 +800,9 @@ router.get('/:id/pdf', async (req, res) => {
             servicios = [];
         }
 
-        // Organizar servicios por tipo
+        // Organizar servicios por tipo — los combos van en internet (evitar duplicados)
         const serviciosInternet = servicios.filter(s => s.tipo === 'internet' || s.tipo === 'combo');
-        const serviciosTV = servicios.filter(s => s.tipo === 'television' || s.tipo === 'combo');
+        const serviciosTV = servicios.filter(s => s.tipo === 'television');
 
         console.log('📋 Servicios Internet:', serviciosInternet.length, 'TV:', serviciosTV.length);
 

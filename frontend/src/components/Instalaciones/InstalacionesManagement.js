@@ -22,8 +22,64 @@ import {
   Play,
   AlertCircle,
   RefreshCw,
-  FileText
+  FileText,
+  BarChart2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
+
+// ──────────────────────────────────────────────
+// MiniDonut – pequeño gráfico SVG de estados
+// ──────────────────────────────────────────────
+const MiniDonut = ({ stats }) => {
+  const { programadas = 0, en_proceso = 0, completadas = 0, canceladas = 0 } = stats;
+  const total = programadas + en_proceso + completadas + canceladas;
+  if (total === 0) return null;
+
+  const segments = [
+    { value: completadas, color: '#22c55e' },
+    { value: programadas, color: '#3b82f6' },
+    { value: en_proceso,  color: '#eab308' },
+    { value: canceladas,  color: '#ef4444' },
+  ];
+
+  const R = 28, cx = 35, cy = 35;
+  const circ = 2 * Math.PI * R;
+  let cum = 0;
+  const slices = segments.map(s => {
+    const pct = s.value / total;
+    const dash = pct * circ;
+    const gap  = circ - dash;
+    const offset = circ - cum * circ;
+    cum += pct;
+    return { ...s, dash, gap, offset };
+  });
+
+  const pct = Math.round((completadas / total) * 100);
+
+  return (
+    <div className="flex items-center gap-3">
+      <svg width="70" height="70" viewBox="0 0 70 70">
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke="#f3f4f6" strokeWidth="10" />
+        {slices.map((s, i) => s.value > 0 && (
+          <circle key={i} cx={cx} cy={cy} r={R}
+            fill="none" stroke={s.color} strokeWidth="10"
+            strokeDasharray={`${s.dash} ${s.gap}`}
+            strokeDashoffset={s.offset}
+            style={{ transform: 'rotate(-90deg)', transformOrigin: `${cx}px ${cy}px` }}
+          />
+        ))}
+        <text x={cx} y={cy + 5} textAnchor="middle" fontSize="13" fontWeight="700" fill="#111827">{pct}%</text>
+      </svg>
+      <div className="text-xs space-y-1">
+        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block"/>Completadas</div>
+        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block"/>Programadas</div>
+        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block"/>En proceso</div>
+        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block"/>Canceladas</div>
+      </div>
+    </div>
+  );
+};
 
 import { instalacionesService } from '../../services/instalacionesService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -630,9 +686,11 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
         return (user.rol === 'administrador' || user.rol === 'supervisor' || user.rol === 'secretaria')
           && !['completada', 'cancelada'].includes(instalacion.estado);
       case 'editar':
-        return (user.rol === 'administrador' || user.rol === 'supervisor');
+        return (user.rol === 'administrador' || user.rol === 'supervisor')
+          && instalacion.estado !== 'completada';
       case 'eliminar':
-        return user.rol === 'administrador';
+        return user.rol === 'administrador'
+          && instalacion.estado !== 'completada';
       case 'reagendar':
         return (user.rol === 'administrador' || user.rol === 'supervisor');
       case 'cancelar':
@@ -670,12 +728,19 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
 </div>
 
             <div className="flex items-center space-x-3">
-              {/* ARREGLADO: Botón exportar - Solo admin y supervisor */}
+              <button
+                onClick={cargarDatos}
+                disabled={cargando}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50 disabled:opacity-50"
+                title="Actualizar"
+              >
+                <RefreshCw className={`w-4 h-4 ${cargando ? 'animate-spin' : ''}`} />
+              </button>
               {(user.rol === 'administrador' || user.rol === 'supervisor') && (
                 <button
                   onClick={exportarDatos}
                   disabled={procesando}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   {procesando ? 'Exportando...' : 'Exportar'}
@@ -727,42 +792,110 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
 
       {/* Estadísticas */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-          <div className="bg-white rounded-lg border p-4">
-            <div className="text-2xl font-bold text-gray-900">
-              {estadisticas.total || 0}
-            </div>
-            <div className="text-sm text-gray-600">Total</div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* KPIs */}
+          <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {[
+              { label: 'Total',       value: estadisticas.total      || 0, color: 'text-gray-900',   bg: 'bg-gray-50',   icon: <Wrench   className="w-4 h-4 text-gray-500" /> },
+              { label: 'Programadas', value: estadisticas.programadas|| 0, color: 'text-blue-700',   bg: 'bg-blue-50',   icon: <Calendar className="w-4 h-4 text-blue-500" /> },
+              { label: 'En Proceso',  value: estadisticas.en_proceso || 0, color: 'text-yellow-700', bg: 'bg-yellow-50', icon: <Play     className="w-4 h-4 text-yellow-500" /> },
+              { label: 'Completadas', value: estadisticas.completadas|| 0, color: 'text-green-700',  bg: 'bg-green-50',  icon: <CheckCircle className="w-4 h-4 text-green-500" /> },
+              { label: 'Canceladas',  value: estadisticas.canceladas || 0, color: 'text-red-700',    bg: 'bg-red-50',    icon: <XCircle  className="w-4 h-4 text-red-500" /> },
+              { label: 'Vencidas',    value: estadisticas.vencidas   || 0, color: 'text-orange-700', bg: 'bg-orange-50', icon: <AlertCircle className="w-4 h-4 text-orange-500" /> },
+            ].map(({ label, value, color, bg, icon }) => (
+              <div key={label} className={`rounded-xl border bg-white p-4 flex items-center gap-3`}>
+                <div className={`p-2 rounded-lg ${bg}`}>{icon}</div>
+                <div>
+                  <div className={`text-2xl font-extrabold ${color}`}>{value}</div>
+                  <div className="text-xs text-gray-500">{label}</div>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="bg-white rounded-lg border p-4">
-            <div className="text-2xl font-bold text-blue-600">
-              {estadisticas.programadas || 0}
+          {/* Mini donut */}
+          <div className="bg-white rounded-xl border p-5 flex flex-col justify-between">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart2 className="w-4 h-4 text-[#0e6493]" />
+              <span className="text-sm font-semibold text-gray-700">Distribución</span>
             </div>
-            <div className="text-sm text-gray-600">Programadas</div>
+            <MiniDonut stats={estadisticas} />
           </div>
-          <div className="bg-white rounded-lg border p-4">
-            <div className="text-2xl font-bold text-yellow-600">
-              {estadisticas.en_proceso || 0}
+        </div>
+      </div>
+
+      {/* Barra de filtros + acciones */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        <div className="bg-white rounded-xl border p-4">
+          <div className="flex flex-wrap gap-3 items-end">
+            {/* Búsqueda */}
+            <div className="flex-1 min-w-48">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Buscar</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  value={filtros.busqueda}
+                  onChange={e => aplicarFiltro('busqueda', e.target.value)}
+                  placeholder="Cliente, dirección..."
+                  className="pl-9 w-full text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                />
+              </div>
             </div>
-            <div className="text-sm text-gray-600">En Proceso</div>
-          </div>
-          <div className="bg-white rounded-lg border p-4">
-            <div className="text-2xl font-bold text-green-600">
-              {estadisticas.completadas || 0}
+            {/* Estado */}
+            <div className="min-w-36">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Estado</label>
+              <select
+                value={filtros.estado}
+                onChange={e => aplicarFiltro('estado', e.target.value)}
+                className="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+              >
+                <option value="">Todos</option>
+                <option value="programada">Programada</option>
+                <option value="en_proceso">En Proceso</option>
+                <option value="completada">Completada</option>
+                <option value="cancelada">Cancelada</option>
+                <option value="reagendada">Reagendada</option>
+              </select>
             </div>
-            <div className="text-sm text-gray-600">Completadas</div>
-          </div>
-          <div className="bg-white rounded-lg border p-4">
-            <div className="text-2xl font-bold text-red-600">
-              {estadisticas.canceladas || 0}
+            {/* Fecha desde */}
+            <div className="min-w-36">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Desde</label>
+              <input
+                type="date"
+                value={filtros.fecha_desde}
+                onChange={e => aplicarFiltro('fecha_desde', e.target.value)}
+                className="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+              />
             </div>
-            <div className="text-sm text-gray-600">Canceladas</div>
-          </div>
-          <div className="bg-white rounded-lg border p-4">
-            <div className="text-2xl font-bold text-orange-600">
-              {estadisticas.vencidas || 0}
+            {/* Fecha hasta */}
+            <div className="min-w-36">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Hasta</label>
+              <input
+                type="date"
+                value={filtros.fecha_hasta}
+                onChange={e => aplicarFiltro('fecha_hasta', e.target.value)}
+                className="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+              />
             </div>
-            <div className="text-sm text-gray-600">Vencidas</div>
+            {/* Limpiar */}
+            <button
+              onClick={limpiarFiltros}
+              className="text-sm px-3 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-1"
+            >
+              <Filter className="w-4 h-4" /> Limpiar
+            </button>
+            {/* Separador */}
+            <div className="flex-1" />
+            {/* Nueva instalación */}
+            {(user?.rol === 'administrador' || user?.rol === 'supervisor' || user?.rol === 'secretaria') && (
+              <button
+                onClick={() => abrirModal('crear')}
+                disabled={procesando}
+                className="text-sm px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0e6493]/90 flex items-center gap-2 disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4" /> Nueva Instalación
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -834,24 +967,24 @@ const handleGuardarInstalacion = async (datosInstalacion) => {
             {/* Vista desktop: tabla */}
             <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[#0e6493]/5">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#0e6493] uppercase tracking-wider">
                       Cliente
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#0e6493] uppercase tracking-wider">
                       Fecha/Hora
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#0e6493] uppercase tracking-wider">
                       Instalador
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#0e6493] uppercase tracking-wider">
                       Estado
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#0e6493] uppercase tracking-wider">
                       Dirección
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-semibold text-[#0e6493] uppercase tracking-wider">
                       Acciones
                     </th>
                   </tr>

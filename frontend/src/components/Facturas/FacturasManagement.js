@@ -450,10 +450,10 @@ const { hasPermission } = useAuth();
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            Gestión de Facturas Manual
+            Gestión de Facturas
           </h1>
           <p className="text-gray-600 mt-2">
-            Sistema PSI - Administra facturas, pagos y genera reportes
+            Administra facturas, pagos y reportes financieros
           </p>
           {facturas.length > 0 && (
             <p className="text-sm text-gray-500 mt-1">
@@ -483,14 +483,6 @@ const { hasPermission } = useAuth();
     ➕ Nueva Factura
   </button>
 )}
-          <button
-            onClick={handleProbarPDF}
-            disabled={loading || !facturas.length}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            🧪 Probar PDF
-          </button>
-
           <button
             onClick={refrescar}
             disabled={loading}

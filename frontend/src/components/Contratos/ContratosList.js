@@ -15,8 +15,86 @@ import {
   Clock,
   AlertTriangle,
   PenTool,
-  RefreshCw
+  RefreshCw,
+  TrendingUp,
+  Award,
+  BarChart2
 } from 'lucide-react';
+
+// ──────────────────────────────────────────────
+// DonutChart – SVG donut chart for contract states
+// ──────────────────────────────────────────────
+const DonutChart = ({ activos = 0, vencidos = 0, terminados = 0, anulados = 0 }) => {
+  const total = activos + vencidos + terminados + anulados;
+  if (total === 0) return (
+    <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Sin datos</div>
+  );
+
+  const segments = [
+    { value: activos,    color: '#22c55e', label: 'Activos'    },
+    { value: vencidos,   color: '#f97316', label: 'Vencidos'   },
+    { value: terminados, color: '#6b7280', label: 'Terminados' },
+    { value: anulados,   color: '#ef4444', label: 'Anulados'   },
+  ];
+
+  const R = 50, cx = 70, cy = 70;
+  const circumference = 2 * Math.PI * R;
+  let cumulative = 0;
+
+  const slices = segments.map(seg => {
+    const pct = seg.value / total;
+    const dash = pct * circumference;
+    const gap  = circumference - dash;
+    const offset = circumference - cumulative * circumference;
+    cumulative += pct;
+    return { ...seg, dash, gap, offset };
+  });
+
+  const pctActivos = Math.round((activos / total) * 100);
+
+  return (
+    <div className="flex items-center gap-6">
+      <div className="relative flex-shrink-0">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle cx={cx} cy={cy} r={R} fill="none" stroke="#f3f4f6" strokeWidth="18" />
+          {slices.map((s, i) => (
+            s.value > 0 && (
+              <circle
+                key={i}
+                cx={cx} cy={cy} r={R}
+                fill="none"
+                stroke={s.color}
+                strokeWidth="18"
+                strokeDasharray={`${s.dash} ${s.gap}`}
+                strokeDashoffset={s.offset}
+                strokeLinecap="butt"
+                style={{ transform: 'rotate(-90deg)', transformOrigin: `${cx}px ${cy}px` }}
+              />
+            )
+          ))}
+          <text x={cx} y={cy - 6} textAnchor="middle" fontSize="18" fontWeight="700" fill="#111827">{pctActivos}%</text>
+          <text x={cx} y={cy + 12} textAnchor="middle" fontSize="9" fill="#6b7280">activos</text>
+        </svg>
+      </div>
+      <div className="space-y-2 flex-1">
+        {segments.map((s, i) => (
+          <div key={i} className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+              <span className="text-gray-600">{s.label}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-20 bg-gray-100 rounded-full h-1.5">
+                <div className="h-1.5 rounded-full" style={{ width: `${(s.value/total)*100}%`, backgroundColor: s.color }} />
+              </div>
+              <span className="font-semibold text-gray-800 w-6 text-right">{s.value}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 import contratosService from '../../services/contratosService';
 
 const ContratosList = () => {
@@ -235,51 +313,106 @@ const { hasPermission } = useAuth();
     );
   }
 
+  const totalContratos = estadisticas?.total_contratos || 0;
+  const pctFirmados   = totalContratos > 0
+    ? Math.round(((estadisticas?.contratos_firmados || 0) / totalContratos) * 100)
+    : 0;
+  const pctActivos    = totalContratos > 0
+    ? Math.round(((estadisticas?.contratos_activos || 0) / totalContratos) * 100)
+    : 0;
+
   return (
     <div className="space-y-6">
       {/* Estadísticas */}
       {estadisticas && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center">
-              <FileText className="w-8 h-8 text-blue-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Contratos</p>
-                <p className="text-2xl font-bold text-gray-900">{estadisticas.total_contratos}</p>
+        <>
+          {/* KPI cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Total */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total</p>
+                  <p className="text-3xl font-extrabold text-gray-900 mt-1">{estadisticas.total_contratos}</p>
+                </div>
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <FileText className="w-5 h-5 text-blue-500" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 mt-3">contratos registrados</p>
+            </div>
+
+            {/* Activos */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Activos</p>
+                  <p className="text-3xl font-extrabold text-green-600 mt-1">{estadisticas.contratos_activos}</p>
+                </div>
+                <div className="p-2 bg-green-50 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                  <span>del total</span><span className="font-medium text-green-600">{pctActivos}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-1.5">
+                  <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${pctActivos}%` }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Vencidos */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Vencidos</p>
+                  <p className="text-3xl font-extrabold text-orange-500 mt-1">{estadisticas.contratos_vencidos}</p>
+                </div>
+                <div className="p-2 bg-orange-50 rounded-lg">
+                  <Clock className="w-5 h-5 text-orange-500" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 mt-3">requieren atención</p>
+            </div>
+
+            {/* Firmados */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Firmados</p>
+                  <p className="text-3xl font-extrabold text-purple-600 mt-1">{estadisticas.contratos_firmados}</p>
+                </div>
+                <div className="p-2 bg-purple-50 rounded-lg">
+                  <Award className="w-5 h-5 text-purple-500" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                  <span>tasa de firma</span><span className="font-medium text-purple-600">{pctFirmados}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-1.5">
+                  <div className="bg-purple-500 h-1.5 rounded-full" style={{ width: `${pctFirmados}%` }} />
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center">
-              <CheckCircle className="w-8 h-8 text-green-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Activos</p>
-                <p className="text-2xl font-bold text-gray-900">{estadisticas.contratos_activos}</p>
-              </div>
+          {/* Donut chart + breakdown */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart2 className="w-5 h-5 text-[#0e6493]" />
+              <h3 className="text-base font-semibold text-gray-900">Distribución por Estado</h3>
             </div>
+            <DonutChart
+              activos={estadisticas.contratos_activos || 0}
+              vencidos={estadisticas.contratos_vencidos || 0}
+              terminados={estadisticas.contratos_terminados || 0}
+              anulados={estadisticas.contratos_anulados || 0}
+            />
           </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center">
-              <Clock className="w-8 h-8 text-orange-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Vencidos</p>
-                <p className="text-2xl font-bold text-gray-900">{estadisticas.contratos_vencidos}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center">
-              <User className="w-8 h-8 text-purple-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Firmados</p>
-                <p className="text-2xl font-bold text-gray-900">{estadisticas.contratos_firmados}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        </>
       )}
 
       {/* Filtros */}

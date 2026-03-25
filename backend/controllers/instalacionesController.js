@@ -601,6 +601,15 @@ const selectQuery = `
                 });
             }
 
+            // Bloquear edición de instalaciones completadas
+            if (instalacionActual[0].estado === 'completada') {
+                await connection.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: 'No se puede editar una instalación ya completada. El registro es de solo lectura para mantener la trazabilidad.'
+                });
+            }
+
             // 🔴 CORRECCIÓN 1: Convertir instalador_id vacío a null
             if (datosActualizacion.instalador_id === '' || datosActualizacion.instalador_id === 'null') {
                 datosActualizacion.instalador_id = null;

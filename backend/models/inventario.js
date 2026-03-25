@@ -517,7 +517,6 @@ static async getInstallerHistory(instaladorId, limit = 50) {
         JOIN sistema_usuarios u ON h.instalador_id = u.id
         LEFT JOIN clientes c ON h.cliente_id = c.id
         ORDER BY h.fecha_accion DESC
-        LIMIT 10
       `;
       
       const [generalStats] = await db.execute(generalQuery);

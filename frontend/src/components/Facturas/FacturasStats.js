@@ -1,15 +1,54 @@
-// frontend/src/components/Facturas/FacturasStats.js - SIMPLE Y FUNCIONAL
+// frontend/src/components/Facturas/FacturasStats.js
 import React, { useState, useEffect } from 'react';
-import { 
-  FileText, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
+import {
+  FileText,
+  Clock,
+  CheckCircle,
+  XCircle,
   AlertTriangle,
-  DollarSign,
   TrendingUp,
-  RefreshCw
+  RefreshCw,
+  TrendingDown,
 } from 'lucide-react';
+
+// ── Gráfica de dona SVG ──────────────────────────────────────────────────────
+const DonutChart = ({ segments, size = 160, strokeWidth = 28 }) => {
+  const r = (size - strokeWidth) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circumference = 2 * Math.PI * r;
+
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  if (total === 0) return null;
+
+  let offset = 0;
+  const arcs = segments.map((seg) => {
+    const dash = (seg.value / total) * circumference;
+    const gap  = circumference - dash;
+    const arc  = { ...seg, dash, gap, offset };
+    offset += dash;
+    return arc;
+  });
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="rotate-[-90deg]">
+      {/* fondo gris */}
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth={strokeWidth} />
+      {arcs.map((arc, i) => (
+        <circle
+          key={i}
+          cx={cx} cy={cy} r={r}
+          fill="none"
+          stroke={arc.color}
+          strokeWidth={strokeWidth}
+          strokeDasharray={`${arc.dash} ${arc.gap}`}
+          strokeDashoffset={-arc.offset}
+          strokeLinecap="butt"
+        />
+      ))}
+    </svg>
+  );
+};
 
 const FacturasStats = ({ facturas = [], loading = false }) => {
   const [stats, setStats] = useState(null);
@@ -384,99 +423,82 @@ useEffect(() => {
         })}
       </div>
 
-      {/* Panel de resumen adicional */}
+      {/* Panel de resumen financiero con gráfica */}
       {statsSeguras.total > 0 && (
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <TrendingUp className="w-5 h-5 text-blue-600 mr-2" />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-blue-600" />
               Resumen Financiero
             </h3>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Facturación total */}
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Total Facturado</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {formatearMoneda(statsSeguras.monto_total)}
-              </p>
-            </div>
-            
-            {/* Promedio por factura */}
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Promedio por Factura</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {formatearMoneda(statsSeguras.total > 0 ? statsSeguras.monto_total / statsSeguras.total : 0)}
-              </p>
-            </div>
-            
-            {/* Tasa de recaudo */}
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Tasa de Recaudo</p>
-              <p className="text-2xl font-bold text-green-600">
-                {statsSeguras.monto_total > 0 
-                  ? Math.round((statsSeguras.monto_pagado / statsSeguras.monto_total) * 100)
-                  : 0}%
-              </p>
-            </div>
+            <span className="text-sm text-gray-500">
+              Total: {formatearMoneda(statsSeguras.monto_total)}
+            </span>
           </div>
 
-          {/* Barra de progreso visual */}
-          {statsSeguras.monto_total > 0 && (
-            <div className="mt-6">
-              <div className="flex justify-between text-sm text-gray-600 mb-2">
-                <span>Distribución de Cartera</span>
-                <span>{formatearMoneda(statsSeguras.monto_total)} total</span>
-              </div>
-              
-              <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                <div className="flex h-full">
-                  {/* Pagado */}
-                  <div
-                    className="bg-green-500 transition-all duration-300"
-                    style={{
-                      width: `${(statsSeguras.monto_pagado / statsSeguras.monto_total) * 100}%`
-                    }}
-                    title={`Pagado: ${formatearMoneda(statsSeguras.monto_pagado)}`}
-                  ></div>
-                  
-                  {/* Vencido */}
-                  <div
-                    className="bg-red-500 transition-all duration-300"
-                    style={{
-                      width: `${(statsSeguras.monto_vencido / statsSeguras.monto_total) * 100}%`
-                    }}
-                    title={`Vencido: ${formatearMoneda(statsSeguras.monto_vencido)}`}
-                  ></div>
-                  
-                  {/* Pendiente */}
-                  <div
-                    className="bg-yellow-500 transition-all duration-300"
-                    style={{
-                      width: `${((statsSeguras.monto_pendiente - statsSeguras.monto_vencido) / statsSeguras.monto_total) * 100}%`
-                    }}
-                    title={`Pendiente: ${formatearMoneda(statsSeguras.monto_pendiente - statsSeguras.monto_vencido)}`}
-                  ></div>
+          <div className="flex flex-col md:flex-row gap-8 items-center">
+            {/* Gráfica de dona */}
+            {statsSeguras.monto_total > 0 && (
+              <div className="relative flex-shrink-0">
+                <DonutChart
+                  size={160}
+                  strokeWidth={30}
+                  segments={[
+                    { value: statsSeguras.monto_pagado,                                    color: '#22c55e', label: 'Pagado'   },
+                    { value: statsSeguras.monto_vencido,                                   color: '#ef4444', label: 'Vencido'  },
+                    { value: Math.max(0, statsSeguras.monto_pendiente - statsSeguras.monto_vencido), color: '#f59e0b', label: 'Pendiente' },
+                  ]}
+                />
+                {/* Porcentaje recaudo en el centro */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-bold text-gray-900">
+                    {Math.round((statsSeguras.monto_pagado / statsSeguras.monto_total) * 100)}%
+                  </span>
+                  <span className="text-xs text-gray-500">recaudado</span>
                 </div>
               </div>
-              
-              <div className="flex justify-between items-center text-xs text-gray-600 mt-2">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-green-500 rounded-full mr-1"></div>
-                  <span>Pagado ({Math.round((statsSeguras.monto_pagado / statsSeguras.monto_total) * 100)}%)</span>
+            )}
+
+            {/* Leyenda y métricas */}
+            <div className="flex-1 space-y-4 w-full">
+              {[
+                { label: 'Pagado',    value: statsSeguras.monto_pagado,  pct: statsSeguras.monto_total > 0 ? Math.round((statsSeguras.monto_pagado / statsSeguras.monto_total) * 100) : 0,  color: 'bg-green-500',  textColor: 'text-green-700'  },
+                { label: 'Pendiente', value: Math.max(0, statsSeguras.monto_pendiente - statsSeguras.monto_vencido), pct: statsSeguras.monto_total > 0 ? Math.round(((statsSeguras.monto_pendiente - statsSeguras.monto_vencido) / statsSeguras.monto_total) * 100) : 0, color: 'bg-yellow-400', textColor: 'text-yellow-700' },
+                { label: 'Vencido',   value: statsSeguras.monto_vencido, pct: statsSeguras.monto_total > 0 ? Math.round((statsSeguras.monto_vencido / statsSeguras.monto_total) * 100) : 0,  color: 'bg-red-500',   textColor: 'text-red-700'    },
+              ].map((item) => (
+                <div key={item.label}>
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-3 h-3 rounded-full ${item.color}`} />
+                      <span className="text-sm text-gray-700">{item.label}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-sm font-semibold ${item.textColor}`}>{formatearMoneda(item.value)}</span>
+                      <span className="text-xs text-gray-400 w-8 text-right">{item.pct}%</span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className={`${item.color} h-2 rounded-full transition-all duration-500`} style={{ width: `${item.pct}%` }} />
+                  </div>
                 </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-yellow-500 rounded-full mr-1"></div>
-                  <span>Pendiente</span>
+              ))}
+
+              <div className="pt-4 border-t border-gray-100 grid grid-cols-2 gap-4">
+                <div className="text-center bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">Promedio/Factura</p>
+                  <p className="text-base font-bold text-gray-900">
+                    {formatearMoneda(statsSeguras.total > 0 ? statsSeguras.monto_total / statsSeguras.total : 0)}
+                  </p>
                 </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-red-500 rounded-full mr-1"></div>
-                  <span>Vencido</span>
+                <div className="text-center bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">En Mora</p>
+                  <p className="text-base font-bold text-red-600">
+                    {statsSeguras.facturas_mora} facturas
+                  </p>
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
       )}
 
