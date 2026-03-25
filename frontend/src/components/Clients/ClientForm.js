@@ -1332,7 +1332,7 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                         <div>
                           <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Fecha de registro</label>
                           <p className="text-sm text-gray-800 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
-                            {new Date(client.fecha_registro).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}
+                            {new Date(String(client.fecha_registro).split('T')[0] + 'T12:00:00').toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}
                           </p>
                         </div>
                       )}

@@ -72,7 +72,8 @@ const FacturasClienteCompleto = () => {
   };
 
   const formatearFecha = (fecha) => {
-    return new Date(fecha).toLocaleDateString('es-CO');
+    if (!fecha) return '-';
+    return new Date(String(fecha).split('T')[0] + 'T12:00:00').toLocaleDateString('es-CO');
   };
 
   const formatearMonto = (monto) => {

@@ -174,8 +174,8 @@ router.get('/pdf/cartera-vencida',
         widths:  [65,        135,      85,               65,           65,               55,          80,      60,    102],
         rows: facturas.map(f => [
           f.numero_factura, f.nombre_cliente, f.identificacion_cliente,
-          new Date(f.fecha_emision).toLocaleDateString('es-CO'),
-          new Date(f.fecha_vencimiento).toLocaleDateString('es-CO'),
+          new Date(String(f.fecha_emision).split('T')[0] + 'T12:00:00').toLocaleDateString('es-CO'),
+          new Date(String(f.fecha_vencimiento).split('T')[0] + 'T12:00:00').toLocaleDateString('es-CO'),
           `${f.dias_mora} días`,
           fmt(f.total), f.ruta || '', f.telefono_cliente || ''
         ]),

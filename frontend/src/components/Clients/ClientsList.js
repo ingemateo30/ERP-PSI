@@ -26,7 +26,8 @@ const ClientsList = ({
   // Formatear fecha
   const formatearFecha = (fecha) => {
     if (!fecha) return '-';
-    return new Date(fecha).toLocaleDateString('es-ES');
+    // Usar T12:00:00 para evitar el desplazamiento UTC-5 que muestra un día antes
+    return new Date(String(fecha).split('T')[0] + 'T12:00:00').toLocaleDateString('es-CO');
   };
 
   // Obtener color del estado
