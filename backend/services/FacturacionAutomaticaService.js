@@ -138,7 +138,7 @@ class FacturacionAutomaticaService {
         console.log('🔍 Buscando clientes para facturar...');
 
         const [clientes] = await conexion.execute(`
-          SELECT DISTINCT 
+          SELECT DISTINCT
             c.id,
             c.identificacion,
             c.nombre,
@@ -148,13 +148,13 @@ class FacturacionAutomaticaService {
             MIN(sc.fecha_activacion) as fecha_activacion,
             COUNT(DISTINCT sc.id) as servicios_activos
           FROM clientes c
-          JOIN servicios_cliente sc ON c.id = sc.cliente_id 
+          JOIN servicios_cliente sc ON c.id = sc.cliente_id
             AND sc.estado = 'activo'
-          JOIN planes_servicio ps ON sc.plan_id = ps.id
-            AND ps.activo = 1
-          LEFT JOIN facturas f ON c.id = f.cliente_id 
+          LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+          LEFT JOIN facturas f ON c.id = f.cliente_id
             AND f.estado != 'anulada'
           WHERE c.estado = 'activo'
+            AND sc.plan_id IS NOT NULL
           GROUP BY c.id, c.identificacion, c.nombre, c.estrato, c.fecha_registro
           ORDER BY c.id ASC
         `);

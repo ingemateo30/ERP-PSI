@@ -3,6 +3,7 @@
 const Cliente = require('../models/cliente');
 const XLSX = require('xlsx');
 const path = require('path');
+const { audit } = require('../utils/auditLogger');
 
 class ClienteController {
   // Obtener todos los clientes
@@ -416,6 +417,17 @@ static async crear(req, res) {
     // ✅ OBTENER CLIENTE CREADO Y RESPONDER
     const clienteCreado = await Cliente.obtenerPorId(clienteId);
 
+    // Registrar en auditoría
+    audit({
+      usuario_id: req.user?.id || null,
+      accion: 'CLIENTE_CREADO',
+      tabla: 'clientes',
+      registro_id: clienteId,
+      datos_nuevos: { nombre: datosCliente.nombre, identificacion: datosCliente.identificacion },
+      ip: req.ip,
+      user_agent: req.get('User-Agent'),
+    });
+
     res.status(201).json({
       success: true,
       data: clienteCreado,
@@ -519,6 +531,17 @@ static async crear(req, res) {
       await Cliente.actualizar(id, datosActualizacion);
       const clienteActualizado = await Cliente.obtenerPorId(id);
 
+      audit({
+        usuario_id: req.user?.id || null,
+        accion: 'CLIENTE_ACTUALIZADO',
+        tabla: 'clientes',
+        registro_id: parseInt(id),
+        datos_antes: { nombre: clienteExistente.nombre, estado: clienteExistente.estado },
+        datos_nuevos: { nombre: datosActualizacion.nombre, estado: datosActualizacion.estado },
+        ip: req.ip,
+        user_agent: req.get('User-Agent'),
+      });
+
       res.json({
         success: true,
         data: clienteActualizado,
@@ -556,6 +579,15 @@ static async crear(req, res) {
       }
 
       const resultado = await Cliente.eliminar(id);
+
+      audit({
+        usuario_id: req.user?.id || null,
+        accion: resultado.tipo === 'hard' ? 'CLIENTE_ELIMINADO' : 'CLIENTE_RETIRADO',
+        tabla: 'clientes',
+        registro_id: parseInt(id),
+        ip: req.ip,
+        user_agent: req.get('User-Agent'),
+      });
 
       res.json({
         success: true,

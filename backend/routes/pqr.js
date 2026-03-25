@@ -241,6 +241,191 @@ router.get('/sla-alertas', async (req, res) => {
 });
 
 // Obtener PQR por ID
+// NOTA: Las rutas específicas (/mis-pqr, /cliente/:id, /usuarios/disponibles, /reportes/crc)
+// deben estar ANTES de esta ruta genérica /:id para que Express no las capture como IDs.
+
+// ─── Rutas específicas movidas aquí para evitar captura por /:id ──────────────
+
+// Obtener PQRs por cliente
+router.get('/cliente/:clienteId', async (req, res) => {
+    try {
+        const { clienteId } = req.params;
+
+        const query = `
+            SELECT
+                p.*,
+                c.nombre as cliente_nombre,
+                c.identificacion as cliente_identificacion,
+                u.nombre as usuario_asignado_nombre
+            FROM pqr p
+            JOIN clientes c ON p.cliente_id = c.id
+            LEFT JOIN sistema_usuarios u ON p.usuario_asignado = u.id
+            WHERE p.cliente_id = ?
+            ORDER BY p.fecha_recepcion DESC
+        `;
+
+        const pqrs = await db.query(query, [clienteId]);
+
+        res.json({
+            success: true,
+            pqrs
+        });
+
+    } catch (error) {
+        console.error('Error obteniendo PQRs del cliente:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error obteniendo PQRs del cliente'
+        });
+    }
+});
+
+// Obtener usuarios para asignación
+router.get('/usuarios/disponibles', async (req, res) => {
+    try {
+        const query = `
+            SELECT id, nombre, correo, rol, sede_id
+            FROM sistema_usuarios
+            WHERE activo = 1 AND rol IN ('administrador', 'supervisor', 'secretaria', 'instalador')
+            ORDER BY FIELD(rol,'administrador','supervisor','secretaria','instalador'), nombre
+        `;
+
+        const usuarios = await db.query(query);
+
+        res.json({
+            success: true,
+            usuarios
+        });
+
+    } catch (error) {
+        console.error('Error obteniendo usuarios:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error obteniendo usuarios'
+        });
+    }
+});
+
+/**
+ * GET /api/v1/pqr/mis-pqr
+ * PQRs asignadas al técnico autenticado + PQRs sin asignar de su sede
+ */
+router.get('/mis-pqr', async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { estado } = req.query;
+
+        let estadoFilter = '';
+        const params = [userId, userId];
+        if (estado) {
+            estadoFilter = 'AND p.estado = ?';
+            params.push(estado);
+        }
+
+        const pqrs = await db.query(`
+            SELECT
+                p.*,
+                c.nombre AS cliente_nombre,
+                c.telefono AS cliente_telefono,
+                c.identificacion AS cliente_identificacion,
+                ci.nombre AS ciudad_nombre,
+                u.nombre AS usuario_asignado_nombre
+            FROM pqr p
+            LEFT JOIN clientes c ON p.cliente_id = c.id
+            LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+            LEFT JOIN sistema_usuarios u ON p.usuario_asignado = u.id
+            WHERE (p.usuario_asignado = ? OR (p.usuario_asignado IS NULL AND p.estado = 'abierto'))
+              AND p.estado != 'cerrado'
+              ${estadoFilter}
+            ORDER BY
+                CASE p.prioridad WHEN 'alta' THEN 1 WHEN 'media' THEN 2 ELSE 3 END,
+                p.fecha_recepcion DESC
+        `, params);
+
+        res.json({ success: true, data: pqrs, total: pqrs.length });
+
+    } catch (error) {
+        console.error('Error obteniendo mis PQRs:', error);
+        res.status(500).json({ success: false, error: 'Error obteniendo PQRs' });
+    }
+});
+
+// Reportes de PQR para CRC
+router.get('/reportes/crc', async (req, res) => {
+    try {
+        const { anno, trimestre } = req.query;
+
+        if (!anno || !trimestre) {
+            return res.status(400).json({
+                success: false,
+                error: 'anno y trimestre son requeridos'
+            });
+        }
+
+        let meses;
+        switch(trimestre) {
+            case '1': meses = [1, 2, 3]; break;
+            case '2': meses = [4, 5, 6]; break;
+            case '3': meses = [7, 8, 9]; break;
+            case '4': meses = [10, 11, 12]; break;
+            default:
+                return res.status(400).json({
+                    success: false,
+                    error: 'Trimestre inválido'
+                });
+        }
+
+        const queryQuejas = `
+            SELECT
+                ? as ANNO,
+                ? as TRIMESTRE,
+                COUNT(*) as TOTAL_QUEJAS,
+                COUNT(CASE WHEN estado IN ('resuelto', 'cerrado') THEN 1 END) as QUEJAS_RESUELTAS,
+                AVG(tiempo_respuesta_horas) as TIEMPO_PROMEDIO_DIAS,
+                COUNT(CASE WHEN satisfaccion_cliente IN ('satisfecho', 'muy_satisfecho') THEN 1 END) as SATISFECHOS
+            FROM pqr
+            WHERE YEAR(fecha_recepcion) = ?
+                AND MONTH(fecha_recepcion) IN (?, ?, ?)
+                AND tipo = 'queja'
+        `;
+
+        const [reporteQuejas] = await db.query(queryQuejas, [
+            anno, trimestre, anno, ...meses
+        ]);
+
+        const queryCategorias = `
+            SELECT
+                categoria,
+                COUNT(*) as cantidad,
+                AVG(tiempo_respuesta_horas) as tiempo_promedio
+            FROM pqr
+            WHERE YEAR(fecha_recepcion) = ?
+                AND MONTH(fecha_recepcion) IN (?, ?, ?)
+            GROUP BY categoria
+        `;
+
+        const categorias = await db.query(queryCategorias, [anno, ...meses]);
+
+        res.json({
+            success: true,
+            reporte: {
+                ...reporteQuejas,
+                TIEMPO_PROMEDIO_DIAS: reporteQuejas.TIEMPO_PROMEDIO_DIAS ?
+                    Math.round(reporteQuejas.TIEMPO_PROMEDIO_DIAS / 24 * 100) / 100 : 0,
+                por_categoria: categorias
+            }
+        });
+
+    } catch (error) {
+        console.error('Error generando reporte CRC:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error generando reporte'
+        });
+    }
+});
+
+// ─── Ruta genérica por ID (debe ir DESPUÉS de todas las rutas específicas) ────
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -567,109 +752,7 @@ router.post('/:id/asignar', async (req, res) => {
     }
 });
 
-// Obtener PQRs por cliente
-router.get('/cliente/:clienteId', async (req, res) => {
-    try {
-        const { clienteId } = req.params;
-        
-        const query = `
-            SELECT 
-                p.*,
-                c.nombre as cliente_nombre,
-                c.identificacion as cliente_identificacion,
-                u.nombre as usuario_asignado_nombre
-            FROM pqr p
-            JOIN clientes c ON p.cliente_id = c.id
-            LEFT JOIN sistema_usuarios u ON p.usuario_asignado = u.id
-            WHERE p.cliente_id = ?
-            ORDER BY p.fecha_recepcion DESC
-        `;
-        
-        const pqrs = await db.query(query, [clienteId]);
-        
-        res.json({ 
-            success: true,
-            pqrs 
-        });
-        
-    } catch (error) {
-        console.error('Error obteniendo PQRs del cliente:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Error obteniendo PQRs del cliente' 
-        });
-    }
-});
-
-// Obtener usuarios para asignación
-router.get('/usuarios/disponibles', async (req, res) => {
-    try {
-        const query = `
-            SELECT id, nombre, correo, rol, sede_id
-            FROM sistema_usuarios
-            WHERE activo = 1 AND rol IN ('administrador', 'supervisor', 'secretaria', 'instalador')
-            ORDER BY FIELD(rol,'administrador','supervisor','secretaria','instalador'), nombre
-        `;
-
-        const usuarios = await db.query(query);
-
-        res.json({
-            success: true,
-            usuarios
-        });
-
-    } catch (error) {
-        console.error('Error obteniendo usuarios:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Error obteniendo usuarios'
-        });
-    }
-});
-
-/**
- * GET /api/v1/pqr/mis-pqr
- * PQRs asignadas al técnico autenticado + PQRs sin asignar de su sede
- */
-router.get('/mis-pqr', async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const { estado } = req.query;
-
-        let estadoFilter = '';
-        const params = [userId, userId];
-        if (estado) {
-            estadoFilter = 'AND p.estado = ?';
-            params.push(estado);
-        }
-
-        const pqrs = await db.query(`
-            SELECT
-                p.*,
-                c.nombre AS cliente_nombre,
-                c.telefono AS cliente_telefono,
-                c.identificacion AS cliente_identificacion,
-                ci.nombre AS ciudad_nombre,
-                u.nombre AS usuario_asignado_nombre
-            FROM pqr p
-            LEFT JOIN clientes c ON p.cliente_id = c.id
-            LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
-            LEFT JOIN sistema_usuarios u ON p.usuario_asignado = u.id
-            WHERE (p.usuario_asignado = ? OR (p.usuario_asignado IS NULL AND p.estado = 'abierto'))
-              AND p.estado != 'cerrado'
-              ${estadoFilter}
-            ORDER BY
-                CASE p.prioridad WHEN 'alta' THEN 1 WHEN 'media' THEN 2 ELSE 3 END,
-                p.fecha_recepcion DESC
-        `, params);
-
-        res.json({ success: true, data: pqrs, total: pqrs.length });
-
-    } catch (error) {
-        console.error('Error obteniendo mis PQRs:', error);
-        res.status(500).json({ success: false, error: 'Error obteniendo PQRs' });
-    }
-});
+// (rutas /cliente/:clienteId, /usuarios/disponibles, /mis-pqr fueron movidas antes de /:id)
 
 /**
  * PATCH /api/v1/pqr/:id/gestionar
@@ -719,82 +802,6 @@ router.patch('/:id/gestionar', async (req, res) => {
     }
 });
 
-// Reportes de PQR para CRC
-router.get('/reportes/crc', async (req, res) => {
-    try {
-        const { anno, trimestre } = req.query;
-        
-        if (!anno || !trimestre) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'anno y trimestre son requeridos' 
-            });
-        }
-        
-        // Calcular meses del trimestre
-        let meses;
-        switch(trimestre) {
-            case '1': meses = [1, 2, 3]; break;
-            case '2': meses = [4, 5, 6]; break;
-            case '3': meses = [7, 8, 9]; break;
-            case '4': meses = [10, 11, 12]; break;
-            default: 
-                return res.status(400).json({ 
-                    success: false,
-                    error: 'Trimestre inválido' 
-                });
-        }
-        
-        // Reporte de monitoreo de quejas
-        const queryQuejas = `
-            SELECT 
-                ? as ANNO,
-                ? as TRIMESTRE,
-                COUNT(*) as TOTAL_QUEJAS,
-                COUNT(CASE WHEN estado IN ('resuelto', 'cerrado') THEN 1 END) as QUEJAS_RESUELTAS,
-                AVG(tiempo_respuesta_horas) as TIEMPO_PROMEDIO_DIAS,
-                COUNT(CASE WHEN satisfaccion_cliente IN ('satisfecho', 'muy_satisfecho') THEN 1 END) as SATISFECHOS
-            FROM pqr 
-            WHERE YEAR(fecha_recepcion) = ? 
-                AND MONTH(fecha_recepcion) IN (?, ?, ?)
-                AND tipo = 'queja'
-        `;
-        
-        const [reporteQuejas] = await db.query(queryQuejas, [
-            anno, trimestre, anno, ...meses
-        ]);
-        
-        // Reporte por categorías
-        const queryCategorias = `
-            SELECT 
-                categoria,
-                COUNT(*) as cantidad,
-                AVG(tiempo_respuesta_horas) as tiempo_promedio
-            FROM pqr 
-            WHERE YEAR(fecha_recepcion) = ? 
-                AND MONTH(fecha_recepcion) IN (?, ?, ?)
-            GROUP BY categoria
-        `;
-        
-        const categorias = await db.query(queryCategorias, [anno, ...meses]);
-        
-        res.json({
-            success: true,
-            reporte: {
-                ...reporteQuejas,
-                TIEMPO_PROMEDIO_DIAS: reporteQuejas.TIEMPO_PROMEDIO_DIAS ? 
-                    Math.round(reporteQuejas.TIEMPO_PROMEDIO_DIAS / 24 * 100) / 100 : 0,
-                por_categoria: categorias
-            }
-        });
-        
-    } catch (error) {
-        console.error('Error generando reporte CRC:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Error generando reporte' 
-        });
-    }
-});
+// (ruta /reportes/crc fue movida antes de /:id)
 
 module.exports = router;

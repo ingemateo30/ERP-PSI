@@ -10,317 +10,325 @@ import {
   Package,
   CheckCircle,
   Image as ImageIcon,
-  FileText
+  FileText,
+  Wrench,
+  DollarSign,
+  Info,
+  AlertCircle,
+  XCircle
 } from 'lucide-react';
 
 const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
   const [equipos, setEquipos] = useState([]);
-  const [fotos, setFotos] = useState({ antes: null, despues: null, firma: null });
+  const [fotos, setFotos]     = useState({ antes: null, despues: null, firma: null });
 
   useEffect(() => {
     if (instalacion) {
-      console.log('🔍 MODAL DETALLE - Instalación completa:', instalacion);
       cargarDatosCompletos();
     }
+    // eslint-disable-next-line
   }, [instalacion]);
 
-  const cargarDatosCompletos = async () => {
+  /* ────────────────── helpers ────────────────── */
+
+  const formatDate = (dateString) => {
+    if (!dateString) return null;
     try {
-      const token = localStorage.getItem('accessToken');
+      const dp = dateString.split('T')[0].split(' ')[0];
+      const [y, m, d] = dp.split('-').map(Number);
+      if (!y || !m || !d) return null;
+      return new Date(y, m - 1, d).toLocaleDateString('es-ES', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+    } catch { return null; }
+  };
 
-      // Parsear equipos instalados
-      let equiposIds = [];
-      try {
-        if (instalacion.equipos_instalados) {
-          equiposIds = typeof instalacion.equipos_instalados === 'string'
-            ? JSON.parse(instalacion.equipos_instalados)
-            : instalacion.equipos_instalados;
-        } else if (instalacion.equipos) {
-          equiposIds = typeof instalacion.equipos === 'string'
-            ? JSON.parse(instalacion.equipos)
-            : instalacion.equipos;
-        }
+  const formatCurrency = (val) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(val) || 0);
 
-        console.log('📦 MODAL DETALLE - IDs de equipos:', equiposIds);
+  const getEstadoBadge = (estado) => {
+    const map = {
+      programada: { cls: 'bg-blue-100 text-blue-800 border-blue-200',   icon: <Clock      size={14} />, label: 'Programada' },
+      en_proceso: { cls: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: <Wrench  size={14} />, label: 'En Proceso' },
+      completada: { cls: 'bg-green-100 text-green-800 border-green-200', icon: <CheckCircle size={14} />, label: 'Completada' },
+      cancelada:  { cls: 'bg-red-100 text-red-800 border-red-200',       icon: <XCircle   size={14} />, label: 'Cancelada'  },
+      reagendada: { cls: 'bg-purple-100 text-purple-800 border-purple-200', icon: <Calendar size={14} />, label: 'Reagendada' },
+    };
+    return map[estado] || { cls: 'bg-gray-100 text-gray-800 border-gray-200', icon: <AlertCircle size={14} />, label: estado };
+  };
 
-        equiposIds = Array.isArray(equiposIds)
-          ? equiposIds.filter(id => id !== null && id !== undefined && id !== '')
+  /* ────────────────── data load ────────────────── */
+
+  const cargarDatosCompletos = async () => {
+    const token = localStorage.getItem('accessToken');
+
+    // ── Equipos ──
+    let equiposIds = [];
+    try {
+      const raw = instalacion.equipos_instalados || instalacion.equipos;
+      if (raw) {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        equiposIds = Array.isArray(parsed)
+          ? parsed.filter(id => id !== null && id !== undefined && id !== '')
           : [];
-
-      } catch (e) {
-        console.error('❌ Error parseando IDs de equipos:', e);
-        equiposIds = [];
       }
+    } catch { equiposIds = []; }
 
-      // Obtener datos completos de los equipos
-      if (equiposIds.length > 0) {
-        const equiposCompletos = [];
-
-        for (const equipoId of equiposIds) {
-          try {
-            console.log(`🔍 Intentando cargar equipo ID: ${equipoId}`);
-            const response = await fetch(
-              `${process.env.REACT_APP_API_URL}/inventory/equipment/${equipoId}`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
-
-            console.log(`📊 Response status para equipo ${equipoId}:`, response.status);
-
-            if (response.ok) {
-              const data = await response.json();
-              console.log(`📦 Data recibida para equipo ${equipoId}:`, data);
-
-              if (data.success && data.data) {
-                equiposCompletos.push(data.data);
-                console.log('✅ Equipo cargado exitosamente:', data.equipo);
-              } else if (data.success && data.equipos) {
-                equiposCompletos.push(data.equipos);
-                console.log('✅ Equipo cargado exitosamente (plural):', data.equipos);
-              } else if (data) {
-                equiposCompletos.push(data);
-                console.log('✅ Equipo cargado (directo):', data);
-              }
-            } else {
-              const errorText = await response.text();
-              console.error(`❌ Error ${response.status} cargando equipo ${equipoId}:`, errorText);
-            }
-          } catch (error) {
-            console.error('❌ Error de red cargando equipo:', equipoId, error);
+    if (equiposIds.length > 0) {
+      const list = [];
+      for (const equipoId of equiposIds) {
+        try {
+          const r = await fetch(
+            `${process.env.REACT_APP_API_URL}/inventory/equipment/${equipoId}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (r.ok) {
+            const data = await r.json();
+            const eq = data.data || data.equipos || data;
+            if (eq) list.push(eq);
           }
-        }
-
-        setEquipos(equiposCompletos);
-        console.log('📦 MODAL DETALLE - Equipos completos cargados:', equiposCompletos);
-      } else {
-        setEquipos([]);
+        } catch { /* ignore */ }
       }
+      setEquipos(list);
+    } else {
+      setEquipos([]);
+    }
 
-      // Parsear fotos
-      try {
-        let fotosData = null;
-
-        if (instalacion.fotos_instalacion) {
-          fotosData = typeof instalacion.fotos_instalacion === 'string'
-            ? JSON.parse(instalacion.fotos_instalacion)
-            : instalacion.fotos_instalacion;
-        } else if (instalacion.fotos) {
-          fotosData = typeof instalacion.fotos === 'string'
-            ? JSON.parse(instalacion.fotos)
-            : instalacion.fotos;
-        }
-
-        console.log('📷 MODAL DETALLE - Fotos raw:', fotosData);
-
-        if (fotosData && Array.isArray(fotosData) && fotosData.length > 0) {
-          const fotosValidas = fotosData.filter(foto => {
-            if (typeof foto === 'string' && foto.startsWith('data:image')) {
-              return true;
-            }
-            if (foto && typeof foto === 'object' && (foto.url || foto.data)) {
-              return true;
-            }
-            return false;
+    // ── Fotos ──
+    try {
+      const rawFotos = instalacion.fotos_instalacion || instalacion.fotos;
+      if (rawFotos) {
+        const fotosData = typeof rawFotos === 'string' ? JSON.parse(rawFotos) : rawFotos;
+        if (Array.isArray(fotosData) && fotosData.length > 0) {
+          const validas = fotosData.filter(f =>
+            (typeof f === 'string' && f.startsWith('data:image')) ||
+            (f && typeof f === 'object' && (f.url || f.data))
+          );
+          const get = (f) => typeof f === 'string' ? f : (f?.url || f?.data);
+          setFotos({
+            antes:   validas.length >= 1 ? get(validas[0]) : null,
+            despues: validas.length >= 3 ? get(validas[1]) : null,
+            firma:   validas.length >= 3 ? get(validas[2]) : validas.length === 2 ? get(validas[1]) : null,
           });
-
-          console.log('📷 Fotos válidas encontradas:', fotosValidas.length);
-
-          // ✅ LÓGICA CORREGIDA: Detectar si hay 2 o 3 fotos
-          if (fotosValidas.length >= 1) {
-            const primeraFoto = typeof fotosValidas[0] === 'string'
-              ? fotosValidas[0]
-              : (fotosValidas[0].url || fotosValidas[0].data);
-
-            // Si hay 2 fotos: foto instalación + firma
-            // Si hay 3 fotos: foto instalación + después + firma
-            let segundaFoto = null;
-            let firmaFoto = null;
-
-            if (fotosValidas.length === 2) {
-              // La segunda foto es la firma
-              firmaFoto = typeof fotosValidas[1] === 'string'
-                ? fotosValidas[1]
-                : (fotosValidas[1].url || fotosValidas[1].data);
-            } else if (fotosValidas.length >= 3) {
-              // La segunda es "después" y la tercera es firma
-              segundaFoto = typeof fotosValidas[1] === 'string'
-                ? fotosValidas[1]
-                : (fotosValidas[1].url || fotosValidas[1].data);
-              firmaFoto = typeof fotosValidas[2] === 'string'
-                ? fotosValidas[2]
-                : (fotosValidas[2].url || fotosValidas[2].data);
-            }
-
-            setFotos({
-              antes: primeraFoto,
-              despues: segundaFoto,
-              firma: firmaFoto
-            });
-
-            console.log('📷 Fotos asignadas - Antes:', primeraFoto ? 'SI' : 'NO', 'Después:', segundaFoto ? 'SI' : 'NO', 'Firma:', firmaFoto ? 'SI' : 'NO');
-          }
-        } else {
-          console.log('📷 No hay fotos en el array');
-          setFotos({ antes: null, despues: null, firma: null });
+          return;
         }
-      } catch (e) {
-        console.error('❌ Error parseando fotos:', e);
-        setFotos({ antes: null, despues: null, firma: null });
       }
-
-    } catch (error) {
-      console.error('❌ Error general cargando datos:', error);
+      setFotos({ antes: null, despues: null, firma: null });
+    } catch {
+      setFotos({ antes: null, despues: null, firma: null });
     }
   };
 
   if (!isOpen || !instalacion) return null;
 
-  const getEstadoBadge = (estado) => {
-    const badges = {
-      'programada': 'bg-blue-100 text-blue-800',
-      'en_proceso': 'bg-yellow-100 text-yellow-800',
-      'completada': 'bg-green-100 text-green-800',
-      'cancelada': 'bg-red-100 text-red-800'
-    };
-    return badges[estado] || 'bg-gray-100 text-gray-800';
-  };
+  const estadoInfo = getEstadoBadge(instalacion.estado);
 
-  const getEstadoTexto = (estado) => {
-    const textos = {
-      'programada': 'Programada',
-      'en_proceso': 'En Proceso',
-      'completada': 'Completada',
-      'cancelada': 'Cancelada'
-    };
-    return textos[estado] || estado;
-  };
+  /* ────────────────── sub-components ────────────────── */
+
+  const InfoRow = ({ label, value }) => (
+    value ? (
+      <div>
+        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">{label}</p>
+        <p className="text-sm font-medium text-gray-900">{value}</p>
+      </div>
+    ) : null
+  );
+
+  /* ────────────────── render ────────────────── */
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="bg-[#0e6493] text-white p-6 flex items-center justify-between">
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold">Detalles de Instalación</h2>
-            <p className="text-sm opacity-90 mt-1">ID: #{instalacion.id}</p>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] overflow-hidden flex flex-col">
+
+        {/* ── Header ── */}
+        <div className="bg-gradient-to-r from-[#0e6493] to-[#1a7ab5] text-white px-6 py-5 flex-shrink-0">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs text-white/70 uppercase tracking-wider mb-1">Instalación #{instalacion.id}</p>
+              <h2 className="text-xl font-bold">{instalacion.cliente_nombre || 'Sin cliente'}</h2>
+              {instalacion.direccion_instalacion && (
+                <p className="text-sm text-white/80 mt-1 flex items-center gap-1">
+                  <MapPin size={14} /> {instalacion.direccion_instalacion}
+                  {instalacion.barrio ? ` · ${instalacion.barrio}` : ''}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${estadoInfo.cls}`}>
+                {estadoInfo.icon} {estadoInfo.label}
+              </span>
+              <button onClick={onClose}
+                className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors ml-1">
+                <X size={22} />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getEstadoBadge(instalacion.estado)}`}>
-              {getEstadoTexto(instalacion.estado)}
-            </span>
-            <button
-              onClick={onClose}
-              className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
-            >
-              <X size={24} />
-            </button>
+
+          {/* Quick info strip */}
+          <div className="flex flex-wrap gap-4 mt-3">
+            {instalacion.fecha_programada && (
+              <div className="flex items-center gap-1.5 text-white/80 text-xs">
+                <Calendar size={13} />
+                {formatDate(instalacion.fecha_programada) || instalacion.fecha_programada.split('T')[0]}
+                {instalacion.hora_programada && ` · ${instalacion.hora_programada}`}
+              </div>
+            )}
+            {instalacion.instalador_nombre_completo && instalacion.instalador_nombre_completo !== 'Instalador no asignado' && (
+              <div className="flex items-center gap-1.5 text-white/80 text-xs">
+                <Wrench size={13} /> {instalacion.instalador_nombre_completo}
+              </div>
+            )}
+            {instalacion.tipo_instalacion && (
+              <div className="flex items-center gap-1.5 text-white/80 text-xs">
+                <Info size={13} /> {instalacion.tipo_instalacion}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Contenido Scrollable */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Información del Cliente */}
-          <div className="bg-gray-50 rounded-lg p-5">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-              <User className="mr-2" size={20} />
-              Información del Cliente
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Nombre</p>
-                <p className="font-medium text-gray-900">{instalacion.cliente_nombre}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Teléfono</p>
-                <p className="font-medium text-gray-900 flex items-center">
-                  <Phone size={16} className="mr-2" />
-                  {instalacion.cliente_telefono}
-                </p>
-              </div>
-              <div className="md:col-span-2">
-                <p className="text-sm text-gray-600">Dirección de Instalación</p>
-                <p className="font-medium text-gray-900 flex items-center">
-                  <MapPin size={16} className="mr-2" />
-                  {instalacion.direccion_instalacion}
-                </p>
-              </div>
-            </div>
-          </div>
+        {/* ── Content ── */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
 
-          {/* Información de Programación */}
-          <div className="bg-gray-50 rounded-lg p-5">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-              <Calendar className="mr-2" size={20} />
-              Programación
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Fecha Programada</p>
-                <p className="font-medium text-gray-900">
-                  {(() => {
-                    const dp = (instalacion.fecha_programada || '').split('T')[0];
-                    const [y, m, d] = dp.split('-').map(Number);
-                    return new Date(y, m - 1, d).toLocaleDateString('es-ES', {
-                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                    });
-                  })()}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Hora</p>
-                <p className="font-medium text-gray-900 flex items-center">
-                  <Clock size={16} className="mr-2" />
-                  {instalacion.hora_programada}
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* Row 1: Cliente + Instalador */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-          {/* Equipos Instalados */}
-          {equipos && equipos.length > 0 && (
-            <div className="bg-gray-50 rounded-lg p-5">
-              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                <Package className="mr-2" size={20} />
-                Equipos Instalados ({equipos.length})
+            {/* Cliente */}
+            <div className="bg-gray-50 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <User size={16} className="text-[#0e6493]" /> Información del Cliente
               </h3>
               <div className="space-y-3">
-                {equipos.map((equipo, index) => (
-                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-900 text-lg">
-                          {equipo.codigo || equipo.equipo_codigo || 'Sin código'}
-                        </p>
-                        <p className="text-sm text-gray-700 font-medium mt-1">
-                          {equipo.nombre || equipo.equipo_nombre || equipo.descripcion || 'Sin nombre'}
-                        </p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
-                            {equipo.tipo || equipo.tipo_equipo || 'Sin tipo'}
-                          </span>
+                <InfoRow label="Nombre" value={instalacion.cliente_nombre} />
+                <InfoRow label="Identificación" value={instalacion.cliente_identificacion} />
+                {instalacion.cliente_telefono && (
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Teléfono</p>
+                    <a href={`tel:${instalacion.cliente_telefono}`}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800">
+                      <Phone size={14} /> {instalacion.cliente_telefono}
+                    </a>
+                  </div>
+                )}
+                {instalacion.telefono_contacto && instalacion.telefono_contacto !== instalacion.cliente_telefono && (
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Teléfono contacto</p>
+                    <a href={`tel:${instalacion.telefono_contacto}`}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800">
+                      <Phone size={14} /> {instalacion.telefono_contacto}
+                    </a>
+                  </div>
+                )}
+                <InfoRow label="Persona que recibe" value={instalacion.persona_recibe} />
+              </div>
+            </div>
+
+            {/* Instalador */}
+            <div className="bg-gray-50 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <Wrench size={16} className="text-[#0e6493]" /> Instalador Asignado
+              </h3>
+              <div className="space-y-3">
+                {instalacion.instalador_nombre_completo && instalacion.instalador_nombre_completo !== 'Instalador no asignado'
+                  ? (
+                    <>
+                      <InfoRow label="Nombre" value={instalacion.instalador_nombre_completo} />
+                      {instalacion.instalador_telefono && (
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Teléfono</p>
+                          <a href={`tel:${instalacion.instalador_telefono}`}
+                            className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800">
+                            <Phone size={14} /> {instalacion.instalador_telefono}
+                          </a>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        {(equipo.numero_serie || equipo.serial) && (
-                          <p className="text-xs text-gray-600 mb-1">
-                            <span className="font-semibold">S/N:</span> {equipo.numero_serie || equipo.serial}
-                          </p>
-                        )}
-                        {equipo.estado && (
-                          <span className={`inline-block px-2 py-1 text-xs rounded mt-1 ${
-                            equipo.estado === 'disponible' ? 'bg-green-100 text-green-800' :
-                            equipo.estado === 'asignado' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {equipo.estado.toUpperCase()}
-                          </span>
-                        )}
-                      </div>
+                      )}
+                    </>
+                  )
+                  : <p className="text-sm text-gray-400 italic">Sin instalador asignado</p>
+                }
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Programación + Costos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+            {/* Programación / Timeline */}
+            <div className="bg-gray-50 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <Calendar size={16} className="text-[#0e6493]" /> Programación
+              </h3>
+              <div className="space-y-3">
+                <InfoRow label="Fecha programada"
+                  value={formatDate(instalacion.fecha_programada) || instalacion.fecha_programada?.split('T')[0]} />
+                <InfoRow label="Hora programada" value={instalacion.hora_programada} />
+                {instalacion.fecha_realizada && (
+                  <InfoRow label="Fecha realizada" value={formatDate(instalacion.fecha_realizada) || instalacion.fecha_realizada?.split('T')[0]} />
+                )}
+                {instalacion.created_at && (
+                  <InfoRow label="Fecha creación" value={formatDate(instalacion.created_at) || instalacion.created_at?.split('T')[0]} />
+                )}
+                <InfoRow label="Tipo instalación" value={instalacion.tipo_instalacion} />
+              </div>
+            </div>
+
+            {/* Costo */}
+            <div className="bg-gray-50 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <DollarSign size={16} className="text-[#0e6493]" /> Costos & Detalles
+              </h3>
+              <div className="space-y-3">
+                {instalacion.costo_instalacion != null && instalacion.costo_instalacion !== '' ? (
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Costo instalación</p>
+                    <p className="text-lg font-bold text-gray-900">{formatCurrency(instalacion.costo_instalacion)}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Sin costo registrado</p>
+                )}
+                {instalacion.motivo_cancelacion && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-xs text-red-600 font-semibold uppercase mb-1">Motivo cancelación</p>
+                    <p className="text-sm text-red-800">{instalacion.motivo_cancelacion}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Equipos instalados */}
+          {equipos.length > 0 && (
+            <div className="bg-gray-50 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <Package size={16} className="text-[#0e6493]" /> Equipos Instalados ({equipos.length})
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {equipos.map((eq, idx) => (
+                  <div key={idx} className="bg-white border border-gray-200 rounded-lg p-4 flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {eq.nombre || eq.equipo_nombre || eq.descripcion || 'Equipo sin nombre'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Código: {eq.codigo || eq.equipo_codigo || 'N/A'}
+                      </p>
+                      {(eq.numero_serie || eq.serial) && (
+                        <p className="text-xs text-gray-500">S/N: {eq.numero_serie || eq.serial}</p>
+                      )}
+                      {eq.tipo && (
+                        <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
+                          {eq.tipo}
+                        </span>
+                      )}
                     </div>
+                    {eq.estado && (
+                      <span className={`ml-2 px-2 py-1 text-xs rounded-full flex-shrink-0 ${
+                        eq.estado === 'disponible' ? 'bg-green-100 text-green-700' :
+                        eq.estado === 'asignado'   ? 'bg-blue-100 text-blue-700'  :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {eq.estado}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -329,36 +337,33 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
 
           {/* Fotos */}
           {(fotos.antes || fotos.despues || fotos.firma) && (
-            <div className="bg-gray-50 rounded-lg p-5">
-              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                <ImageIcon className="mr-2" size={20} />
-                Fotografías de la Instalación
+            <div className="bg-gray-50 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <ImageIcon size={16} className="text-[#0e6493]" /> Fotografías
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {fotos.antes && (
-                  <div className="bg-white p-3 rounded-lg border border-gray-200">
-                    <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
-                      <ImageIcon size={16} className="mr-2" />
-                      Instalación Completada
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <p className="text-xs font-semibold text-gray-600 px-3 py-2 border-b border-gray-100">
+                      Instalación
                     </p>
-                    <img
-                      src={fotos.antes}
-                      alt="Instalación completada"
-                      className="w-full h-64 object-cover rounded-lg shadow-sm"
-                    />
+                    <img src={fotos.antes} alt="Instalación" className="w-full h-48 object-cover" />
+                  </div>
+                )}
+                {fotos.despues && (
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <p className="text-xs font-semibold text-gray-600 px-3 py-2 border-b border-gray-100">
+                      Después
+                    </p>
+                    <img src={fotos.despues} alt="Después" className="w-full h-48 object-cover" />
                   </div>
                 )}
                 {fotos.firma && (
-                  <div className="bg-white p-3 rounded-lg border border-gray-200">
-                    <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
-                      <ImageIcon size={16} className="mr-2" />
-                      Firma del Instalador
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <p className="text-xs font-semibold text-gray-600 px-3 py-2 border-b border-gray-100">
+                      Firma cliente
                     </p>
-                    <img
-                      src={fotos.firma}
-                      alt="Firma del instalador"
-                      className="w-full h-64 object-contain rounded-lg shadow-sm bg-white"
-                    />
+                    <img src={fotos.firma} alt="Firma" className="w-full h-48 object-contain p-2" />
                   </div>
                 )}
               </div>
@@ -367,22 +372,19 @@ const ModalDetalleInstalacion = ({ isOpen, onClose, instalacion }) => {
 
           {/* Observaciones */}
           {instalacion.observaciones && (
-            <div className="bg-gray-50 rounded-lg p-5">
-              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                <FileText className="mr-2" size={20} />
-                Observaciones
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-yellow-800 mb-2 flex items-center gap-2">
+                <FileText size={16} /> Observaciones
               </h3>
-              <p className="text-gray-700 whitespace-pre-wrap">{instalacion.observaciones}</p>
+              <p className="text-sm text-yellow-900 whitespace-pre-wrap">{instalacion.observaciones}</p>
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="bg-gray-50 p-6 border-t flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-[#0e6493] hover:bg-[#0a4d6e] text-white rounded-lg transition-colors"
-          >
+        {/* ── Footer ── */}
+        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex-shrink-0 flex justify-end">
+          <button onClick={onClose}
+            className="px-6 py-2.5 bg-[#0e6493] hover:bg-[#0a4d6e] text-white rounded-lg transition-colors font-medium text-sm">
             Cerrar
           </button>
         </div>
