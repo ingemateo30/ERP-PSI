@@ -1,11 +1,12 @@
 // frontend/src/components/PQR/MisPQR.jsx
 // Vista del técnico: sus PQRs asignadas + PQRs sin asignar disponibles
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   AlertCircle, CheckCircle, Clock, MessageSquare, User,
-  Phone, RefreshCw, ChevronDown, ChevronUp, Send, X
+  Phone, RefreshCw, ChevronDown, ChevronUp, Send, X, PenLine
 } from 'lucide-react';
+import SignaturePad from 'react-signature-canvas';
 import { useAuth } from '../../contexts/AuthContext';
 
 const API = `${process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1'}/pqr`;
@@ -36,22 +37,42 @@ const Badge = ({ tipo, valor }) => {
 const ModalGestion = ({ pqr, onClose, onSuccess }) => {
   const [estado, setEstado] = useState(pqr.estado === 'abierto' ? 'en_proceso' : pqr.estado);
   const [nota, setNota] = useState('');
+  const [respuesta, setRespuesta] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
+  const sigRef = useRef(null);
+
+  const esResolucion = estado === 'resuelto' || estado === 'cerrado';
+
+  const limpiarFirma = () => { if (sigRef.current) sigRef.current.clear(); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setEnviando(true);
     setError(null);
+
+    if (esResolucion && !respuesta.trim()) {
+      setError('La respuesta al cliente es obligatoria para resolver/cerrar la PQR.');
+      return;
+    }
+    if (esResolucion && sigRef.current && sigRef.current.isEmpty()) {
+      setError('La firma del cliente es obligatoria al resolver la PQR.');
+      return;
+    }
+
+    setEnviando(true);
     try {
       const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      const body = { estado, nota_gestion: nota };
+      if (esResolucion) {
+        body.respuesta = respuesta;
+        if (sigRef.current && !sigRef.current.isEmpty()) {
+          body.firma_cliente = sigRef.current.toDataURL();
+        }
+      }
       const res = await fetch(`${API}/${pqr.id}/gestionar`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ estado, nota_gestion: nota })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body)
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Error al gestionar');
@@ -66,8 +87,8 @@ const ModalGestion = ({ pqr, onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full">
-        <div className="flex items-center justify-between p-4 border-b">
+      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white">
           <h2 className="font-semibold text-gray-900">Gestionar PQR #{pqr.id}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
@@ -92,17 +113,57 @@ const ModalGestion = ({ pqr, onClose, onSuccess }) => {
             </select>
           </div>
 
-          {/* Nota */}
+          {/* Nota interna */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nota de gestión</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nota interna de gestión</label>
             <textarea
               value={nota}
               onChange={e => setNota(e.target.value)}
-              rows={3}
+              rows={2}
               placeholder="Describe las acciones realizadas..."
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
             />
           </div>
+
+          {/* Campos extra solo al resolver/cerrar */}
+          {esResolucion && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Respuesta al cliente <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={respuesta}
+                  onChange={e => setRespuesta(e.target.value)}
+                  rows={4}
+                  required
+                  placeholder="Explique al cliente cómo se resolvió su PQR..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Firma del cliente <span className="text-red-500">*</span>
+                  </label>
+                  <button type="button" onClick={limpiarFirma} className="text-xs text-blue-600 hover:underline">
+                    Limpiar
+                  </button>
+                </div>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <SignaturePad
+                    ref={sigRef}
+                    canvasProps={{ width: 460, height: 140, className: 'w-full rounded-lg cursor-crosshair' }}
+                    penColor="#1a1a2e"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                  <PenLine size={12} /> Firme en el recuadro con el mouse o dedo
+                </p>
+              </div>
+            </>
+          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -116,7 +177,7 @@ const ModalGestion = ({ pqr, onClose, onSuccess }) => {
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               <Send size={14} />
-              {enviando ? 'Guardando...' : 'Guardar gestión'}
+              {enviando ? 'Guardando...' : esResolucion ? 'Resolver PQR' : 'Guardar gestión'}
             </button>
           </div>
         </form>

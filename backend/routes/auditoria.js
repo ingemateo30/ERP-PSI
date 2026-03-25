@@ -82,6 +82,8 @@ router.get('/', async (req, res) => {
       params
     );
 
+    const limitNum = Math.max(1, Math.min(200, parseInt(limit) || 50));
+    const offsetNum = Math.max(0, parseInt(offset) || 0);
     const logs = await Database.query(
       `SELECT
          l.id,
@@ -100,8 +102,8 @@ router.get('/', async (req, res) => {
        LEFT JOIN sistema_usuarios u ON l.usuario_id = u.id
        ${where}
        ORDER BY l.created_at DESC
-       LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), offset]
+       LIMIT ${limitNum} OFFSET ${offsetNum}`,
+      params
     );
 
     // Parsear JSON guardados como texto

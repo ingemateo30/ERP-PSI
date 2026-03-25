@@ -779,12 +779,21 @@ router.patch('/:id/gestionar', async (req, res) => {
             return res.status(403).json({ success: false, error: 'No tienes permiso para gestionar esta PQR' });
         }
 
+        const { respuesta, firma_cliente } = req.body;
         const updateFields = ['estado = ?'];
         const updateValues = [estado];
 
         if (nota_gestion) {
             updateFields.push('respuesta = CONCAT(COALESCE(respuesta, ""), "\n[Gestión ", NOW(), "]: ", ?)');
             updateValues.push(nota_gestion);
+        }
+        if (respuesta) {
+            updateFields.push('respuesta = ?');
+            updateValues.push(respuesta);
+        }
+        if (firma_cliente) {
+            updateFields.push('firma_cliente = ?');
+            updateValues.push(firma_cliente);
         }
         if (estado === 'cerrado' || estado === 'resuelto') {
             updateFields.push('fecha_cierre = NOW()');
