@@ -82,10 +82,11 @@ const InstalacionModal = ({
   // ==========================================
   
   const pestañas = [
-    { id: 'general', nombre: 'Información General', icono: User },
-    { id: 'detalles', nombre: 'Detalles Técnicos', icono: Settings },
-    { id: 'ubicacion', nombre: 'Ubicación', icono: MapPin },
-    { id: 'historial', nombre: 'Historial', icono: Clock }
+    { id: 'general',  nombre: 'Información General', icono: User },
+    { id: 'detalles', nombre: 'Detalles Técnicos',   icono: Settings },
+    { id: 'ubicacion',nombre: 'Ubicación',            icono: MapPin },
+    { id: 'fotos',    nombre: 'Fotos',                icono: Eye },
+    { id: 'historial',nombre: 'Historial',            icono: Clock }
   ];
 
   // ==========================================
@@ -95,7 +96,6 @@ const InstalacionModal = ({
   useEffect(() => {
     if (instalacion) {
       console.log('🔍 Cargando datos de instalación:', instalacion);
-      // Strip the time portion from fecha_programada to ensure correct display in date input
       const fechaProgramada = instalacion.fecha_programada
         ? instalacion.fecha_programada.split('T')[0]
         : '';
@@ -105,10 +105,14 @@ const InstalacionModal = ({
         equipos_instalados: instalacion.equipos_instalados || [],
         costo_instalacion: instalacion.costo_instalacion || 0
       });
-      
-      // Si tenemos cliente_id, buscar el cliente
+
       if (instalacion.cliente_id) {
         buscarClientePorId(instalacion.cliente_id);
+      }
+
+      // En modo ver, cargar los detalles completos (incluyendo fotos) desde el API
+      if (modo === 'ver' && instalacion.id) {
+        cargarDetalleCompleto(instalacion.id);
       }
     }
 
@@ -175,6 +179,30 @@ const InstalacionModal = ({
       }
     } catch (error) {
       console.error('❌ Error cargando servicios del cliente:', error);
+    }
+  };
+
+  // Carga detalles completos (fotos, plan, etc.) cuando se visualiza una instalación
+  const cargarDetalleCompleto = async (instalacionId) => {
+    try {
+      const response = await instalacionesService.getInstalacion(instalacionId);
+      if (response.success && response.instalacion) {
+        const det = response.instalacion;
+        const fechaProgramada = det.fecha_programada
+          ? det.fecha_programada.split('T')[0]
+          : '';
+        setFormData(prev => ({
+          ...prev,
+          ...det,
+          fecha_programada: fechaProgramada,
+          equipos_instalados: det.equipos_instalados || prev.equipos_instalados || [],
+          fotos_instalacion: Array.isArray(det.fotos_instalacion)
+            ? det.fotos_instalacion
+            : (typeof det.fotos_instalacion === 'string' ? JSON.parse(det.fotos_instalacion || '[]') : [])
+        }));
+      }
+    } catch (error) {
+      console.error('❌ Error cargando detalle completo:', error);
     }
   };
 
@@ -505,18 +533,39 @@ const validarFormulario = () => {
   <label className="block text-sm font-medium text-gray-700 mb-2">
     Cliente *
   </label>
+  {/* Search filter for client selector */}
+  <input
+    type="text"
+    value={busquedaCliente}
+    onChange={e => setBusquedaCliente(e.target.value)}
+    placeholder="Filtrar por nombre o identificación..."
+    className="w-full px-3 py-2 mb-1 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-400"
+  />
   <select
     value={formData.cliente_id}
     onChange={(e) => handleChange('cliente_id', e.target.value)}
     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+    size={6}
   >
-    <option value="">Seleccionar cliente...</option>
-    {clientes.map(cliente => (
-      <option key={cliente.id} value={cliente.id}>
-        {cliente.nombre} - {cliente.identificacion}
-      </option>
-    ))}
+    <option value="">— Seleccionar cliente —</option>
+    {clientes
+      .filter(c => {
+        if (!busquedaCliente.trim()) return true;
+        const q = busquedaCliente.toLowerCase();
+        return (c.nombre || '').toLowerCase().includes(q) ||
+               (c.identificacion || '').toLowerCase().includes(q);
+      })
+      .map(cliente => (
+        <option key={cliente.id} value={cliente.id}>
+          {cliente.nombre} — {cliente.identificacion}
+        </option>
+      ))}
   </select>
+  {formData.cliente_id && clienteSeleccionado && (
+    <p className="mt-1 text-xs text-green-600 font-medium">
+      ✓ {clienteSeleccionado.nombre} ({clienteSeleccionado.identificacion})
+    </p>
+  )}
   {errores.cliente_id && (
     <p className="mt-1 text-sm text-red-600">{errores.cliente_id}</p>
   )}
@@ -601,15 +650,22 @@ const validarFormulario = () => {
     <Settings className="w-4 h-4 mr-2" />
     Detalles Técnicos
   </h4>
-  <div className="space-y-2">
-    <div>
-      <span className="text-sm text-gray-600">IP Asignada:</span>
-      <p className="font-medium">{instalacion?.ip_asignada || 'No asignada'}</p>
-    </div>
-    <div>
-      <span className="text-sm text-gray-600">TAP (Contraseña):</span>
-      <p className="font-medium">{instalacion?.tap || 'No especificado'}</p>
-    </div>
+  <div className="grid grid-cols-2 gap-2">
+    {[
+      { label: 'IP Asignada',   val: formData?.ip_asignada },
+      { label: 'MAC Address',   val: formData?.mac_address },
+      { label: 'ONT ID',        val: formData?.ont_id },
+      { label: 'TAP',           val: formData?.tap },
+      { label: 'Plan',          val: formData?.plan_nombre },
+      { label: 'Precio Plan',   val: formData?.plan_precio ? `$${Number(formData.plan_precio).toLocaleString('es-CO')}` : null },
+      { label: 'Costo Instalación', val: formData?.costo_instalacion ? `$${Number(formData.costo_instalacion).toLocaleString('es-CO')}` : null },
+      { label: 'Persona Recibe', val: formData?.persona_recibe },
+    ].map(({ label, val }) => (
+      <div key={label}>
+        <span className="text-xs text-gray-500">{label}:</span>
+        <p className="text-sm font-medium text-gray-800">{val || <span className="text-gray-400 italic">—</span>}</p>
+      </div>
+    ))}
   </div>
 </div>
 
@@ -919,12 +975,51 @@ const validarFormulario = () => {
     </div>
   );
 
+  const renderPestañaFotos = () => {
+    const fotos = formData.fotos_instalacion || [];
+    const apiBase = process.env.REACT_APP_API_URL
+      ? process.env.REACT_APP_API_URL.replace('/api/v1', '')
+      : 'http://45.173.69.5:3000';
+
+    return (
+      <div className="space-y-4">
+        {fotos.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+            <Eye className="w-12 h-12 mb-3 opacity-30" />
+            <p className="text-sm">No hay fotos registradas para esta instalación</p>
+          </div>
+        ) : (
+          <div>
+            <p className="text-sm text-gray-500 mb-3">{fotos.length} foto(s) adjunta(s)</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {fotos.map((foto, idx) => {
+                const src = foto.startsWith('http') ? foto : `${apiBase}/${foto.replace(/^\//, '')}`;
+                return (
+                  <a key={idx} href={src} target="_blank" rel="noopener noreferrer" className="block">
+                    <img
+                      src={src}
+                      alt={`Foto ${idx + 1}`}
+                      className="w-full h-40 object-cover rounded-lg border border-gray-200 hover:opacity-90 transition-opacity"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
  const renderContenidoPestaña = () => {
     switch (pestañaActiva) {
       case 'general':
         return renderPestañaGeneral();
       case 'detalles':
         return renderPestañaDetalles();
+      case 'fotos':
+        return renderPestañaFotos();
       case 'ubicacion':
         return renderPestañaUbicacion();
       case 'historial':
