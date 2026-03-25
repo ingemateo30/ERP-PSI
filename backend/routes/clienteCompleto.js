@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const ClienteCompletoService = require('../services/ClienteCompletoService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { audit } = require('../utils/auditLogger');
 
 /**
  * ============================================
@@ -198,6 +199,17 @@ router.post('/crear',
         datosCompletos,
         createdBy
       );
+
+      // Registrar en auditoría
+      audit({
+        usuario_id: createdBy,
+        accion: 'CREATE',
+        tabla: 'clientes',
+        registro_id: resultado.cliente?.id || resultado.clienteId || null,
+        datos_nuevos: { identificacion: datosCompletos.cliente.identificacion, nombre: datosCompletos.cliente.nombre },
+        ip: req.ip,
+        user_agent: req.get('User-Agent')
+      }).catch(() => {});
 
       res.status(201).json({
         success: true,

@@ -612,14 +612,46 @@ const FacturacionAutomatica = () => {
         </div>
       )}
 
-      {/* Mensaje si no hay datos */}
+      {/* Mensaje si no hay datos a facturar */}
       {preview && !preview.detalles?.length && !preview.error && (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-          <p className="text-lg font-semibold text-gray-900 mb-2">No hay clientes para facturar</p>
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <p className="text-lg font-semibold text-gray-900 mb-2">Todos los clientes ya están facturados</p>
           <p className="text-sm text-gray-600">
-            Todos los clientes activos ya tienen factura del período actual
+            {preview.excluidos?.length > 0
+              ? `${preview.excluidos.length} clientes revisados — todos tienen cobertura vigente o sin servicios activos`
+              : 'No hay clientes pendientes de facturar para el período actual'}
           </p>
+        </div>
+      )}
+
+      {/* Clientes excluidos del preview */}
+      {preview?.excluidos?.length > 0 && (
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-yellow-500" />
+            Clientes omitidos del período ({preview.excluidos.length})
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-xs text-gray-500 uppercase">
+                  <th className="px-4 py-2 text-left">Cliente</th>
+                  <th className="px-4 py-2 text-left">Identificación</th>
+                  <th className="px-4 py-2 text-left">Motivo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {preview.excluidos.map((exc, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 font-medium text-gray-800">{exc.nombre}</td>
+                    <td className="px-4 py-2 text-gray-600">{exc.identificacion}</td>
+                    <td className="px-4 py-2 text-yellow-700">{exc.razon}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

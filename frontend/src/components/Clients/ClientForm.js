@@ -552,18 +552,53 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
     cargarSectoresPorCiudad();
   }, [formData.ciudad_id]);
 
+  // Barrios predefinidos por nombre de ciudad
+  const BARRIOS_POR_CIUDAD = {
+    'San Gil': [
+      'Centro', 'El Gallineral', 'La Avenida', 'El Bosque', 'La Esperanza',
+      'Villa del Río', 'Los Comuneros', 'El Carmen', 'San Carlos', 'Bella Vista',
+      'La Granja', 'El Jardín', 'Santander', 'El Recreo', 'Guanentá',
+      'La Plazuela', 'Ricaurte', 'El Progreso', 'Nuevo Milenio', 'La Pradera'
+    ],
+    'Socorro': [
+      'Centro', 'El Común', 'La Gruta', 'La Palma', 'El Resguardo',
+      'San Francisco', 'El Prado', 'Bello Horizonte', 'El Carmen', 'La Esperanza'
+    ],
+    'Bucaramanga': [
+      'Centro', 'Cabecera del Llano', 'Ciudadela Real de Minas', 'El Prado',
+      'García Rovira', 'Gaitán', 'La Concordia', 'Lagos del Cacique', 'Provenza',
+      'Sotomayor', 'San Francisco', 'Terrazas', 'El Poblado', 'Antonia Santos'
+    ],
+    'Floridablanca': [
+      'Centro', 'Caldas', 'El Recreo', 'La Cumbre', 'La Trinidad',
+      'Rincón de Girón', 'San Mateo', 'Santa Ana', 'Villa Lili', 'Zapamanga'
+    ],
+    'Vélez': ['Centro', 'El Común', 'La Feria', 'San José', 'El Carmen'],
+    'Barbosa': ['Centro', 'La Palma', 'El Recreo', 'San Antonio', 'El Progreso'],
+  };
+
   // Cargar barrios sugeridos cuando cambia la ciudad
   useEffect(() => {
     const cargarBarrios = async () => {
       if (formData.ciudad_id) {
-        const res = await clientService.getBarriosPorCiudad(formData.ciudad_id);
-        setBarriosSugeridos(res.data || []);
+        const ciudadNombre = ciudades.find(c => String(c.id) === String(formData.ciudad_id))?.nombre || '';
+        const predefinidos = BARRIOS_POR_CIUDAD[ciudadNombre] || [];
+        try {
+          const res = await clientService.getBarriosPorCiudad(formData.ciudad_id);
+          const deApi = res.data || [];
+          // Merge: API first (real clients), then predefined not already in list
+          const merged = [...new Set([...deApi, ...predefinidos])];
+          setBarriosSugeridos(merged);
+        } catch {
+          setBarriosSugeridos(predefinidos);
+        }
       } else {
         setBarriosSugeridos([]);
       }
     };
     cargarBarrios();
-  }, [formData.ciudad_id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.ciudad_id, ciudades]);
 
   const calcularFechaVencimiento = (fechaInicio, meses) => {
     if (!fechaInicio || !meses) return '';
@@ -1189,6 +1224,49 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Ciudad {!modoAgregarServicio && <span className="text-red-500">*</span>}
+                      </label>
+                      <select
+                        value={formData.ciudad_id}
+                        onChange={(e) => handleInputChange('ciudad_id', e.target.value)}
+                        disabled={modoAgregarServicio}
+                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100 ${!modoAgregarServicio && errors.ciudad_id ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                      >
+                        <option value="">Seleccionar ciudad</option>
+                        {ciudades.map(ciudad => (
+                          <option key={ciudad.id} value={ciudad.id}>
+                            {ciudad.nombre}
+                          </option>
+                        ))}
+                      </select>
+                      {!modoAgregarServicio && errors.ciudad_id && (
+                        <p className="mt-1 text-sm text-red-600">{errors.ciudad_id}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Sector
+                      </label>
+                      <select
+                        value={formData.sector_id}
+                        onChange={(e) => handleInputChange('sector_id', e.target.value)}
+                        disabled={modoAgregarServicio}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100"
+                      >
+                        <option value="">Seleccionar sector</option>
+                        {sectores.map(sector => (
+                          <option key={sector.id} value={sector.id}>
+                            {sector.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="relative">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Barrio
@@ -1242,49 +1320,6 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                         <option value="4">Estrato 4</option>
                         <option value="5">Estrato 5</option>
                         <option value="6">Estrato 6</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Ciudad {!modoAgregarServicio && <span className="text-red-500">*</span>}
-                      </label>
-                      <select
-                        value={formData.ciudad_id}
-                        onChange={(e) => handleInputChange('ciudad_id', e.target.value)}
-                        disabled={modoAgregarServicio}
-                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100 ${!modoAgregarServicio && errors.ciudad_id ? 'border-red-500' : 'border-gray-300'
-                          }`}
-                      >
-                        <option value="">Seleccionar ciudad</option>
-                        {ciudades.map(ciudad => (
-                          <option key={ciudad.id} value={ciudad.id}>
-                            {ciudad.nombre}
-                          </option>
-                        ))}
-                      </select>
-                      {!modoAgregarServicio && errors.ciudad_id && (
-                        <p className="mt-1 text-sm text-red-600">{errors.ciudad_id}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Sector
-                      </label>
-                      <select
-                        value={formData.sector_id}
-                        onChange={(e) => handleInputChange('sector_id', e.target.value)}
-                        disabled={modoAgregarServicio}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100"
-                      >
-                        <option value="">Seleccionar sector</option>
-                        {sectores.map(sector => (
-                          <option key={sector.id} value={sector.id}>
-                            {sector.nombre}
-                          </option>
-                        ))}
                       </select>
                     </div>
                   </div>
