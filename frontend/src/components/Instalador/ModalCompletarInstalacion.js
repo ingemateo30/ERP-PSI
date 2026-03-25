@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Camera, Upload, Package, CheckCircle, Wifi, Lock, Pen, RotateCcw } from 'lucide-react';
-import SignatureCanvas from 'react-signature-canvas';
+import SignaturePad from '../ui/SignaturePad';
 
 // Comprime imagen a máx 1024px y 70% calidad → reduce de ~5MB a ~300KB
 const comprimirImagen = (file) => {
@@ -480,14 +480,15 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
               Firma Usuario *
             </label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 bg-white">
-              <SignatureCanvas
+              <SignaturePad
                 ref={sigCanvas}
-                canvasProps={{
-                  width: 500,
-                  height: 150,
-                  className: 'w-full border rounded'
-                }}
-                backgroundColor="rgb(255, 255, 255)"
+                width={500}
+                height={160}
+                backgroundColor="rgb(255,255,255)"
+                penColor="#1a1a2e"
+                minWidth={1.5}
+                maxWidth={4}
+                className="w-full border rounded"
                 onBegin={handleFirmaInicio}
               />
             </div>

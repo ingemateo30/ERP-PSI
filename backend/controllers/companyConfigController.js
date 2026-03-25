@@ -104,16 +104,20 @@ class CompanyConfigController {
         });
       }
 
+      // Campos protegidos que no pueden actualizarse por la UI
+      const CAMPOS_PROTEGIDOS = ['licencia', 'resolucion_facturacion', 'consecutivo_factura', 'id', 'created_at', 'updated_at'];
+      CAMPOS_PROTEGIDOS.forEach(c => delete configData[c]);
+
       // Limpiar y procesar datos
       Object.keys(configData).forEach(key => {
         if (typeof configData[key] === 'string') {
           configData[key] = configData[key].trim();
         }
         // Convertir números si es necesario
-        if (['dias_mora_corte', 'consecutivo_factura', 'consecutivo_contrato', 'consecutivo_recibo', 'consecutivo_orden'].includes(key)) {
+        if (['dias_mora_corte', 'consecutivo_contrato', 'consecutivo_recibo', 'consecutivo_orden'].includes(key)) {
           configData[key] = parseInt(configData[key]) || 0;
         }
-        if (['valor_reconexion', 'porcentaje_iva', 'porcentaje_interes'].includes(key)) {
+        if (['valor_reconexion', 'porcentaje_iva', 'porcentaje_interes', 'factura_dias_vencimiento'].includes(key)) {
           configData[key] = parseFloat(configData[key]) || 0;
         }
       });
