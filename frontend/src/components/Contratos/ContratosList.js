@@ -20,6 +20,7 @@ import {
   Award,
   BarChart2
 } from 'lucide-react';
+import contratosService from '../../services/contratosService';
 
 // ──────────────────────────────────────────────
 // DonutChart – SVG donut chart for contract states
@@ -95,8 +96,6 @@ const DonutChart = ({ activos = 0, vencidos = 0, terminados = 0, anulados = 0 })
     </div>
   );
 };
-import contratosService from '../../services/contratosService';
-
 const ContratosList = () => {
   const [contratos, setContratos] = useState([]);
   const [loading, setLoading] = useState(true);
