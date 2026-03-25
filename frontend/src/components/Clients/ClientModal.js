@@ -344,7 +344,7 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
                   value={srv.velocidad_bajada
                     ? `${srv.velocidad_bajada}/${srv.velocidad_subida || srv.velocidad_bajada} Mbps`
                     : srv.velocidad}
-                />}
+                />)}
               {srv.direccion_servicio && <InfoRow label="Dirección servicio" value={srv.direccion_servicio} className="col-span-2" />}
               {srv.fecha_activacion && <InfoRow label="Activación" value={formatDate(srv.fecha_activacion)} />}
               {srv.fecha_suspension && <InfoRow label="Suspendido" value={formatDate(srv.fecha_suspension)} />}
