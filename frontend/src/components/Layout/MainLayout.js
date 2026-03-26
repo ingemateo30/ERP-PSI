@@ -455,53 +455,53 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   // MENÚ ORGANIZADO POR GRUPOS
   // ==========================================
 
-  const gestionPrincipal = [
-    { icon: <Home size={22} />, label: 'Dashboard', path: '/dashboard', permission: null },
+  // ── 1. Dashboard (sin etiqueta de grupo) ──────────────────────────────────
+  const navDashboard = [
+    { icon: <Home size={22} />, label: 'Inicio', path: '/dashboard', permission: null }
+  ];
+
+  // ── 2. Clientes ───────────────────────────────────────────────────────────
+  const navClientes = [
     { icon: <Users size={22} />, label: 'Clientes', path: '/clients', permission: 'secretaria,supervisor,administrador' },
     { icon: <MapPin size={22} />, label: 'Clientes por Sector', path: '/clients/por-sector', permission: 'secretaria,supervisor,administrador' }
   ];
 
-  const facturacionFinanzas = [
-    { icon: <Activity size={22} />, label: 'Facturación Automática', path: '/facturacion-automatica', permission: 'administrador' },
-    { icon: <TrendingUp size={22} />, label: 'Facturas', path: '/facturas', permission: 'secretaria,supervisor,administrador' },
-    { icon: <FileText size={22} />, label: 'Contratos', path: '/contratos', permission: 'secretaria,supervisor,administrador' },
-    { icon: <CreditCard size={22} />, label: 'Pagos', path: '/cruce-pagos', permission: 'secretaria,supervisor,administrador' },
-    { icon: <GitMerge size={22} />, label: 'Cruce Masivo', path: '/cruce-masivo', permission: 'secretaria,supervisor,administrador' },
-    { icon: <Building2 size={22} />, label: 'Formatos Bancos', path: '/formatos-bancos', permission: 'secretaria,supervisor,administrador' },
-    { icon: <FileText size={22} />, label: 'Historial Facturas', path: '/historial-facturas', permission: 'secretaria,supervisor,administrador' },
-    { icon: <DollarSign size={22} />, label: 'Cartera Morosos', path: '/cartera', permission: 'secretaria,supervisor,administrador' }
-  ];
-
-  const serviciosOperaciones = [
+  // ── 3. Servicios & Instalaciones ─────────────────────────────────────────
+  const navServicios = [
     { icon: <Wifi size={22} />, label: 'Planes de Servicio', path: '/config/service-plans', permission: 'administrador' },
     { icon: <Wrench size={22} />, label: 'Instalaciones', path: '/instalaciones', permission: 'instalador,secretaria,supervisor,administrador' },
-    { icon: <Package size={22} />, label: 'Inventario', path: '/inventory', permission: 'instalador,secretaria,supervisor,administrador' },
-    { icon: <ArrowRightLeft size={18} />, label: 'Movimientos Recientes', path: '/inventory/movimientos', permission: 'secretaria,supervisor,administrador', subitem: true },
-    { icon: <Users size={18} />, label: 'Instaladores', path: '/inventory/instaladores', permission: 'secretaria,supervisor,administrador', subitem: true },
-    { icon: <Calendar size={22} />, label: 'Calendario', path: '/calendar', permission: 'instalador,secretaria,supervisor,administrador' }
+    { icon: <BarChart3 size={22} />, label: 'Mapa de Instalaciones', path: '/mapa-instalaciones', permission: 'instalador,administrador,supervisor,secretaria' }
   ];
 
-  const atencionCliente = [
-    { icon: <MessageSquare size={22} />, label: 'Mis PQR', path: '/mis-pqr', permission: 'instalador,secretaria,supervisor,administrador' },
-    { icon: <FileText size={22} />, label: 'PQR', path: '/pqr', permission: 'secretaria,supervisor,administrador' },
-    { icon: <Loader2 size={22} />, label: 'Incidencias', path: '/incidencias', permission: 'secretaria,supervisor,administrador' },
-    { icon: <Mail size={22} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', permission: 'secretaria,supervisor,administrador' }
+  // ── 4. Facturación ────────────────────────────────────────────────────────
+  const navFacturacion = [
+    { icon: <TrendingUp size={22} />, label: 'Facturas', path: '/facturas', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Activity size={22} />, label: 'Facturación Masiva', path: '/facturacion-automatica', permission: 'administrador' },
+    { icon: <DollarSign size={22} />, label: 'Cartera / Cobros', path: '/cartera', permission: 'secretaria,supervisor,administrador' }
   ];
 
-  const reportesAnalisis = [
-    { icon: <PieChartIcon size={22} />, label: 'Reportes', path: '/reportes-regulatorios', permission: 'administrador' },
+  // ── 5. Soporte ────────────────────────────────────────────────────────────
+  const navSoporte = [
+    { icon: <FileText size={22} />, label: 'PQR / Tickets', path: '/pqr', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Loader2 size={22} />, label: 'Incidencias', path: '/incidencias', permission: 'secretaria,supervisor,administrador' }
+  ];
+
+  // ── 6. Reportes & Estadísticas ────────────────────────────────────────────
+  const navReportes = [
     { icon: <BarChart3 size={22} />, label: 'Estadísticas', path: '/reports', permission: 'administrador' },
-    { icon: <Navigation size={22} />, label: 'Seguimiento Técnicos', path: '/seguimiento-tecnicos', permission: 'administrador,supervisor,secretaria' },
-    { icon: <BarChart3 size={22} />, label: 'Mapa Instalaciones', path: '/mapa-instalaciones', permission: 'instalador,administrador,supervisor,secretaria' },
-    { icon: <MapPin size={22} />, label: 'Mapa Clientes', path: '/mapa-clientes', permission: 'administrador,supervisor,secretaria' }
+    { icon: <PieChartIcon size={22} />, label: 'Reportes', path: '/reportes-regulatorios', permission: 'administrador' }
   ];
 
-  const administracion = [
-    { icon: <UserCheck size={22} />, label: 'Usuarios Sistema', path: '/admin/users', permission: 'administrador' },
-    { icon: <Shield size={22} />, label: 'Auditoría', path: '/auditoria', permission: 'administrador' },
-    { icon: <Activity size={22} />, label: 'Estado del Servidor', path: '/sistema/estado-servidor', permission: 'administrador' },
-    { icon: <FileText size={22} />, label: 'Firma de Contratos', path: '/firma-contratos', permission: 'operador,secretaria,supervisor,administrador' },
-    { icon: <Settings size={22} />, label: 'Configuración', path: '/config', permission: 'administrador' }
+  // ── 7. Configuración ──────────────────────────────────────────────────────
+  const navConfiguracion = [
+    { icon: <Settings size={22} />, label: 'Configuración General', path: '/config', permission: 'administrador' },
+    { icon: <UserCheck size={22} />, label: 'Usuarios', path: '/admin/users', permission: 'administrador' }
+  ];
+
+  // ── 8. Sistema (solo administrador) ──────────────────────────────────────
+  const navSistema = [
+    { icon: <Shield size={22} />, label: 'Auditoría / Logs', path: '/auditoria', permission: 'administrador' },
+    { icon: <Activity size={22} />, label: 'Estado del Servidor', path: '/sistema/estado-servidor', permission: 'administrador' }
   ];
 
   const filtrarPorPermisos = (items) => {
@@ -509,12 +509,14 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   };
 
   const grupos = [
-    { titulo: 'Principal', items: filtrarPorPermisos(gestionPrincipal) },
-    { titulo: 'Facturación', items: filtrarPorPermisos(facturacionFinanzas) },
-    { titulo: 'Servicios', items: filtrarPorPermisos(serviciosOperaciones) },
-    { titulo: 'Atención', items: filtrarPorPermisos(atencionCliente) },
-    { titulo: 'Reportes', items: filtrarPorPermisos(reportesAnalisis) },
-    { titulo: 'Admin', items: filtrarPorPermisos(administracion) }
+    { titulo: null,                      items: filtrarPorPermisos(navDashboard) },
+    { titulo: 'Clientes',                items: filtrarPorPermisos(navClientes) },
+    { titulo: 'Servicios & Instalaciones', items: filtrarPorPermisos(navServicios) },
+    { titulo: 'Facturación',             items: filtrarPorPermisos(navFacturacion) },
+    { titulo: 'Soporte',                 items: filtrarPorPermisos(navSoporte) },
+    { titulo: 'Reportes & Estadísticas', items: filtrarPorPermisos(navReportes) },
+    { titulo: 'Configuración',           items: filtrarPorPermisos(navConfiguracion) },
+    { titulo: 'Sistema',                 items: filtrarPorPermisos(navSistema) }
   ].filter(grupo => grupo.items.length > 0);
 
   const handleMenuClick = (path) => {
@@ -569,7 +571,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
         <nav className="mt-16 flex-1 px-2 overflow-y-auto scrollbar-hide">
           {grupos.map((grupo, grupoIndex) => (
             <div key={grupoIndex} className="mb-4">
-              {sidebarOpen && grupo.items.length > 0 && (
+              {sidebarOpen && grupo.items.length > 0 && grupo.titulo && (
                 <div className="px-3 py-2 text-xs font-semibold text-white/60 uppercase tracking-wider border-b border-white/10 mb-2">
                   {grupo.titulo}
                 </div>
