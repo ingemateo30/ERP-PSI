@@ -333,7 +333,7 @@ const FirmaContratosWrapper = () => {
     const formatearFecha = (fecha) => {
         if (!fecha) return 'No definida';
         try {
-            return format(new Date(fecha), 'dd/MM/yyyy', { locale: es });
+            return format(new Date(String(fecha).substring(0,10) + 'T12:00:00'), 'dd/MM/yyyy', { locale: es });
         } catch {
             return fecha;
         }

@@ -951,7 +951,7 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     Este contrato ya ha sido firmado digitalmente.
                     {contratoData.fecha_firma && (
                         <span className="block text-sm mt-1">
-                            Fecha de firma: {new Date(contratoData.fecha_firma).toLocaleDateString('es-CO')}
+                            Fecha de firma: {new Date(String(contratoData.fecha_firma).substring(0,10) + 'T12:00:00').toLocaleDateString('es-CO')}
                         </span>
                     )}
                 </p>
