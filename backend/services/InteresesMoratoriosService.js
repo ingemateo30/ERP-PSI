@@ -36,18 +36,18 @@ class InteresesMoratoriosService {
 
         // Obtener facturas morosas (más de fecha de vencimiento)
         const [facturasMorosas] = await conexion.execute(`
-          SELECT 
+          SELECT
             f.id,
             f.cliente_id,
             f.numero_factura,
             f.total,
             f.fecha_vencimiento,
             f.interes as interes_actual,
-            COALESCE(SUM(p.valor_pagado), 0) as total_pagado,
+            COALESCE(SUM(p.monto), 0) as total_pagado,
             DATEDIFF(?, f.fecha_vencimiento) as dias_mora,
-            (f.total - COALESCE(SUM(p.valor_pagado), 0)) as saldo_pendiente
+            (f.total - COALESCE(SUM(p.monto), 0)) as saldo_pendiente
           FROM facturas f
-          LEFT JOIN pagos p ON f.id = p.factura_id AND p.activo = 1
+          LEFT JOIN pagos p ON f.id = p.factura_id
           WHERE f.estado IN ('pendiente', 'vencida')
             AND f.activo = 1
             AND f.fecha_vencimiento < ?
