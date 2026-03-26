@@ -542,7 +542,7 @@ const { hasPermission } = useAuth();
                 <p><span className="font-medium">Cliente:</span> {contrato.cliente_nombre}</p>
                 <p><span className="font-medium">Plan:</span> {contrato.plan_nombre || 'N/A'}</p>
                 <p><span className="font-medium">Permanencia:</span> {contrato.tipo_permanencia === 'con_permanencia' ? `${contrato.permanencia_meses || 0} meses` : 'Sin permanencia'}</p>
-                <p><span className="font-medium">Fecha:</span> {contrato.fecha_generacion ? new Date(contrato.fecha_generacion).toLocaleDateString('es-CO') : 'N/A'}</p>
+                <p><span className="font-medium">Fecha:</span> {contrato.fecha_generacion ? new Date(contrato.fecha_generacion + 'T12:00:00').toLocaleDateString('es-CO') : 'N/A'}</p>
               </div>
               <div className="flex items-center gap-3">
                 <button onClick={() => handleVerPDF(contrato.id)} className="text-indigo-600 hover:text-indigo-900" title="Ver PDF"><Eye className="w-4 h-4" /></button>
@@ -646,7 +646,7 @@ const { hasPermission } = useAuth();
 
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {contrato.fecha_generacion ? 
-                      new Date(contrato.fecha_generacion).toLocaleDateString('es-CO')
+                      new Date(contrato.fecha_generacion + 'T12:00:00').toLocaleDateString('es-CO')
                       : 'N/A'
                     }
                   </td>

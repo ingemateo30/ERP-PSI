@@ -3,6 +3,14 @@
 // VERSIÓN CORREGIDA - Soluciona todos los errores de facturación
 
 const { Database } = require('../models/Database');
+
+// Helper: fecha local Colombia → YYYY-MM-DD (sin desfase UTC)
+function fechaLocalMySQL(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 const pool = require('../config/database');
 const IVACalculatorService = require('./IVACalculatorService');
 
@@ -45,7 +53,7 @@ class ClienteCompletoService {
           plan_id: primerServicio.planInternetId || primerServicio.planTelevisionId || primerServicio.plan_id,
           tipo_permanencia: primerServicio.tipoContrato || 'sin_permanencia',
           precio_personalizado: primerServicio.precioInternetCustom || primerServicio.precioTelevisionCustom || primerServicio.precio_personalizado,
-          fecha_activacion: primerServicio.fechaActivacion || primerServicio.fecha_activacion || new Date().toISOString().split('T')[0],
+          fecha_activacion: primerServicio.fechaActivacion || primerServicio.fecha_activacion || fechaLocalMySQL(),
           observaciones: primerServicio.observaciones || '',
           // ✅ CORRECCIÓN: Incluir campos de instalación que vienen del frontend
           cobrar_instalacion: primerServicio.cobrar_instalacion,
@@ -163,7 +171,7 @@ class ClienteCompletoService {
       ciudad_id: datosCliente.ciudad_id ? parseInt(datosCliente.ciudad_id) : null,
       sector_id: datosCliente.sector_id ? parseInt(datosCliente.sector_id) : null,
       observaciones: limpiarValor(datosCliente.observaciones),
-      fecha_registro: datosCliente.fecha_inicio_contrato || new Date().toISOString().split('T')[0],
+      fecha_registro: datosCliente.fecha_inicio_contrato || fechaLocalMySQL(),
       created_by: createdBy ? parseInt(createdBy) : null
     };
 
@@ -259,7 +267,7 @@ class ClienteCompletoService {
       plan_id: parseInt(datosServicio.plan_id),
       precio_personalizado: precioFinal,
       direccion_servicio: limpiarValor(datosServicio.direccion_servicio) || 'Misma dirección del cliente',
-      fecha_activacion: datosServicio.fecha_activacion || new Date().toISOString().split('T')[0],
+      fecha_activacion: datosServicio.fecha_activacion || fechaLocalMySQL(),
       estado: 'activo',
       observaciones: limpiarValor(datosServicio.observaciones),
       created_by: createdBy ? parseInt(createdBy) : null
@@ -794,7 +802,7 @@ const observacionesContrato = JSON.stringify({
 
     // Fecha de vencimiento de permanencia
     const fechaVencimientoPermanencia = permanenciaMeses > 0 ?
-      new Date(Date.now() + (permanenciaMeses * 30 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0] :
+      fechaLocalMySQL(new Date(Date.now() + (permanenciaMeses * 30 * 24 * 60 * 60 * 1000))) :
       null;
 
     const query = `

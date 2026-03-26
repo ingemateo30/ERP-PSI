@@ -3,6 +3,14 @@ const { Database } = require('../models/Database');
 const ContratoPDFGenerator = require('../utils/ContratoPDFGenerator'); // Antiguo (mantener para compatibilidad)
 const ContratoPDFGeneratorMINTIC = require('../utils/ContratoPDFGeneratorMINTIC'); // Nuevo modelo MINTIC
 const puppeteer = require('puppeteer');
+
+// Helper: fecha local Colombia → YYYY-MM-DD (sin desfase UTC)
+function fechaLocalMySQL(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 const FirmaPDFService = require('../services/FirmaPDFService');
 const fs = require('fs');
 const path = require('path');
@@ -916,9 +924,9 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
                     contratoOriginal.tipo_contrato,
                     contratoOriginal.tipo_permanencia,
                     meses,
-                    fechaInicio.toISOString().split('T')[0],
-                    fechaFin.toISOString().split('T')[0],
-                    fechaFin.toISOString().split('T')[0],
+                    fechaLocalMySQL(fechaInicio),
+                    fechaLocalMySQL(fechaFin),
+                    fechaLocalMySQL(fechaFin),
                     obsTexto
                 ]
             );
@@ -941,8 +949,8 @@ if (plan_nombre === 'N/A' && contrato.observaciones) {
                     numero_contrato: nuevoNumero,
                     contrato_anterior_id: parseInt(id),
                     contrato_anterior_estado: terminar_anterior ? 'terminado' : contratoOriginal.estado,
-                    fecha_inicio: fechaInicio.toISOString().split('T')[0],
-                    fecha_fin: fechaFin.toISOString().split('T')[0],
+                    fecha_inicio: fechaLocalMySQL(fechaInicio),
+                    fecha_fin: fechaLocalMySQL(fechaFin),
                     permanencia_meses: meses
                 }
             });

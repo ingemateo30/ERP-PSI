@@ -4,6 +4,14 @@ const path = require('path');
 const { PDFDocument, rgb } = require('pdf-lib');
 const Database = require('../config/database');
 
+// Helper: obtener fecha local Colombia en formato YYYY-MM-DD sin desfase UTC
+function fechaLocalMySQL(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 class FirmaPDFService {
   
   /**
@@ -230,9 +238,8 @@ static async abrirContratoParaFirma(contratoId) {
 
       console.log('💾 PDF firmado guardado en:', rutaPDFFirmado);
 
-      // Actualizar base de datos - Usar fecha actual sin problemas de zona horaria
-      const fechaActual = new Date();
-      const fechaFirmaMySQL = fechaActual.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+      // Actualizar base de datos - Usar fecha LOCAL Colombia (no UTC)
+      const fechaFirmaMySQL = fechaLocalMySQL();
 
       const observacionesActualizadas = `${contrato.observaciones || ''}\n[FIRMA DIGITAL] Firmado por: ${firmado_por} - Cédula: ${cedula_firmante} - Fecha: ${new Date().toLocaleString('es-CO')} - Tipo: ${tipo_firma}${observaciones ? ` - Obs: ${observaciones}` : ''}`;
 
@@ -325,8 +332,8 @@ static async abrirContratoParaFirma(contratoId) {
         // Posición aproximada: X centrado en columna izquierda, Y en la zona del box de firma
         const firmaBoxWidth = 100;
         const firmaBoxHeight = 45;
-        const firmaBoxX = 80; // Centrado en columna izquierda (~28 a ~285pt)
-        const firmaBoxY = 405; // Dentro del recuadro de firma en PAGO Y FACTURACIÓN
+        const firmaBoxX = 80;
+        const firmaBoxY = 440; // Subido para quedar dentro del recuadro
 
         console.log('✍️ Colocando firma en recuadro PAGO Y FACTURACIÓN');
         page2.drawImage(signatureImage, {
@@ -338,7 +345,7 @@ static async abrirContratoParaFirma(contratoId) {
 
         // ✅ Firma en la sección inferior de aceptación del contrato (centrada)
         const firmaX = (width - signatureWidth) / 2;
-        const firmaY = 95;
+        const firmaY = 75; // Bajada para quedar sobre la línea de firma
 
         console.log('✍️ Colocando firma en sección de aceptación del contrato');
         console.log(`📐 Dimensiones página: width=${width}, height=${height}`);
