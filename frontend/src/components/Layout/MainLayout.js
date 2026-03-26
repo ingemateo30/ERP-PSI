@@ -75,7 +75,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <MapPin size={18} />, label: 'Mapa Clientes', path: '/mapa-clientes', keywords: ['mapa', 'clientes', 'map', 'ciudad', 'ubicacion', 'general'], color: 'blue', permission: 'administrador,supervisor,secretaria' },
     { icon: <UserCheck size={18} />, label: 'Usuarios Sistema', path: '/admin/users', keywords: ['usuarios', 'admin', 'sistema'], color: 'blue', permission: 'administrador' },
     { icon: <Shield size={18} />, label: 'Auditoría', path: '/auditoria', keywords: ['auditoria', 'logs', 'audit', 'acciones', 'historial'], color: 'indigo', permission: 'administrador' },
-    { icon: <Server size={18} />, label: 'Estado del Servidor', path: '/sistema/estado-servidor', keywords: ['servidor', 'estado', 'monitoreo', 'cpu', 'ram', 'disco', 'pm2', 'logs', 'sistema', 'health'], color: 'gray', permission: 'administrador' },
+    { icon: <Activity size={18} />, label: 'Estado del Servidor', path: '/sistema/estado-servidor', keywords: ['servidor', 'estado', 'monitoreo', 'cpu', 'ram', 'disco', 'pm2', 'logs', 'sistema', 'health'], color: 'gray', permission: 'administrador' },
     { icon: <FileText size={18} />, label: 'Firma de Contratos', path: '/firma-contratos', keywords: ['firma', 'signature', 'contratos'], color: 'indigo', permission: 'operador,secretaria,supervisor,administrador' },
     { icon: <Settings size={18} />, label: 'Configuración', path: '/config', keywords: ['configuracion', 'settings', 'config'], color: 'gray', permission: 'administrador' },
     { icon: <User size={18} />, label: 'Mi Perfil', path: '/profile', keywords: ['perfil', 'profile', 'cuenta'], color: 'blue', permission: null },
@@ -499,7 +499,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const administracion = [
     { icon: <UserCheck size={22} />, label: 'Usuarios Sistema', path: '/admin/users', permission: 'administrador' },
     { icon: <Shield size={22} />, label: 'Auditoría', path: '/auditoria', permission: 'administrador' },
-    { icon: <Server size={22} />, label: 'Estado del Servidor', path: '/sistema/estado-servidor', permission: 'administrador' },
+    { icon: <Activity size={22} />, label: 'Estado del Servidor', path: '/sistema/estado-servidor', permission: 'administrador' },
     { icon: <FileText size={22} />, label: 'Firma de Contratos', path: '/firma-contratos', permission: 'operador,secretaria,supervisor,administrador' },
     { icon: <Settings size={22} />, label: 'Configuración', path: '/config', permission: 'administrador' }
   ];
