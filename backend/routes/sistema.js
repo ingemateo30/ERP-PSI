@@ -5,6 +5,8 @@ const router = express.Router();
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
+const os = require('os');
+const { execSync } = require('child_process');
 const pool = require('../config/database');
 
 const { authenticateToken, requireRole } = require('../middleware/auth');
@@ -215,6 +217,199 @@ router.get('/backup/listar', authenticateToken, requireRole(['administrador']), 
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error al listar backups' });
   }
+});
+
+/**
+ * GET /api/v1/sistema/estado
+ * Estado del servidor: disco, RAM, CPU, uptime, Node.js, PM2 logs, DB
+ */
+router.get('/estado', authenticateToken, requireRole(['administrador']), async (req, res) => {
+  const resultado = {};
+
+  // ── 1. Disco ────────────────────────────────────────────────────────────────
+  try {
+    const dfOutput = execSync('df -h /', { timeout: 5000, encoding: 'utf8' });
+    const lines = dfOutput.trim().split('\n');
+    if (lines.length >= 2) {
+      const parts = lines[1].split(/\s+/);
+      resultado.disco = {
+        sistema_archivos: parts[0] || '',
+        tamano:           parts[1] || '',
+        usado:            parts[2] || '',
+        disponible:       parts[3] || '',
+        uso_porcentaje:   parts[4] || '',
+        montado_en:       parts[5] || '/'
+      };
+    }
+  } catch (err) {
+    resultado.disco = { error: err.message };
+  }
+
+  // ── 2. RAM ───────────────────────────────────────────────────────────────────
+  try {
+    const totalMem = os.totalmem();
+    const freeMem  = os.freemem();
+    const usedMem  = totalMem - freeMem;
+    resultado.ram = {
+      total_bytes:    totalMem,
+      libre_bytes:    freeMem,
+      usado_bytes:    usedMem,
+      total_gb:       (totalMem / 1073741824).toFixed(2),
+      libre_gb:       (freeMem  / 1073741824).toFixed(2),
+      usado_gb:       (usedMem  / 1073741824).toFixed(2),
+      uso_porcentaje: ((usedMem / totalMem) * 100).toFixed(1)
+    };
+  } catch (err) {
+    resultado.ram = { error: err.message };
+  }
+
+  // ── 3. CPU ───────────────────────────────────────────────────────────────────
+  try {
+    const loadAvg = os.loadavg();
+    const cpus    = os.cpus();
+    resultado.cpu = {
+      num_nucleos:     cpus.length,
+      modelo:          cpus[0]?.model || 'N/A',
+      velocidad_mhz:   cpus[0]?.speed || 0,
+      carga_1min:      loadAvg[0].toFixed(2),
+      carga_5min:      loadAvg[1].toFixed(2),
+      carga_15min:     loadAvg[2].toFixed(2),
+      uso_porcentaje:  Math.min(((loadAvg[0] / cpus.length) * 100).toFixed(1), 100)
+    };
+  } catch (err) {
+    resultado.cpu = { error: err.message };
+  }
+
+  // ── 4. Uptime ────────────────────────────────────────────────────────────────
+  try {
+    const processUp = process.uptime();
+    const systemUp  = os.uptime();
+    const formatSecs = (secs) => {
+      const d = Math.floor(secs / 86400);
+      const h = Math.floor((secs % 86400) / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = Math.floor(secs % 60);
+      return `${d}d ${h}h ${m}m ${s}s`;
+    };
+    resultado.uptime = {
+      proceso_segundos:  Math.floor(processUp),
+      proceso_formato:   formatSecs(processUp),
+      sistema_segundos:  Math.floor(systemUp),
+      sistema_formato:   formatSecs(systemUp)
+    };
+  } catch (err) {
+    resultado.uptime = { error: err.message };
+  }
+
+  // ── 5. Node.js ───────────────────────────────────────────────────────────────
+  try {
+    const memUsage = process.memoryUsage();
+    resultado.nodejs = {
+      version:          process.version,
+      plataforma:       process.platform,
+      arquitectura:     process.arch,
+      pid:              process.pid,
+      memoria: {
+        rss_mb:         (memUsage.rss         / 1048576).toFixed(2),
+        heap_total_mb:  (memUsage.heapTotal    / 1048576).toFixed(2),
+        heap_usado_mb:  (memUsage.heapUsed     / 1048576).toFixed(2),
+        externo_mb:     (memUsage.external     / 1048576).toFixed(2),
+        heap_porcentaje: ((memUsage.heapUsed / memUsage.heapTotal) * 100).toFixed(1)
+      }
+    };
+  } catch (err) {
+    resultado.nodejs = { error: err.message };
+  }
+
+  // ── 6. Logs PM2 ──────────────────────────────────────────────────────────────
+  try {
+    const pm2LogDirs = [
+      '/root/.pm2/logs',
+      '/home/psiroot/.pm2/logs',
+      path.join(os.homedir(), '.pm2/logs')
+    ];
+
+    let logsEncontrados = [];
+    let dirUsado = null;
+
+    for (const dir of pm2LogDirs) {
+      try {
+        if (fs.existsSync(dir)) {
+          const archivos = fs.readdirSync(dir).filter(f => f.endsWith('.log'));
+          if (archivos.length > 0) {
+            dirUsado = dir;
+            // Leer los últimos 50 líneas de cada archivo de log
+            for (const archivo of archivos) {
+              try {
+                const rutaLog = path.join(dir, archivo);
+                const contenido = execSync(`tail -n 50 "${rutaLog}"`, { timeout: 5000, encoding: 'utf8' });
+                const lineas = contenido.trim().split('\n').filter(l => l.trim());
+                logsEncontrados.push({
+                  archivo,
+                  lineas: lineas.slice(-50)
+                });
+              } catch (logErr) {
+                logsEncontrados.push({ archivo, error: logErr.message });
+              }
+            }
+            break;
+          }
+        }
+      } catch (_) {
+        // Continuar con el siguiente directorio
+      }
+    }
+
+    resultado.pm2_logs = {
+      directorio: dirUsado || 'No encontrado',
+      encontrado: dirUsado !== null,
+      archivos:   logsEncontrados
+    };
+  } catch (err) {
+    resultado.pm2_logs = { encontrado: false, error: err.message, archivos: [] };
+  }
+
+  // ── 7. Base de datos ─────────────────────────────────────────────────────────
+  try {
+    const inicio = Date.now();
+    const conn = await pool.getConnection();
+    await conn.ping();
+    conn.release();
+    resultado.base_datos = {
+      estado:      'conectada',
+      latencia_ms: Date.now() - inicio,
+      host:        process.env.DB_HOST || 'N/A',
+      nombre:      process.env.DB_NAME || 'N/A'
+    };
+  } catch (err) {
+    resultado.base_datos = {
+      estado: 'error',
+      error:  err.message
+    };
+  }
+
+  // ── 8. Conexiones activas (info del proceso) ──────────────────────────────────
+  try {
+    let conexionesInfo = {};
+    try {
+      const netstat = execSync('ss -tnp 2>/dev/null | grep node | wc -l', { timeout: 5000, encoding: 'utf8' });
+      conexionesInfo.conexiones_node = parseInt(netstat.trim(), 10) || 0;
+    } catch (_) {
+      conexionesInfo.conexiones_node = 0;
+    }
+    try {
+      const totalConns = execSync('ss -tn state established 2>/dev/null | wc -l', { timeout: 5000, encoding: 'utf8' });
+      conexionesInfo.conexiones_establecidas = Math.max(0, (parseInt(totalConns.trim(), 10) || 1) - 1);
+    } catch (_) {
+      conexionesInfo.conexiones_establecidas = 0;
+    }
+    resultado.conexiones = conexionesInfo;
+  } catch (err) {
+    resultado.conexiones = { error: err.message };
+  }
+
+  resultado.timestamp = new Date().toISOString();
+  res.json({ success: true, data: resultado });
 });
 
 module.exports = router;

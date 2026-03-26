@@ -418,9 +418,10 @@ class FacturacionAutomaticaService {
           : null;
 
         if (ultimaCobertura && ultimaCobertura >= ultimoDiaMesSiguiente) {
+          const fechaStr = ultimaCobertura.toISOString().split('T')[0];
           return {
             permitir: false,
-            razon: `Ya tiene cobertura completa hasta ${coberturaData[0].ultima_cobertura} (mes siguiente cubierto al 100%)`
+            razon: `Ya tiene cobertura completa hasta ${fechaStr} (mes siguiente cubierto al 100%)`
           };
         }
 

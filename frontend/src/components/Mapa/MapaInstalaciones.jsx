@@ -161,7 +161,7 @@ const MapaInstalaciones = () => {
   };
 
   // Cache de geocodificación en sessionStorage
-  const CACHE_KEY = 'geo_cache_v2';
+  const CACHE_KEY = 'geo_cache_v3';
   const leerCache = () => { try { return JSON.parse(sessionStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; } };
   const guardarCache = (cache) => { try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch {} };
 
@@ -172,12 +172,17 @@ const MapaInstalaciones = () => {
     return dir.replace(/#\s*[\d\-]+/g, '').replace(/No\.\s*[\d\-]+/g, '').trim();
   };
 
-  // Llama a Nominatim con pausa de 1.1s entre llamadas para respetar rate limit
-  const llamarNominatim = async (q) => {
+  // Espera rate limit de Nominatim (1 req/seg)
+  const esperarRateLimit = async () => {
     const ahora = Date.now();
     const espera = Math.max(0, _ultimaLlamadaNominatim + 1100 - ahora);
     if (espera > 0) await new Promise(r => setTimeout(r, espera));
     _ultimaLlamadaNominatim = Date.now();
+  };
+
+  // Búsqueda libre en Nominatim
+  const llamarNominatim = async (q) => {
+    await esperarRateLimit();
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=co`;
       const res = await fetch(url, { headers: { 'User-Agent': 'ERP-PSI/1.0' } });
@@ -187,13 +192,28 @@ const MapaInstalaciones = () => {
     return null;
   };
 
+  // Búsqueda estructurada en Nominatim (más precisa para ciudades colombianas)
+  const llamarNominatimEstructurado = async ({ street, city, state }) => {
+    await esperarRateLimit();
+    try {
+      const params = new URLSearchParams({ format: 'json', limit: '1', country: 'Colombia' });
+      if (street) params.set('street', street);
+      if (city) params.set('city', city);
+      if (state) params.set('state', state);
+      const url = `https://nominatim.openstreetmap.org/search?${params}`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'ERP-PSI/1.0' } });
+      const data = await res.json();
+      if (data?.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    } catch {}
+    return null;
+  };
+
   /**
    * Geocodifica con múltiples intentos en cascada:
-   * 1. Dirección completa (calle + barrio + ciudad + depto)
-   * 2. Barrio + Ciudad + Depto, Colombia
-   * 3. Ciudad + Depto, Colombia
-   * 4. Solo Ciudad, Colombia
-   * Sólo cachea null para el intento de dirección completa (los demás son reutilizables).
+   * 1. Búsqueda estructurada: calle + ciudad + depto
+   * 2. Búsqueda libre: dirección + barrio + ciudad + depto
+   * 3. Búsqueda estructurada: ciudad + depto (muy confiable)
+   * 4. Búsqueda libre: ciudad + depto, Colombia
    */
   const geocodificarInstancia = async (inst) => {
     const direccion = normalizarDireccion(inst.direccion_instalacion || inst.cliente_direccion || inst.direccion || '');
@@ -201,49 +221,70 @@ const MapaInstalaciones = () => {
     const barrio = inst.barrio || '';
     const depto  = inst.departamento_nombre || inst.departamento || '';
 
-    // Intento 1: dirección completa (único, no se comparte con otras instalaciones)
+    const cache = leerCache();
+
+    // Intento 1: búsqueda estructurada con dirección (más preciso)
+    if (direccion && ciudad) {
+      const key = `struct:${direccion}|${ciudad}|${depto}`.toLowerCase();
+      if (cache[key]) return cache[key];
+      if (cache[key] !== null && cache[key] !== undefined) {
+        // skip
+      } else if (cache[key] === null) {
+        // ya falló antes
+      } else {
+        const coords = await llamarNominatimEstructurado({ street: direccion, city: ciudad, state: depto });
+        if (coords) { cache[key] = coords; guardarCache(cache); return coords; }
+        cache[key] = null; guardarCache(cache);
+      }
+    }
+
+    // Intento 2: búsqueda libre con dirección + barrio + ciudad
     if (direccion) {
       const qFull = [direccion, barrio, ciudad, depto, 'Colombia'].filter(Boolean).join(', ');
-      const keyFull = qFull.toLowerCase().trim();
-      const cache = leerCache();
+      const keyFull = `free:${qFull}`.toLowerCase().trim();
       if (cache[keyFull]) return cache[keyFull];
-      if (cache[keyFull] === null) {
-        // ya falló antes, saltar al siguiente intento
+      if (cache[keyFull] !== null && cache[keyFull] !== undefined) {
+        // skip
+      } else if (cache[keyFull] === null) {
+        // ya falló
       } else {
         const coords = await llamarNominatim(qFull);
-        if (coords) {
-          cache[keyFull] = coords;
-          guardarCache(cache);
-          return coords;
-        }
-        // Cachear null sólo para la dirección exacta de esta instalación
-        cache[keyFull] = null;
-        guardarCache(cache);
+        if (coords) { cache[keyFull] = coords; guardarCache(cache); return coords; }
+        cache[keyFull] = null; guardarCache(cache);
       }
     }
 
-    // Intentos 2-4: por barrio/ciudad (compartidos entre instalaciones del mismo lugar)
-    const intentosCompartidos = [
-      [barrio, ciudad, depto, 'Colombia'].filter(Boolean).join(', '),
-      [ciudad, depto, 'Colombia'].filter(Boolean).join(', '),
-      [ciudad, 'Colombia'].filter(Boolean).join(', '),
-    ].filter(q => q && q !== 'Colombia');
-
-    const cache = leerCache();
-    for (const q of intentosCompartidos) {
-      const key = q.toLowerCase().trim();
-      if (cache[key] !== undefined) {
-        if (cache[key]) return cache[key];
-        continue; // null cacheado → intento siguiente
-      }
-      const coords = await llamarNominatim(q);
-      // Solo cachear éxitos en intentos compartidos (null puede ser temporal)
-      if (coords) {
-        cache[key] = coords;
-        guardarCache(cache);
-        return coords;
+    // Intento 3: búsqueda estructurada solo ciudad + depto (muy confiable para municipios colombianos)
+    if (ciudad) {
+      const keyCiudad = `struct:${ciudad}|${depto}`.toLowerCase();
+      if (cache[keyCiudad]) return cache[keyCiudad];
+      if (cache[keyCiudad] === undefined) {
+        const coords = await llamarNominatimEstructurado({ city: ciudad, state: depto });
+        if (coords) { cache[keyCiudad] = coords; guardarCache(cache); return coords; }
+        // No cachear null — la siguiente instalación de la misma ciudad debería intentar de nuevo
       }
     }
+
+    // Intento 4: búsqueda libre barrio + ciudad
+    if (barrio && ciudad) {
+      const keyBarrio = `free:${barrio}, ${ciudad}, ${depto}, colombia`.toLowerCase();
+      if (cache[keyBarrio]) return cache[keyBarrio];
+      if (cache[keyBarrio] === undefined) {
+        const coords = await llamarNominatim(`${barrio}, ${ciudad}, ${depto}, Colombia`);
+        if (coords) { cache[keyBarrio] = coords; guardarCache(cache); return coords; }
+      }
+    }
+
+    // Intento 5: búsqueda libre solo ciudad
+    if (ciudad) {
+      const keyCiudadFree = `free:${ciudad}, ${depto}, colombia`.toLowerCase();
+      if (cache[keyCiudadFree]) return cache[keyCiudadFree];
+      if (cache[keyCiudadFree] === undefined) {
+        const coords = await llamarNominatim(`${ciudad}, ${depto}, Colombia`);
+        if (coords) { cache[keyCiudadFree] = coords; guardarCache(cache); return coords; }
+      }
+    }
+
     return null;
   };
 
@@ -271,7 +312,7 @@ const MapaInstalaciones = () => {
       const inst = instalaciones[i];
       setProgreso({ actual: i + 1, total: instalaciones.length });
 
-      if (!inst.ciudad_nombre && !inst.barrio) {
+      if (!inst.ciudad_nombre && !inst.barrio && !inst.direccion_instalacion && !inst.cliente_direccion && !inst.direccion) {
         fallos++;
         continue;
       }

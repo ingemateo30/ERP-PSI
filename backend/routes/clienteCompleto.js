@@ -141,7 +141,7 @@ router.get('/contratos',
           ps.nombre AS plan_nombre, ps.tipo AS plan_tipo, ps.precio AS plan_precio
         FROM contratos c
         LEFT JOIN clientes cl ON c.cliente_id = cl.id
-        LEFT JOIN servicios_cliente sc ON sc.cliente_id = c.cliente_id AND sc.estado = 'activo'
+        LEFT JOIN servicios_cliente sc ON c.servicio_id = sc.id
         LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
         ${where}
         ORDER BY c.fecha_generacion DESC
