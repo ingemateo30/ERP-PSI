@@ -844,7 +844,7 @@ const { hasPermission } = useAuth();
                     <p className="mt-1">
                       Fecha de vencimiento:{' '}
                       <strong>
-                        {new Date(renovarForm._fechaVencimiento).toLocaleDateString('es-CO', {
+                        {new Date(String(renovarForm._fechaVencimiento).substring(0,10) + 'T12:00:00').toLocaleDateString('es-CO', {
                           year: 'numeric', month: 'long', day: 'numeric'
                         })}
                       </strong>
