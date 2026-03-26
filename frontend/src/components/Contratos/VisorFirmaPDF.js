@@ -385,12 +385,6 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     canvas_y: canvasY,
                     raw_status: status
                 });
-                    timestamp: Date.now(),
-                    canvas_x: canvasX,
-                    canvas_y: canvasY,
-                    report_id: reportId,
-                    raw_status: status
-                });
             };
 
             // Escuchar eventos del dispositivo
