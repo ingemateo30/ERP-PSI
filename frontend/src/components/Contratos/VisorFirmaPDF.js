@@ -200,59 +200,34 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
             let isDrawing = false;
             let lastX = -1;
             let lastY = -1;
-            let lastReportTime = 0;
             let reportCount = 0;
-            let penWasInRange = false;
-            let tipSwitchEverSeen = false; // Detectar si el firmware soporta tip switch
-            let noTipMode = false;         // Modo "sin tip switch" activado
+            let lastStatus = -1;
 
-            // Configuración específica para STU-540
-            const STU540_CONFIG = {
-                maxX: 9600,     // Resolución X del digitalizador
-                maxY: 5760,     // Resolución Y del digitalizador
-                // Umbral de tiempo para detectar pen levantado (ms)
-                timeThreshold: 60
-            };
+            // Resolución real del digitalizador STU-540 (PID=0xa8)
+            // Los datos muestran X hasta ~10400, Y hasta ~5760
+            const MAX_X = 10800;
+            const MAX_Y = 6000;
 
-            console.log('⚙️ Configuración STU-540:', STU540_CONFIG);
-
-            // Función para limpiar pantalla LCD del STU-540
-            const limpiarPantallaSTU = async () => {
-                try {
-                    console.log('🧹 Intentando limpiar pantalla STU-540...');
-                    const clearCommand = new Uint8Array([0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-                    await selectedDevice.sendReport(0x01, clearCommand);
-                    console.log('✅ Pantalla STU-540 limpiada');
-                } catch (error) {
-                    console.log('⚠️ No se pudo enviar comando de limpieza:', error.message);
-                }
-            };
-
-            // Limpiar pantalla al inicio
-            await limpiarPantallaSTU();
+            console.log('⚙️ STU-540 config: maxX=' + MAX_X + ' maxY=' + MAX_Y);
 
             // ═══════════════════════════════════════════════════════════
-            // Procesamiento de datos HID para STU-540 (PID=0xa8)
+            // STU-540 (PID=0xa8) - Protocolo serial sobre HID
             //
-            // HALLAZGOS del firmware real (Report ID=1, 63 bytes):
-            //   - Byte 0: status (0x80=proximidad, 0x81=tocando)
-            //   - Bytes 1-2: X (little-endian, rango 0-9600)
-            //   - Bytes 3-4: Y (little-endian, rango 0-5760)
-            //   - Bytes 5-6: NO es presión válida (valores ~59000)
-            //   - El tip switch (bit 0) puede NO activarse en algunos
-            //     firmwares. Se usa detección por salto de posición
-            //     para separar trazos cuando el pen se levanta.
+            // Report ID=1, 63 bytes. Formato:
+            //   Byte 0: status (0x80=hover, 0x81/0xC0/etc=tocando)
+            //   Bytes 1-2: X (little-endian)
+            //   Bytes 3-4: Y (little-endian)
+            //   Bytes 5+: datos adicionales (no es presión válida)
+            //
+            // ESTRATEGIA DE DETECCIÓN DE TOQUE:
+            //   Hover = status es EXACTAMENTE 0x80
+            //   Toque = status tiene CUALQUIER bit adicional (no solo 0x80)
+            //   Esto cubre: 0x81 (bit0), 0xC0 (bit6), 0x90 (bit4), etc.
+            //   Si NO funciona, los logs mostrarán los status reales.
             // ═══════════════════════════════════════════════════════════
             const procesarDatosHID = (event) => {
                 reportCount++;
                 const data = new Uint8Array(event.data.buffer);
-                const now = Date.now();
-
-                // Log de diagnóstico
-                if (reportCount <= 10 || reportCount % 5000 === 0) {
-                    const hex = Array.from(data.slice(0, 14)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
-                    console.log(`📊 Report #${reportCount} | ID=${event.reportId} len=${data.length} | ${hex}`);
-                }
 
                 if (data.length < 5) return;
 
@@ -260,16 +235,24 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 const x = data[1] | (data[2] << 8);
                 const y = data[3] | (data[4] << 8);
 
-                // ── Validar que son coordenadas del pen ──
-                const inRange = (status & 0x80) !== 0;
-                const tipSwitch = (status & 0x01) !== 0;
+                // ── Log CUALQUIER cambio de status (CRÍTICO para debug) ──
+                if (status !== lastStatus) {
+                    console.log(`🔔 STATUS CAMBIÓ: 0x${lastStatus.toString(16)} → 0x${status.toString(16)} (report #${reportCount}) x=${x} y=${y}`);
+                    console.log(`   Bits: b7=${(status>>7)&1} b6=${(status>>6)&1} b5=${(status>>5)&1} b4=${(status>>4)&1} b3=${(status>>3)&1} b2=${(status>>2)&1} b1=${(status>>1)&1} b0=${status&1}`);
+                    // Log bytes completos cuando cambia status
+                    const hex = Array.from(data.slice(0, 20)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
+                    console.log(`   Raw: ${hex}`);
+                    lastStatus = status;
+                }
 
-                // Si el pen NO está en rango, finalizar cualquier trazo
-                if (!inRange) {
-                    if (penWasInRange) {
-                        console.log('🖊️ Pen fuera de rango');
-                        penWasInRange = false;
-                    }
+                // Log primeros reportes
+                if (reportCount <= 5) {
+                    const hex = Array.from(data.slice(0, 20)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
+                    console.log(`📊 Report #${reportCount} | ID=${event.reportId} len=${data.length} | ${hex}`);
+                }
+
+                // ── Pen NO está en rango → fin de trazo ──
+                if (!(status & 0x80)) {
                     if (isDrawing) {
                         isDrawing = false;
                         ctx.stroke();
@@ -277,95 +260,48 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     return;
                 }
 
-                penWasInRange = true;
-
-                // Validar coordenadas en rango del digitalizador
-                if (x > STU540_CONFIG.maxX + 200 || y > STU540_CONFIG.maxY + 200) return;
+                // Validar coordenadas
+                if (x > MAX_X || y > MAX_Y) return;
                 if (x === 0 && y === 0) return;
 
-                // ── Determinar si el pen está TOCANDO ──
-                // Opción 1: Tip switch (bit 0) está activo
-                // Opción 2: Si el firmware nunca activa bit 0, usar
-                //           el status completo (0x81 vs 0x80)
-                // Para compatibilidad: dibujar cuando tipSwitch O cuando
-                // status indica contacto de cualquier forma
-                const isTouching = tipSwitch || (status & 0x01) !== 0;
+                // ══════════════════════════════════════════════════
+                // DETECCIÓN DE TOQUE:
+                // Hover puro = 0x80 exactamente (solo bit 7 = proximidad)
+                // Contacto = status tiene CUALQUIER otro bit activo
+                // Ejemplos: 0x81, 0x90, 0xC0, 0xA0, 0x84, etc.
+                // ══════════════════════════════════════════════════
+                const isHoverOnly = (status === 0x80);
 
-                // Log primeros eventos de contacto
-                if (reportCount <= 30 || (tipSwitch && reportCount <= 100)) {
-                    console.log(`🔍 #${reportCount} status=0x${status.toString(16)} x=${x} y=${y} tip=${tipSwitch} range=${inRange}`);
-                }
-
-                // ── Detectar modo de operación del firmware ──
-                if (tipSwitch && !tipSwitchEverSeen) {
-                    tipSwitchEverSeen = true;
-                    noTipMode = false;
-                    console.log('✅ Firmware soporta tip switch - modo preciso activado');
-                }
-                // Si después de 50 reportes nunca vimos tip=true,
-                // activar modo "sin tip" que dibuja en proximidad
-                if (reportCount === 50 && !tipSwitchEverSeen) {
-                    noTipMode = true;
-                    console.log('⚠️ Firmware SIN tip switch detectado - modo proximidad activado');
-                }
-
-                // ── Decidir si dibujar ──
-                if (!isTouching && !noTipMode) {
-                    // Firmware con tip switch: solo dibujar en contacto
+                if (isHoverOnly) {
+                    // Pen está cerca pero NO toca → no dibujar
                     if (isDrawing) {
                         isDrawing = false;
                         ctx.stroke();
                     }
                     return;
                 }
-                // En noTipMode: dibujar siempre que haya proximidad (inRange=true)
-                // La separación de trazos se hace por salto de posición/tiempo
 
-                // ── Mapear coordenadas al canvas ──
-                const canvasX = (x / STU540_CONFIG.maxX) * canvas.width;
-                const canvasY = (y / STU540_CONFIG.maxY) * canvas.height;
+                // ── Pen está TOCANDO la superficie → DIBUJAR ──
+                const canvasX = (x / MAX_X) * canvas.width;
+                const canvasY = (y / MAX_Y) * canvas.height;
 
-                // ── Detectar "pen levantado" por salto de posición ──
-                // Si la distancia entre el punto actual y el anterior es
-                // muy grande, el pen se levantó y se movió a otro lugar.
-                // Iniciar un nuevo trazo en vez de conectar los puntos.
-                const timeDelta = now - lastReportTime;
-                let penLifted = false;
-
-                if (lastX >= 0 && lastY >= 0) {
-                    const jumpDist = Math.sqrt(
-                        (canvasX - lastX) ** 2 + (canvasY - lastY) ** 2
-                    );
-                    // Pen se levantó si: salto grande O pausa larga
-                    penLifted = jumpDist > 30 && timeDelta > STU540_CONFIG.timeThreshold;
-                }
-
-                lastReportTime = now;
-
-                // ── Dibujar ──
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
                 ctx.strokeStyle = '#000000';
                 ctx.lineWidth = 2.5;
 
-                if (!isDrawing || penLifted) {
-                    // Iniciar nuevo trazo
-                    if (isDrawing) {
-                        ctx.stroke(); // Cerrar trazo anterior
-                    }
+                if (!isDrawing) {
                     isDrawing = true;
                     ctx.beginPath();
                     ctx.moveTo(canvasX, canvasY);
                     lastX = canvasX;
                     lastY = canvasY;
                 } else {
-                    // Continuar trazo - filtro anti-jitter
                     const dx = canvasX - lastX;
                     const dy = canvasY - lastY;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
                     if (dist > 1.5) {
-                        // Curva suave con punto medio
                         const midX = (lastX + canvasX) / 2;
                         const midY = (lastY + canvasY) / 2;
                         ctx.quadraticCurveTo(lastX, lastY, midX, midY);
