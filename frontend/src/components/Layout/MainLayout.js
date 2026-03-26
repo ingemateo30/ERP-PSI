@@ -470,20 +470,29 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const navServicios = [
     { icon: <Wifi size={22} />, label: 'Planes de Servicio', path: '/config/service-plans', permission: 'administrador' },
     { icon: <Wrench size={22} />, label: 'Instalaciones', path: '/instalaciones', permission: 'instalador,secretaria,supervisor,administrador' },
-    { icon: <BarChart3 size={22} />, label: 'Mapa de Instalaciones', path: '/mapa-instalaciones', permission: 'instalador,administrador,supervisor,secretaria' }
+    { icon: <BarChart3 size={22} />, label: 'Mapa de Instalaciones', path: '/mapa-instalaciones', permission: 'instalador,administrador,supervisor,secretaria' },
+    { icon: <Package size={22} />, label: 'Inventario', path: '/inventario', permission: 'administrador,supervisor' },
+    { icon: <Navigation size={22} />, label: 'Seguimiento Técnicos', path: '/seguimiento-tecnicos', permission: 'administrador,supervisor' },
+    { icon: <Wrench size={22} />, label: 'Mis Trabajos', path: '/mis-trabajos', permission: 'instalador,secretaria,supervisor,administrador' }
   ];
 
   // ── 4. Facturación ────────────────────────────────────────────────────────
   const navFacturacion = [
     { icon: <TrendingUp size={22} />, label: 'Facturas', path: '/facturas', permission: 'secretaria,supervisor,administrador' },
     { icon: <Activity size={22} />, label: 'Facturación Masiva', path: '/facturacion-automatica', permission: 'administrador' },
-    { icon: <DollarSign size={22} />, label: 'Cartera / Cobros', path: '/cartera', permission: 'secretaria,supervisor,administrador' }
+    { icon: <DollarSign size={22} />, label: 'Cartera / Cobros', path: '/cartera', permission: 'secretaria,supervisor,administrador' },
+    { icon: <FileText size={22} />, label: 'Contratos', path: '/contratos', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Clock size={22} />, label: 'Historial de Facturas', path: '/historial-facturacion', permission: 'secretaria,supervisor,administrador' },
+    { icon: <ArrowRightLeft size={22} />, label: 'Cruce Masivo Bancos', path: '/cruce-masivo-bancos', permission: 'administrador' },
+    { icon: <Building2 size={22} />, label: 'Formatos Bancarios', path: '/formatos-bancarios', permission: 'administrador' }
   ];
 
   // ── 5. Soporte ────────────────────────────────────────────────────────────
   const navSoporte = [
     { icon: <FileText size={22} />, label: 'PQR / Tickets', path: '/pqr', permission: 'secretaria,supervisor,administrador' },
-    { icon: <Loader2 size={22} />, label: 'Incidencias', path: '/incidencias', permission: 'secretaria,supervisor,administrador' }
+    { icon: <Loader2 size={22} />, label: 'Incidencias', path: '/incidencias', permission: 'secretaria,supervisor,administrador' },
+    { icon: <MessageSquare size={22} />, label: 'Mis PQR', path: '/mis-pqr', permission: 'instalador,secretaria,supervisor,administrador' },
+    { icon: <Calendar size={22} />, label: 'Calendario', path: '/calendario', permission: 'secretaria,supervisor,administrador,instalador' }
   ];
 
   // ── 6. Reportes & Estadísticas ────────────────────────────────────────────
@@ -495,7 +504,8 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   // ── 7. Configuración ──────────────────────────────────────────────────────
   const navConfiguracion = [
     { icon: <Settings size={22} />, label: 'Configuración General', path: '/config', permission: 'administrador' },
-    { icon: <UserCheck size={22} />, label: 'Usuarios', path: '/admin/users', permission: 'administrador' }
+    { icon: <UserCheck size={22} />, label: 'Usuarios', path: '/admin/users', permission: 'administrador' },
+    { icon: <Mail size={22} />, label: 'Plantillas Correo', path: '/config/plantillas', permission: 'administrador' }
   ];
 
   // ── 8. Sistema (solo administrador) ──────────────────────────────────────
