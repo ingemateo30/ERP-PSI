@@ -203,8 +203,11 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
             let reportCount = 0;
             let lastStatus = -1;
 
+            // Buffer de suavizado: promedio móvil de últimos N puntos
+            const SMOOTH_BUFFER_SIZE = 4;
+            let smoothBuffer = [];
+
             // Resolución real del digitalizador STU-540 (PID=0xa8)
-            // Los datos muestran X hasta ~10400, Y hasta ~5760
             const MAX_X = 10800;
             const MAX_Y = 6000;
 
@@ -222,21 +225,31 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
 
             await limpiarPantallaSTU();
 
-            // ═══════════════════════════════════════════════════════════
-            // STU-540 (PID=0xa8) - Protocolo serial sobre HID
-            //
-            // Report ID=1, 63 bytes. Formato:
-            //   Byte 0: status (0x80=hover, 0x81/0xC0/etc=tocando)
-            //   Bytes 1-2: X (little-endian)
-            //   Bytes 3-4: Y (little-endian)
-            //   Bytes 5+: datos adicionales (no es presión válida)
-            //
-            // ESTRATEGIA DE DETECCIÓN DE TOQUE:
-            //   Hover = status es EXACTAMENTE 0x80
-            //   Toque = status tiene CUALQUIER bit adicional (no solo 0x80)
-            //   Esto cubre: 0x81 (bit0), 0xC0 (bit6), 0x90 (bit4), etc.
-            //   Si NO funciona, los logs mostrarán los status reales.
-            // ═══════════════════════════════════════════════════════════
+            // Configurar estilo del canvas una sola vez
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+
+            // Función de suavizado: promedio móvil ponderado
+            const smoothPoint = (rawX, rawY) => {
+                smoothBuffer.push({ x: rawX, y: rawY });
+                if (smoothBuffer.length > SMOOTH_BUFFER_SIZE) {
+                    smoothBuffer.shift();
+                }
+                // Promedio ponderado: puntos más recientes pesan más
+                let totalWeight = 0;
+                let sx = 0;
+                let sy = 0;
+                for (let i = 0; i < smoothBuffer.length; i++) {
+                    const weight = i + 1; // 1, 2, 3, 4...
+                    sx += smoothBuffer[i].x * weight;
+                    sy += smoothBuffer[i].y * weight;
+                    totalWeight += weight;
+                }
+                return { x: sx / totalWeight, y: sy / totalWeight };
+            };
+
             const procesarDatosHID = (event) => {
                 reportCount++;
                 const data = new Uint8Array(event.data.buffer);
@@ -247,27 +260,18 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 const x = data[1] | (data[2] << 8);
                 const y = data[3] | (data[4] << 8);
 
-                // ── Log CUALQUIER cambio de status (CRÍTICO para debug) ──
+                // Log cambios de status para debug
                 if (status !== lastStatus) {
-                    console.log(`🔔 STATUS CAMBIÓ: 0x${lastStatus.toString(16)} → 0x${status.toString(16)} (report #${reportCount}) x=${x} y=${y}`);
-                    console.log(`   Bits: b7=${(status>>7)&1} b6=${(status>>6)&1} b5=${(status>>5)&1} b4=${(status>>4)&1} b3=${(status>>3)&1} b2=${(status>>2)&1} b1=${(status>>1)&1} b0=${status&1}`);
-                    // Log bytes completos cuando cambia status
-                    const hex = Array.from(data.slice(0, 20)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
-                    console.log(`   Raw: ${hex}`);
+                    console.log(`🔔 STATUS: 0x${lastStatus.toString(16)} → 0x${status.toString(16)} | x=${x} y=${y} | report #${reportCount}`);
                     lastStatus = status;
                 }
 
-                // Log primeros reportes
-                if (reportCount <= 5) {
-                    const hex = Array.from(data.slice(0, 20)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
-                    console.log(`📊 Report #${reportCount} | ID=${event.reportId} len=${data.length} | ${hex}`);
-                }
-
-                // ── Pen NO está en rango → fin de trazo ──
+                // Pen NO está en rango → fin de trazo
                 if (!(status & 0x80)) {
                     if (isDrawing) {
                         isDrawing = false;
                         ctx.stroke();
+                        smoothBuffer = [];
                     }
                     return;
                 }
@@ -276,34 +280,29 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 if (x > MAX_X || y > MAX_Y) return;
                 if (x === 0 && y === 0) return;
 
-                // ══════════════════════════════════════════════════
-                // DETECCIÓN DE TOQUE:
-                // Hover puro = 0x80 exactamente (solo bit 7 = proximidad)
-                // Contacto = status tiene CUALQUIER otro bit activo
-                // Ejemplos: 0x81, 0x90, 0xC0, 0xA0, 0x84, etc.
-                // ══════════════════════════════════════════════════
-                const isHoverOnly = (status === 0x80);
-
-                if (isHoverOnly) {
-                    // Pen está cerca pero NO toca → no dibujar
+                // Hover (0x80 exactamente) → no dibujar
+                if (status === 0x80) {
                     if (isDrawing) {
                         isDrawing = false;
                         ctx.stroke();
+                        smoothBuffer = [];
                     }
                     return;
                 }
 
-                // ── Pen está TOCANDO la superficie → DIBUJAR ──
-                const canvasX = (x / MAX_X) * canvas.width;
-                const canvasY = (y / MAX_Y) * canvas.height;
+                // Pen TOCANDO → dibujar con suavizado
+                const rawCanvasX = (x / MAX_X) * canvas.width;
+                const rawCanvasY = (y / MAX_Y) * canvas.height;
 
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 2.5;
+                // Aplicar suavizado de coordenadas
+                const smoothed = smoothPoint(rawCanvasX, rawCanvasY);
+                const canvasX = smoothed.x;
+                const canvasY = smoothed.y;
 
                 if (!isDrawing) {
+                    // Inicio de trazo
                     isDrawing = true;
+                    smoothBuffer = [{ x: rawCanvasX, y: rawCanvasY }];
                     ctx.beginPath();
                     ctx.moveTo(canvasX, canvasY);
                     lastX = canvasX;
@@ -313,13 +312,19 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     const dy = canvasY - lastY;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
-                    if (dist > 1.5) {
+                    // Umbral mínimo para evitar jitter
+                    if (dist > 2) {
+                        // Curva cuadrática suave SIN romper el path
                         const midX = (lastX + canvasX) / 2;
                         const midY = (lastY + canvasY) / 2;
                         ctx.quadraticCurveTo(lastX, lastY, midX, midY);
-                        ctx.stroke();
-                        ctx.beginPath();
-                        ctx.moveTo(midX, midY);
+                        // Renderizar cada 3 puntos sin romper el path
+                        if (signaturePoints.length % 3 === 0) {
+                            ctx.stroke();
+                            // Reiniciar path desde último punto para mantener continuidad
+                            ctx.beginPath();
+                            ctx.moveTo(midX, midY);
+                        }
                         lastX = canvasX;
                         lastY = canvasY;
                     }
