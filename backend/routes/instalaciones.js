@@ -257,7 +257,7 @@ router.get('/seguimiento-tecnicos',
   async (req, res) => {
     try {
       const { fecha, sede_id } = req.query;
-      const fechaConsulta = fecha || new Date().toISOString().split('T')[0];
+      const fechaConsulta = fecha || fechaColombia();
 
       let sedeFilter = '';
       const params = [fechaConsulta, fechaConsulta];
@@ -568,7 +568,7 @@ router.get('/exportar',
                 )
             ].join('\n');
 
-            const filename = `instalaciones_${new Date().toISOString().split('T')[0]}.csv`;
+            const filename = `instalaciones_${fechaColombia()}.csv`;
 
             res.setHeader('Content-Type', 'text/csv; charset=utf-8');
             res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
@@ -1831,7 +1831,7 @@ router.patch('/:id/cambiar-estado',
 
         if (estado === 'completada') {
             updates.push('fecha_completada = ?');
-            params.push(new Date().toISOString().split('T')[0]);
+            params.push(fechaColombia());
         }
 
         if (observaciones) {

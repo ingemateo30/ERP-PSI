@@ -73,15 +73,17 @@ const FacturaModal = ({
       });
       setBusquedaCliente(factura.nombre_cliente || '');
     } else {
-      const fechaHoy = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const fechaHoy = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
       const fechaVenc = new Date();
       fechaVenc.setDate(fechaVenc.getDate() + 30);
-      
+      const fechaVencStr = `${fechaVenc.getFullYear()}-${String(fechaVenc.getMonth()+1).padStart(2,'0')}-${String(fechaVenc.getDate()).padStart(2,'0')}`;
+
       setFormData({
         numero_factura: '',
         cliente_id: '',
         fecha_emision: fechaHoy,
-        fecha_vencimiento: fechaVenc.toISOString().split('T')[0],
+        fecha_vencimiento: fechaVencStr,
         periodo_desde: '',
         periodo_hasta: '',
         subtotal: '0',

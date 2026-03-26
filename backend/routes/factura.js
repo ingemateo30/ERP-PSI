@@ -9,6 +9,15 @@ const { validarCrearFactura, validarActualizarFactura, validarPagarFactura } = r
 const { body, validationResult } = require('express-validator');
 
 
+// Helper para fecha local en formato MySQL (evita bug UTC de toISOString)
+const fechaLocalMySQL = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 // Middleware de autenticación para todas las rutas
 router.use(authenticateToken);
 
@@ -659,7 +668,7 @@ router.get('/reportes/cartera',
     try {
       const { fecha_corte, incluir_detalle = false } = req.query;
       
-      const fechaCorte = fecha_corte || new Date().toISOString().split('T')[0];
+      const fechaCorte = fecha_corte || fechaLocalMySQL();
       
       let query = `
         SELECT 
@@ -1063,7 +1072,7 @@ router.post('/webhook/pago-exitoso',
       // Marcar como pagada
       const Factura = require('../models/factura');
       const facturaActualizada = await Factura.marcarComoPagada(factura[0].id, {
-        fecha_pago: fecha_pago || new Date().toISOString().split('T')[0],
+        fecha_pago: fecha_pago || fechaLocalMySQL(),
         metodo_pago,
         referencia_pago,
         banco_id

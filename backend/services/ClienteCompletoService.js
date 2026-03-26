@@ -638,7 +638,7 @@ const observacionesContrato = JSON.stringify({
         cliente.barrio || sedeData.barrio || 'No especificado',
         sedeData.telefono_sede || cliente.telefono,
         sedeData.contacto_sede || cliente.nombre,
-        fechaProgramada.toISOString().split('T')[0],
+        fechaLocalMySQL(fechaProgramada),
         '09:00:00',
         'nueva',
         costoInstalacionTotal, // ✅ CORRECCIÓN 1: Costo correcto
@@ -753,7 +753,7 @@ const observacionesContrato = JSON.stringify({
     return {
       id: instalacionId,
       numero: numeroOrden,
-      fecha_programada: new Date(Date.now() + (24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+      fecha_programada: fechaLocalMySQL(new Date(Date.now() + (24 * 60 * 60 * 1000))),
       direccion: cliente.direccion,
       estado: 'programada'
     };
@@ -1092,7 +1092,7 @@ const observacionesContrato = JSON.stringify({
         subtotal: parseFloat(valor),
         iva: 0, // Sin IVA para estratos residenciales
         total: parseFloat(valor),
-        fecha_estimada_vencimiento: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        fecha_estimada_vencimiento: fechaLocalMySQL(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000))
       };
 
       // Agregar conceptos adicionales al preview
@@ -1863,7 +1863,7 @@ static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
       clienteId,
       planId,
       precioFinal,
-      sedeData.fechaActivacion || new Date().toISOString().split('T')[0],
+      sedeData.fechaActivacion || fechaLocalMySQL(),
       observacionesServicio
     ]);
 
@@ -1918,7 +1918,7 @@ static async crearServiciosDeSede(conexion, clienteId, sedeData, createdBy) {
     const [resultado] = await conexion.execute(query, [
       clienteId,
       config.plan_id,
-      config.sede_data.fechaActivacion || new Date().toISOString().split('T')[0],
+      config.sede_data.fechaActivacion || fechaLocalMySQL(),
       precio,
       observaciones
     ]);
@@ -1968,8 +1968,7 @@ static async generarContratoParaSede(conexion, clienteId, serviciosDeLaSede, sed
   let fechaVencimientoPermanencia = null;
   if (tipoPermanencia === 'con_permanencia' && mesesPermanencia > 0) {
     const fechaInicio = new Date();
-    fechaVencimientoPermanencia = new Date(fechaInicio.setMonth(fechaInicio.getMonth() + mesesPermanencia))
-      .toISOString().split('T')[0];
+    fechaVencimientoPermanencia = fechaLocalMySQL(new Date(fechaInicio.setMonth(fechaInicio.getMonth() + mesesPermanencia)));
   }
 
   // ✅ CALCULAR PRECIO TOTAL SUMANDO TODOS LOS SERVICIOS
@@ -2354,14 +2353,14 @@ console.log(`💰 TOTALES FACTURA: Internet=$${valorInternet}, TV=$${valorTelevi
     const fechaActual = new Date();
 
     // FECHA DE EMISIÓN: Hoy
-    const fechaEmision = fechaActual.toISOString().split('T')[0];
+    const fechaEmision = fechaLocalMySQL(fechaActual);
 
     // FECHA DE VENCIMIENTO: 5 días después de la generación (como se solicita)
     const fechaVencimiento = new Date(fechaActual);
     fechaVencimiento.setDate(fechaVencimiento.getDate() + 5);
 
     // PERÍODO DE FACTURACIÓN: Si se crea el 14 de julio, el primer ciclo va hasta el 13 de agosto
-    const fechaDesde = fechaActual.toISOString().split('T')[0]; // Desde hoy
+    const fechaDesde = fechaLocalMySQL(fechaActual); // Desde hoy
 
     const fechaHasta = new Date(fechaActual);
     fechaHasta.setMonth(fechaHasta.getMonth() + 1); // Un mes después
@@ -2372,9 +2371,9 @@ console.log(`💰 TOTALES FACTURA: Internet=$${valorInternet}, TV=$${valorTelevi
 
     return {
       fechaEmision: fechaEmision,
-      fechaVencimiento: fechaVencimiento.toISOString().split('T')[0],
+      fechaVencimiento: fechaLocalMySQL(fechaVencimiento),
       fechaDesde: fechaDesde,
-      fechaHasta: fechaHasta.toISOString().split('T')[0],
+      fechaHasta: fechaLocalMySQL(fechaHasta),
       periodoFacturacion: periodoFacturacion
     };
   }
@@ -2709,7 +2708,7 @@ static async generarNumeroFactura(conexion) {
         precio_personalizado: datosServicio.precio_personalizado,
         tipoContrato: datosServicio.tipo_permanencia || 'sin_permanencia',
         mesesPermanencia: datosServicio.meses_permanencia || (datosServicio.tipo_permanencia === 'con_permanencia' ? 6 : 0),
-        fechaActivacion: datosServicio.fecha_activacion || new Date().toISOString().split('T')[0],
+        fechaActivacion: datosServicio.fecha_activacion || fechaLocalMySQL(),
         observaciones: datosServicio.observaciones || '',
         direccion_servicio: datosServicio.direccion_servicio || cliente.direccion,
         nombre_sede: datosServicio.nombre_sede || 'Servicio Adicional'

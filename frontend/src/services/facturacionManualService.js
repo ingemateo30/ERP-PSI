@@ -662,8 +662,8 @@ try {
       ...facturaData,
       ...totales,
       // Asegurar formato de fechas
-      fecha_emision: facturaData.fecha_emision || new Date().toISOString().split('T')[0],
-      fecha_vencimiento: facturaData.fecha_vencimiento || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      fecha_emision: facturaData.fecha_emision || (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })(),
+      fecha_vencimiento: facturaData.fecha_vencimiento || (() => { const n = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })(),
       // Convertir valores numéricos
       internet: parseFloat(facturaData.internet || 0),
       television: parseFloat(facturaData.television || 0),

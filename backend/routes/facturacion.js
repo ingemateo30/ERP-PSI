@@ -9,6 +9,15 @@ const FacturacionAutomaticaController = require('../controllers/FacturacionAutom
 const BancosFormatosController = require('../controllers/BancosFormatosController');
 const CruceMasivoController = require('../controllers/CruceMasivoController');
 
+// Helper para fecha local en formato MySQL (evita bug UTC de toISOString)
+const fechaLocalMySQL = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 // Multer en memoria para cruce masivo (no guarda en disco)
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -903,7 +912,7 @@ router.post('/facturas/:id/pagar', requireRole('administrador', 'supervisor'), a
       });
     }
 
-    const fechaPagoFinal = fecha_pago || new Date().toISOString().split('T')[0];
+    const fechaPagoFinal = fecha_pago || fechaLocalMySQL();
     
     // ✅ CORRECCIÓN: Actualizar con banco_id, metodo_pago y referencia_pago
     let nuevoEstado = 'pendiente';

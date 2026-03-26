@@ -4,6 +4,15 @@ const { Database } = require('../models/Database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { audit, metaFromReq } = require('../utils/auditLogger');
 
+// Helper para fecha local en formato MySQL (evita bug UTC de toISOString)
+const fechaLocalMySQL = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 // Auto-crear tabla ubicaciones_tecnicos si no existe
 Database.query(`
   CREATE TABLE IF NOT EXISTS ubicaciones_tecnicos (
@@ -41,7 +50,7 @@ router.use(authenticateToken);
 router.get('/mis-trabajos/hoy', async (req, res) => {
   try {
     const instaladorId = req.user.id;
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = fechaLocalMySQL();
     
     const trabajos = await Database.query(`
       SELECT 
@@ -521,7 +530,7 @@ router.get('/mis-incidencias/estadisticas', async (req, res) => {
 router.get('/estadisticas', async (req, res) => {
   try {
     const instaladorId = req.user.id;
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = fechaLocalMySQL();
     
     // Pendientes hoy
     const pendientesHoy = await Database.query(`

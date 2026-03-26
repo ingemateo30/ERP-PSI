@@ -15,7 +15,7 @@ const PagoModal = ({ isOpen, onClose, onPagar, factura, loading, error }) => {
   const [datosPago, setDatosPago] = useState({
     valor_pagado: '',
     metodo_pago: 'efectivo',
-    fecha_pago: new Date().toISOString().split('T')[0],
+    fecha_pago: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })(),
     referencia_pago: '',
     observaciones: '',
     banco: '',
@@ -33,7 +33,7 @@ const PagoModal = ({ isOpen, onClose, onPagar, factura, loading, error }) => {
       setDatosPago({
         valor_pagado: valorTotal.toString(),
         metodo_pago: 'efectivo',
-        fecha_pago: new Date().toISOString().split('T')[0],
+        fecha_pago: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })(),
         referencia_pago: '',
         observaciones: '',
         banco: '',
