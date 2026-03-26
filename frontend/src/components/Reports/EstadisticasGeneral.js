@@ -26,9 +26,11 @@ const EstadisticasGeneral = () => {
   const [estadisticas, setEstadisticas] = useState(null);
   const [animatedValues, setAnimatedValues] = useState({});
   const [selectedPeriod, setSelectedPeriod] = useState('mes');
-  const [filtros, setFiltros] = useState({
-    fecha_desde: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    fecha_hasta: new Date().toISOString().split('T')[0]
+  const [filtros, setFiltros] = useState(() => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const ld = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    return { fecha_desde: ld(firstDay), fecha_hasta: ld(now) };
   });
 
   useEffect(() => {
@@ -116,9 +118,10 @@ const EstadisticasGeneral = () => {
         fechaDesde = new Date(today.getFullYear(), today.getMonth(), 1);
     }
 
+    const ld = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     setFiltros({
-      fecha_desde: fechaDesde.toISOString().split('T')[0],
-      fecha_hasta: today.toISOString().split('T')[0]
+      fecha_desde: ld(fechaDesde),
+      fecha_hasta: ld(today)
     });
   };
 

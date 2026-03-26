@@ -275,8 +275,8 @@ const load = useCallback(async () => {
 
         const resFacturas = await api.get('/facturas', { 
           params: { 
-            fecha_desde: hace6Meses.toISOString().split('T')[0],
-            fecha_hasta: en3Meses.toISOString().split('T')[0],
+            fecha_desde: `${hace6Meses.getFullYear()}-${String(hace6Meses.getMonth()+1).padStart(2,'0')}-${String(hace6Meses.getDate()).padStart(2,'0')}`,
+            fecha_hasta: `${en3Meses.getFullYear()}-${String(en3Meses.getMonth()+1).padStart(2,'0')}-${String(en3Meses.getDate()).padStart(2,'0')}`,
             limit: 1000
           } 
         });

@@ -365,6 +365,32 @@ const tienePermanencia = permanenciaMeses > 1;
             text-align: justify;
         }
 
+        /* RECUADRO DE FIRMA EN PAGO Y FACTURACIÓN */
+        .firma-facturacion-box {
+            border: 1.5px solid #000;
+            padding: 2mm 3mm;
+            margin-top: 2mm;
+            text-align: center;
+        }
+        .firma-facturacion-titulo {
+            font-size: 7pt;
+            font-weight: bold;
+            margin-bottom: 1mm;
+        }
+        .firma-facturacion-espacio {
+            width: 100%;
+            height: 18mm;
+            border-bottom: 1px solid #000;
+            margin-bottom: 1mm;
+        }
+        .firma-facturacion-linea {
+            font-size: 6.5pt;
+            margin-bottom: 0.5mm;
+        }
+        .firma-facturacion-datos {
+            font-size: 6.5pt;
+        }
+
         /* FIRMA - COMPACTA */
         .signature-section {
             margin-top: 6mm;
@@ -648,6 +674,14 @@ static generarDetallesServicios(contratoData, servicios) {
                     <div class="box-title">PAGO Y FACTURACIÓN</div>
                     <div class="box-content-page2">
                         <p>La factura le debe llegar como mínimo 5 días hábiles antes de la fecha de pago. Si no llega, puede solicitarla a través de nuestros Medios de Atención y debe pagarla oportunamente. Si no paga a tiempo, previo aviso, suspenderemos su servicio hasta que pague sus saldos pendientes. Contamos con 3 días hábiles luego de su pago para reconectarle el servicio. Si no paga a tiempo, también podemos reportar su deuda a las centrales de riesgo. Para esto tenemos que avisarle por lo menos con 20 días calendario de anticipación. Si paga luego de este reporte tenemos la obligación dentro del mes de seguimiento de informar su pago para que ya no aparezca reportado. Si tiene un reclamo sobre su factura, puede presentarlo antes de la fecha de pago y en ese caso no debe pagar las sumas reclamadas hasta que resolvamos su solicitud. Si ya pagó, tiene 6 meses para presentar la reclamación.</p>
+                        <div class="firma-facturacion-box">
+                            <p class="firma-facturacion-titulo">Acepto recibir la factura por medios electrónicos</p>
+                            <div class="firma-facturacion-espacio">
+                                <!-- Espacio para la firma del cliente -->
+                            </div>
+                            <p class="firma-facturacion-linea">Firma del suscriptor</p>
+                            <p class="firma-facturacion-datos"><strong>CC/CE:</strong> ${contratoData.cliente_identificacion || ''}</p>
+                        </div>
                     </div>
                 </div>
 

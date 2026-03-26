@@ -37,7 +37,7 @@ class ClientService {
       const fechaObj = new Date(fecha);
       const offsetMinutos = fechaObj.getTimezoneOffset();
       fechaObj.setMinutes(fechaObj.getMinutes() + offsetMinutos);
-      return fechaObj.toISOString().split('T')[0];
+      return `${fechaObj.getFullYear()}-${String(fechaObj.getMonth()+1).padStart(2,'0')}-${String(fechaObj.getDate()).padStart(2,'0')}`;
     } catch (error) {
       console.error('Error corrigiendo fecha:', error);
       return fecha;

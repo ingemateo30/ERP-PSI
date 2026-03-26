@@ -11,7 +11,8 @@ import {
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const fmt = (n) => Math.round(parseFloat(n) || 0).toLocaleString('es-CO');
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-CO') : '—';
+const fmtDate = (d) => d ? new Date(String(d).substring(0,10) + 'T12:00:00').toLocaleDateString('es-CO') : '—';
+const localDateStr = (dt = new Date()) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 
 const metodoBadge = {
     transferencia: 'bg-blue-100 text-blue-800',
@@ -48,16 +49,16 @@ const CrucePagosBancarios = () => {
     const [loadingPagadas, setLoadingPagadas]     = useState(false);
 
     const [filtrosPendientes, setFiltrosPendientes] = useState({
-        fecha_inicio: new Date(new Date().setDate(1)).toISOString().split('T')[0],
-        fecha_fin:    new Date().toISOString().split('T')[0],
+        fecha_inicio: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; })(),
+        fecha_fin:    localDateStr(),
         busqueda:     ''
     });
 
     const [filtrosPagadas, setFiltrosPagadas] = useState({
         banco:        '',
         metodo_pago:  '',
-        fecha_inicio: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
-        fecha_fin:    new Date().toISOString().split('T')[0],
+        fecha_inicio: (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return localDateStr(d); })(),
+        fecha_fin:    localDateStr(),
         busqueda:     ''
     });
 
@@ -66,7 +67,7 @@ const CrucePagosBancarios = () => {
     const [facturaSeleccionada, setFacturaSeleccionada] = useState(null);
     const [datosPago, setDatosPago] = useState({
         monto: '', referencia: '',
-        fecha_pago:   new Date().toISOString().split('T')[0],
+        fecha_pago:   localDateStr(),
         banco_id:     '',
         metodo_pago:  'transferencia',
         observaciones: ''
@@ -152,7 +153,7 @@ const CrucePagosBancarios = () => {
         setDatosPago({
             monto:         Math.round(f.total),
             referencia:    '',
-            fecha_pago:    new Date().toISOString().split('T')[0],
+            fecha_pago:    localDateStr(),
             banco_id:      '',
             metodo_pago:   'transferencia',
             observaciones: ''
@@ -191,7 +192,7 @@ const CrucePagosBancarios = () => {
         });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        a.download = `pagos_${tab}_${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `pagos_${tab}_${localDateStr()}.csv`;
         a.click();
     };
 

@@ -7,6 +7,14 @@ const FacturacionAutomaticaService = require('../services/FacturacionAutomaticaS
 const IVACalculatorService = require('../services/IVACalculatorService');
 const Database = require('../models/Database');
 
+// Helper para fecha local en formato MySQL (evita bug UTC de toISOString)
+const fechaLocalMySQL = (date = new Date()) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 class FacturacionController {
 
   /**
@@ -449,8 +457,8 @@ class FacturacionController {
           ...estadisticas,
           ...estadisticasIVA[0],
           periodo: {
-            fecha_inicio: fecha_inicio || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-            fecha_fin: fecha_fin || new Date().toISOString().split('T')[0]
+            fecha_inicio: fecha_inicio || fechaLocalMySQL(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
+            fecha_fin: fecha_fin || fechaLocalMySQL()
           }
         }
       });

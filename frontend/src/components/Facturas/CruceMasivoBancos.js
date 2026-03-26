@@ -70,7 +70,7 @@ const CruceMasivoBancos = () => {
   const { hasPermission } = useAuth();
   const [bancoSel, setBancoSel] = useState(null);
   const [archivo, setArchivo] = useState(null);
-  const [fechaPago, setFechaPago] = useState(new Date().toISOString().split('T')[0]);
+  const [fechaPago, setFechaPago] = useState(() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; });
   const [estado, setEstado] = useState('idle'); // idle | previewing | processing | done | error
   const [preview, setPreview] = useState(null);
   const [resultado, setResultado] = useState(null);

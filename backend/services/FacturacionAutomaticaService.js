@@ -11,6 +11,14 @@ const { Database } = require('../models/Database');
 const InteresesMoratoriosService = require('./InteresesMoratoriosService');
 const IVACalculatorService = require('./IVACalculatorService');
 
+// Helper: fecha local Colombia → YYYY-MM-DD (sin desfase UTC)
+function fechaLocalMySQL(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 class FacturacionAutomaticaService {
 
   /**
@@ -153,8 +161,10 @@ class FacturacionAutomaticaService {
           LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
           LEFT JOIN facturas f ON c.id = f.cliente_id
             AND f.estado != 'anulada'
+            AND f.activo = 1
           WHERE c.estado = 'activo'
           GROUP BY c.id, c.identificacion, c.nombre, c.estrato, c.fecha_registro
+          HAVING COUNT(DISTINCT sc.id) > 0
           ORDER BY c.id ASC
         `);
 
@@ -213,7 +223,26 @@ class FacturacionAutomaticaService {
 
         // ✅ DETERMINAR FECHA BASE (fecha de inicio del contrato/instalación)
         // Parsear con T12:00:00 para evitar el desfase UTC-5 que devuelve un día antes
-        const parseFecha = (f) => new Date(String(f).split('T')[0] + 'T12:00:00');
+        const parseFecha = (f) => {
+          if (!f) return new Date('invalid');
+          // Si es un objeto Date de JS (MySQL devuelve Date en UTC midnight),
+          // usar getUTC* para evitar desfase de timezone (UTC-5 Colombia)
+          if (f instanceof Date) {
+            return new Date(f.getUTCFullYear(), f.getUTCMonth(), f.getUTCDate(), 12, 0, 0);
+          }
+          // Si es string ISO o similar, extraer la parte de fecha
+          const str = String(f);
+          const match = str.match(/(\d{4})-(\d{2})-(\d{2})/);
+          if (match) {
+            return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]), 12, 0, 0);
+          }
+          // Fallback
+          const d = new Date(str);
+          if (!isNaN(d.getTime())) {
+            return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0);
+          }
+          return new Date('invalid');
+        };
         let fechaBaseFacturacion;
 
         if (cliente.fecha_instalacion_real) {
@@ -239,11 +268,10 @@ class FacturacionAutomaticaService {
           tipoFacturacion = 'Primera facturación';
 
           fechaDesde = new Date(fechaBaseFacturacion);
-          // 1ra factura: desde registro hasta el día antes de un mes después
-          // Ej: 24 mar → 23 abr  |  24 ene → 23 feb  |  31 ene → 27/28 feb
+          // 1ra factura: desde fecha de registro/instalación por exactamente 30 días
+          // Ej: 27 jun → 26 jul  |  24 mar → 22 abr  |  15 ene → 13 feb
           fechaHasta = new Date(fechaDesde);
-          fechaHasta.setMonth(fechaHasta.getMonth() + 1);
-          fechaHasta.setDate(fechaHasta.getDate() - 1);
+          fechaHasta.setDate(fechaHasta.getDate() + 29); // 30 días incluyendo el primero
 
           console.log(`   🆕 1ra Factura: ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
         }
@@ -263,16 +291,19 @@ class FacturacionAutomaticaService {
           const ultimaFechaFacturada = parseFecha(cliente.ultima_fecha_facturada);
 
           // Desde: día siguiente a la última factura
-          // Ej: 1ra terminó 23 abr → 2da empieza 24 abr
+          // Ej: 1ra terminó 3 abr → 2da empieza 4 abr
           fechaDesde = new Date(ultimaFechaFacturada);
           fechaDesde.setDate(fechaDesde.getDate() + 1);
 
-          // 2da factura (nivelación): desde fechaDesde hasta el ÚLTIMO DÍA DE ESE MISMO MES
-          // Ej: 24 abr → 30 abr  (NO 30 días más, solo completar el mes)
+          // 2da factura (nivelación): desde fechaDesde hasta el ÚLTIMO DÍA DEL MES
+          // donde cae fechaDesde. Esto alinea el ciclo al mes calendario.
+          // Ej: 4 abr → 30 abr  |  27 jul → 31 jul  |  15 mar → 31 mar
+          // La 3ra factura ya será del 1 al último día del mes siguiente (mes completo).
           fechaHasta = new Date(
             fechaDesde.getFullYear(),
             fechaDesde.getMonth() + 1,
-            0 // Último día del mes de fechaDesde
+            0, // Último día del mes de fechaDesde
+            12, 0, 0
           );
 
           console.log(`   🔄 2da Factura (nivelación): ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
@@ -300,7 +331,7 @@ class FacturacionAutomaticaService {
           fechaDesde.setDate(fechaDesde.getDate() + 1);
 
           // Siempre facturar hasta el último día del mes en que cae fechaDesde
-          fechaHasta = new Date(fechaDesde.getFullYear(), fechaDesde.getMonth() + 1, 0);
+          fechaHasta = new Date(fechaDesde.getFullYear(), fechaDesde.getMonth() + 1, 0, 12, 0, 0);
           esNivelacion = fechaDesde.getDate() !== 1; // nivelación cuando no empieza el día 1
           tipoFacturacion = esNivelacion ? 'Nivelación' : 'Mensual completo';
 
@@ -313,7 +344,14 @@ class FacturacionAutomaticaService {
 
         // ✅ VALIDACIÓN: Asegurar que las fechas son válidas
         if (isNaN(fechaDesde.getTime()) || isNaN(fechaHasta.getTime())) {
-          throw new Error('Error en el cálculo de fechas de facturación');
+          console.error(`   ❌ Fechas inválidas para cliente ${cliente.nombre} (ID: ${clienteId})`);
+          console.error(`      fechaDesde: ${fechaDesde}, fechaHasta: ${fechaHasta}`);
+          console.error(`      fecha_registro: ${cliente.fecha_registro} (tipo: ${typeof cliente.fecha_registro})`);
+          console.error(`      fecha_instalacion_real: ${cliente.fecha_instalacion_real} (tipo: ${typeof cliente.fecha_instalacion_real})`);
+          console.error(`      fecha_activacion_servicios: ${cliente.fecha_activacion_servicios} (tipo: ${typeof cliente.fecha_activacion_servicios})`);
+          console.error(`      ultima_fecha_facturada: ${cliente.ultima_fecha_facturada} (tipo: ${typeof cliente.ultima_fecha_facturada})`);
+          console.error(`      totalFacturas: ${totalFacturas}`);
+          throw new Error(`Error en el cálculo de fechas de facturación para cliente ${cliente.nombre} (ID: ${clienteId}). Verifique las fechas del cliente.`);
         }
 
         if (diasFacturados < 1 || diasFacturados > 400) {
@@ -323,14 +361,14 @@ class FacturacionAutomaticaService {
         console.log(`   ⏱️ Días a facturar: ${diasFacturados}`);
 
         return {
-          fecha_desde: fechaDesde.toISOString().split('T')[0],
-          fecha_hasta: fechaHasta.toISOString().split('T')[0],
+          fecha_desde: fechaLocalMySQL(fechaDesde),
+          fecha_hasta: fechaLocalMySQL(fechaHasta),
           periodo_descripcion: periodoDescripcion,
           dias_facturados: diasFacturados,
           es_primera_factura: esPrimeraFactura,
           es_nivelacion: esNivelacion,
           tipo_facturacion: tipoFacturacion,
-          fecha_base_instalacion: fechaBaseFacturacion.toISOString().split('T')[0],
+          fecha_base_instalacion: fechaLocalMySQL(fechaBaseFacturacion),
           numero_factura: totalFacturas + 1
         };
 
@@ -409,7 +447,7 @@ class FacturacionAutomaticaService {
           : null;
 
         if (ultimaCobertura && ultimaCobertura > ultimoDiaMesSiguiente) {
-          const fechaStr = ultimaCobertura.toISOString().split('T')[0];
+          const fechaStr = fechaLocalMySQL(ultimaCobertura);
           return {
             permitir: false,
             razon: `Ya tiene cobertura completa hasta ${fechaStr} (mes siguiente cubierto al 100%)`
@@ -572,17 +610,16 @@ class FacturacionAutomaticaService {
   static async calcularSaldoAnterior(conexion, clienteId) {
     try {
       const [resultado] = await conexion.execute(`
-        SELECT 
+        SELECT
           COALESCE(SUM(f.total - COALESCE(
-            (SELECT SUM(p.monto) 
-             FROM pagos p 
-             WHERE p.factura_id = f.id 
-               AND p.activo = 1), 0
+            (SELECT SUM(p.monto)
+             FROM pagos p
+             WHERE p.factura_id = f.id), 0
           )), 0) as saldo_pendiente
         FROM facturas f
         WHERE f.cliente_id = ?
           AND f.estado IN ('pendiente', 'vencida')
-          AND f.activo = '1'
+          AND f.activo = 1
       `, [clienteId]);
 
       const saldo = parseFloat(resultado[0]?.saldo_pendiente || 0);
@@ -738,8 +775,8 @@ class FacturacionAutomaticaService {
         cliente.identificacion,
         cliente.nombre,
         `${fechaEmision.getFullYear()}-${String(fechaEmision.getMonth() + 1).padStart(2, '0')}`,
-        fechaEmision.toISOString().split('T')[0],
-        fechaVencimiento.toISOString().split('T')[0],
+        fechaLocalMySQL(fechaEmision),
+        fechaLocalMySQL(fechaVencimiento),
         periodo.fecha_desde,
         periodo.fecha_hasta,
         totales.internet,

@@ -5,6 +5,15 @@ const cron = require('node-cron');
 const FacturacionAutomaticaService = require('../services/FacturacionAutomaticaService');
 const { Database } = require('../models/Database');
 
+// Helper para fecha local en formato MySQL (evita bug UTC de toISOString)
+const fechaLocalMySQL = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 // Importaciones opcionales
 let EmailService;
 
@@ -240,7 +249,7 @@ class CronJobs {
               f.numero_factura,
               f.total,
               DATEDIFF(NOW(), f.fecha_vencimiento) as dias_mora,
-              COALESCE(SUM(p.valor_pagado), 0) as total_pagado
+              COALESCE(SUM(p.monto), 0) as total_pagado
             FROM facturas f
             LEFT JOIN pagos p ON f.id = p.factura_id
             WHERE f.estado IN ('pendiente', 'vencida')
@@ -426,7 +435,7 @@ class CronJobs {
 
         try {
           // Crear respaldo de facturas del día
-          const fechaHoy = new Date().toISOString().split('T')[0];
+          const fechaHoy = fechaLocalMySQL();
 
           const [facturasHoy] = await conexion.execute(`
             SELECT COUNT(*) as total FROM facturas 

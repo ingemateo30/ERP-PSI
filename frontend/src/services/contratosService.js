@@ -434,7 +434,7 @@ async obtenerProximosAVencer(dias = 30) {
 
         const params = {
             estado: 'activo',
-            fecha_vencimiento_hasta: fechaLimite.toISOString().split('T')[0]
+            fecha_vencimiento_hasta: `${fechaLimite.getFullYear()}-${String(fechaLimite.getMonth()+1).padStart(2,'0')}-${String(fechaLimite.getDate()).padStart(2,'0')}`
         };
 
         return await this.obtenerTodos(params);

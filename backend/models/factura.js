@@ -1,5 +1,14 @@
 const pool = require('../config/database');
 
+// Helper para fecha local en formato MySQL (evita bug UTC de toISOString)
+const fechaLocalMySQL = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 class Factura {
   // Obtener todas las facturas con filtros
   static async obtenerTodas(filtros = {}) {
@@ -341,7 +350,7 @@ class Factura {
         cliente[0].identificacion,
         cliente[0].nombre,
         datosFactura.periodo_facturacion,
-        datosFactura.fecha_emision || new Date().toISOString().split('T')[0],
+        datosFactura.fecha_emision || fechaLocalMySQL(),
         datosFactura.fecha_vencimiento,
         datosFactura.fecha_desde,
         datosFactura.fecha_hasta,
@@ -491,7 +500,7 @@ class Factura {
             updated_at = NOW()
         WHERE id = ?
       `, [
-        datosPago.fecha_pago || new Date().toISOString().split('T')[0],
+        datosPago.fecha_pago || fechaLocalMySQL(),
         datosPago.metodo_pago,
         datosPago.referencia_pago || null,
         datosPago.banco_id || null,

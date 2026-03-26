@@ -4,6 +4,14 @@ const path = require('path');
 const { PDFDocument, rgb } = require('pdf-lib');
 const Database = require('../config/database');
 
+// Helper: obtener fecha local Colombia en formato YYYY-MM-DD sin desfase UTC
+function fechaLocalMySQL(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 class FirmaPDFService {
   
   /**
@@ -217,7 +225,7 @@ static async abrirContratoParaFirma(contratoId) {
       await this.agregarFirmaAlPDF(pdfDoc, signature_base64, {
         firmado_por,
         cedula_firmante,
-        fecha_firma: new Date().toLocaleDateString('es-CO'),
+        fecha_firma: fechaLocalMySQL().split('-').reverse().join('/'),
         observaciones
       }, contrato);
 
@@ -230,9 +238,8 @@ static async abrirContratoParaFirma(contratoId) {
 
       console.log('💾 PDF firmado guardado en:', rutaPDFFirmado);
 
-      // Actualizar base de datos - Usar fecha actual sin problemas de zona horaria
-      const fechaActual = new Date();
-      const fechaFirmaMySQL = fechaActual.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+      // Actualizar base de datos - Usar fecha LOCAL Colombia (no UTC)
+      const fechaFirmaMySQL = fechaLocalMySQL();
 
       const observacionesActualizadas = `${contrato.observaciones || ''}\n[FIRMA DIGITAL] Firmado por: ${firmado_por} - Cédula: ${cedula_firmante} - Fecha: ${new Date().toLocaleString('es-CO')} - Tipo: ${tipo_firma}${observaciones ? ` - Obs: ${observaciones}` : ''}`;
 
@@ -320,14 +327,30 @@ static async abrirContratoParaFirma(contratoId) {
         console.log(`✍️ Colocando firma en página ${pageIndex + 1} de ${totalPages}`);
         const { width, height } = page2.getSize();
 
-        // ✅ Imagen de firma centrada sobre la línea de firma
-        const firmaX = (width - signatureWidth) / 2; // Centrada horizontalmente
-        const firmaY = 95; // Bajada para quedar justo sobre la línea de firma
+        // ✅ Firma en el recuadro de PAGO Y FACTURACIÓN (columna izquierda, dentro del box)
+        // El recuadro está en la columna izquierda de la página 2
+        // Posición aproximada: X centrado en columna izquierda, Y en la zona del box de firma
+        const firmaBoxWidth = 100;
+        const firmaBoxHeight = 45;
+        const firmaBoxX = 80;
+        const firmaBoxY = 520; // Dentro del recuadro PAGO Y FACTURACIÓN
 
-        console.log('✍️ Colocando firma en página 2 (contrato principal) - Centrada sobre línea');
+        console.log('✍️ Colocando firma en recuadro PAGO Y FACTURACIÓN');
+        page2.drawImage(signatureImage, {
+          x: firmaBoxX,
+          y: firmaBoxY,
+          width: firmaBoxWidth,
+          height: firmaBoxHeight,
+        });
+
+        // ✅ Firma en la sección inferior de aceptación del contrato (centrada)
+        const firmaX = (width - signatureWidth) / 2;
+        const firmaY = 65; // Sobre la línea de firma sección aceptación
+
+        console.log('✍️ Colocando firma en sección de aceptación del contrato');
         console.log(`📐 Dimensiones página: width=${width}, height=${height}`);
 
-        // Dibujar imagen de firma centrada
+        // Dibujar imagen de firma centrada en la sección inferior
         page2.drawImage(signatureImage, {
           x: firmaX,
           y: firmaY,
@@ -386,7 +409,7 @@ const infoY = margin + blockHeight;       // Cerca del borde superior (60 puntos
 
         // ✅ Imagen de firma centrada sobre la línea de firma EN PERMANENCIA
         const firmaX3 = (width - signatureWidth) / 2; // Centrada horizontalmente
-        const firmaY3 = 190; // Más arriba (reducido desde 140 a 110)
+        const firmaY3 = 235; // Sobre la línea de firma en permanencia
 
         console.log('✍️ Colocando firma en página 3 (anexo de permanencia)');
         console.log(`📐 Dimensiones página 3: width=${width}, height=${height}`);

@@ -3,6 +3,14 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+
+// Helper: fecha local Colombia → YYYY-MM-DD (sin desfase UTC)
+function fechaLocalMySQL(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 const AlertasClienteService = require('../services/AlertasClienteService');
 const EstadoClienteService = require('../services/EstadoClienteService');
 const { autenticar } = require('../middleware/auth');
@@ -954,7 +962,7 @@ router.post('/clientes-con-servicios',
       if (datosCliente.tiene_permanencia && datosCliente.permanencia_meses) {
         const fecha = new Date();
         fecha.setMonth(fecha.getMonth() + parseInt(datosCliente.permanencia_meses));
-        fechaHasta = fecha.toISOString().split('T')[0];
+        fechaHasta = fechaLocalMySQL(fecha);
       }
 
       const queryCliente = `
@@ -978,7 +986,7 @@ router.post('/clientes-con-servicios',
         datosCliente.ciudad_id ? parseInt(datosCliente.ciudad_id) : null,  // ✅ CORREGIDO: Se guarda ciudad
         datosCliente.sector_id ? parseInt(datosCliente.sector_id) : null,  // ✅ CORREGIDO: Se guarda sector
         datosCliente.observaciones || null,
-        new Date().toISOString().split('T')[0],         // ✅ CORREGIDO: Se guarda fecha_registro
+        fechaLocalMySQL(),                               // ✅ fecha_registro local Colombia
         fechaHasta,                                     // ✅ CORREGIDO: Se calcula fecha_hasta
         codigoUsuario,                                  // ✅ CORREGIDO: Se guarda código_usuario
         req.user?.id || 1
@@ -1221,8 +1229,8 @@ async function generarContratoConConsecutivo(conexion, clienteId, datosCliente, 
   let fechaVencimientoPermanencia = null;
   if (tienePermancencia && mesesPermanencia > 0) {
     const fechaInicio = new Date();
-    fechaVencimientoPermanencia = new Date(fechaInicio.setMonth(fechaInicio.getMonth() + mesesPermanencia))
-      .toISOString().split('T')[0];
+    const fechaFin = new Date(fechaInicio.setMonth(fechaInicio.getMonth() + mesesPermanencia));
+    fechaVencimientoPermanencia = fechaLocalMySQL(fechaFin);
   }
 
   const queryContrato = `
@@ -1241,8 +1249,8 @@ async function generarContratoConConsecutivo(conexion, clienteId, datosCliente, 
     tienePermancencia ? 'con_permanencia' : 'sin_permanencia',
     mesesPermanencia,
     parseFloat(datosCliente.costo_instalacion || 150000),
-    new Date().toISOString().split('T')[0],
-    new Date().toISOString().split('T')[0],
+    fechaLocalMySQL(),
+    fechaLocalMySQL(),
     fechaVencimientoPermanencia,
     createdBy
   ];
@@ -1272,7 +1280,7 @@ async function crearServicioCliente(conexion, clienteId, planId, datosServicio, 
     planId,
     datosServicio.precioPersonalizado ? parseFloat(datosServicio.precioPersonalizado) : null,
     `${tipoServicio} - ${datosServicio.observaciones || 'Servicio creado automáticamente'}`,
-    datosServicio.fechaActivacion || new Date().toISOString().split('T')[0]
+    datosServicio.fechaActivacion || fechaLocalMySQL()
   ];
 
   const [resultado] = await conexion.execute(queryServicio, valoresServicio);
@@ -1284,7 +1292,7 @@ async function crearServicioCliente(conexion, clienteId, planId, datosServicio, 
  */
 async function generarInstalacionAutomatica(conexion, clienteId, servicioId, contratoId, datosServicio, createdBy) {
   const fechaInstalacion = datosServicio.fechaInstalacion ||
-    new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    fechaLocalMySQL(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
   const queryInstalacion = `
     INSERT INTO instalaciones (
@@ -1482,10 +1490,10 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
       datosCliente.identificacion || '',                      // 3. identificacion_cliente
       datosCliente.nombre || '',                              // 4. nombre_cliente
       periodoFacturacion,                                     // 5. periodo_facturacion
-      fechaEmision.toISOString().split('T')[0],              // 6. fecha_emision
-      fechaVencimiento.toISOString().split('T')[0],          // 7. fecha_vencimiento
-      fechaDesde.toISOString().split('T')[0],                // 8. fecha_desde
-      fechaHasta.toISOString().split('T')[0],                // 9. fecha_hasta
+      fechaLocalMySQL(fechaEmision),                          // 6. fecha_emision
+      fechaLocalMySQL(fechaVencimiento),                     // 7. fecha_vencimiento
+      fechaLocalMySQL(fechaDesde),                           // 8. fecha_desde
+      fechaLocalMySQL(fechaHasta),                           // 9. fecha_hasta
       valorInternet,                                          // 10. internet
       valorTelevision,                                        // 11. television
       0.00,                                                   // 12. saldo_anterior
@@ -1556,8 +1564,8 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
       numero_factura: numeroFactura,
       total: total,
       cliente_id: clienteId,
-      fecha_emision: fechaEmision.toISOString().split('T')[0],
-      fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
+      fecha_emision: fechaLocalMySQL(fechaEmision),
+      fecha_vencimiento: fechaLocalMySQL(fechaVencimiento),
       servicios_incluidos: serviciosArray.length
     };
 
