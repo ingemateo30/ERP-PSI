@@ -57,6 +57,7 @@ const MapaClientes = lazy(() => import('./components/Mapa/MapaClientes'));
 const CarteraPanel = lazy(() => import('./components/Cartera/CarteraPanel'));
 const SeguimientoTecnicos = lazy(() => import('./components/Instalaciones/SeguimientoTecnicos'));
 const MisPQR = lazy(() => import('./components/PQR/MisPQR'));
+const EstadoServidor = lazy(() => import('./components/Sistema/EstadoServidor'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -618,6 +619,18 @@ function App() {
                   <ProtectedRoute requiredRole="administrador">
                     <MainLayout title="Auditoría" subtitle="Logs de acciones críticas del sistema">
                       <AuditoriaLogs />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Estado del servidor — solo administradores */}
+              <Route
+                path="/sistema/estado-servidor"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Estado del Servidor" subtitle="Monitoreo de recursos y salud del sistema">
+                      <EstadoServidor />
                     </MainLayout>
                   </ProtectedRoute>
                 }
