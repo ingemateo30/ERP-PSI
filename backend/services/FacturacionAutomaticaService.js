@@ -279,24 +279,41 @@ class FacturacionAutomaticaService {
         }
         
         // ========================================================================
-        // CASO 3: FACTURACIÓN MENSUAL ESTÁNDAR (2+ facturas previas)
-        // Se genera el día 20 del mes actual cubriendo el mes SIGUIENTE completo
-        // Ejemplo: 20 de marzo → factura del 1 al 30 de abril
+        // CASO 3: FACTURACIÓN MENSUAL (2+ facturas previas)
+        // Continúa desde el día siguiente a la última cobertura.
+        // - Si la cobertura termina ANTES del fin del mes actual → nivelación al fin del mes actual
+        // - Si termina en el mes actual o siguiente → completa hasta fin del mes siguiente
         // ========================================================================
         else {
-          tipoFacturacion = 'Facturación mensual estándar (mes siguiente)';
+          if (!cliente.ultima_fecha_facturada) {
+            throw new Error('No se encontró la fecha de la última factura para facturación mensual');
+          }
 
-          // Primer día del mes siguiente (JavaScript maneja overflow automáticamente)
-          const primerDiaMesSiguiente = new Date(
-            fechaReferencia.getFullYear(),
-            fechaReferencia.getMonth() + 1,
-            1
-          );
+          const ultimaFechaFacturada = parseFecha(cliente.ultima_fecha_facturada);
 
-          fechaDesde = new Date(primerDiaMesSiguiente.getFullYear(), primerDiaMesSiguiente.getMonth(), 1);
-          fechaHasta = new Date(primerDiaMesSiguiente.getFullYear(), primerDiaMesSiguiente.getMonth() + 1, 0);
+          // Día siguiente a la última cobertura
+          fechaDesde = new Date(ultimaFechaFacturada);
+          fechaDesde.setDate(fechaDesde.getDate() + 1);
 
-          console.log(`   📊 Factura mensual (mes siguiente): ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
+          // Último día del mes actual y del mes siguiente
+          const finMesActual   = new Date(fechaReferencia.getFullYear(), fechaReferencia.getMonth() + 1, 0);
+          const finMesSiguiente = new Date(fechaReferencia.getFullYear(), fechaReferencia.getMonth() + 2, 0);
+
+          if (fechaDesde <= finMesActual) {
+            // Cobertura terminó antes de fin del mes actual → nivelación para completar el mes
+            fechaHasta = finMesActual;
+            esNivelacion = true;
+            tipoFacturacion = 'Nivelación (completar mes actual)';
+            console.log(`   🔄 Nivelación mes actual: ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
+          } else {
+            // Cobertura entra al mes siguiente → facturar hasta fin del mes siguiente
+            fechaHasta = finMesSiguiente;
+            esNivelacion = (fechaDesde.getDate() > 1); // es nivelación si no empieza el día 1
+            tipoFacturacion = esNivelacion
+              ? 'Nivelación (completar mes siguiente)'
+              : 'Facturación mensual estándar';
+            console.log(`   📊 Factura mes siguiente: ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
+          }
         }
 
         // ✅ CÁLCULO CORRECTO DE DÍAS
@@ -392,18 +409,18 @@ class FacturacionAutomaticaService {
           return { permitir: true, razon: 'Con primera factura — genera segunda (nivelación)' };
         }
 
-        // 2+ facturas: billing mensual estándar
-        // Bloquear solo si ya hay cobertura desde el primer día del mes siguiente
+        // 2+ facturas: billing mensual
+        // Bloquear SOLO si ya tiene cobertura completa hasta el último día del mes siguiente
         const hoy = new Date();
-        const primerDiaMesSiguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+        const ultimoDiaMesSiguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0);
         const ultimaCobertura = coberturaData[0].ultima_cobertura
           ? new Date(coberturaData[0].ultima_cobertura)
           : null;
 
-        if (ultimaCobertura && ultimaCobertura >= primerDiaMesSiguiente) {
+        if (ultimaCobertura && ultimaCobertura >= ultimoDiaMesSiguiente) {
           return {
             permitir: false,
-            razon: `Ya tiene cobertura hasta ${coberturaData[0].ultima_cobertura} (mes siguiente cubierto)`
+            razon: `Ya tiene cobertura completa hasta ${coberturaData[0].ultima_cobertura} (mes siguiente cubierto al 100%)`
           };
         }
 

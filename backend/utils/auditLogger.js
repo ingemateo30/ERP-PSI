@@ -50,13 +50,18 @@ async function audit({
 }
 
 /**
- * Extrae IP y User-Agent de un objeto request de Express.
+ * Extrae IP real y User-Agent de un objeto request de Express.
+ * Soporta X-Forwarded-For cuando app corre detrás de proxy.
  */
 function metaFromReq(req) {
-  return {
-    ip: req.ip || req.connection?.remoteAddress || null,
-    user_agent: req.get?.('User-Agent') || null,
-  };
+  const forwarded = req.headers?.['x-forwarded-for'];
+  const ip = forwarded
+    ? forwarded.split(',')[0].trim()
+    : (req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null);
+
+  const userAgent = req.get?.('User-Agent') || null;
+
+  return { ip, user_agent: userAgent };
 }
 
 module.exports = { audit, metaFromReq };

@@ -63,6 +63,9 @@ const AjustarVista = ({ instalaciones }) => {
   return null;
 };
 
+// Timestamp de última llamada a Nominatim — a nivel de módulo para persistir entre renders
+let _ultimaLlamadaNominatim = 0;
+
 // ==========================================
 // COMPONENTE PRINCIPAL
 // ==========================================
@@ -169,13 +172,12 @@ const MapaInstalaciones = () => {
     return dir.replace(/#\s*[\d\-]+/g, '').replace(/No\.\s*[\d\-]+/g, '').trim();
   };
 
-  // Llama a Nominatim con pausa y retorna {lat,lng} o null
-  let _ultimaLlamada = 0;
+  // Llama a Nominatim con pausa de 1.1s entre llamadas para respetar rate limit
   const llamarNominatim = async (q) => {
     const ahora = Date.now();
-    const espera = Math.max(0, _ultimaLlamada + 1100 - ahora);
+    const espera = Math.max(0, _ultimaLlamadaNominatim + 1100 - ahora);
     if (espera > 0) await new Promise(r => setTimeout(r, espera));
-    _ultimaLlamada = Date.now();
+    _ultimaLlamadaNominatim = Date.now();
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=co`;
       const res = await fetch(url, { headers: { 'User-Agent': 'ERP-PSI/1.0' } });
@@ -187,32 +189,60 @@ const MapaInstalaciones = () => {
 
   /**
    * Geocodifica con múltiples intentos en cascada:
-   * 1. Barrio + Ciudad + Depto, Colombia
-   * 2. Ciudad + Depto, Colombia
-   * 3. Solo Ciudad, Colombia
+   * 1. Dirección completa (calle + barrio + ciudad + depto)
+   * 2. Barrio + Ciudad + Depto, Colombia
+   * 3. Ciudad + Depto, Colombia
+   * 4. Solo Ciudad, Colombia
+   * Sólo cachea null para el intento de dirección completa (los demás son reutilizables).
    */
   const geocodificarInstancia = async (inst) => {
+    const direccion = normalizarDireccion(inst.direccion_instalacion || inst.cliente_direccion || inst.direccion || '');
     const ciudad = inst.ciudad_nombre || inst.ciudad || '';
     const barrio = inst.barrio || '';
     const depto  = inst.departamento_nombre || inst.departamento || '';
 
-    const intentos = [
+    // Intento 1: dirección completa (único, no se comparte con otras instalaciones)
+    if (direccion) {
+      const qFull = [direccion, barrio, ciudad, depto, 'Colombia'].filter(Boolean).join(', ');
+      const keyFull = qFull.toLowerCase().trim();
+      const cache = leerCache();
+      if (cache[keyFull]) return cache[keyFull];
+      if (cache[keyFull] === null) {
+        // ya falló antes, saltar al siguiente intento
+      } else {
+        const coords = await llamarNominatim(qFull);
+        if (coords) {
+          cache[keyFull] = coords;
+          guardarCache(cache);
+          return coords;
+        }
+        // Cachear null sólo para la dirección exacta de esta instalación
+        cache[keyFull] = null;
+        guardarCache(cache);
+      }
+    }
+
+    // Intentos 2-4: por barrio/ciudad (compartidos entre instalaciones del mismo lugar)
+    const intentosCompartidos = [
       [barrio, ciudad, depto, 'Colombia'].filter(Boolean).join(', '),
       [ciudad, depto, 'Colombia'].filter(Boolean).join(', '),
       [ciudad, 'Colombia'].filter(Boolean).join(', '),
     ].filter(q => q && q !== 'Colombia');
 
     const cache = leerCache();
-    for (const q of intentos) {
+    for (const q of intentosCompartidos) {
       const key = q.toLowerCase().trim();
       if (cache[key] !== undefined) {
         if (cache[key]) return cache[key];
-        continue; // null cacheado → saltar
+        continue; // null cacheado → intento siguiente
       }
       const coords = await llamarNominatim(q);
-      cache[key] = coords;
-      guardarCache(cache);
-      if (coords) return coords;
+      // Solo cachear éxitos en intentos compartidos (null puede ser temporal)
+      if (coords) {
+        cache[key] = coords;
+        guardarCache(cache);
+        return coords;
+      }
     }
     return null;
   };

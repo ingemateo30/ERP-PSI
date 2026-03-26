@@ -136,7 +136,7 @@ router.get('/contratos',
         SELECT
           c.id, c.numero_contrato, c.tipo_contrato, c.tipo_permanencia,
           c.permanencia_meses, c.costo_instalacion, c.fecha_generacion,
-          c.fecha_inicio, c.fecha_fin, c.estado, c.valor_mensual, c.observaciones,
+          c.fecha_inicio, c.fecha_fin, c.estado, c.observaciones,
           cl.nombre AS cliente_nombre, cl.identificacion AS cliente_identificacion,
           ps.nombre AS plan_nombre, ps.tipo AS plan_tipo, ps.precio AS plan_precio
         FROM contratos c
