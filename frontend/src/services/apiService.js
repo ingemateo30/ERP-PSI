@@ -378,6 +378,13 @@ export const configService = {
   getDepartments: () => apiService.get('/config/departments'),
 };
 
+export const sistemaService = {
+  getEstado: () => apiService.get('/sistema/estado'),
+  generarBackup: () => apiService.post('/sistema/backup/generar'),
+  getUltimoBackup: () => apiService.get('/sistema/backup/ultimo'),
+  listarBackups: () => apiService.get('/sistema/backup/listar'),
+};
+
 // Exportar el servicio principal
 export default apiService;
 export { API_BASE_URL };
