@@ -962,7 +962,7 @@ router.post('/clientes-con-servicios',
       if (datosCliente.tiene_permanencia && datosCliente.permanencia_meses) {
         const fecha = new Date();
         fecha.setMonth(fecha.getMonth() + parseInt(datosCliente.permanencia_meses));
-        fechaHasta = fecha.toISOString().split('T')[0];
+        fechaHasta = fechaLocalMySQL(fecha);
       }
 
       const queryCliente = `

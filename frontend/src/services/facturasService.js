@@ -94,8 +94,8 @@ export const facturasService = {
         const hoy = new Date();
         const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
         
-        queryParams.fecha_desde = primerDia.toISOString().split('T')[0];
-        queryParams.fecha_hasta = hoy.toISOString().split('T')[0];
+        queryParams.fecha_desde = `${primerDia.getFullYear()}-${String(primerDia.getMonth()+1).padStart(2,'0')}-${String(primerDia.getDate()).padStart(2,'0')}`;
+        queryParams.fecha_hasta = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
       }
 
       console.log('📊 Enviando parámetros de estadísticas:', queryParams);
