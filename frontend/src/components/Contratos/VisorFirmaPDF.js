@@ -235,81 +235,68 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
 
                 // ═══════════════════════════════════════════════════════
                 // DIAGNÓSTICO: Log detallado de los primeros reportes
-                // para entender el formato real del protocolo HID
+                // para entender el formato real del protocolo HID.
+                // Esto es CRÍTICO para saber qué reportId y formato
+                // usa esta versión específica del STU-540.
                 // ═══════════════════════════════════════════════════════
-                if (reportCount <= 20 || reportCount % 5000 === 0) {
-                    const hex = Array.from(data.slice(0, 12)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
+                if (reportCount <= 30 || reportCount % 5000 === 0) {
+                    const hex = Array.from(data.slice(0, 14)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
                     console.log(`📊 Report #${reportCount} | ID=${reportId} len=${data.length} | ${hex}`);
                 }
 
-                // ═══════════════════════════════════════════════════════
-                // STU-540 Report IDs (WebHID ya quita el report ID del buffer):
-                //   2  = PenData (coordenadas de pen sin encriptar)
-                //   5  = DeviceStatus
-                //  11  = PenDataEncrypted
-                //  15  = PenDataEncryptedEx
-                //  17  = PenDataTimeCountSequence
-                //  25  = PenDataTimeCountSequenceEncrypted
-                //
-                // Solo procesar reportes de pen data
-                // ═══════════════════════════════════════════════════════
-                const PEN_REPORT_IDS = [2, 11, 15, 17, 25];
-                if (!PEN_REPORT_IDS.includes(reportId)) {
-                    if (reportCount <= 20) {
-                        console.log(`⏭️ Ignorando reporte con ID=${reportId} (no es pen data)`);
+                // Necesitamos al menos 7 bytes para parsear status + x + y + pressure
+                if (data.length < 7) {
+                    if (reportCount <= 10) {
+                        console.log(`⏭️ Reporte muy corto: ${data.length} bytes`);
                     }
                     return;
                 }
 
-                if (data.length < 7) return;
-
                 // ═══════════════════════════════════════════════════════
-                // Parseo de coordenadas según formato STU-540
-                // Formato PenData (Report ID 2):
-                //   byte 0: status
+                // Parseo de coordenadas - formato estándar Wacom STU:
+                //   byte 0: status byte
                 //   bytes 1-2: X (little-endian uint16)
                 //   bytes 3-4: Y (little-endian uint16)
                 //   bytes 5-6: Pressure (little-endian uint16)
-                //
-                // Para PenDataTimeCountSequence (Report ID 17):
-                //   byte 0: status
-                //   bytes 1-2: X
-                //   bytes 3-4: Y
-                //   bytes 5-6: Pressure
-                //   bytes 7-8: TimeCount
-                //   bytes 9-10: Sequence
                 // ═══════════════════════════════════════════════════════
                 const status   = data[0];
                 const x        = data[1] | (data[2] << 8);
                 const y        = data[3] | (data[4] << 8);
                 const pressure = data[5] | (data[6] << 8);
 
-                // Log detallado de valores parseados en primeros contactos
+                // Log valores parseados para diagnóstico
                 if (reportCount <= 30) {
-                    console.log(`🔍 Parsed: status=0x${status.toString(16).padStart(2,'0')} x=${x} y=${y} p=${pressure} | tip=${(status&0x01)!==0} range=${(status&0x80)!==0}`);
+                    console.log(`🔍 ID=${reportId} status=0x${status.toString(16).padStart(2,'0')} x=${x} y=${y} p=${pressure} | tip=${(status&0x01)!==0} range=${(status&0x80)!==0}`);
                 }
 
                 // ═══════════════════════════════════════════════════════
-                // Detección de contacto:
-                // Tip Switch = bit 0 del status = pen tocando superficie
-                // In Range   = bit 7 del status = pen cerca (hover)
-                //
-                // SOLO dibujar cuando hay contacto físico (tip switch)
+                // Validación: ¿Es este reporte pen data?
+                // En vez de filtrar por reportId (que varía según firmware),
+                // validamos que los datos tengan sentido como coordenadas:
+                // - X debe estar en rango 0-9600 (resolución STU-540)
+                // - Y debe estar en rango 0-5760
+                // - Status debe tener algún bit de pen activo
                 // ═══════════════════════════════════════════════════════
+
+                // Si X e Y están fuera del rango del digitalizador, no es pen data
+                if (x > 12000 || y > 8000) return;
+
+                // Detección de contacto: Tip Switch = bit 0 del status
+                // Solo dibujar cuando el pen TOCA la superficie
                 const tipSwitch = (status & 0x01) !== 0;
 
-                if (!tipSwitch) {
+                // Si no hay contacto físico (tip switch OFF), no dibujar
+                // pero si pressure > 0, considerarlo como contacto (fallback)
+                if (!tipSwitch && pressure === 0) {
                     if (isDrawing) {
                         isDrawing = false;
-                        ctx.stroke(); // Finalizar último trazo pendiente
+                        ctx.stroke();
                     }
                     return;
                 }
 
-                // Validar coordenadas dentro de rango razonable del digitalizador
-                // STU-540: máx 9600 x 5760, ignorar valores fuera de rango
+                // Ignorar coordenadas (0,0) - no son datos válidos
                 if (x === 0 && y === 0) return;
-                if (x > 9700 || y > 5900) return;
 
                 // Mapear coordenadas del digitalizador al canvas
                 const maxX = 9600;
