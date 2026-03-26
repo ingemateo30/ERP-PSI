@@ -39,14 +39,19 @@ import authService from '../../services/authService';
 // MiniDonut – pequeño gráfico SVG de estados
 // ──────────────────────────────────────────────
 const MiniDonut = ({ stats }) => {
-  const { programadas = 0, en_proceso = 0, completadas = 0, canceladas = 0 } = stats;
-  const total = programadas + en_proceso + completadas + canceladas;
+  const programadas  = Number(stats?.programadas)  || 0;
+  const en_proceso   = Number(stats?.en_proceso)   || 0;
+  const completadas  = Number(stats?.completadas)  || 0;
+  const canceladas   = Number(stats?.canceladas)   || 0;
+  const reagendadas  = Number(stats?.reagendadas)  || 0;
+  const total = programadas + en_proceso + completadas + canceladas + reagendadas;
   if (total === 0) return null;
 
   const segments = [
     { value: completadas, color: '#22c55e' },
     { value: programadas, color: '#3b82f6' },
     { value: en_proceso,  color: '#eab308' },
+    { value: reagendadas, color: '#f97316' },
     { value: canceladas,  color: '#ef4444' },
   ];
 
@@ -79,10 +84,11 @@ const MiniDonut = ({ stats }) => {
         <text x={cx} y={cy + 5} textAnchor="middle" fontSize="13" fontWeight="700" fill="#111827">{pct}%</text>
       </svg>
       <div className="text-xs space-y-1">
-        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block"/>Completadas</div>
-        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block"/>Programadas</div>
-        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block"/>En proceso</div>
-        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block"/>Canceladas</div>
+        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block"/>Completadas <span className="text-gray-400 ml-0.5">{completadas}</span></div>
+        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block"/>Programadas <span className="text-gray-400 ml-0.5">{programadas}</span></div>
+        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block"/>En proceso <span className="text-gray-400 ml-0.5">{en_proceso}</span></div>
+        {reagendadas > 0 && <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500 inline-block"/>Reagendadas <span className="text-gray-400 ml-0.5">{reagendadas}</span></div>}
+        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block"/>Canceladas <span className="text-gray-400 ml-0.5">{canceladas}</span></div>
       </div>
     </div>
   );

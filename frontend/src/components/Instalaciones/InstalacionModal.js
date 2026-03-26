@@ -82,10 +82,11 @@ const InstalacionModal = ({
   // ==========================================
   
   const pestañas = [
-    { id: 'general', nombre: 'Información General', icono: User },
-    { id: 'detalles', nombre: 'Detalles Técnicos', icono: Settings },
-    { id: 'ubicacion', nombre: 'Ubicación', icono: MapPin },
-    { id: 'historial', nombre: 'Historial', icono: Clock }
+    { id: 'general',  nombre: 'Información General', icono: User },
+    { id: 'detalles', nombre: 'Detalles Técnicos',   icono: Settings },
+    { id: 'ubicacion',nombre: 'Ubicación',            icono: MapPin },
+    { id: 'fotos',    nombre: 'Fotos',                icono: Eye },
+    { id: 'historial',nombre: 'Historial',            icono: Clock }
   ];
 
   // ==========================================
@@ -95,7 +96,6 @@ const InstalacionModal = ({
   useEffect(() => {
     if (instalacion) {
       console.log('🔍 Cargando datos de instalación:', instalacion);
-      // Strip the time portion from fecha_programada to ensure correct display in date input
       const fechaProgramada = instalacion.fecha_programada
         ? instalacion.fecha_programada.split('T')[0]
         : '';
@@ -105,10 +105,14 @@ const InstalacionModal = ({
         equipos_instalados: instalacion.equipos_instalados || [],
         costo_instalacion: instalacion.costo_instalacion || 0
       });
-      
-      // Si tenemos cliente_id, buscar el cliente
+
       if (instalacion.cliente_id) {
         buscarClientePorId(instalacion.cliente_id);
+      }
+
+      // En modo ver, cargar los detalles completos (incluyendo fotos) desde el API
+      if (modo === 'ver' && instalacion.id) {
+        cargarDetalleCompleto(instalacion.id);
       }
     }
 
@@ -175,6 +179,30 @@ const InstalacionModal = ({
       }
     } catch (error) {
       console.error('❌ Error cargando servicios del cliente:', error);
+    }
+  };
+
+  // Carga detalles completos (fotos, plan, etc.) cuando se visualiza una instalación
+  const cargarDetalleCompleto = async (instalacionId) => {
+    try {
+      const response = await instalacionesService.getInstalacion(instalacionId);
+      if (response.success && response.instalacion) {
+        const det = response.instalacion;
+        const fechaProgramada = det.fecha_programada
+          ? det.fecha_programada.split('T')[0]
+          : '';
+        setFormData(prev => ({
+          ...prev,
+          ...det,
+          fecha_programada: fechaProgramada,
+          equipos_instalados: det.equipos_instalados || prev.equipos_instalados || [],
+          fotos_instalacion: Array.isArray(det.fotos_instalacion)
+            ? det.fotos_instalacion
+            : (typeof det.fotos_instalacion === 'string' ? JSON.parse(det.fotos_instalacion || '[]') : [])
+        }));
+      }
+    } catch (error) {
+      console.error('❌ Error cargando detalle completo:', error);
     }
   };
 
@@ -505,18 +533,71 @@ const validarFormulario = () => {
   <label className="block text-sm font-medium text-gray-700 mb-2">
     Cliente *
   </label>
-  <select
-    value={formData.cliente_id}
-    onChange={(e) => handleChange('cliente_id', e.target.value)}
-    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-  >
-    <option value="">Seleccionar cliente...</option>
-    {clientes.map(cliente => (
-      <option key={cliente.id} value={cliente.id}>
-        {cliente.nombre} - {cliente.identificacion}
-      </option>
-    ))}
-  </select>
+  {/* Combobox de búsqueda de cliente */}
+  {clienteSeleccionado ? (
+    // Cliente ya elegido — mostrar chip con opción de cambiar
+    <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-300 rounded-lg">
+      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+      <span className="text-sm font-medium text-green-800 flex-1 truncate">
+        {clienteSeleccionado.nombre} <span className="font-normal text-green-600">({clienteSeleccionado.identificacion})</span>
+      </span>
+      <button
+        type="button"
+        onClick={() => { setClienteSeleccionado(null); handleChange('cliente_id', ''); setBusquedaCliente(''); }}
+        className="text-green-500 hover:text-green-700 flex-shrink-0"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  ) : (
+    // Input de búsqueda + lista desplegable
+    <div className="relative">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          value={busquedaCliente}
+          onChange={e => setBusquedaCliente(e.target.value)}
+          placeholder={cargando ? 'Cargando clientes...' : `Buscar entre ${clientes.length} clientes...`}
+          disabled={cargando}
+          autoComplete="off"
+          className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50"
+        />
+      </div>
+      {busquedaCliente.trim().length >= 2 && (
+        <ul className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+          {clientes
+            .filter(c => {
+              const q = busquedaCliente.toLowerCase();
+              return (c.nombre || '').toLowerCase().includes(q) ||
+                     (c.identificacion || '').toLowerCase().includes(q);
+            })
+            .slice(0, 40)
+            .map(cliente => (
+              <li
+                key={cliente.id}
+                onMouseDown={(e) => {
+                  e.preventDefault(); // evitar que el input pierda foco antes del click
+                  handleChange('cliente_id', String(cliente.id));
+                  setClienteSeleccionado(cliente);
+                  setBusquedaCliente('');
+                }}
+                className="px-4 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-800 border-b border-gray-50 last:border-0"
+              >
+                <span className="font-medium">{cliente.nombre}</span>
+                <span className="text-gray-400 ml-2">{cliente.identificacion}</span>
+              </li>
+            ))}
+          {clientes.filter(c => {
+            const q = busquedaCliente.toLowerCase();
+            return (c.nombre || '').toLowerCase().includes(q) || (c.identificacion || '').toLowerCase().includes(q);
+          }).length === 0 && (
+            <li className="px-4 py-3 text-sm text-gray-400 text-center">Sin resultados</li>
+          )}
+        </ul>
+      )}
+    </div>
+  )}
   {errores.cliente_id && (
     <p className="mt-1 text-sm text-red-600">{errores.cliente_id}</p>
   )}
@@ -601,15 +682,22 @@ const validarFormulario = () => {
     <Settings className="w-4 h-4 mr-2" />
     Detalles Técnicos
   </h4>
-  <div className="space-y-2">
-    <div>
-      <span className="text-sm text-gray-600">IP Asignada:</span>
-      <p className="font-medium">{instalacion?.ip_asignada || 'No asignada'}</p>
-    </div>
-    <div>
-      <span className="text-sm text-gray-600">TAP (Contraseña):</span>
-      <p className="font-medium">{instalacion?.tap || 'No especificado'}</p>
-    </div>
+  <div className="grid grid-cols-2 gap-2">
+    {[
+      { label: 'IP Asignada',   val: formData?.ip_asignada },
+      { label: 'MAC Address',   val: formData?.mac_address },
+      { label: 'ONT ID',        val: formData?.ont_id },
+      { label: 'TAP',           val: formData?.tap },
+      { label: 'Plan',          val: formData?.plan_nombre },
+      { label: 'Precio Plan',   val: formData?.plan_precio ? `$${Number(formData.plan_precio).toLocaleString('es-CO')}` : null },
+      { label: 'Costo Instalación', val: formData?.costo_instalacion ? `$${Number(formData.costo_instalacion).toLocaleString('es-CO')}` : null },
+      { label: 'Persona Recibe', val: formData?.persona_recibe },
+    ].map(({ label, val }) => (
+      <div key={label}>
+        <span className="text-xs text-gray-500">{label}:</span>
+        <p className="text-sm font-medium text-gray-800">{val || <span className="text-gray-400 italic">—</span>}</p>
+      </div>
+    ))}
   </div>
 </div>
 
@@ -919,12 +1007,90 @@ const validarFormulario = () => {
     </div>
   );
 
+  const renderPestañaFotos = () => {
+    const fotos = formData.fotos_instalacion || [];
+
+    // Construir URL/src para cada foto.
+    // Las fotos pueden ser:
+    //   - strings base64 "data:image/...;base64,..."  (guardadas directamente en BD)
+    //   - objetos { url: '/uploads/...', tipo, fecha } (subidas como archivo)
+    //   - strings "/uploads/..." (rutas relativas)
+    const resolverSrc = (foto) => {
+      const ruta = (typeof foto === 'object' && foto !== null) ? foto.url : foto;
+      if (!ruta) return null;
+      // data URI → usar directamente (no enviar a nginx)
+      if (ruta.startsWith('data:')) return ruta;
+      if (ruta.startsWith('http://') || ruta.startsWith('https://')) return ruta;
+      // Ruta relativa → construir URL absoluta al backend
+      const limpio = ruta.replace(/^\/+/, '');
+      const apiUrl = process.env.REACT_APP_API_URL || '';
+      const base = apiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '') || window.location.origin;
+      return `${base}/${limpio}`;
+    };
+
+    // Para el href del <a> no podemos usar data URIs directos (navegadores bloquean o es lento)
+    // Convertimos a blob URL on-demand o simplemente no enlazamos data URIs
+    const esDataUri = (src) => src && src.startsWith('data:');
+
+    return (
+      <div className="space-y-4">
+        {fotos.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+            <EyeOff className="w-12 h-12 mb-3 opacity-30" />
+            <p className="text-sm">No hay fotos registradas para esta instalación</p>
+          </div>
+        ) : (
+          <div>
+            <p className="text-sm text-gray-500 mb-3">{fotos.length} foto(s) adjunta(s)</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {fotos.map((foto, idx) => {
+                const src = resolverSrc(foto);
+                const label = (typeof foto === 'object' && foto !== null && foto.tipo)
+                  ? foto.tipo : `Foto ${idx + 1}`;
+                // Para data URIs: abrir en ventana nueva con blob para evitar 414
+                const handleAmpliar = (e) => {
+                  if (esDataUri(src)) {
+                    e.preventDefault();
+                    const w = window.open('', '_blank');
+                    if (w) { w.document.write(`<html><body style="margin:0;background:#000"><img src="${src}" style="max-width:100%;max-height:100vh;display:block;margin:auto"></body></html>`); w.document.close(); }
+                  }
+                };
+                return (
+                  <a key={idx} href={esDataUri(src) ? '#' : src} target="_blank"
+                    rel="noopener noreferrer" onClick={handleAmpliar}
+                    className="block border border-gray-200 rounded-lg overflow-hidden hover:opacity-90 transition-opacity bg-gray-50 cursor-zoom-in">
+                    <img
+                      src={src}
+                      alt={label}
+                      className="w-full h-40 object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        const div = document.createElement('div');
+                        div.style.cssText = 'width:100%;height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;gap:4px';
+                        div.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span>No disponible</span>';
+                        e.target.parentNode.appendChild(div);
+                      }}
+                    />
+                    <p className="text-xs text-center text-gray-500 py-1 bg-gray-50 capitalize">{label}</p>
+                  </a>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">Haz clic en una foto para verla en tamaño completo</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
  const renderContenidoPestaña = () => {
     switch (pestañaActiva) {
       case 'general':
         return renderPestañaGeneral();
       case 'detalles':
         return renderPestañaDetalles();
+      case 'fotos':
+        return renderPestañaFotos();
       case 'ubicacion':
         return renderPestañaUbicacion();
       case 'historial':

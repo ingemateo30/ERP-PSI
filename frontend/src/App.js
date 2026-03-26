@@ -28,7 +28,9 @@ const BanksConfig = lazy(() => import('./components/Config/BanksConfig'));
 const GeographyConfig = lazy(() => import('./components/Config/GeographyConfig'));
 const ServicePlansConfig = lazy(() => import('./components/Config/ServicePlansConfig'));
 const PlantillasCorreoConfig = lazy(() => import('./components/Config/PlantillasCorreoConfig'));
-const InventoryManagement = lazy(() => import('./components/Inventory/InventoryManagement')); // CORREGIDO: Importación correcta del componente InventoryManagement'./components/Inventory/InventoryManagement';
+const InventoryManagement   = lazy(() => import('./components/Inventory/InventoryManagement'));
+const MovimientosInventario  = lazy(() => import('./components/Inventory/MovimientosInventario'));
+const InstalladoresInventario= lazy(() => import('./components/Inventory/InstalladoresInventario'));
 
 // Lazy loading de componentes de gestión
 const ClientsManagement = lazy(() => import('./components/Clients/ClientsManagement'));
@@ -495,6 +497,32 @@ function App() {
                   <ProtectedRoute requiredRole="instalador,secretaria,supervisor,administrador">
                     <MainLayout title="Gestión de Inventario" subtitle="">
                       <InventoryManagement />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/inventory/movimientos"
+                element={
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
+                    <MainLayout title="Movimientos Recientes" subtitle="Historial de movimientos de equipos">
+                      <Suspense fallback={<LoadingFallback />}>
+                        <MovimientosInventario />
+                      </Suspense>
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/inventory/instaladores"
+                element={
+                  <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
+                    <MainLayout title="Instaladores" subtitle="Equipos asignados por instalador">
+                      <Suspense fallback={<LoadingFallback />}>
+                        <InstalladoresInventario />
+                      </Suspense>
                     </MainLayout>
                   </ProtectedRoute>
                 }

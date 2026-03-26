@@ -1,66 +1,8 @@
 // frontend/src/components/Inventory/EquipmentStats.js
 
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-
-// Componente de paginación reutilizable
-const Paginator = ({ page, totalPages, onChange }) => {
-  if (totalPages <= 1) return null;
-  return (
-    <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-      <span className="text-sm text-gray-500">
-        Página {page} de {totalPages}
-      </span>
-      <div className="flex gap-1">
-        <button
-          onClick={() => onChange(page - 1)}
-          disabled={page === 1}
-          className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1)
-          .filter(n => n === 1 || n === totalPages || Math.abs(n - page) <= 1)
-          .reduce((acc, n, i, arr) => {
-            if (i > 0 && n - arr[i - 1] > 1) acc.push('...');
-            acc.push(n);
-            return acc;
-          }, [])
-          .map((n, i) =>
-            n === '...' ? (
-              <span key={`ellipsis-${i}`} className="px-2 py-1 text-sm text-gray-400">…</span>
-            ) : (
-              <button
-                key={n}
-                onClick={() => onChange(n)}
-                className={`w-8 h-8 rounded text-sm font-medium transition-colors ${
-                  n === page
-                    ? 'bg-blue-600 text-white'
-                    : 'hover:bg-gray-100 text-gray-700'
-                }`}
-              >
-                {n}
-              </button>
-            )
-          )}
-        <button
-          onClick={() => onChange(page + 1)}
-          disabled={page === totalPages}
-          className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const PAGE_SIZE_INSTALLERS = 10;
-const PAGE_SIZE_MOVEMENTS  = 15;
+import React from 'react';
 
 const EquipmentStats = ({ stats }) => {
-  const [pageInstaladores, setPageInstaladores] = useState(1);
-  const [pageMovimientos, setPageMovimientos]   = useState(1);
 
   if (!stats) return null;
 
@@ -84,29 +26,6 @@ const EquipmentStats = ({ stats }) => {
     { label: 'Dañados',          value: stats.general?.dañados || 0,          icon: '❌', color: 'text-red-600'    },
     { label: 'Perdidos',         value: stats.general?.perdidos || 0,          icon: '❓', color: 'text-gray-600'   },
   ];
-
-  // Datos para paginación
-  const instaladoresAll = stats.por_instalador || [];
-  const totalPagesInstaladores = Math.max(1, Math.ceil(instaladoresAll.length / PAGE_SIZE_INSTALLERS));
-  const instaladoresPagina = instaladoresAll.slice(
-    (pageInstaladores - 1) * PAGE_SIZE_INSTALLERS,
-    pageInstaladores * PAGE_SIZE_INSTALLERS
-  );
-
-  const movimientosAll = stats.movimientos_recientes || [];
-  const totalPagesMovimientos = Math.max(1, Math.ceil(movimientosAll.length / PAGE_SIZE_MOVEMENTS));
-  const movimientosPagina = movimientosAll.slice(
-    (pageMovimientos - 1) * PAGE_SIZE_MOVEMENTS,
-    pageMovimientos * PAGE_SIZE_MOVEMENTS
-  );
-
-  const actionInfo = {
-    'asignado':  { icon: '👤', color: 'bg-blue-500'   },
-    'devuelto':  { icon: '↩️', color: 'bg-yellow-500' },
-    'instalado': { icon: '🏠', color: 'bg-green-500'  },
-    'retirado':  { icon: '📤', color: 'bg-orange-500' },
-    'dañado':    { icon: '🔧', color: 'bg-red-500'    },
-  };
 
   return (
     <div className="space-y-6">
@@ -199,122 +118,6 @@ const EquipmentStats = ({ stats }) => {
         </div>
       )}
 
-      {/* Instaladores — con paginación completa */}
-      {instaladoresAll.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-900">
-              Instaladores
-              <span className="ml-2 text-sm font-normal text-gray-400">({instaladoresAll.length} total)</span>
-            </h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Instalador', 'Equipos Asignados', 'Pendientes', 'Instalados', 'Promedio Días'].map(h => (
-                    <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {instaladoresPagina.map((instalador, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{instalador.nombre}</div>
-                      <div className="text-sm text-gray-500">{instalador.telefono}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {instalador.equipos_asignados}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        {instalador.equipos_pendientes}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        {instalador.equipos_instalados}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {instalador.promedio_dias_asignacion ? Math.round(instalador.promedio_dias_asignacion) + ' días' : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Paginator
-            page={pageInstaladores}
-            totalPages={totalPagesInstaladores}
-            onChange={p => { setPageInstaladores(p); }}
-          />
-        </div>
-      )}
-
-      {/* Movimientos Recientes — con paginación completa */}
-      {movimientosAll.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-900">
-              Movimientos Recientes
-              <span className="ml-2 text-sm font-normal text-gray-400">({movimientosAll.length} registros)</span>
-            </h3>
-          </div>
-          <div className="flow-root">
-            <ul className="-mb-8">
-              {movimientosPagina.map((movimiento, index) => {
-                const isLast = index === movimientosPagina.length - 1;
-                const info = actionInfo[movimiento.accion] || { icon: '📦', color: 'bg-gray-500' };
-                return (
-                  <li key={(pageMovimientos - 1) * PAGE_SIZE_MOVEMENTS + index}>
-                    <div className="relative pb-8">
-                      {!isLast && (
-                        <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true" />
-                      )}
-                      <div className="relative flex space-x-3">
-                        <div>
-                          <span className={`${info.color} h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white text-white text-sm`}>
-                            {info.icon}
-                          </span>
-                        </div>
-                        <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-                          <div>
-                            <p className="text-sm text-gray-500">
-                              <span className="font-medium text-gray-900">{movimiento.codigo}</span> fue{' '}
-                              <span className="font-medium">{movimiento.accion}</span>
-                              {movimiento.instalador_nombre && (
-                                <> por <span className="font-medium">{movimiento.instalador_nombre}</span></>
-                              )}
-                              {movimiento.cliente_nombre && (
-                                <> para <span className="font-medium">{movimiento.cliente_nombre}</span></>
-                              )}
-                            </p>
-                            <p className="text-xs text-gray-400">{movimiento.equipo_nombre}</p>
-                          </div>
-                          <div className="text-right text-sm whitespace-nowrap text-gray-500">
-                            {new Date(movimiento.fecha_accion).toLocaleDateString('es-CO', {
-                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-          <Paginator
-            page={pageMovimientos}
-            totalPages={totalPagesMovimientos}
-            onChange={p => { setPageMovimientos(p); }}
-          />
-        </div>
-      )}
     </div>
   );
 };
