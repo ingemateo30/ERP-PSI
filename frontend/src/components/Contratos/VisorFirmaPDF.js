@@ -210,6 +210,18 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
 
             console.log('⚙️ STU-540 config: maxX=' + MAX_X + ' maxY=' + MAX_Y);
 
+            // Función para limpiar pantalla LCD del STU-540
+            const limpiarPantallaSTU = async () => {
+                try {
+                    const clearCommand = new Uint8Array([0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+                    await selectedDevice.sendReport(0x01, clearCommand);
+                } catch (error) {
+                    // Silenciar - puede fallar en algunos firmwares
+                }
+            };
+
+            await limpiarPantallaSTU();
+
             // ═══════════════════════════════════════════════════════════
             // STU-540 (PID=0xa8) - Protocolo serial sobre HID
             //
@@ -316,7 +328,7 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 // Guardar punto
                 signaturePoints.push({
                     x, y,
-                    timestamp: now,
+                    timestamp: Date.now(),
                     canvas_x: canvasX,
                     canvas_y: canvasY,
                     raw_status: status
@@ -398,8 +410,8 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                                 biometric: true,
                                 points_count: signaturePoints.length,
                                 timestamp: new Date().toISOString(),
-                                resolution: `${STU540_CONFIG.width}x${STU540_CONFIG.height}`,
-                                max_pressure: STU540_CONFIG.maxPressure,
+                                resolution: `${MAX_X}x${MAX_Y}`,
+                                max_pressure: 1023,
                                 total_reports: reportCount
                             },
                             points: signaturePoints.slice(0, 200) // Más puntos para mejor calidad
