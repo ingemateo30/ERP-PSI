@@ -558,23 +558,68 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
       'Centro', 'El Gallineral', 'La Avenida', 'El Bosque', 'La Esperanza',
       'Villa del Río', 'Los Comuneros', 'El Carmen', 'San Carlos', 'Bella Vista',
       'La Granja', 'El Jardín', 'Santander', 'El Recreo', 'Guanentá',
-      'La Plazuela', 'Ricaurte', 'El Progreso', 'Nuevo Milenio', 'La Pradera'
+      'La Plazuela', 'Ricaurte', 'El Progreso', 'Nuevo Milenio', 'La Pradera',
+      'La Independencia', 'San Francisco', 'El Poblado', 'Las Palmas',
+      'San José', 'El Carmelo', 'Pinchote', 'Agua Blanca',
+      'El Tejar', 'Los Alpes', 'El Mirador', 'Villa Colombia',
+      'El Jordán', 'San Isidro', 'La Colina', 'Las Américas', 'Ciudad Satélite',
+      'El Prado', 'La Floresta', 'Bélgica', 'La Rivera', 'Olímpico', 'La Unión',
+      'El Paraíso', 'La Castellana', 'Villa Nueva', 'La Esmeralda', 'El Trapiche',
+      'Sector Rural', 'El Común', 'Curití (cerca)', 'El Pescadero'
     ],
     'Socorro': [
       'Centro', 'El Común', 'La Gruta', 'La Palma', 'El Resguardo',
-      'San Francisco', 'El Prado', 'Bello Horizonte', 'El Carmen', 'La Esperanza'
+      'San Francisco', 'El Prado', 'Bello Horizonte', 'El Carmen', 'La Esperanza',
+      'La Chacra', 'El Recreo', 'La Granja', 'Guadualito', 'Villa Olímpica',
+      'El Bosque', 'Las Américas', 'El Progreso', 'San Roque',
+      'El Pedregal', 'La Independencia', 'El Campín', 'La Victoria', 'Los Comuneros',
+      'Urbanización Casablanca', 'El Mirador', 'La Floresta', 'Villa del Río',
+      'El Porvenir', 'Las Lajas', 'Sector El Anteojo', 'El Trapiche', 'La Aldea',
+      'Barrio Nuevo', 'San Martín', 'La Concordia', 'El Cedro'
     ],
     'Bucaramanga': [
       'Centro', 'Cabecera del Llano', 'Ciudadela Real de Minas', 'El Prado',
       'García Rovira', 'Gaitán', 'La Concordia', 'Lagos del Cacique', 'Provenza',
-      'Sotomayor', 'San Francisco', 'Terrazas', 'El Poblado', 'Antonia Santos'
+      'Sotomayor', 'San Francisco', 'Terrazas', 'El Poblado', 'Antonia Santos',
+      'La Rosita', 'Ciudad Valencia', 'El Jardín', 'La Aurora',
+      'Los Comuneros', 'Mutis', 'El Reposo',
+      'Las Américas', 'Ricaurte', 'La Joya', 'Colsag'
     ],
     'Floridablanca': [
       'Centro', 'Caldas', 'El Recreo', 'La Cumbre', 'La Trinidad',
-      'Rincón de Girón', 'San Mateo', 'Santa Ana', 'Villa Lili', 'Zapamanga'
+      'Rincón de Girón', 'San Mateo', 'Santa Ana', 'Villa Lili', 'Zapamanga',
+      'Cañaveral', 'Lagos del Cacique', 'El Jardín', 'Villabel',
+      'El Poblado', 'Ruitoque', 'Reposo del Bosque', 'El Bosque'
     ],
-    'Vélez': ['Centro', 'El Común', 'La Feria', 'San José', 'El Carmen'],
-    'Barbosa': ['Centro', 'La Palma', 'El Recreo', 'San Antonio', 'El Progreso'],
+    'Vélez': [
+      'Centro', 'El Común', 'La Feria', 'San José', 'El Carmen',
+      'El Jordán', 'La Esperanza', 'El Progreso', 'El Bosque',
+      'San Roque', 'La Victoria', 'Las Flores', 'El Mirador',
+      'La Unión', 'El Rosal', 'La Florida', 'El Pórtico',
+      'La Colina', 'Villa Olímpica', 'Sector Norte', 'Sector Sur', 'La Pradera'
+    ],
+    'Barbosa': [
+      'Centro', 'La Palma', 'El Recreo', 'San Antonio', 'El Progreso',
+      'El Palmar', 'La Esperanza', 'La Victoria',
+      'San Vicente', 'El Carmen', 'La Floresta', 'El Porvenir', 'Urbanización Norte',
+      'El Jordán', 'La Colina', 'Las Palmas', 'El Bosque', 'Sector Industrial'
+    ],
+    'Charalá': [
+      'Centro', 'El Jordán', 'La Esperanza', 'San Roque', 'La Victoria',
+      'El Progreso', 'La Floresta', 'El Carmen', 'Las Flores', 'El Mirador'
+    ],
+    'Oiba': [
+      'Centro', 'El Jordán', 'La Esperanza', 'El Progreso', 'La Victoria',
+      'San Roque', 'La Floresta', 'El Carmen', 'El Mirador', 'Las Palmas'
+    ],
+    'Mogotes': [
+      'Centro', 'El Jordán', 'La Esperanza', 'El Progreso', 'San Roque',
+      'La Victoria', 'El Bosque', 'Las Flores', 'El Mirador', 'La Unión'
+    ],
+    'Guadalupe': [
+      'Centro', 'El Jordán', 'La Esperanza', 'El Progreso', 'La Victoria',
+      'San Roque', 'El Bosque', 'La Floresta', 'El Carmen', 'Las Palmas'
+    ],
   };
 
   // Cargar barrios sugeridos cuando cambia la ciudad
