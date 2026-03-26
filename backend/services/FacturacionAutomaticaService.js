@@ -280,40 +280,31 @@ class FacturacionAutomaticaService {
         
         // ========================================================================
         // CASO 3: FACTURACIÓN MENSUAL (2+ facturas previas)
-        // Continúa desde el día siguiente a la última cobertura.
-        // - Si la cobertura termina ANTES del fin del mes actual → nivelación al fin del mes actual
-        // - Si termina en el mes actual o siguiente → completa hasta fin del mes siguiente
+        // Continúa desde el día siguiente a la última fecha facturada.
+        // Siempre factura hasta el último día del mes en que cae fechaDesde.
+        // Ejemplos:
+        //   - Cobertura hasta Mar 18 → fechaDesde = Mar 19 → fechaHasta = Mar 31 (nivelación, 13 días)
+        //   - Cobertura hasta Mar 31 → fechaDesde = Abr  1 → fechaHasta = Abr 30 (mes completo, 30 días)
+        //   - Cobertura hasta Abr 14 → fechaDesde = Abr 15 → fechaHasta = Abr 30 (nivelación, 16 días)
+        //   - Cobertura hasta Abr 30 → fechaDesde = May  1 → fechaHasta = May 31 (mes completo, 31 días)
         // ========================================================================
         else {
           if (!cliente.ultima_fecha_facturada) {
-            throw new Error('No se encontró la fecha de la última factura para facturación mensual');
+            throw new Error('No se encontró la fecha de la última factura para facturación mensual (ultima_fecha_facturada es nulo)');
           }
 
           const ultimaFechaFacturada = parseFecha(cliente.ultima_fecha_facturada);
 
-          // Día siguiente a la última cobertura
+          // Día siguiente a la última fecha facturada
           fechaDesde = new Date(ultimaFechaFacturada);
           fechaDesde.setDate(fechaDesde.getDate() + 1);
 
-          // Último día del mes actual y del mes siguiente
-          const finMesActual   = new Date(fechaReferencia.getFullYear(), fechaReferencia.getMonth() + 1, 0);
-          const finMesSiguiente = new Date(fechaReferencia.getFullYear(), fechaReferencia.getMonth() + 2, 0);
+          // Siempre facturar hasta el último día del mes en que cae fechaDesde
+          fechaHasta = new Date(fechaDesde.getFullYear(), fechaDesde.getMonth() + 1, 0);
+          esNivelacion = fechaDesde.getDate() !== 1; // nivelación cuando no empieza el día 1
+          tipoFacturacion = esNivelacion ? 'Nivelación' : 'Mensual completo';
 
-          if (fechaDesde <= finMesActual) {
-            // Cobertura terminó antes de fin del mes actual → nivelación para completar el mes
-            fechaHasta = finMesActual;
-            esNivelacion = true;
-            tipoFacturacion = 'Nivelación (completar mes actual)';
-            console.log(`   🔄 Nivelación mes actual: ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
-          } else {
-            // Cobertura entra al mes siguiente → facturar hasta fin del mes siguiente
-            fechaHasta = finMesSiguiente;
-            esNivelacion = (fechaDesde.getDate() > 1); // es nivelación si no empieza el día 1
-            tipoFacturacion = esNivelacion
-              ? 'Nivelación (completar mes siguiente)'
-              : 'Facturación mensual estándar';
-            console.log(`   📊 Factura mes siguiente: ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
-          }
+          console.log(`   📊 CASO 3 (${tipoFacturacion}): ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
         }
 
         // ✅ CÁLCULO CORRECTO DE DÍAS
@@ -325,7 +316,7 @@ class FacturacionAutomaticaService {
           throw new Error('Error en el cálculo de fechas de facturación');
         }
 
-        if (diasFacturados < 1 || diasFacturados > 365) {
+        if (diasFacturados < 1 || diasFacturados > 400) {
           throw new Error(`Días facturados fuera de rango válido: ${diasFacturados}`);
         }
 
@@ -417,7 +408,7 @@ class FacturacionAutomaticaService {
           ? new Date(coberturaData[0].ultima_cobertura)
           : null;
 
-        if (ultimaCobertura && ultimaCobertura >= ultimoDiaMesSiguiente) {
+        if (ultimaCobertura && ultimaCobertura > ultimoDiaMesSiguiente) {
           const fechaStr = ultimaCobertura.toISOString().split('T')[0];
           return {
             permitir: false,

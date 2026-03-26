@@ -67,6 +67,36 @@ const AjustarVista = ({ instalaciones }) => {
 let _ultimaLlamadaNominatim = 0;
 
 // ==========================================
+// TABLA DE COORDENADAS DE CIUDADES COLOMBIANAS
+// Usada como fallback instantáneo antes de llamar a Nominatim
+// ==========================================
+const COORDENADAS_CIUDADES_CO = {
+  'socorro': { lat: 6.4608, lng: -73.2620 },
+  'san gil': { lat: 6.5566, lng: -73.1354 },
+  'velez': { lat: 6.0087, lng: -73.6776 },
+  'vélez': { lat: 6.0087, lng: -73.6776 },
+  'barbosa': { lat: 5.9333, lng: -73.6167 },
+  'charalá': { lat: 6.2872, lng: -73.1430 },
+  'charala': { lat: 6.2872, lng: -73.1430 },
+  'oiba': { lat: 6.2697, lng: -73.2997 },
+  'guadalupe': { lat: 6.3113, lng: -73.3538 },
+  'mogotes': { lat: 6.4866, lng: -73.0225 },
+  'ocamonte': { lat: 6.3536, lng: -73.2108 },
+  'suaita': { lat: 6.1072, lng: -73.4447 },
+  'palmas del socorro': { lat: 6.4608, lng: -73.2620 },
+  'bucaramanga': { lat: 7.1193, lng: -73.1227 },
+  'floridablanca': { lat: 7.0644, lng: -73.0965 },
+  'giron': { lat: 7.0753, lng: -73.1697 },
+  'girón': { lat: 7.0753, lng: -73.1697 },
+  'piedecuesta': { lat: 6.9876, lng: -73.0508 },
+  'bogota': { lat: 4.7110, lng: -74.0721 },
+  'bogotá': { lat: 4.7110, lng: -74.0721 },
+  'medellin': { lat: 6.2442, lng: -75.5812 },
+  'medellín': { lat: 6.2442, lng: -75.5812 },
+  'cali': { lat: 3.4516, lng: -76.5320 },
+};
+
+// ==========================================
 // COMPONENTE PRINCIPAL
 // ==========================================
 const MapaInstalaciones = () => {
@@ -95,7 +125,8 @@ const MapaInstalaciones = () => {
     completadas: 0,
     canceladas: 0,
     reagendadas: 0,
-    con_direccion: 0
+    con_direccion: 0,
+    con_gps: 0
   });
 
   const CENTRO_MAPA = [6.4667, -73.2667]; // Socorro
@@ -146,9 +177,13 @@ const MapaInstalaciones = () => {
   };
 
   const calcularEstadisticas = (datos) => {
-    const conDir = datos.filter(i => i.direccion_instalacion || i.cliente_direccion || i.direccion).length;
-    console.log(`📊 Con dirección: ${conDir} de ${datos.length}`);
-    
+    const conGPS = datos.filter(i =>
+      i.coordenadas_lat && i.coordenadas_lng &&
+      parseFloat(i.coordenadas_lat) !== 0 && parseFloat(i.coordenadas_lng) !== 0
+    ).length;
+    const conDir = datos.filter(i => i.direccion_instalacion || i.cliente_direccion || i.ciudad_nombre).length;
+    console.log(`📊 Con GPS: ${conGPS}, con dirección/ciudad: ${conDir} de ${datos.length}`);
+
     setEstadisticas({
       total: datos.length,
       programadas: datos.filter(i => i.estado === 'programada').length,
@@ -156,7 +191,8 @@ const MapaInstalaciones = () => {
       completadas: datos.filter(i => i.estado === 'completada').length,
       canceladas: datos.filter(i => i.estado === 'cancelada').length,
       reagendadas: datos.filter(i => i.estado === 'reagendada').length,
-      con_direccion: conDir
+      con_direccion: conDir,
+      con_gps: conGPS
     });
   };
 
@@ -209,79 +245,54 @@ const MapaInstalaciones = () => {
   };
 
   /**
-   * Geocodifica con múltiples intentos en cascada:
-   * 1. Búsqueda estructurada: calle + ciudad + depto
-   * 2. Búsqueda libre: dirección + barrio + ciudad + depto
-   * 3. Búsqueda estructurada: ciudad + depto (muy confiable)
-   * 4. Búsqueda libre: ciudad + depto, Colombia
+   * Geocodifica con estrategia de prioridades:
+   * 1. Coordenadas GPS almacenadas en la BD (coordenadas_lat / coordenadas_lng) — instantáneo, sin API
+   * 2. Tabla hardcodeada de ciudades colombianas — instantáneo, sin API
+   * 3. Nominatim estructurado por ciudad+depto — con caché
+   * 4. Nominatim libre ciudad+depto — con caché
    */
   const geocodificarInstancia = async (inst) => {
-    const direccion = normalizarDireccion(inst.direccion_instalacion || inst.cliente_direccion || inst.direccion || '');
-    const ciudad = inst.ciudad_nombre || inst.ciudad || '';
+    // Prioridad 1: coordenadas GPS guardadas en la BD
+    if (inst.coordenadas_lat && inst.coordenadas_lng) {
+      const lat = parseFloat(inst.coordenadas_lat);
+      const lng = parseFloat(inst.coordenadas_lng);
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        return { lat, lng };
+      }
+    }
+
+    const ciudad = (inst.ciudad_nombre || inst.ciudad || '').toLowerCase().trim();
     const barrio = inst.barrio || '';
     const depto  = inst.departamento_nombre || inst.departamento || '';
+    const direccion = normalizarDireccion(inst.direccion_instalacion || inst.cliente_direccion || inst.direccion || '');
 
+    // Prioridad 2: tabla hardcodeada de ciudades (instantáneo, sin API)
+    if (ciudad && COORDENADAS_CIUDADES_CO[ciudad]) {
+      return COORDENADAS_CIUDADES_CO[ciudad];
+    }
+
+    // Prioridad 3 y 4: Nominatim con caché
     const cache = leerCache();
 
-    // Intento 1: búsqueda estructurada con dirección (más preciso)
-    if (direccion && ciudad) {
-      const key = `struct:${direccion}|${ciudad}|${depto}`.toLowerCase();
-      if (cache[key]) return cache[key];
-      if (cache[key] !== null && cache[key] !== undefined) {
-        // skip
-      } else if (cache[key] === null) {
-        // ya falló antes
-      } else {
-        const coords = await llamarNominatimEstructurado({ street: direccion, city: ciudad, state: depto });
-        if (coords) { cache[key] = coords; guardarCache(cache); return coords; }
-        cache[key] = null; guardarCache(cache);
-      }
-    }
-
-    // Intento 2: búsqueda libre con dirección + barrio + ciudad
-    if (direccion) {
-      const qFull = [direccion, barrio, ciudad, depto, 'Colombia'].filter(Boolean).join(', ');
-      const keyFull = `free:${qFull}`.toLowerCase().trim();
-      if (cache[keyFull]) return cache[keyFull];
-      if (cache[keyFull] !== null && cache[keyFull] !== undefined) {
-        // skip
-      } else if (cache[keyFull] === null) {
-        // ya falló
-      } else {
-        const coords = await llamarNominatim(qFull);
-        if (coords) { cache[keyFull] = coords; guardarCache(cache); return coords; }
-        cache[keyFull] = null; guardarCache(cache);
-      }
-    }
-
-    // Intento 3: búsqueda estructurada solo ciudad + depto (muy confiable para municipios colombianos)
     if (ciudad) {
-      const keyCiudad = `struct:${ciudad}|${depto}`.toLowerCase();
+      const keyCiudad = `nominatim:${ciudad}:${depto}`.toLowerCase();
       if (cache[keyCiudad]) return cache[keyCiudad];
       if (cache[keyCiudad] === undefined) {
-        const coords = await llamarNominatimEstructurado({ city: ciudad, state: depto });
-        if (coords) { cache[keyCiudad] = coords; guardarCache(cache); return coords; }
-        // No cachear null — la siguiente instalación de la misma ciudad debería intentar de nuevo
-      }
-    }
-
-    // Intento 4: búsqueda libre barrio + ciudad
-    if (barrio && ciudad) {
-      const keyBarrio = `free:${barrio}, ${ciudad}, ${depto}, colombia`.toLowerCase();
-      if (cache[keyBarrio]) return cache[keyBarrio];
-      if (cache[keyBarrio] === undefined) {
-        const coords = await llamarNominatim(`${barrio}, ${ciudad}, ${depto}, Colombia`);
-        if (coords) { cache[keyBarrio] = coords; guardarCache(cache); return coords; }
-      }
-    }
-
-    // Intento 5: búsqueda libre solo ciudad
-    if (ciudad) {
-      const keyCiudadFree = `free:${ciudad}, ${depto}, colombia`.toLowerCase();
-      if (cache[keyCiudadFree]) return cache[keyCiudadFree];
-      if (cache[keyCiudadFree] === undefined) {
-        const coords = await llamarNominatim(`${ciudad}, ${depto}, Colombia`);
-        if (coords) { cache[keyCiudadFree] = coords; guardarCache(cache); return coords; }
+        // Intento estructurado (más preciso para municipios)
+        const coords = await llamarNominatimEstructurado({ city: inst.ciudad_nombre || inst.ciudad, state: depto });
+        if (coords) {
+          cache[keyCiudad] = coords;
+          guardarCache(cache);
+          return coords;
+        }
+        // Intento libre
+        const coords2 = await llamarNominatim(`${inst.ciudad_nombre || inst.ciudad}, ${depto}, Colombia`);
+        if (coords2) {
+          cache[keyCiudad] = coords2;
+          guardarCache(cache);
+          return coords2;
+        }
+        // No cachear null — podría funcionar en el siguiente intento
       }
     }
 
@@ -305,34 +316,43 @@ const MapaInstalaciones = () => {
     setProgreso({ actual: 0, total: instalaciones.length });
 
     const resultados = [];
-    let exitos = 0;
+    let gps = 0;           // coordenadas directas de la BD
+    let geocodificados = 0; // resueltas por tabla o Nominatim
     let fallos = 0;
 
     for (let i = 0; i < instalaciones.length; i++) {
       const inst = instalaciones[i];
       setProgreso({ actual: i + 1, total: instalaciones.length });
 
-      if (!inst.ciudad_nombre && !inst.barrio && !inst.direccion_instalacion && !inst.cliente_direccion && !inst.direccion) {
+      if (!inst.coordenadas_lat && !inst.coordenadas_lng && !inst.ciudad_nombre && !inst.barrio && !inst.direccion_instalacion && !inst.cliente_direccion) {
         fallos++;
         continue;
       }
+
+      const tieneGPS = inst.coordenadas_lat && inst.coordenadas_lng &&
+        parseFloat(inst.coordenadas_lat) !== 0 && parseFloat(inst.coordenadas_lng) !== 0;
 
       const coords = await geocodificarInstancia(inst);
 
       if (coords) {
         resultados.push({ ...inst, coordenadas: coords, direccion_completa: construirDireccion(inst) });
-        exitos++;
+        if (tieneGPS) {
+          gps++;
+        } else {
+          geocodificados++;
+        }
       } else {
         fallos++;
         console.warn(`❌ Sin coords: ${inst.cliente_nombre} (${inst.ciudad_nombre})`);
       }
     }
 
-    console.log(`📊 Geocodificación: ${exitos} exitosas, ${fallos} fallidas`);
+    const exitos = gps + geocodificados;
+    console.log(`📊 Geocodificación: ${exitos} exitosas (${gps} GPS, ${geocodificados} geocodificadas), ${fallos} fallidas`);
     setInstalacionesMapa(resultados);
     setGeocodificando(false);
 
-    alert(`✅ Geocodificación completada:\n${exitos} ubicadas\n${fallos} sin coordenadas\nTotal: ${instalaciones.length}`);
+    alert(`✅ Geocodificación completada:\n${gps} con GPS almacenado\n${geocodificados} geocodificadas\n${fallos} sin coordenadas\nTotal: ${instalaciones.length}`);
 
     if (resultados.length > 0) setVistaActual('mapa');
   };
@@ -509,8 +529,11 @@ const MapaInstalaciones = () => {
         <div className="bg-teal-50 p-4 rounded-lg shadow border border-teal-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-teal-600">Con Dirección</p>
+              <p className="text-sm text-teal-600">Con Ubicación</p>
               <p className="text-2xl font-bold text-teal-900">{estadisticas.con_direccion}</p>
+              {estadisticas.con_gps > 0 && (
+                <p className="text-xs text-teal-500 mt-1">{estadisticas.con_gps} con GPS</p>
+              )}
             </div>
             <MapPin className="w-8 h-8 text-teal-400" />
           </div>
