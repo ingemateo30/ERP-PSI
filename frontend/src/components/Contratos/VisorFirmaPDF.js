@@ -233,9 +233,10 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 const data = new Uint8Array(event.data.buffer);
 
                 // Log cada 1000 reportes (y el primero para diagnóstico)
-                if (reportCount === 1 || reportCount % 1000 === 0) {
-                    console.log(`📊 Reporte #${reportCount} (len=${data.length}):`,
-                               Array.from(data.slice(0, 10)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+                // Log primeros reportes para diagnóstico del protocolo
+                if (reportCount <= 5 || reportCount % 2000 === 0) {
+                    const hex = Array.from(data.slice(0, 10)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
+                    console.log(`📊 Reporte #${reportCount} (len=${data.length}): ${hex}  | status=0x${data[0]?.toString(16)} tip=${(data[0]&0x01)!==0} proximity=${(data[0]&0x80)!==0}`);
                 }
 
                 // Aceptar reportes con suficientes bytes para parsear coordenadas (≥7)
@@ -246,40 +247,50 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
 
                 const status = data[0];
 
-                // Extraer coordenadas y presión primero para usarlas en la detección
+                // Extraer coordenadas y presión
                 let x = data[1] | (data[2] << 8);
                 let y = data[3] | (data[4] << 8);
                 let pressure = data[5] | (data[6] << 8);
 
-                // Detectar pen activo:
-                // - bit 7 del status (rdy) = pen en proximidad según Wacom STU protocol
-                // - status 0x01 o 0x81 = tip switch activo
-                // - fallback: si hay presión > 0, el pen está tocando
-                const isPenActive = (status & 0x80) !== 0 ||  // rdy bit
-                                    status === 0x91 || status === 0x92 || // valores previos (compatibilidad)
-                                    status === 0x01 || status === 0x81 || // tip switch
-                                    pressure > 0;                         // presión detectada
+                // ═══════════════════════════════════════════════════════
+                // PROTOCOLO STU-540 - Byte de status:
+                //   bit 0 (0x01) = Tip Switch (pen TOCANDO la superficie)
+                //   bit 5 (0x20) = Side Switch (botón lateral)
+                //   bit 6 (0x40) = Eraser (borrador)
+                //   bit 7 (0x80) = In Range / Proximity (pen CERCA, sin tocar)
+                //
+                // IMPORTANTE: Solo dibujar cuando Tip Switch está activo (bit 0),
+                // lo que significa que el pen está físicamente tocando la tablet.
+                // El bit de proximidad (0x80) se activa al acercar el pen sin
+                // contacto — NO debe iniciar dibujo.
+                // ═══════════════════════════════════════════════════════
+                const tipSwitch = (status & 0x01) !== 0;  // Pen tocando superficie
+                const inRange  = (status & 0x80) !== 0;   // Pen en proximidad
 
-                if (!isPenActive) {
-                    // Si el pen no está activo y estábamos dibujando, finalizar trazo
+                // Solo considerar como "activo para dibujar" si:
+                // 1. Tip switch está ON (contacto físico), O
+                // 2. Hay presión real > umbral mínimo (fallback por si el bit no se reporta)
+                const isPenTouching = tipSwitch || pressure > 10;
+
+                if (!isPenTouching) {
+                    // Pen en hover o fuera de rango — finalizar trazo si estábamos dibujando
                     if (isDrawing) {
                         isDrawing = false;
-                        console.log(`🎨 TRAZO FINALIZADO. Total puntos: ${signaturePoints.length}`);
+                        console.log(`🎨 TRAZO FINALIZADO (pen levantado). Total puntos: ${signaturePoints.length}`);
                     }
                     return;
                 }
 
                 // Validación de rango de coordenadas
-                if (x > 65535 || y > 65535) {
+                if (x > 15000 || y > 15000 || x === 0 || y === 0) {
                     return;
                 }
 
-                // Rango de coordenadas del digitalizador STU-540 según Wacom STU SDK:
-                // 9600 × 5760 (equivalente al panel LCD 800×480 × escala 12)
-                // Anteriormente se usaba 4000×4000 lo que cortaba la firma en ~42% del área
+                // Rango de coordenadas del digitalizador STU-540:
+                // Resolución del digitalizador: 9600 × 5760
                 const maxX = 9600;
                 const maxY = 5760;
-                
+
                 const canvasX = Math.min(canvas.width - 1, (x / maxX) * canvas.width);
                 const canvasY = Math.min(canvas.height - 1, (y / maxY) * canvas.height);
                 
@@ -288,13 +299,14 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 ctx.lineJoin = 'round';
                 ctx.globalCompositeOperation = 'source-over';
                 
-                // Grosor variable basado en presión (si está disponible)
-                const lineWidth = pressure > 0 ? 
-                    Math.max(1, Math.min(4, pressure / 500)) : 2;
-                
-                ctx.strokeStyle = '#000000';  // Negro para firma real
+                // Grosor variable basado en presión
+                // STU-540 presión max ~1023, normalizar a rango 1.5-3.5px
+                const lineWidth = pressure > 10 ?
+                    Math.max(1.5, Math.min(3.5, (pressure / 1023) * 3.5)) : 2;
+
+                ctx.strokeStyle = '#000000';
                 ctx.lineWidth = lineWidth;
-                
+
                 if (!isDrawing) {
                     // Iniciar nuevo trazo
                     isDrawing = true;
@@ -302,43 +314,39 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     ctx.moveTo(canvasX, canvasY);
                     lastX = canvasX;
                     lastY = canvasY;
-                    
-                    console.log(`🖊️ Iniciando firma en (${canvasX.toFixed(1)}, ${canvasY.toFixed(1)})`);
+
+                    if (reportCount <= 50) {
+                        console.log(`🖊️ Trazo iniciado en (${canvasX.toFixed(1)}, ${canvasY.toFixed(1)}) presión=${pressure} status=0x${status.toString(16)}`);
+                    }
                 } else {
-                    // Continuar trazo suave
-                    const distance = Math.sqrt(Math.pow(canvasX - lastX, 2) + Math.pow(canvasY - lastY, 2));
-                    
-                    if (distance > 0.5) {
-                        // Usar quadraticCurveTo para líneas más suaves
+                    // Continuar trazo suave - filtrar jitter con distancia mínima
+                    const distance = Math.sqrt((canvasX - lastX) ** 2 + (canvasY - lastY) ** 2);
+
+                    if (distance > 1.5) {
+                        // Usar quadraticCurveTo para líneas suaves
                         const midX = (lastX + canvasX) / 2;
                         const midY = (lastY + canvasY) / 2;
-                        
+
                         ctx.quadraticCurveTo(lastX, lastY, midX, midY);
                         ctx.stroke();
-                        
-                        // Comenzar nuevo path desde el punto medio
+
                         ctx.beginPath();
                         ctx.moveTo(midX, midY);
-                        
+
                         lastX = canvasX;
                         lastY = canvasY;
-                        
-                        if (signaturePoints.length % 20 === 0) {
-                            console.log(`✍️ Firmando... ${signaturePoints.length} puntos`);
-                        }
                     }
                 }
 
                 // Guardar punto para la firma
                 signaturePoints.push({
-                    x: x,
-                    y: y,
-                    pressure: pressure,
+                    x, y, pressure,
                     timestamp: Date.now(),
                     canvas_x: canvasX,
                     canvas_y: canvasY,
                     line_width: lineWidth,
-                    pen_active: isPenActive,
+                    tip_switch: tipSwitch,
+                    in_range: inRange,
                     report_number: reportCount,
                     raw_status: status
                 });
@@ -1190,10 +1198,10 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                                 <div className="border-2 border-dashed border-green-300 rounded-lg p-4 bg-green-50">
                                     <canvas
                                         ref={wacomCanvasRef}
-                                        width={480}
-                                        height={180}
+                                        width={800}
+                                        height={480}
                                         className="w-full border rounded bg-white mx-auto block"
-                                        style={{ aspectRatio: '8/3' }}
+                                        style={{ aspectRatio: '5/3', maxHeight: '300px' }}
                                     />
                                     {!isCapturingWacom && (
                                         <p className="text-center text-sm text-green-700 mt-2">
