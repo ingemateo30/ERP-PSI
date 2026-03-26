@@ -283,26 +283,22 @@ class FacturacionAutomaticaService {
           const ultimaFechaFacturada = parseFecha(cliente.ultima_fecha_facturada);
 
           // Desde: día siguiente a la última factura
-          // Ej: 1ra terminó 26 jul → 2da empieza 27 jul
+          // Ej: 1ra terminó 3 abr → 2da empieza 4 abr
           fechaDesde = new Date(ultimaFechaFacturada);
           fechaDesde.setDate(fechaDesde.getDate() + 1);
 
-          // 2da factura (nivelación): cobrar 30 días Y ADEMÁS los días restantes del mes
-          // para nivelar que todos los usuarios tengan el mismo periodo (del 1 al 30/31).
-          // Ej: Desde 27 jul → 30 días sería hasta 25 ago → extender hasta 31 ago
-          // Resultado: 27 jul → 31 ago (nivelación)
-          const fecha30Dias = new Date(fechaDesde);
-          fecha30Dias.setDate(fecha30Dias.getDate() + 29); // 30 días incluyendo el primero
-
-          // Extender hasta el último día del mes donde caen los 30 días
+          // 2da factura (nivelación): desde fechaDesde hasta el ÚLTIMO DÍA DEL MES
+          // donde cae fechaDesde. Esto alinea el ciclo al mes calendario.
+          // Ej: 4 abr → 30 abr  |  27 jul → 31 jul  |  15 mar → 31 mar
+          // La 3ra factura ya será del 1 al último día del mes siguiente (mes completo).
           fechaHasta = new Date(
-            fecha30Dias.getFullYear(),
-            fecha30Dias.getMonth() + 1,
-            0, // Último día del mes
+            fechaDesde.getFullYear(),
+            fechaDesde.getMonth() + 1,
+            0, // Último día del mes de fechaDesde
             12, 0, 0
           );
 
-          console.log(`   🔄 2da Factura (nivelación): ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')} (30 días + nivelación hasta fin de mes)`);
+          console.log(`   🔄 2da Factura (nivelación): ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
         }
         
         // ========================================================================

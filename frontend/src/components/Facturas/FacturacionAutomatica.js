@@ -140,8 +140,8 @@ const FacturacionAutomatica = () => {
         cliente.identificacion,
         cliente.tipo_factura === 'primera' ? '1ra Factura' :
         cliente.tipo_factura === 'segunda' ? '2da Nivelación' : 'Mensual',
-        new Date(cliente.periodo_facturacion.fecha_desde).toLocaleDateString('es-CO'),
-        new Date(cliente.periodo_facturacion.fecha_hasta).toLocaleDateString('es-CO'),
+        new Date(cliente.periodo_facturacion.fecha_desde + 'T12:00:00').toLocaleDateString('es-CO'),
+        new Date(cliente.periodo_facturacion.fecha_hasta + 'T12:00:00').toLocaleDateString('es-CO'),
         cliente.periodo_facturacion.dias,
         cliente.totales.internet || 0,
         cliente.totales.television || 0,
@@ -479,8 +479,8 @@ const FacturacionAutomatica = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
-                          {new Date(cliente.periodo_facturacion.fecha_desde).toLocaleDateString('es-CO', {day: '2-digit', month: 'short'})} - {' '}
-                          {new Date(cliente.periodo_facturacion.fecha_hasta).toLocaleDateString('es-CO', {day: '2-digit', month: 'short'})}
+                          {new Date(cliente.periodo_facturacion.fecha_desde + 'T12:00:00').toLocaleDateString('es-CO', {day: 'numeric', month: 'short'})} - {' '}
+                          {new Date(cliente.periodo_facturacion.fecha_hasta + 'T12:00:00').toLocaleDateString('es-CO', {day: 'numeric', month: 'short'})}
                         </div>
                         <div className="text-xs text-gray-500">
                           {cliente.periodo_facturacion.dias} días
