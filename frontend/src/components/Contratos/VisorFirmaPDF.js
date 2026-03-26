@@ -230,124 +230,135 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
             // Función para procesar datos HID específica para STU-540
             const procesarDatosHID = (event) => {
                 reportCount++;
+                const reportId = event.reportId;
                 const data = new Uint8Array(event.data.buffer);
 
-                // Log cada 1000 reportes (y el primero para diagnóstico)
-                // Log primeros reportes para diagnóstico del protocolo
-                if (reportCount <= 5 || reportCount % 2000 === 0) {
-                    const hex = Array.from(data.slice(0, 10)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
-                    console.log(`📊 Reporte #${reportCount} (len=${data.length}): ${hex}  | status=0x${data[0]?.toString(16)} tip=${(data[0]&0x01)!==0} proximity=${(data[0]&0x80)!==0}`);
+                // ═══════════════════════════════════════════════════════
+                // DIAGNÓSTICO: Log detallado de los primeros reportes
+                // para entender el formato real del protocolo HID
+                // ═══════════════════════════════════════════════════════
+                if (reportCount <= 20 || reportCount % 5000 === 0) {
+                    const hex = Array.from(data.slice(0, 12)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
+                    console.log(`📊 Report #${reportCount} | ID=${reportId} len=${data.length} | ${hex}`);
                 }
 
-                // Aceptar reportes con suficientes bytes para parsear coordenadas (≥7)
-                // El STU-540 puede enviar paquetes de 8 bytes o de 64 bytes según el modo.
-                // Antes se filtraba solo 63 bytes (=64-byte packet minus report ID), lo que
-                // rechazaba todos los paquetes de 8 bytes — bug crítico corregido aquí.
-                if (data.length < 7) return;
-
-                const status = data[0];
-
-                // Extraer coordenadas y presión
-                let x = data[1] | (data[2] << 8);
-                let y = data[3] | (data[4] << 8);
-                let pressure = data[5] | (data[6] << 8);
-
                 // ═══════════════════════════════════════════════════════
-                // PROTOCOLO STU-540 - Byte de status:
-                //   bit 0 (0x01) = Tip Switch (pen TOCANDO la superficie)
-                //   bit 5 (0x20) = Side Switch (botón lateral)
-                //   bit 6 (0x40) = Eraser (borrador)
-                //   bit 7 (0x80) = In Range / Proximity (pen CERCA, sin tocar)
+                // STU-540 Report IDs (WebHID ya quita el report ID del buffer):
+                //   2  = PenData (coordenadas de pen sin encriptar)
+                //   5  = DeviceStatus
+                //  11  = PenDataEncrypted
+                //  15  = PenDataEncryptedEx
+                //  17  = PenDataTimeCountSequence
+                //  25  = PenDataTimeCountSequenceEncrypted
                 //
-                // IMPORTANTE: Solo dibujar cuando Tip Switch está activo (bit 0),
-                // lo que significa que el pen está físicamente tocando la tablet.
-                // El bit de proximidad (0x80) se activa al acercar el pen sin
-                // contacto — NO debe iniciar dibujo.
+                // Solo procesar reportes de pen data
                 // ═══════════════════════════════════════════════════════
-                const tipSwitch = (status & 0x01) !== 0;  // Pen tocando superficie
-                const inRange  = (status & 0x80) !== 0;   // Pen en proximidad
-
-                // Solo considerar como "activo para dibujar" si:
-                // 1. Tip switch está ON (contacto físico), O
-                // 2. Hay presión real > umbral mínimo (fallback por si el bit no se reporta)
-                const isPenTouching = tipSwitch || pressure > 10;
-
-                if (!isPenTouching) {
-                    // Pen en hover o fuera de rango — finalizar trazo si estábamos dibujando
-                    if (isDrawing) {
-                        isDrawing = false;
-                        console.log(`🎨 TRAZO FINALIZADO (pen levantado). Total puntos: ${signaturePoints.length}`);
+                const PEN_REPORT_IDS = [2, 11, 15, 17, 25];
+                if (!PEN_REPORT_IDS.includes(reportId)) {
+                    if (reportCount <= 20) {
+                        console.log(`⏭️ Ignorando reporte con ID=${reportId} (no es pen data)`);
                     }
                     return;
                 }
 
-                // Validación de rango de coordenadas
-                if (x > 15000 || y > 15000 || x === 0 || y === 0) {
+                if (data.length < 7) return;
+
+                // ═══════════════════════════════════════════════════════
+                // Parseo de coordenadas según formato STU-540
+                // Formato PenData (Report ID 2):
+                //   byte 0: status
+                //   bytes 1-2: X (little-endian uint16)
+                //   bytes 3-4: Y (little-endian uint16)
+                //   bytes 5-6: Pressure (little-endian uint16)
+                //
+                // Para PenDataTimeCountSequence (Report ID 17):
+                //   byte 0: status
+                //   bytes 1-2: X
+                //   bytes 3-4: Y
+                //   bytes 5-6: Pressure
+                //   bytes 7-8: TimeCount
+                //   bytes 9-10: Sequence
+                // ═══════════════════════════════════════════════════════
+                const status   = data[0];
+                const x        = data[1] | (data[2] << 8);
+                const y        = data[3] | (data[4] << 8);
+                const pressure = data[5] | (data[6] << 8);
+
+                // Log detallado de valores parseados en primeros contactos
+                if (reportCount <= 30) {
+                    console.log(`🔍 Parsed: status=0x${status.toString(16).padStart(2,'0')} x=${x} y=${y} p=${pressure} | tip=${(status&0x01)!==0} range=${(status&0x80)!==0}`);
+                }
+
+                // ═══════════════════════════════════════════════════════
+                // Detección de contacto:
+                // Tip Switch = bit 0 del status = pen tocando superficie
+                // In Range   = bit 7 del status = pen cerca (hover)
+                //
+                // SOLO dibujar cuando hay contacto físico (tip switch)
+                // ═══════════════════════════════════════════════════════
+                const tipSwitch = (status & 0x01) !== 0;
+
+                if (!tipSwitch) {
+                    if (isDrawing) {
+                        isDrawing = false;
+                        ctx.stroke(); // Finalizar último trazo pendiente
+                    }
                     return;
                 }
 
-                // Rango de coordenadas del digitalizador STU-540:
-                // Resolución del digitalizador: 9600 × 5760
+                // Validar coordenadas dentro de rango razonable del digitalizador
+                // STU-540: máx 9600 x 5760, ignorar valores fuera de rango
+                if (x === 0 && y === 0) return;
+                if (x > 9700 || y > 5900) return;
+
+                // Mapear coordenadas del digitalizador al canvas
                 const maxX = 9600;
                 const maxY = 5760;
+                const canvasX = (x / maxX) * canvas.width;
+                const canvasY = (y / maxY) * canvas.height;
 
-                const canvasX = Math.min(canvas.width - 1, (x / maxX) * canvas.width);
-                const canvasY = Math.min(canvas.height - 1, (y / maxY) * canvas.height);
-                
-                // FIRMA REAL (no debug) - configuración profesional
+                // Configurar estilo de trazo
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                ctx.globalCompositeOperation = 'source-over';
-                
-                // Grosor variable basado en presión
-                // STU-540 presión max ~1023, normalizar a rango 1.5-3.5px
-                const lineWidth = pressure > 10 ?
-                    Math.max(1.5, Math.min(3.5, (pressure / 1023) * 3.5)) : 2;
-
                 ctx.strokeStyle = '#000000';
-                ctx.lineWidth = lineWidth;
+
+                // Grosor basado en presión (1.5 - 3.5px)
+                ctx.lineWidth = pressure > 10
+                    ? Math.max(1.5, Math.min(3.5, (pressure / 1023) * 3.5))
+                    : 2;
 
                 if (!isDrawing) {
-                    // Iniciar nuevo trazo
                     isDrawing = true;
                     ctx.beginPath();
                     ctx.moveTo(canvasX, canvasY);
                     lastX = canvasX;
                     lastY = canvasY;
-
-                    if (reportCount <= 50) {
-                        console.log(`🖊️ Trazo iniciado en (${canvasX.toFixed(1)}, ${canvasY.toFixed(1)}) presión=${pressure} status=0x${status.toString(16)}`);
-                    }
                 } else {
-                    // Continuar trazo suave - filtrar jitter con distancia mínima
-                    const distance = Math.sqrt((canvasX - lastX) ** 2 + (canvasY - lastY) ** 2);
+                    // Filtro anti-jitter: ignorar movimientos < 2px
+                    const dx = canvasX - lastX;
+                    const dy = canvasY - lastY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
 
-                    if (distance > 1.5) {
-                        // Usar quadraticCurveTo para líneas suaves
+                    if (dist > 2) {
+                        // Curva suave con punto medio
                         const midX = (lastX + canvasX) / 2;
                         const midY = (lastY + canvasY) / 2;
-
                         ctx.quadraticCurveTo(lastX, lastY, midX, midY);
                         ctx.stroke();
-
                         ctx.beginPath();
                         ctx.moveTo(midX, midY);
-
                         lastX = canvasX;
                         lastY = canvasY;
                     }
                 }
 
-                // Guardar punto para la firma
+                // Guardar punto
                 signaturePoints.push({
                     x, y, pressure,
                     timestamp: Date.now(),
                     canvas_x: canvasX,
                     canvas_y: canvasY,
-                    line_width: lineWidth,
-                    tip_switch: tipSwitch,
-                    in_range: inRange,
-                    report_number: reportCount,
+                    report_id: reportId,
                     raw_status: status
                 });
             };
