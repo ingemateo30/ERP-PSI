@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const AlertasClienteService = require('../services/AlertasClienteService');
+const EstadoClienteService = require('../services/EstadoClienteService');
 const { autenticar } = require('../middleware/auth');
 const { verificarRol, verificarPermiso } = require('../middleware/roleAuth');
 
@@ -1650,6 +1651,52 @@ router.delete('/:id',
   verificarRol('administrador'),
   ClienteController.eliminar
 );
+// ─── Estado automático por mora ────────────────────────────────────────────
+
+// POST /clientes/ejecutar-transiciones — Aplica suspensión/corte/reactivación masiva
+router.post('/ejecutar-transiciones',
+  authenticateToken,
+  requireRole ? requireRole('administrador') : verificarRol('administrador'),
+  async (req, res) => {
+    try {
+      const resultado = await EstadoClienteService.ejecutarTransiciones();
+      res.json({ success: true, data: resultado });
+    } catch (error) {
+      console.error('❌ Error en ejecutar-transiciones:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// GET /clientes/resumen-estados — Resumen de cartera por estado y mora
+router.get('/resumen-estados',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const data = await EstadoClienteService.resumenEstados();
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error('❌ Error en resumen-estados:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// GET /clientes/:id/verificar-estado — Verifica mora y estado de un cliente específico
+router.get('/:id/verificar-estado',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const data = await EstadoClienteService.verificarCliente(req.params.id);
+      if (!data) return res.status(404).json({ success: false, message: 'Cliente no encontrado' });
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error('❌ Error en verificar-estado:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
 // Manejo de errores para rutas no encontradas
 router.use('*', (req, res) => {
   res.status(404).json({

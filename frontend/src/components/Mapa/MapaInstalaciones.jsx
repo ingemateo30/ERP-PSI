@@ -1,22 +1,19 @@
 // frontend/src/components/Mapa/MapaInstalaciones.jsx
-// Mapa de Instalaciones - VERSIÓN CORREGIDA
+// Mapa de Instalaciones - lookup por ciudad, sin geocoding externo
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
-  MapPin, Navigation, Calendar, CheckCircle, Clock,
-  XCircle, AlertCircle, Filter, RefreshCw,
-  Home, Phone, User, Package, Loader2,
-  BarChart3, Map as MapIcon, Activity, Info
+  MapPin, List, Map as MapIcon, Search, Filter,
+  CheckCircle, Clock, XCircle, AlertCircle, RefreshCw,
+  User, Package, Calendar, Navigation, Loader2
 } from 'lucide-react';
 import apiService from '../../services/apiService';
 import { useAuth } from '../../contexts/AuthContext';
 
-// ==========================================
-// FIX ICONOS LEAFLET
-// ==========================================
+// ── Leaflet icon fix ──────────────────────────────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
@@ -24,896 +21,531 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
 });
 
-// ==========================================
-// ICONOS PERSONALIZADOS
-// ==========================================
-const crearIcono = (estado, numero) => {
-  const colores = {
-    programada: '#3B82F6',
-    en_proceso: '#F59E0B',
-    completada: '#10B981',
-    cancelada: '#EF4444',
-    reagendada: '#8B5CF6'
-  };
-
-  return L.divIcon({
-    className: 'custom-marker',
-    html: `<div style="background:${colores[estado]||'#6B7280'};width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);color:#fff;font-size:11px;font-weight:bold">${numero||''}</span></div>`,
-    iconSize: [36, 36],
-    iconAnchor: [18, 36],
-    popupAnchor: [0, -36]
-  });
+// ── City lookup table ─────────────────────────────────────────────────────────
+const CIUDADES_CO = {
+  'socorro': [6.4608, -73.2620],
+  'san gil': [6.5566, -73.1354],
+  'vélez': [6.0087, -73.6776], 'velez': [6.0087, -73.6776],
+  'barbosa': [5.9333, -73.6167],
+  'charalá': [6.2872, -73.1430], 'charala': [6.2872, -73.1430],
+  'oiba': [6.2697, -73.2997],
+  'guadalupe': [6.3113, -73.3538],
+  'mogotes': [6.4866, -73.0225],
+  'ocamonte': [6.3536, -73.2108],
+  'suaita': [6.1072, -73.4447],
+  'bucaramanga': [7.1193, -73.1227],
+  'floridablanca': [7.0644, -73.0965],
+  'girón': [7.0753, -73.1697], 'giron': [7.0753, -73.1697],
+  'piedecuesta': [6.9876, -73.0508],
+  'bogotá': [4.7110, -74.0721], 'bogota': [4.7110, -74.0721],
 };
 
-// ==========================================
-// AJUSTAR VISTA DEL MAPA
-// ==========================================
-const AjustarVista = ({ instalaciones }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (instalaciones?.length > 0) {
-      const bounds = instalaciones.map(i => [i.coordenadas.lat, i.coordenadas.lng]);
-      if (bounds.length > 0) {
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-      }
+function resolverCoordenadas(inst) {
+  if (inst.coordenadas_lat && inst.coordenadas_lng) {
+    const lat = parseFloat(inst.coordenadas_lat);
+    const lng = parseFloat(inst.coordenadas_lng);
+    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+      return { lat, lng, precision: 'gps' };
     }
-  }, [instalaciones, map]);
-  
+  }
+  const ciudad = (inst.ciudad_nombre || '').toLowerCase().trim();
+  if (ciudad && CIUDADES_CO[ciudad]) {
+    return { lat: CIUDADES_CO[ciudad][0], lng: CIUDADES_CO[ciudad][1], precision: 'ciudad' };
+  }
   return null;
+}
+
+function offsetAleatorio(lat, lng, idx) {
+  const r = 0.003;
+  const angle = (idx * 137.5) * Math.PI / 180;
+  return { lat: lat + r * Math.cos(angle), lng: lng + r * Math.sin(angle) };
+}
+
+// ── Custom marker icons ───────────────────────────────────────────────────────
+const COLORES_ESTADO = {
+  programada: '#3B82F6',
+  en_proceso: '#F59E0B',
+  completada: '#10B981',
+  cancelada: '#EF4444',
+  reagendada: '#8B5CF6',
 };
 
-// Timestamp de última llamada a Nominatim — a nivel de módulo para persistir entre renders
-let _ultimaLlamadaNominatim = 0;
+function crearIcono(estado) {
+  const color = COLORES_ESTADO[estado] || '#6B7280';
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:22px;height:22px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -14],
+  });
+}
 
-// ==========================================
-// TABLA DE COORDENADAS DE CIUDADES COLOMBIANAS
-// Usada como fallback instantáneo antes de llamar a Nominatim
-// ==========================================
-const COORDENADAS_CIUDADES_CO = {
-  'socorro': { lat: 6.4608, lng: -73.2620 },
-  'san gil': { lat: 6.5566, lng: -73.1354 },
-  'velez': { lat: 6.0087, lng: -73.6776 },
-  'vélez': { lat: 6.0087, lng: -73.6776 },
-  'barbosa': { lat: 5.9333, lng: -73.6167 },
-  'charalá': { lat: 6.2872, lng: -73.1430 },
-  'charala': { lat: 6.2872, lng: -73.1430 },
-  'oiba': { lat: 6.2697, lng: -73.2997 },
-  'guadalupe': { lat: 6.3113, lng: -73.3538 },
-  'mogotes': { lat: 6.4866, lng: -73.0225 },
-  'ocamonte': { lat: 6.3536, lng: -73.2108 },
-  'suaita': { lat: 6.1072, lng: -73.4447 },
-  'palmas del socorro': { lat: 6.4608, lng: -73.2620 },
-  'bucaramanga': { lat: 7.1193, lng: -73.1227 },
-  'floridablanca': { lat: 7.0644, lng: -73.0965 },
-  'giron': { lat: 7.0753, lng: -73.1697 },
-  'girón': { lat: 7.0753, lng: -73.1697 },
-  'piedecuesta': { lat: 6.9876, lng: -73.0508 },
-  'bogota': { lat: 4.7110, lng: -74.0721 },
-  'bogotá': { lat: 4.7110, lng: -74.0721 },
-  'medellin': { lat: 6.2442, lng: -75.5812 },
-  'medellín': { lat: 6.2442, lng: -75.5812 },
-  'cali': { lat: 3.4516, lng: -76.5320 },
+// ── Map bounds adjuster ───────────────────────────────────────────────────────
+function AjustarVista({ marcadores }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!marcadores || marcadores.length === 0) return;
+    const bounds = marcadores.map(m => [m.coords.lat, m.coords.lng]);
+    if (bounds.length === 1) {
+      map.setView(bounds[0], 13);
+    } else {
+      map.fitBounds(bounds, { padding: [40, 40] });
+    }
+  }, [marcadores, map]);
+  return null;
+}
+
+// ── Status helpers ────────────────────────────────────────────────────────────
+const ESTADO_CONFIG = {
+  programada:  { label: 'Programada',  color: 'bg-blue-100 text-blue-800',   icon: Clock },
+  en_proceso:  { label: 'En Proceso',  color: 'bg-yellow-100 text-yellow-800', icon: AlertCircle },
+  completada:  { label: 'Completada',  color: 'bg-green-100 text-green-800', icon: CheckCircle },
+  cancelada:   { label: 'Cancelada',   color: 'bg-red-100 text-red-800',     icon: XCircle },
+  reagendada:  { label: 'Reagendada',  color: 'bg-purple-100 text-purple-800', icon: RefreshCw },
 };
 
-// ==========================================
-// COMPONENTE PRINCIPAL
-// ==========================================
-const MapaInstalaciones = () => {
+function EstadoBadge({ estado, small = false }) {
+  const cfg = ESTADO_CONFIG[estado] || { label: estado, color: 'bg-gray-100 text-gray-800', icon: AlertCircle };
+  const Icon = cfg.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full font-medium ${cfg.color} ${small ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-xs'}`}>
+      <Icon size={small ? 10 : 12} />
+      {cfg.label}
+    </span>
+  );
+}
+
+function formatFecha(f) {
+  if (!f) return '—';
+  try {
+    return new Date(f).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch {
+    return f;
+  }
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function MapaInstalaciones() {
   const { user } = useAuth();
   const [instalaciones, setInstalaciones] = useState([]);
-  const [instalacionesMapa, setInstalacionesMapa] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [geocodificando, setGeocodificando] = useState(false);
-  const [progreso, setProgreso] = useState({ actual: 0, total: 0 });
+  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
-  const [filtros, setFiltros] = useState({
-    estado: '',
-    instalador: '',
-    fechaDesde: '',
-    fechaHasta: '',
-    busqueda: ''
-  });
-  const [busquedaTemp, setBusquedaTemp] = useState('');
-  const [vistaActual, setVistaActual] = useState('lista');
-  const [instalacionSeleccionada, setInstalacionSeleccionada] = useState(null);
-  const [mostrarFiltros, setMostrarFiltros] = useState(true);
-  const [estadisticas, setEstadisticas] = useState({
-    total: 0,
-    programadas: 0,
-    en_proceso: 0,
-    completadas: 0,
-    canceladas: 0,
-    reagendadas: 0,
-    con_direccion: 0,
-    con_gps: 0
-  });
+  const [vista, setVista] = useState('lista'); // 'lista' | 'mapa'
+  const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [busqueda, setBusqueda] = useState('');
+  const [ajustarVista, setAjustarVista] = useState(false);
 
-  const CENTRO_MAPA = [6.4667, -73.2667]; // Socorro
-  const ZOOM = 13;
-
-  // Verificar si el usuario es instalador
-  const esInstalador = user && user.rol === 'instalador';
-
-  // Debounce para el campo de búsqueda
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setFiltros(prev => ({ ...prev, busqueda: busquedaTemp }));
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [busquedaTemp]);
+  const cargarInstalaciones = async () => {
+    setCargando(true);
+    setError(null);
+    try {
+      const data = await apiService.getInstalaciones();
+      setInstalaciones(Array.isArray(data) ? data : (data?.instalaciones || []));
+    } catch (err) {
+      console.error('Error cargando instalaciones:', err);
+      setError('No se pudieron cargar las instalaciones. Intenta de nuevo.');
+    } finally {
+      setCargando(false);
+    }
+  };
 
   useEffect(() => {
     cargarInstalaciones();
-  }, [filtros]);
+  }, []);
 
-  const cargarInstalaciones = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (filtros.estado) params.append('estado', filtros.estado);
-      if (filtros.instalador) params.append('instalador_id', filtros.instalador);
-      if (filtros.fechaDesde) params.append('fecha_desde', filtros.fechaDesde);
-      if (filtros.fechaHasta) params.append('fecha_hasta', filtros.fechaHasta);
-      if (filtros.busqueda) params.append('busqueda', filtros.busqueda);
+  // Build marker list immediately from lookup table
+  const marcadores = useMemo(() => {
+    return instalaciones.map((inst, idx) => {
+      const pos = resolverCoordenadas(inst);
+      if (!pos) return null;
+      const coords = pos.precision === 'ciudad'
+        ? offsetAleatorio(pos.lat, pos.lng, idx)
+        : { lat: pos.lat, lng: pos.lng };
+      return { ...inst, coords, precision: pos.precision };
+    }).filter(Boolean);
+  }, [instalaciones]);
 
-      const res = await apiService.get(`/instalaciones?${params}`);
-      console.log('📡 Respuesta API:', res);
-      console.log('📡 Parámetros enviados:', params.toString());
-
-      if (res.success && Array.isArray(res.data)) {
-        console.log(`✅ Instalaciones cargadas: ${res.data.length}`);
-        setInstalaciones(res.data);
-        calcularEstadisticas(res.data);
+  // Filtered list for both views
+  const instalacionesFiltradas = useMemo(() => {
+    return instalaciones.filter(inst => {
+      if (filtroEstado !== 'todos' && inst.estado !== filtroEstado) return false;
+      if (busqueda.trim()) {
+        const q = busqueda.toLowerCase();
+        return (
+          (inst.cliente_nombre || '').toLowerCase().includes(q) ||
+          (inst.direccion_instalacion || '').toLowerCase().includes(q) ||
+          (inst.cliente_direccion || '').toLowerCase().includes(q) ||
+          (inst.ciudad_nombre || '').toLowerCase().includes(q)
+        );
       }
-      setError(null);
-    } catch (err) {
-      console.error('❌ Error cargando instalaciones:', err);
-      setError('Error cargando instalaciones');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calcularEstadisticas = (datos) => {
-    const conGPS = datos.filter(i =>
-      i.coordenadas_lat && i.coordenadas_lng &&
-      parseFloat(i.coordenadas_lat) !== 0 && parseFloat(i.coordenadas_lng) !== 0
-    ).length;
-    const conDir = datos.filter(i => i.direccion_instalacion || i.cliente_direccion || i.ciudad_nombre).length;
-    console.log(`📊 Con GPS: ${conGPS}, con dirección/ciudad: ${conDir} de ${datos.length}`);
-
-    setEstadisticas({
-      total: datos.length,
-      programadas: datos.filter(i => i.estado === 'programada').length,
-      en_proceso: datos.filter(i => i.estado === 'en_proceso').length,
-      completadas: datos.filter(i => i.estado === 'completada').length,
-      canceladas: datos.filter(i => i.estado === 'cancelada').length,
-      reagendadas: datos.filter(i => i.estado === 'reagendada').length,
-      con_direccion: conDir,
-      con_gps: conGPS
+      return true;
     });
-  };
+  }, [instalaciones, filtroEstado, busqueda]);
 
-  // Cache de geocodificación en sessionStorage
-  const CACHE_KEY = 'geo_cache_v3';
-  const leerCache = () => { try { return JSON.parse(sessionStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; } };
-  const guardarCache = (cache) => { try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch {} };
-
-  // Normalizador: quita el número exacto de la calle ("Calle 5 # 3-45" → "") porque Nominatim no lo conoce
-  const normalizarDireccion = (dir) => {
-    if (!dir) return '';
-    // Remover coordenadas exactas tipo "# 3-45", "No. 3-45", etc.
-    return dir.replace(/#\s*[\d\-]+/g, '').replace(/No\.\s*[\d\-]+/g, '').trim();
-  };
-
-  // Espera rate limit de Nominatim (1 req/seg)
-  const esperarRateLimit = async () => {
-    const ahora = Date.now();
-    const espera = Math.max(0, _ultimaLlamadaNominatim + 1100 - ahora);
-    if (espera > 0) await new Promise(r => setTimeout(r, espera));
-    _ultimaLlamadaNominatim = Date.now();
-  };
-
-  // Búsqueda libre en Nominatim
-  const llamarNominatim = async (q) => {
-    await esperarRateLimit();
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=co`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'ERP-PSI/1.0' } });
-      const data = await res.json();
-      if (data?.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-    } catch {}
-    return null;
-  };
-
-  // Búsqueda estructurada en Nominatim (más precisa para ciudades colombianas)
-  const llamarNominatimEstructurado = async ({ street, city, state }) => {
-    await esperarRateLimit();
-    try {
-      const params = new URLSearchParams({ format: 'json', limit: '1', country: 'Colombia' });
-      if (street) params.set('street', street);
-      if (city) params.set('city', city);
-      if (state) params.set('state', state);
-      const url = `https://nominatim.openstreetmap.org/search?${params}`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'ERP-PSI/1.0' } });
-      const data = await res.json();
-      if (data?.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-    } catch {}
-    return null;
-  };
-
-  /**
-   * Geocodifica con estrategia de prioridades:
-   * 1. Coordenadas GPS almacenadas en la BD (coordenadas_lat / coordenadas_lng) — instantáneo, sin API
-   * 2. Tabla hardcodeada de ciudades colombianas — instantáneo, sin API
-   * 3. Nominatim estructurado por ciudad+depto — con caché
-   * 4. Nominatim libre ciudad+depto — con caché
-   */
-  const geocodificarInstancia = async (inst) => {
-    // Prioridad 1: coordenadas GPS guardadas en la BD
-    if (inst.coordenadas_lat && inst.coordenadas_lng) {
-      const lat = parseFloat(inst.coordenadas_lat);
-      const lng = parseFloat(inst.coordenadas_lng);
-      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-        return { lat, lng };
+  const marcadoresFiltrados = useMemo(() => {
+    return marcadores.filter(m => {
+      if (filtroEstado !== 'todos' && m.estado !== filtroEstado) return false;
+      if (busqueda.trim()) {
+        const q = busqueda.toLowerCase();
+        return (
+          (m.cliente_nombre || '').toLowerCase().includes(q) ||
+          (m.direccion_instalacion || '').toLowerCase().includes(q) ||
+          (m.cliente_direccion || '').toLowerCase().includes(q) ||
+          (m.ciudad_nombre || '').toLowerCase().includes(q)
+        );
       }
-    }
+      return true;
+    });
+  }, [marcadores, filtroEstado, busqueda]);
 
-    const ciudad = (inst.ciudad_nombre || inst.ciudad || '').toLowerCase().trim();
-    const barrio = inst.barrio || '';
-    const depto  = inst.departamento_nombre || inst.departamento || '';
-    const direccion = normalizarDireccion(inst.direccion_instalacion || inst.cliente_direccion || inst.direccion || '');
+  // Stats
+  const stats = useMemo(() => {
+    const total = instalaciones.length;
+    const conGPS = marcadores.filter(m => m.precision === 'gps').length;
+    const porCiudad = marcadores.filter(m => m.precision === 'ciudad').length;
+    const sinUbicacion = total - marcadores.length;
+    const porEstado = {};
+    instalaciones.forEach(inst => {
+      porEstado[inst.estado] = (porEstado[inst.estado] || 0) + 1;
+    });
+    return { total, conGPS, porCiudad, sinUbicacion, porEstado };
+  }, [instalaciones, marcadores]);
 
-    // Prioridad 2: tabla hardcodeada de ciudades (instantáneo, sin API)
-    if (ciudad && COORDENADAS_CIUDADES_CO[ciudad]) {
-      return COORDENADAS_CIUDADES_CO[ciudad];
-    }
-
-    // Prioridad 3 y 4: Nominatim con caché
-    const cache = leerCache();
-
-    if (ciudad) {
-      const keyCiudad = `nominatim:${ciudad}:${depto}`.toLowerCase();
-      if (cache[keyCiudad]) return cache[keyCiudad];
-      if (cache[keyCiudad] === undefined) {
-        // Intento estructurado (más preciso para municipios)
-        const coords = await llamarNominatimEstructurado({ city: inst.ciudad_nombre || inst.ciudad, state: depto });
-        if (coords) {
-          cache[keyCiudad] = coords;
-          guardarCache(cache);
-          return coords;
-        }
-        // Intento libre
-        const coords2 = await llamarNominatim(`${inst.ciudad_nombre || inst.ciudad}, ${depto}, Colombia`);
-        if (coords2) {
-          cache[keyCiudad] = coords2;
-          guardarCache(cache);
-          return coords2;
-        }
-        // No cachear null — podría funcionar en el siguiente intento
-      }
-    }
-
-    return null;
+  const handleVerMapa = () => {
+    setVista('mapa');
+    setAjustarVista(v => !v); // toggle to trigger AjustarVista
   };
 
-  const construirDireccion = (i) => {
-    const partes = [
-      i.direccion_instalacion || i.cliente_direccion || i.direccion,
-      i.barrio,
-      i.ciudad_nombre,
-      i.departamento_nombre,
-      'Colombia'
-    ].filter(Boolean);
-    return partes.join(', ');
-  };
-
-  const geocodificarTodas = async () => {
-    console.log(`🚀 Geocodificando ${instalaciones.length} instalaciones`);
-    setGeocodificando(true);
-    setProgreso({ actual: 0, total: instalaciones.length });
-
-    const resultados = [];
-    let gps = 0;           // coordenadas directas de la BD
-    let geocodificados = 0; // resueltas por tabla o Nominatim
-    let fallos = 0;
-
-    for (let i = 0; i < instalaciones.length; i++) {
-      const inst = instalaciones[i];
-      setProgreso({ actual: i + 1, total: instalaciones.length });
-
-      if (!inst.coordenadas_lat && !inst.coordenadas_lng && !inst.ciudad_nombre && !inst.barrio && !inst.direccion_instalacion && !inst.cliente_direccion) {
-        fallos++;
-        continue;
-      }
-
-      const tieneGPS = inst.coordenadas_lat && inst.coordenadas_lng &&
-        parseFloat(inst.coordenadas_lat) !== 0 && parseFloat(inst.coordenadas_lng) !== 0;
-
-      const coords = await geocodificarInstancia(inst);
-
-      if (coords) {
-        resultados.push({ ...inst, coordenadas: coords, direccion_completa: construirDireccion(inst) });
-        if (tieneGPS) {
-          gps++;
-        } else {
-          geocodificados++;
-        }
-      } else {
-        fallos++;
-        console.warn(`❌ Sin coords: ${inst.cliente_nombre} (${inst.ciudad_nombre})`);
-      }
-    }
-
-    const exitos = gps + geocodificados;
-    console.log(`📊 Geocodificación: ${exitos} exitosas (${gps} GPS, ${geocodificados} geocodificadas), ${fallos} fallidas`);
-    setInstalacionesMapa(resultados);
-    setGeocodificando(false);
-
-    alert(`✅ Geocodificación completada:\n${gps} con GPS almacenado\n${geocodificados} geocodificadas\n${fallos} sin coordenadas\nTotal: ${instalaciones.length}`);
-
-    if (resultados.length > 0) setVistaActual('mapa');
-  };
-
-  const colorEstado = (e) => ({
-    programada: 'bg-blue-100 text-blue-800',
-    en_proceso: 'bg-orange-100 text-orange-800',
-    completada: 'bg-green-100 text-green-800',
-    cancelada: 'bg-red-100 text-red-800',
-    reagendada: 'bg-purple-100 text-purple-800'
-  }[e] || 'bg-gray-100 text-gray-800');
-
-  const formatFecha = (f) => {
-    if (!f) return 'N/A';
-    try {
-      return new Date(f).toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    } catch {
-      return 'N/A';
-    }
-  };
-
+  // ── Render ──
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      {/* ENCABEZADO */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <MapPin className="w-8 h-8 text-blue-600" />
-              Mapa de Instalaciones
-            </h1>
-            <p className="text-gray-600">Visualiza instalaciones geográficamente (OpenStreetMap - Gratuito)</p>
-            {esInstalador && (
-              <div className="mt-2 flex items-center gap-2 text-sm text-blue-600">
-                <Info className="w-4 h-4" />
-                <span>Mostrando solo tus instalaciones asignadas</span>
-              </div>
-            )}
+    <div className="flex flex-col h-full bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <MapPin className="text-blue-600" size={22} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Mapa de Instalaciones</h1>
+              <p className="text-sm text-gray-500">
+                {cargando ? 'Cargando…' : `${stats.total} instalaciones · ${marcadores.length} ubicadas`}
+              </p>
+            </div>
           </div>
-          
-          <div className="flex gap-3">
-            <button 
-              onClick={() => setMostrarFiltros(!mostrarFiltros)} 
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-            >
-              <Filter className="w-5 h-5" />
-              {mostrarFiltros ? 'Ocultar' : 'Mostrar'} Filtros
-            </button>
-            
-            <button 
-              onClick={cargarInstalaciones} 
-              disabled={loading} 
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
-            >
-              <RefreshCw className={`w-5 h-5 ${loading && 'animate-spin'}`} />
-              Actualizar
-            </button>
-            
-            {vistaActual === 'lista' && instalaciones.length > 0 && (
-              <button 
-                onClick={geocodificarTodas} 
-                disabled={geocodificando} 
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
-              >
-                {geocodificando ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Geocodificando {progreso.actual}/{progreso.total}...
-                  </>
-                ) : (
-                  <>
-                    <Navigation className="w-5 h-5" />
-                    Ver en Mapa
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* TABS */}
-        <div className="flex gap-2">
-          <button 
-            onClick={() => setVistaActual('lista')} 
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              vistaActual === 'lista' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
+          <button
+            onClick={cargarInstalaciones}
+            disabled={cargando}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
           >
-            <Activity className="w-4 h-4 inline mr-2" />
-            Vista Lista
-          </button>
-          <button 
-            onClick={() => setVistaActual('mapa')} 
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              vistaActual === 'mapa' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <MapIcon className="w-4 h-4 inline mr-2" />
-            Vista Mapa
+            <RefreshCw size={15} className={cargando ? 'animate-spin' : ''} />
+            Actualizar
           </button>
         </div>
       </div>
 
-      {/* ESTADÍSTICAS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-        <div className="bg-gray-50 p-4 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total</p>
-              <p className="text-2xl font-bold text-gray-900">{estadisticas.total}</p>
-            </div>
-            <BarChart3 className="w-8 h-8 text-gray-400" />
-          </div>
-        </div>
-
-        <div className="bg-blue-50 p-4 rounded-lg shadow border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-blue-600">Programadas</p>
-              <p className="text-2xl font-bold text-blue-900">{estadisticas.programadas}</p>
-            </div>
-            <Clock className="w-8 h-8 text-blue-400" />
-          </div>
-        </div>
-
-        <div className="bg-orange-50 p-4 rounded-lg shadow border border-orange-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-orange-600">En Proceso</p>
-              <p className="text-2xl font-bold text-orange-900">{estadisticas.en_proceso}</p>
-            </div>
-            <Activity className="w-8 h-8 text-orange-400" />
-          </div>
-        </div>
-
-        <div className="bg-green-50 p-4 rounded-lg shadow border border-green-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-green-600">Completadas</p>
-              <p className="text-2xl font-bold text-green-900">{estadisticas.completadas}</p>
-            </div>
-            <CheckCircle className="w-8 h-8 text-green-400" />
-          </div>
-        </div>
-
-        <div className="bg-red-50 p-4 rounded-lg shadow border border-red-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-red-600">Canceladas</p>
-              <p className="text-2xl font-bold text-red-900">{estadisticas.canceladas}</p>
-            </div>
-            <XCircle className="w-8 h-8 text-red-400" />
-          </div>
-        </div>
-
-        <div className="bg-purple-50 p-4 rounded-lg shadow border border-purple-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-purple-600">Reagendadas</p>
-              <p className="text-2xl font-bold text-purple-900">{estadisticas.reagendadas}</p>
-            </div>
-            <AlertCircle className="w-8 h-8 text-purple-400" />
-          </div>
-        </div>
-
-        <div className="bg-teal-50 p-4 rounded-lg shadow border border-teal-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-teal-600">Con Ubicación</p>
-              <p className="text-2xl font-bold text-teal-900">{estadisticas.con_direccion}</p>
-              {estadisticas.con_gps > 0 && (
-                <p className="text-xs text-teal-500 mt-1">{estadisticas.con_gps} con GPS</p>
-              )}
-            </div>
-            <MapPin className="w-8 h-8 text-teal-400" />
-          </div>
-        </div>
-      </div>
-
-      {/* FILTROS */}
-      {mostrarFiltros && (
-        <div className="bg-white p-4 rounded-lg shadow mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <input
-              type="text"
-              value={busquedaTemp}
-              onChange={e => setBusquedaTemp(e.target.value)}
-              placeholder="Buscar cliente, dirección..."
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-
-            <select
-              value={filtros.estado}
-              onChange={e => setFiltros({...filtros, estado: e.target.value})}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos los estados</option>
-              <option value="programada">Programada</option>
-              <option value="en_proceso">En Proceso</option>
-              <option value="completada">Completada</option>
-              <option value="cancelada">Cancelada</option>
-              <option value="reagendada">Reagendada</option>
-            </select>
-
-            <input
-              type="date"
-              value={filtros.fechaDesde}
-              onChange={e => setFiltros({...filtros, fechaDesde: e.target.value})}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="Fecha desde"
-            />
-
-            <input
-              type="date"
-              value={filtros.fechaHasta}
-              onChange={e => setFiltros({...filtros, fechaHasta: e.target.value})}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="Fecha hasta"
-            />
-
-            <button
-              onClick={() => {
-                setFiltros({estado:'',instalador:'',fechaDesde:'',fechaHasta:'',busqueda:''});
-                setBusquedaTemp('');
-              }}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-            >
-              Limpiar Filtros
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ERROR */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5" />
-          {error}
-        </div>
-      )}
-
-      {/* VISTA DE LISTA */}
-      {vistaActual === 'lista' && (
-        loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <span className="ml-3 text-gray-600">Cargando instalaciones...</span>
-          </div>
-        ) : instalaciones.length === 0 ? (
-          <div className="text-center py-12">
-            <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">No hay instalaciones para mostrar</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {instalaciones.map(i => (
-              <div key={i.id} className="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-gray-900">
-                    {i.cliente_nombre || 'Sin nombre'}
-                  </h3>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${colorEstado(i.estado)}`}>
-                    {i.estado}
-                  </span>
-                </div>
-                
-                <div className="space-y-2 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <Home className="w-4 h-4 flex-shrink-0" />
-                    <span className="truncate">
-                      {i.direccion_instalacion || i.cliente_direccion || i.direccion || 'Sin dirección'}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 flex-shrink-0" />
-                    <span>{formatFecha(i.fecha_programada)}</span>
-                  </div>
-                  
-                  {i.instalador_nombres && (
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 flex-shrink-0" />
-                      <span className="truncate">{i.instalador_nombres}</span>
-                    </div>
-                  )}
-                </div>
-                
-                <button 
-                  onClick={() => setInstalacionSeleccionada(i)} 
-                  className="mt-3 w-full px-3 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-sm font-medium"
-                >
-                  Ver Detalles
-                </button>
-              </div>
+      {/* Stats bar */}
+      {!cargando && !error && (
+        <div className="bg-white border-b border-gray-200 px-6 py-3">
+          <div className="flex flex-wrap gap-4 text-sm">
+            <span className="text-gray-500">
+              Total: <strong className="text-gray-900">{stats.total}</strong>
+            </span>
+            {Object.entries(stats.porEstado).map(([estado, count]) => (
+              <span key={estado} className="text-gray-500">
+                {ESTADO_CONFIG[estado]?.label || estado}:{' '}
+                <strong style={{ color: COLORES_ESTADO[estado] || '#6B7280' }}>{count}</strong>
+              </span>
             ))}
-          </div>
-        )
-      )}
-
-      {/* VISTA DE MAPA */}
-      {vistaActual === 'mapa' && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          {instalacionesMapa.length === 0 ? (
-            <div className="p-12 text-center">
-              <MapIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Mapa no disponible
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Debes geocodificar las direcciones primero para visualizarlas en el mapa
-              </p>
-              <button 
-                onClick={geocodificarTodas} 
-                disabled={geocodificando || instalaciones.length === 0} 
-                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
-                {geocodificando ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Geocodificando {progreso.actual}/{progreso.total}...
-                  </>
-                ) : (
-                  <>
-                    <Navigation className="w-5 h-5 mr-2" />
-                    Geocodificar Direcciones
-                  </>
-                )}
-              </button>
-              <p className="text-sm text-gray-500 mt-4">
-                Este proceso puede tardar algunos minutos (pausa de 1s entre peticiones por política de Nominatim)
-              </p>
-            </div>
-          ) : (
-            <div style={{ height: '600px', width: '100%' }}>
-              <MapContainer 
-                center={CENTRO_MAPA} 
-                zoom={ZOOM} 
-                style={{ height: '100%', width: '100%' }}
-                scrollWheelZoom={true}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                
-                <AjustarVista instalaciones={instalacionesMapa} />
-                
-                {instalacionesMapa.map((i, idx) => (
-                  <Marker
-                    key={i.id}
-                    position={[i.coordenadas.lat, i.coordenadas.lng]}
-                    icon={crearIcono(i.estado, idx + 1)}
-                  >
-                    <Popup maxWidth={300}>
-                      <div className="p-2">
-                        <h3 className="font-bold text-lg mb-2 text-gray-900">
-                          {i.cliente_nombre || 'Sin nombre'}
-                        </h3>
-                        
-                        <div className="space-y-1 text-sm mb-3">
-                          <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${colorEstado(i.estado)}`}>
-                            {i.estado}
-                          </span>
-                          
-                          <div className="flex items-start gap-2 text-gray-700 mt-2">
-                            <Home className="w-4 h-4 mt-1 flex-shrink-0" />
-                            <span>{i.direccion_completa || construirDireccion(i)}</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 text-gray-700">
-                            <Calendar className="w-4 h-4 flex-shrink-0" />
-                            <span>{formatFecha(i.fecha_programada)}</span>
-                          </div>
-                          
-                          {i.instalador_nombres && (
-                            <div className="flex items-center gap-2 text-gray-700">
-                              <User className="w-4 h-4 flex-shrink-0" />
-                              <span>{i.instalador_nombres}</span>
-                            </div>
-                          )}
-                          
-                          {i.plan_nombre && (
-                            <div className="flex items-center gap-2 text-gray-700">
-                              <Package className="w-4 h-4 flex-shrink-0" />
-                              <span>{i.plan_nombre}</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <button
-                          onClick={() => setInstalacionSeleccionada(i)}
-                          className="w-full px-3 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700"
-                        >
-                          Ver Detalles Completos
-                        </button>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* MODAL DE DETALLE */}
-      {instalacionSeleccionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    {instalacionSeleccionada.cliente_nombre || 'Sin nombre'}
-                  </h2>
-                  <p className="text-gray-500 mt-1">
-                    Instalación #{instalacionSeleccionada.id}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setInstalacionSeleccionada(null)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <XCircle className="w-6 h-6" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">
-                      Estado
-                    </label>
-                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${colorEstado(instalacionSeleccionada.estado)}`}>
-                      {instalacionSeleccionada.estado}
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">
-                      Dirección
-                    </label>
-                    <p className="text-gray-900">
-                      {instalacionSeleccionada.direccion_instalacion || 
-                       instalacionSeleccionada.cliente_direccion || 
-                       instalacionSeleccionada.direccion ||
-                       'Sin dirección'}
-                    </p>
-                  </div>
-
-                  {(instalacionSeleccionada.barrio) && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
-                        Barrio
-                      </label>
-                      <p className="text-gray-900">{instalacionSeleccionada.barrio}</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">
-                      Fecha Programada
-                    </label>
-                    <p className="text-gray-900">{formatFecha(instalacionSeleccionada.fecha_programada)}</p>
-                  </div>
-
-                  {instalacionSeleccionada.hora_programada && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
-                        Hora
-                      </label>
-                      <p className="text-gray-900">{instalacionSeleccionada.hora_programada}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  {instalacionSeleccionada.instalador_nombres && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
-                        Instalador
-                      </label>
-                      <p className="text-gray-900">{instalacionSeleccionada.instalador_nombres}</p>
-                    </div>
-                  )}
-
-                  {(instalacionSeleccionada.telefono_contacto || instalacionSeleccionada.cliente_telefono) && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
-                        Teléfono
-                      </label>
-                      <p className="text-gray-900">
-                        {instalacionSeleccionada.telefono_contacto || instalacionSeleccionada.cliente_telefono}
-                      </p>
-                    </div>
-                  )}
-
-                  {instalacionSeleccionada.plan_nombre && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
-                        Plan de Servicio
-                      </label>
-                      <p className="text-gray-900">{instalacionSeleccionada.plan_nombre}</p>
-                    </div>
-                  )}
-
-                  {instalacionSeleccionada.costo_instalacion && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
-                        Costo de Instalación
-                      </label>
-                      <p className="text-gray-900">
-                        ${parseFloat(instalacionSeleccionada.costo_instalacion).toLocaleString('es-CO')}
-                      </p>
-                    </div>
-                  )}
-
-                  {instalacionSeleccionada.tipo_instalacion && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
-                        Tipo de Instalación
-                      </label>
-                      <p className="text-gray-900 capitalize">{instalacionSeleccionada.tipo_instalacion}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {instalacionSeleccionada.observaciones && (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <label className="block text-sm font-medium text-gray-500 mb-2">
-                    Observaciones
-                  </label>
-                  <p className="text-gray-900 whitespace-pre-wrap">
-                    {instalacionSeleccionada.observaciones}
-                  </p>
-                </div>
-              )}
-
-              <div className="mt-6 flex gap-3">
-                <button
-                  onClick={() => setInstalacionSeleccionada(null)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
+            <span className="text-gray-400">|</span>
+            <span className="text-gray-500">
+              GPS exacto: <strong className="text-green-600">{stats.conGPS}</strong>
+            </span>
+            <span className="text-gray-500">
+              Centro ciudad: <strong className="text-blue-600">{stats.porCiudad}</strong>
+            </span>
+            {stats.sinUbicacion > 0 && (
+              <span className="text-gray-500">
+                Sin ubicación: <strong className="text-gray-400">{stats.sinUbicacion}</strong>
+              </span>
+            )}
           </div>
         </div>
       )}
+
+      {/* Filters + view toggle */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex flex-wrap gap-3 items-center">
+        {/* Search */}
+        <div className="relative flex-1 min-w-48">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar cliente, dirección, ciudad…"
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Estado filter */}
+        <div className="flex items-center gap-2">
+          <Filter size={15} className="text-gray-400" />
+          <select
+            value={filtroEstado}
+            onChange={e => setFiltroEstado(e.target.value)}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="todos">Todos los estados</option>
+            {Object.entries(ESTADO_CONFIG).map(([key, cfg]) => (
+              <option key={key} value={key}>{cfg.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* View toggle */}
+        <div className="flex rounded-lg border border-gray-300 overflow-hidden ml-auto">
+          <button
+            onClick={() => setVista('lista')}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
+              vista === 'lista' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <List size={15} />
+            Lista
+          </button>
+          <button
+            onClick={handleVerMapa}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
+              vista === 'mapa' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <MapIcon size={15} />
+            Mapa
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto">
+        {cargando ? (
+          <div className="flex flex-col items-center justify-center h-64 gap-4">
+            <Loader2 size={40} className="text-blue-500 animate-spin" />
+            <p className="text-gray-500 text-sm">Cargando instalaciones…</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-64 gap-4 p-6">
+            <AlertCircle size={40} className="text-red-400" />
+            <p className="text-gray-600 text-center">{error}</p>
+            <button
+              onClick={cargarInstalaciones}
+              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+            >
+              Reintentar
+            </button>
+          </div>
+        ) : vista === 'lista' ? (
+          <ListaInstalaciones instalaciones={instalacionesFiltradas} marcadores={marcadores} />
+        ) : (
+          <MapaView
+            marcadoresFiltrados={marcadoresFiltrados}
+            ajustarVista={ajustarVista}
+          />
+        )}
+      </div>
     </div>
   );
-};
+}
 
-export default MapaInstalaciones;
+// ── Lista view ────────────────────────────────────────────────────────────────
+function ListaInstalaciones({ instalaciones, marcadores }) {
+  const marcadoresMap = useMemo(() => {
+    const m = {};
+    marcadores.forEach(mk => { m[mk.id] = mk; });
+    return m;
+  }, [marcadores]);
+
+  if (instalaciones.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <MapPin size={40} className="text-gray-300" />
+        <p className="text-gray-400">No hay instalaciones que coincidan con los filtros.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {instalaciones.map(inst => {
+          const mk = marcadoresMap[inst.id];
+          return (
+            <div key={inst.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow">
+              {/* Top row */}
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ background: COLORES_ESTADO[inst.estado] || '#6B7280' }}
+                  />
+                  <span className="font-semibold text-gray-900 text-sm truncate">
+                    {inst.cliente_nombre || 'Sin nombre'}
+                  </span>
+                </div>
+                <EstadoBadge estado={inst.estado} small />
+              </div>
+
+              {/* Details */}
+              <div className="space-y-1.5 text-xs text-gray-500">
+                {(inst.ciudad_nombre || inst.departamento_nombre) && (
+                  <div className="flex items-center gap-1.5">
+                    <MapPin size={11} className="flex-shrink-0" />
+                    <span>{[inst.ciudad_nombre, inst.departamento_nombre].filter(Boolean).join(', ')}</span>
+                  </div>
+                )}
+                {(inst.direccion_instalacion || inst.cliente_direccion) && (
+                  <div className="flex items-start gap-1.5">
+                    <Navigation size={11} className="flex-shrink-0 mt-0.5" />
+                    <span className="line-clamp-2">{inst.direccion_instalacion || inst.cliente_direccion}</span>
+                  </div>
+                )}
+                {inst.plan_nombre && (
+                  <div className="flex items-center gap-1.5">
+                    <Package size={11} className="flex-shrink-0" />
+                    <span>{inst.plan_nombre}</span>
+                  </div>
+                )}
+                {inst.instalador_nombre && (
+                  <div className="flex items-center gap-1.5">
+                    <User size={11} className="flex-shrink-0" />
+                    <span>{inst.instalador_nombre}</span>
+                  </div>
+                )}
+                {(inst.fecha_programada || inst.fecha_realizada) && (
+                  <div className="flex items-center gap-1.5">
+                    <Calendar size={11} className="flex-shrink-0" />
+                    <span>{formatFecha(inst.fecha_realizada || inst.fecha_programada)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Precision badge */}
+              {mk && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  {mk.precision === 'gps' ? (
+                    <span className="text-xs text-green-600 flex items-center gap-1">
+                      <span>📍</span> GPS exacto
+                    </span>
+                  ) : (
+                    <span className="text-xs text-blue-500 flex items-center gap-1">
+                      <span>🏙️</span> Centro ciudad
+                    </span>
+                  )}
+                </div>
+              )}
+              {!mk && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <span className="text-xs text-gray-400">Sin ubicación registrada</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Mapa view ─────────────────────────────────────────────────────────────────
+function MapaView({ marcadoresFiltrados, ajustarVista }) {
+  const CENTER = [6.4608, -73.2620];
+  const ZOOM = 11;
+
+  if (marcadoresFiltrados.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <MapPin size={40} className="text-gray-300" />
+        <p className="text-gray-400">No hay instalaciones ubicadas para los filtros actuales.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full" style={{ minHeight: '500px' }}>
+      <MapContainer
+        center={CENTER}
+        zoom={ZOOM}
+        style={{ height: '100%', width: '100%', minHeight: '500px' }}
+        scrollWheelZoom={true}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <AjustarVista marcadores={marcadoresFiltrados} key={ajustarVista} />
+        {marcadoresFiltrados.map(inst => (
+          <Marker
+            key={inst.id}
+            position={[inst.coords.lat, inst.coords.lng]}
+            icon={crearIcono(inst.estado)}
+          >
+            <Popup maxWidth={280}>
+              <div className="text-sm" style={{ minWidth: '220px' }}>
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className="font-semibold text-gray-900 leading-tight">
+                    {inst.cliente_nombre || 'Sin nombre'}
+                  </span>
+                  <EstadoBadge estado={inst.estado} small />
+                </div>
+
+                {/* Info rows */}
+                <div className="space-y-1 text-xs text-gray-600">
+                  {(inst.ciudad_nombre || inst.departamento_nombre) && (
+                    <div className="flex items-center gap-1.5">
+                      <MapPin size={11} />
+                      <span>{[inst.ciudad_nombre, inst.departamento_nombre].filter(Boolean).join(', ')}</span>
+                    </div>
+                  )}
+                  {(inst.direccion_instalacion || inst.cliente_direccion) && (
+                    <div className="flex items-start gap-1.5">
+                      <Navigation size={11} className="mt-0.5 flex-shrink-0" />
+                      <span>{inst.direccion_instalacion || inst.cliente_direccion}</span>
+                    </div>
+                  )}
+                  {inst.plan_nombre && (
+                    <div className="flex items-center gap-1.5">
+                      <Package size={11} />
+                      <span>{inst.plan_nombre}</span>
+                    </div>
+                  )}
+                  {inst.instalador_nombre && (
+                    <div className="flex items-center gap-1.5">
+                      <User size={11} />
+                      <span>{inst.instalador_nombre}</span>
+                    </div>
+                  )}
+                  {(inst.fecha_programada || inst.fecha_realizada) && (
+                    <div className="flex items-center gap-1.5">
+                      <Calendar size={11} />
+                      <span>{formatFecha(inst.fecha_realizada || inst.fecha_programada)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Precision */}
+                <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
+                  {inst.precision === 'gps' ? (
+                    <span className="text-green-600">📍 GPS exacto</span>
+                  ) : (
+                    <span className="text-blue-500">🏙️ Centro ciudad (aproximado)</span>
+                  )}
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+    </div>
+  );
+}
