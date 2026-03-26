@@ -217,21 +217,21 @@ class FacturacionAutomaticaService {
         // Parsear con T12:00:00 para evitar el desfase UTC-5 que devuelve un día antes
         const parseFecha = (f) => {
           if (!f) return new Date('invalid');
-          // Si es un objeto Date de JS, extraer año/mes/día directamente
+          // Si es un objeto Date de JS (MySQL devuelve Date en UTC midnight),
+          // usar getUTC* para evitar desfase de timezone (UTC-5 Colombia)
           if (f instanceof Date) {
-            return new Date(f.getFullYear(), f.getMonth(), f.getDate(), 12, 0, 0);
+            return new Date(f.getUTCFullYear(), f.getUTCMonth(), f.getUTCDate(), 12, 0, 0);
           }
           // Si es string ISO o similar, extraer la parte de fecha
           const str = String(f);
-          // Intentar formato YYYY-MM-DD (puede venir con o sin T)
           const match = str.match(/(\d{4})-(\d{2})-(\d{2})/);
           if (match) {
             return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]), 12, 0, 0);
           }
-          // Fallback: intentar parsear directamente
+          // Fallback
           const d = new Date(str);
           if (!isNaN(d.getTime())) {
-            return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0);
+            return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0);
           }
           return new Date('invalid');
         };
@@ -602,17 +602,16 @@ class FacturacionAutomaticaService {
   static async calcularSaldoAnterior(conexion, clienteId) {
     try {
       const [resultado] = await conexion.execute(`
-        SELECT 
+        SELECT
           COALESCE(SUM(f.total - COALESCE(
-            (SELECT SUM(p.monto) 
-             FROM pagos p 
-             WHERE p.factura_id = f.id 
-               AND p.activo = 1), 0
+            (SELECT SUM(p.monto)
+             FROM pagos p
+             WHERE p.factura_id = f.id), 0
           )), 0) as saldo_pendiente
         FROM facturas f
         WHERE f.cliente_id = ?
           AND f.estado IN ('pendiente', 'vencida')
-          AND f.activo = '1'
+          AND f.activo = 1
       `, [clienteId]);
 
       const saldo = parseFloat(resultado[0]?.saldo_pendiente || 0);

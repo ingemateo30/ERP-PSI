@@ -240,7 +240,7 @@ class CronJobs {
               f.numero_factura,
               f.total,
               DATEDIFF(NOW(), f.fecha_vencimiento) as dias_mora,
-              COALESCE(SUM(p.valor_pagado), 0) as total_pagado
+              COALESCE(SUM(p.monto), 0) as total_pagado
             FROM facturas f
             LEFT JOIN pagos p ON f.id = p.factura_id
             WHERE f.estado IN ('pendiente', 'vencida')
