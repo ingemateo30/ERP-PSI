@@ -1094,8 +1094,27 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                 </h3>
               </div>
 
+              {/* Nombre completo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nombre Completo {!modoAgregarServicio && <span className="text-red-500">*</span>}
+                </label>
+                <input
+                  type="text"
+                  value={formData.nombre}
+                  onChange={(e) => handleInputChange('nombre', e.target.value)}
+                  disabled={modoAgregarServicio}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100 ${!modoAgregarServicio && errors.nombre ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  placeholder="Juan Pérez López"
+                />
+                {!modoAgregarServicio && errors.nombre && (
+                  <p className="mt-1 text-sm text-red-600">{errors.nombre}</p>
+                )}
+              </div>
+
               {/* Identificación */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Tipo de Documento
@@ -1112,24 +1131,22 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                     <option value="extranjeria">C.E.</option>
                   </select>
                 </div>
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Número de Identificación {!modoAgregarServicio && <span className="text-red-500">*</span>}
                   </label>
-
                   <input
                     type="text"
                     value={formData.identificacion}
                     onChange={(e) => handleInputChange('identificacion', e.target.value)}
                     disabled={modoAgregarServicio}
-                    className={`w-full max-w-[400px] px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100 transition-all ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100 transition-all ${
                       !modoAgregarServicio && errors.identificacion ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="1234567890"
                   />
-
                   {!modoAgregarServicio && errors.identificacion && (
-                    <p className="mt-1 text-sm text-red-600 break-words max-w-[400px]">
+                    <p className="mt-1 text-sm text-red-600 break-words">
                       {errors.identificacion}
                     </p>
                   )}
@@ -1167,44 +1184,8 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                 </div>
               )}
 
-              {/* Nombre completo */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre Completo {!modoAgregarServicio && <span className="text-red-500">*</span>}
-                </label>
-                <input
-                  type="text"
-                  value={formData.nombre}
-                  onChange={(e) => handleInputChange('nombre', e.target.value)}
-                  disabled={modoAgregarServicio}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100 ${!modoAgregarServicio && errors.nombre ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                  placeholder="Juan Pérez López"
-                />
-                {!modoAgregarServicio && errors.nombre && (
-                  <p className="mt-1 text-sm text-red-600">{errors.nombre}</p>
-                )}
-              </div>
-
-              {/* Email y teléfonos */}
+              {/* Teléfono y Email */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email {!modoAgregarServicio && <span className="text-red-500">*</span>}
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    disabled={modoAgregarServicio}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100 ${!modoAgregarServicio && errors.email ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                    placeholder="cliente@email.com"
-                  />
-                  {!modoAgregarServicio && errors.email && (
-                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                  )}
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Teléfono Móvil {!modoAgregarServicio && <span className="text-red-500">*</span>}
@@ -1220,6 +1201,23 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                   />
                   {!modoAgregarServicio && errors.telefono && (
                     <p className="mt-1 text-sm text-red-600">{errors.telefono}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email {!modoAgregarServicio && <span className="text-red-500">*</span>}
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    disabled={modoAgregarServicio}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] disabled:bg-gray-100 ${!modoAgregarServicio && errors.email ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                    placeholder="cliente@email.com"
+                  />
+                  {!modoAgregarServicio && errors.email && (
+                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
                   )}
                 </div>
               </div>
@@ -1246,28 +1244,6 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                 </h4>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {modoAgregarServicio ? 'Dirección del Servicio' : 'Dirección'} <span className="text-red-500">*</span>
-                    </label>
-                    {modoAgregarServicio && (
-                      <p className="text-xs text-blue-600 mb-2">
-                        ℹ️ Puedes usar la misma dirección del cliente o ingresar una nueva si el servicio es para otra ubicación
-                      </p>
-                    )}
-                    <input
-                      type="text"
-                      value={formData.direccion}
-                      onChange={(e) => handleInputChange('direccion', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${!modoAgregarServicio && errors.direccion ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                      placeholder={modoAgregarServicio ? "Dirección donde se instalará el servicio" : "Calle 123 # 45-67"}
-                    />
-                    {!modoAgregarServicio && errors.direccion && (
-                      <p className="mt-1 text-sm text-red-600">{errors.direccion}</p>
-                    )}
-                  </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1367,6 +1343,28 @@ const ClientForm = ({ client, onClose, onSave, permissions }) => {
                         <option value="6">Estrato 6</option>
                       </select>
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {modoAgregarServicio ? 'Dirección del Servicio' : 'Dirección'} <span className="text-red-500">*</span>
+                    </label>
+                    {modoAgregarServicio && (
+                      <p className="text-xs text-blue-600 mb-2">
+                        ℹ️ Puedes usar la misma dirección del cliente o ingresar una nueva si el servicio es para otra ubicación
+                      </p>
+                    )}
+                    <input
+                      type="text"
+                      value={formData.direccion}
+                      onChange={(e) => handleInputChange('direccion', e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${!modoAgregarServicio && errors.direccion ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      placeholder={modoAgregarServicio ? "Dirección donde se instalará el servicio" : "Calle 123 # 45-67"}
+                    />
+                    {!modoAgregarServicio && errors.direccion && (
+                      <p className="mt-1 text-sm text-red-600">{errors.direccion}</p>
+                    )}
                   </div>
                 </div>
               </div>
