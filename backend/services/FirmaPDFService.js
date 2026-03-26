@@ -333,7 +333,7 @@ static async abrirContratoParaFirma(contratoId) {
         const firmaBoxWidth = 100;
         const firmaBoxHeight = 45;
         const firmaBoxX = 80;
-        const firmaBoxY = 500; // Dentro del recuadro PAGO Y FACTURACIÓN
+        const firmaBoxY = 520; // Dentro del recuadro PAGO Y FACTURACIÓN
 
         console.log('✍️ Colocando firma en recuadro PAGO Y FACTURACIÓN');
         page2.drawImage(signatureImage, {
@@ -345,7 +345,7 @@ static async abrirContratoParaFirma(contratoId) {
 
         // ✅ Firma en la sección inferior de aceptación del contrato (centrada)
         const firmaX = (width - signatureWidth) / 2;
-        const firmaY = 58; // Sobre la línea de firma sección aceptación
+        const firmaY = 65; // Sobre la línea de firma sección aceptación
 
         console.log('✍️ Colocando firma en sección de aceptación del contrato');
         console.log(`📐 Dimensiones página: width=${width}, height=${height}`);
@@ -409,7 +409,7 @@ const infoY = margin + blockHeight;       // Cerca del borde superior (60 puntos
 
         // ✅ Imagen de firma centrada sobre la línea de firma EN PERMANENCIA
         const firmaX3 = (width - signatureWidth) / 2; // Centrada horizontalmente
-        const firmaY3 = 210; // Sobre la línea de firma en permanencia
+        const firmaY3 = 235; // Sobre la línea de firma en permanencia
 
         console.log('✍️ Colocando firma en página 3 (anexo de permanencia)');
         console.log(`📐 Dimensiones página 3: width=${width}, height=${height}`);
