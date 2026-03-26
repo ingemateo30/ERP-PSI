@@ -53,6 +53,9 @@ if (process.env.JWT_REFRESH_SECRET.length < 32) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Confiar en proxy reverso (nginx/apache) para obtener la IP real del cliente
+app.set('trust proxy', true);
+
 // Importar middleware de seguridad
 const { securityHeaders, hideServerInfo, validateContentType } = require('./middleware/security');
 const { authenticateToken } = require('./middleware/auth');
