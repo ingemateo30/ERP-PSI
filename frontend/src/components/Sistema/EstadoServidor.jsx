@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Server, Cpu, HardDrive, MemoryStick, Activity,
-  RefreshCw, Database, Clock, Terminal, CheckCircle,
-  XCircle, AlertTriangle, Wifi, Zap, BarChart2, Info
+  Cpu, HardDrive, Activity,
+  RefreshCw, Clock, Terminal, CheckCircle,
+  XCircle, AlertTriangle, Wifi, Zap, BarChart3, Info, Package
 } from 'lucide-react';
 import apiService from '../../services/apiService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -237,7 +237,7 @@ const EstadoServidor = () => {
             </Card>
 
             {/* RAM */}
-            <Card icon={<MemoryStick size={20} />} title="Memoria RAM">
+            <Card icon={<Package size={20} />} title="Memoria RAM">
               {datos.ram?.error ? (
                 <p className="text-sm text-red-500">{datos.ram.error}</p>
               ) : (
@@ -331,7 +331,7 @@ const EstadoServidor = () => {
             </Card>
 
             {/* Base de datos + Conexiones */}
-            <Card icon={<Database size={20} />} title="Base de datos">
+            <Card icon={<HardDrive size={20} />} title="Base de datos">
               {datos.base_datos?.error && datos.base_datos?.estado !== 'conectada' ? (
                 <div className="space-y-3">
                   <DBBadge estado="error" />
