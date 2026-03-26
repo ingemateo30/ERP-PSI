@@ -2,6 +2,14 @@
 
 const pool = require('../config/database');
 
+// Helper: fecha local Colombia → YYYY-MM-DD (sin desfase UTC)
+function fechaLocalMySQL(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 class Cliente {
   // Obtener todos los clientes con filtros
    static async obtenerTodos(filtros = {}) {
@@ -287,7 +295,7 @@ class Cliente {
         datos.telefono || null,
         datos.telefono_2 || null,
         datos.correo || null,
-        datos.fecha_registro || new Date().toISOString().split('T')[0],
+        datos.fecha_registro || fechaLocalMySQL(),
         datos.estado || 'activo',
         datos.mac_address || null,
         datos.ip_asignada || null,

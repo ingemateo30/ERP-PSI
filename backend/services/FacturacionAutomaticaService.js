@@ -11,6 +11,14 @@ const { Database } = require('../models/Database');
 const InteresesMoratoriosService = require('./InteresesMoratoriosService');
 const IVACalculatorService = require('./IVACalculatorService');
 
+// Helper: fecha local Colombia → YYYY-MM-DD (sin desfase UTC)
+function fechaLocalMySQL(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 class FacturacionAutomaticaService {
 
   /**
@@ -353,14 +361,14 @@ class FacturacionAutomaticaService {
         console.log(`   ⏱️ Días a facturar: ${diasFacturados}`);
 
         return {
-          fecha_desde: fechaDesde.toISOString().split('T')[0],
-          fecha_hasta: fechaHasta.toISOString().split('T')[0],
+          fecha_desde: fechaLocalMySQL(fechaDesde),
+          fecha_hasta: fechaLocalMySQL(fechaHasta),
           periodo_descripcion: periodoDescripcion,
           dias_facturados: diasFacturados,
           es_primera_factura: esPrimeraFactura,
           es_nivelacion: esNivelacion,
           tipo_facturacion: tipoFacturacion,
-          fecha_base_instalacion: fechaBaseFacturacion.toISOString().split('T')[0],
+          fecha_base_instalacion: fechaLocalMySQL(fechaBaseFacturacion),
           numero_factura: totalFacturas + 1
         };
 
@@ -439,7 +447,7 @@ class FacturacionAutomaticaService {
           : null;
 
         if (ultimaCobertura && ultimaCobertura > ultimoDiaMesSiguiente) {
-          const fechaStr = ultimaCobertura.toISOString().split('T')[0];
+          const fechaStr = fechaLocalMySQL(ultimaCobertura);
           return {
             permitir: false,
             razon: `Ya tiene cobertura completa hasta ${fechaStr} (mes siguiente cubierto al 100%)`
@@ -767,8 +775,8 @@ class FacturacionAutomaticaService {
         cliente.identificacion,
         cliente.nombre,
         `${fechaEmision.getFullYear()}-${String(fechaEmision.getMonth() + 1).padStart(2, '0')}`,
-        fechaEmision.toISOString().split('T')[0],
-        fechaVencimiento.toISOString().split('T')[0],
+        fechaLocalMySQL(fechaEmision),
+        fechaLocalMySQL(fechaVencimiento),
         periodo.fecha_desde,
         periodo.fecha_hasta,
         totales.internet,
