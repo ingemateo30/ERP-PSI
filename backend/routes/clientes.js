@@ -395,6 +395,260 @@ router.delete('/:clienteId/servicios/:servicioId',
 );
 
 // ==========================================
+// CAMBIOS DE PLAN (ISP BUSINESS LOGIC)
+// ==========================================
+
+/**
+ * POST /:id/servicios/:servicioId/programar-baja
+ * Programa la baja de un servicio al final del ciclo de facturación actual.
+ * El servicio sigue activo hasta la fecha programada (no se interrumpe de inmediato).
+ */
+router.post('/:id/servicios/:servicioId/programar-baja',
+  requireRole('administrador', 'supervisor', 'secretaria'),
+  async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const { id: clienteId, servicioId } = req.params;
+      const { motivo = '', fecha_baja } = req.body;
+
+      // Obtener servicio
+      const [servicios] = await connection.execute(
+        `SELECT sc.*, ps.nombre AS plan_nombre, ps.precio
+         FROM servicios_cliente sc
+         INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
+         WHERE sc.id = ? AND sc.cliente_id = ? AND sc.estado = 'activo'`,
+        [servicioId, clienteId]
+      );
+      if (servicios.length === 0) {
+        return res.status(404).json({ success: false, message: 'Servicio activo no encontrado' });
+      }
+      const servicio = servicios[0];
+
+      // Calcular fin del ciclo actual: buscar la fecha_hasta de la última factura activa del cliente
+      const [ultimaFactura] = await connection.execute(
+        `SELECT fecha_hasta FROM facturas
+         WHERE cliente_id = ? AND estado != 'anulada' AND activo = 1
+         ORDER BY fecha_hasta DESC LIMIT 1`,
+        [clienteId]
+      );
+
+      let fechaBaja;
+      if (fecha_baja) {
+        fechaBaja = fecha_baja;
+      } else if (ultimaFactura.length > 0 && ultimaFactura[0].fecha_hasta) {
+        const dt = new Date(ultimaFactura[0].fecha_hasta);
+        // Un día después del fin del ciclo actual
+        dt.setDate(dt.getDate() + 1);
+        fechaBaja = dt.toISOString().split('T')[0];
+      } else {
+        // Si no hay facturas, programar para fin del mes actual
+        const now = new Date();
+        fechaBaja = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      }
+
+      // Guardar fecha_programada_cancelacion (columna agregada en migration 012)
+      await connection.execute(`
+        UPDATE servicios_cliente
+        SET fecha_programada_cancelacion = ?,
+            motivo_cancelacion = ?,
+            updated_at = NOW()
+        WHERE id = ?
+      `, [fechaBaja, motivo || 'Baja solicitada por cliente', servicioId]);
+
+      await connection.commit();
+
+      res.json({
+        success: true,
+        message: `Baja del plan "${servicio.plan_nombre}" programada para el ${fechaBaja}`,
+        data: {
+          servicio_id: parseInt(servicioId),
+          plan_nombre: servicio.plan_nombre,
+          fecha_baja: fechaBaja,
+          motivo
+        }
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      console.error('❌ Error programando baja de servicio:', error);
+      res.status(500).json({ success: false, message: error.message });
+    } finally {
+      connection.release();
+    }
+  }
+);
+
+/**
+ * DELETE /:id/servicios/:servicioId/cancelar-programacion-baja
+ * Cancela una baja programada (el cliente decidió quedarse).
+ */
+router.delete('/:id/servicios/:servicioId/cancelar-programacion-baja',
+  requireRole('administrador', 'supervisor', 'secretaria'),
+  async (req, res) => {
+    try {
+      const { id: clienteId, servicioId } = req.params;
+      await pool.execute(`
+        UPDATE servicios_cliente
+        SET fecha_programada_cancelacion = NULL, motivo_cancelacion = NULL, updated_at = NOW()
+        WHERE id = ? AND cliente_id = ?
+      `, [servicioId, clienteId]);
+      res.json({ success: true, message: 'Programación de baja cancelada' });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+/**
+ * POST /:id/servicios/:servicioId/migrar-plan
+ * Cambia el plan de un servicio activo.
+ * - Si es upgrade/downgrade inmediato: calcula cargo proporcional.
+ * - El cambio es efectivo de inmediato; el prorrateo se incluye en la próxima factura
+ *   como ajuste en el campo "varios".
+ */
+router.post('/:id/servicios/:servicioId/migrar-plan',
+  requireRole('administrador', 'supervisor', 'secretaria'),
+  async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const { id: clienteId, servicioId } = req.params;
+      const { nuevo_plan_id, precio_personalizado, motivo = '', generar_cargo_prorrateado = true } = req.body;
+
+      if (!nuevo_plan_id) {
+        return res.status(400).json({ success: false, message: 'nuevo_plan_id es requerido' });
+      }
+
+      // Obtener servicio actual
+      const [servicios] = await connection.execute(
+        `SELECT sc.*, ps.nombre AS plan_nombre, ps.precio AS precio_plan,
+                ps.tipo AS tipo_plan
+         FROM servicios_cliente sc
+         INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
+         WHERE sc.id = ? AND sc.cliente_id = ? AND sc.estado = 'activo'`,
+        [servicioId, clienteId]
+      );
+      if (servicios.length === 0) {
+        return res.status(404).json({ success: false, message: 'Servicio activo no encontrado' });
+      }
+      const servicio = servicios[0];
+
+      // Obtener nuevo plan
+      const [planes] = await connection.execute(
+        `SELECT id, nombre, precio, tipo FROM planes_servicio WHERE id = ? AND activo = 1`,
+        [nuevo_plan_id]
+      );
+      if (planes.length === 0) {
+        return res.status(404).json({ success: false, message: 'Plan de destino no encontrado o inactivo' });
+      }
+      const nuevoPlan = planes[0];
+
+      // Calcular prorrateo si hay cambio de precio
+      const precioViejo = parseFloat(servicio.precio_personalizado || servicio.precio_plan) || 0;
+      const precioNuevo = parseFloat(precio_personalizado || nuevoPlan.precio) || 0;
+      const diferenciaPrecio = precioNuevo - precioViejo;
+
+      let cargoProrrateo = 0;
+      let diasRestantes = 0;
+      let diasCiclo = 30;
+
+      if (generar_cargo_prorrateado && diferenciaPrecio !== 0) {
+        // Buscar fin del ciclo actual
+        const [ultimaFactura] = await connection.execute(
+          `SELECT fecha_hasta FROM facturas
+           WHERE cliente_id = ? AND estado != 'anulada' AND activo = 1
+           ORDER BY fecha_hasta DESC LIMIT 1`,
+          [clienteId]
+        );
+
+        if (ultimaFactura.length > 0 && ultimaFactura[0].fecha_hasta) {
+          const fechaFin = new Date(ultimaFactura[0].fecha_hasta);
+          const hoy = new Date();
+          diasRestantes = Math.max(0, Math.ceil((fechaFin - hoy) / (1000 * 60 * 60 * 24)));
+          cargoProrrateo = parseFloat(((diferenciaPrecio / diasCiclo) * diasRestantes).toFixed(2));
+        }
+      }
+
+      // Actualizar servicio al nuevo plan
+      await connection.execute(`
+        UPDATE servicios_cliente
+        SET plan_id = ?,
+            precio_personalizado = ?,
+            updated_at = NOW(),
+            observaciones = CONCAT(COALESCE(observaciones,''),
+              ' | CAMBIO PLAN ', NOW(), ': ', ?, ' → ', ?, IF(? != '', CONCAT(' (', ?, ')'), ''))
+        WHERE id = ?
+      `, [
+        nuevo_plan_id,
+        precio_personalizado !== undefined ? precio_personalizado : null,
+        servicio.plan_nombre, nuevoPlan.nombre,
+        motivo, motivo,
+        servicioId
+      ]);
+
+      // Si hay cargo prorrateo significativo (> $100), registrarlo para la próxima factura
+      // Lo guardamos en una tabla de cargos pendientes o directamente en la factura abierta
+      let cargoPendienteId = null;
+      if (Math.abs(cargoProrrateo) >= 100) {
+        // Buscar si hay factura en borrador/pendiente del período actual
+        const [facturaAbierta] = await connection.execute(`
+          SELECT id FROM facturas
+          WHERE cliente_id = ? AND estado IN ('pendiente','borrador') AND activo = 1
+          ORDER BY id DESC LIMIT 1
+        `, [clienteId]);
+
+        if (facturaAbierta.length > 0) {
+          // Ajustar el campo 'varios' de la factura abierta
+          await connection.execute(`
+            UPDATE facturas
+            SET varios = COALESCE(varios, 0) + ?,
+                subtotal = subtotal + ?,
+                total = total + ?,
+                updated_at = NOW(),
+                observaciones = CONCAT(COALESCE(observaciones,''),
+                  ' | Ajuste cambio de plan: ', ?)
+            WHERE id = ?
+          `, [cargoProrrateo, cargoProrrateo, cargoProrrateo,
+              `${servicio.plan_nombre} → ${nuevoPlan.nombre} (${diasRestantes} días)`,
+              facturaAbierta[0].id]);
+        }
+        // Si no hay factura abierta, se registrará en la próxima facturación automática
+        // (el campo varios se puede calcular en FacturacionAutomaticaService)
+      }
+
+      await connection.commit();
+
+      res.json({
+        success: true,
+        message: `Plan cambiado de "${servicio.plan_nombre}" a "${nuevoPlan.nombre}"`,
+        data: {
+          plan_anterior: servicio.plan_nombre,
+          plan_nuevo: nuevoPlan.nombre,
+          precio_anterior: precioViejo,
+          precio_nuevo: precioNuevo,
+          diferencia_precio: diferenciaPrecio,
+          cargo_prorrateo: cargoProrrateo,
+          dias_restantes_ciclo: diasRestantes,
+          nota: cargoProrrateo !== 0
+            ? `Se ${cargoProrrateo > 0 ? 'cobrarán' : 'acreditarán'} $${Math.abs(cargoProrrateo).toLocaleString('es-CO')} por ${diasRestantes} días restantes del ciclo`
+            : 'Sin ajuste de prorrateo'
+        }
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      console.error('❌ Error migrando plan:', error);
+      res.status(500).json({ success: false, message: error.message });
+    } finally {
+      connection.release();
+    }
+  }
+);
+
+// ==========================================
 // RUTAS DE CONSULTA
 // ==========================================
 

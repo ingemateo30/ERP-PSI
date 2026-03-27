@@ -38,17 +38,10 @@ const HistorialFacturacionWrapper = () => {
     // FUNCIONES PRINCIPALES CORREGIDAS
     // ==========================================
 
-    // Cargar lista de clientes al montar el componente
+    // No cargar clientes al montar: usar búsqueda bajo demanda (100k+ clientes)
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
-        const modoDemo = urlParams.get('demo') === 'true';
-
-        if (modoDemo) {
-            console.log('🎭 Modo demo activado');
-            cargarDatosPrueba();
-        } else {
-            cargarClientes();
-        }
+        if (urlParams.get('demo') === 'true') cargarDatosPrueba();
     }, []);
 
     // CORREGIDO: Función principal para cargar clientes
@@ -327,27 +320,27 @@ if (facturasCargadas.length === 0) {
         setLoading(false);
     };
 
+    // Búsqueda en servidor (soporta 100k+ clientes sin cargar todo en memoria)
     const buscarClientes = async (termino) => {
-        if (!termino.trim()) {
+        if (!termino || termino.trim().length < 2) {
+            setClientes([]);
             return;
         }
-
         try {
             setLoading(true);
-
-            const clientesFiltrados = clientes.filter(cliente => {
-                const nombre = (cliente.nombre || `${cliente.nombres || ''} ${cliente.apellidos || ''}`).toLowerCase();
-                const identificacion = (cliente.identificacion || cliente.numero_documento || '').toLowerCase();
-                const telefono = (cliente.telefono || '').toLowerCase();
-
-                return nombre.includes(termino.toLowerCase()) ||
-                    identificacion.includes(termino.toLowerCase()) ||
-                    telefono.includes(termino.toLowerCase());
-            });
-
-            setClientes(clientesFiltrados);
+            const token = localStorage.getItem('accessToken');
+            const API_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
+            const resp = await fetch(
+                `${API_URL}/clientes?search=${encodeURIComponent(termino.trim())}&limit=20&page=1`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const data = await resp.json();
+            // La respuesta puede ser { success, data: { clientes, pagination } } o { success, data: [] }
+            const lista = data?.data?.clientes || data?.data || [];
+            setClientes(Array.isArray(lista) ? lista : []);
         } catch (error) {
             console.error('Error buscando clientes:', error);
+            setClientes([]);
         } finally {
             setLoading(false);
         }
@@ -478,15 +471,11 @@ const verDetalleFactura = useCallback((factura) => {
         const valor = e.target.value;
         setBusquedaCliente(valor);
 
-        // Debounce la búsqueda
+        // Búsqueda en servidor con debounce (mínimo 2 caracteres)
         clearTimeout(window.busquedaTimeout);
         window.busquedaTimeout = setTimeout(() => {
-            if (valor.trim()) {
-                buscarClientes(valor);
-            } else {
-                cargarClientes();
-            }
-        }, 300);
+            buscarClientes(valor);
+        }, 350);
     };
 
     const seleccionarCliente = (cliente) => {
@@ -502,10 +491,11 @@ const verDetalleFactura = useCallback((factura) => {
     const limpiarSeleccion = () => {
         setClienteSeleccionado(null);
         setMostrarBuscador(true);
+        setClientes([]);
+        setBusquedaCliente('');
         setFacturas([]);
         setFacturaDetalle(null);
         resetearEstadisticas();
-        cargarClientes();
     };
 
     const handleFiltroChange = (campo, valor) => {

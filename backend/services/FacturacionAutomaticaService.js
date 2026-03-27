@@ -30,12 +30,21 @@ class FacturacionAutomaticaService {
 
       const fechaActual = new Date();
       const periodo = parametros.periodo || `${fechaActual.getFullYear()}-${String(fechaActual.getMonth() + 1).padStart(2, '0')}`;
-      const diasVencimiento = parametros.diasVencimiento || 15; // Días para vencimiento (por defecto 15)
+      const diasVencimiento = parametros.diasVencimiento || 15;
+      // ── Nuevos parámetros ──────────────────────────────────────────────────
+      // sedeId: filtrar por ciudad_id (solo facturar esa sede)
+      const sedeId = parametros.sedeId || parametros.sede_id || null;
+      // modo: 'borrador' → facturas en estado 'borrador' (no enviar notificaciones)
+      //       'definitivo' → flujo normal
+      const modo = parametros.modo === 'borrador' ? 'borrador' : 'definitivo';
+      // ──────────────────────────────────────────────────────────────────────
 
-      console.log(`📅 Días de vencimiento configurados: ${diasVencimiento}`);
+      console.log(`📅 Días de vencimiento: ${diasVencimiento}`);
+      console.log(`🏢 Sede: ${sedeId ? `ID ${sedeId}` : 'Todas'}`);
+      console.log(`📋 Modo: ${modo}`);
 
-      // 1. Obtener clientes activos para facturar
-      const clientesParaFacturar = await this.obtenerClientesParaFacturar(fechaActual);
+      // 1. Obtener clientes activos para facturar (con filtro de sede)
+      const clientesParaFacturar = await this.obtenerClientesParaFacturar(fechaActual, sedeId);
 
       console.log(`👥 Clientes encontrados para facturar: ${clientesParaFacturar.length}`);
 
@@ -80,8 +89,8 @@ class FacturacionAutomaticaService {
             continue;
           }
 
-          // 6. Generar la factura
-          const factura = await this.crearFacturaCompleta(cliente, conceptos, periodoCliente, diasVencimiento);
+          // 6. Generar la factura (en estado borrador si corresponde)
+          const factura = await this.crearFacturaCompleta(cliente, conceptos, periodoCliente, diasVencimiento, modo);
 
           facturasGeneradas++;
           resultadosDetallados.push({
@@ -109,13 +118,18 @@ class FacturacionAutomaticaService {
 
       const resumen = {
         periodo,
+        modo,
+        sede_id: sedeId,
         fecha_proceso: fechaActual.toISOString(),
         clientes_procesados: clientesParaFacturar.length,
         facturas_generadas: facturasGeneradas,
         errores: erroresFacturacion,
-        tasa_exito: clientesParaFacturar.length > 0 ? 
+        tasa_exito: clientesParaFacturar.length > 0 ?
           ((facturasGeneradas / clientesParaFacturar.length) * 100).toFixed(2) : '0.00',
-        detalles: resultadosDetallados
+        detalles: resultadosDetallados,
+        nota: modo === 'borrador'
+          ? 'Facturas generadas en borrador. Revise y confirme desde el panel de facturación.'
+          : 'Facturación definitiva completada.'
       };
 
       console.log('📊 Resumen de facturación mensual:');
@@ -138,12 +152,14 @@ class FacturacionAutomaticaService {
   /**
    * ✅ CORREGIDO: Obtener clientes activos para facturar
    */
-  static async obtenerClientesParaFacturar(fechaReferencia = new Date()) {
+  static async obtenerClientesParaFacturar(fechaReferencia = new Date(), sedeId = null) {
     try {
       const conexion = await Database.getConnection();
 
       try {
         console.log('🔍 Buscando clientes para facturar...');
+
+        const sedeWhere = sedeId ? `AND c.ciudad_id = ${parseInt(sedeId)}` : '';
 
         const [clientes] = await conexion.execute(`
           SELECT DISTINCT
@@ -151,6 +167,7 @@ class FacturacionAutomaticaService {
             c.identificacion,
             c.nombre,
             c.estrato,
+            c.ciudad_id,
             c.fecha_registro,
             MAX(f.fecha_hasta) as ultima_fecha_facturada,
             MIN(sc.fecha_activacion) as fecha_activacion,
@@ -162,8 +179,8 @@ class FacturacionAutomaticaService {
           LEFT JOIN facturas f ON c.id = f.cliente_id
             AND f.estado != 'anulada'
             AND f.activo = 1
-          WHERE c.estado = 'activo'
-          GROUP BY c.id, c.identificacion, c.nombre, c.estrato, c.fecha_registro
+          WHERE c.estado = 'activo' ${sedeWhere}
+          GROUP BY c.id, c.identificacion, c.nombre, c.estrato, c.ciudad_id, c.fecha_registro
           HAVING COUNT(DISTINCT sc.id) > 0
           ORDER BY c.id ASC
         `);
@@ -729,7 +746,7 @@ class FacturacionAutomaticaService {
   // CREACIÓN DE FACTURA COMPLETA
   // ========================================================================
 
-  static async crearFacturaCompleta(cliente, conceptos, periodo, diasVencimiento = 15) {
+  static async crearFacturaCompleta(cliente, conceptos, periodo, diasVencimiento = 15, modo = 'definitivo') {
     const conexion = await Database.getConnection();
 
     try {
@@ -768,7 +785,7 @@ class FacturacionAutomaticaService {
           descuento, varios,
           subtotal, iva, total,
           estado, activo, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', 1, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
       `, [
         numeroFactura,
         cliente.id,
@@ -788,7 +805,8 @@ class FacturacionAutomaticaService {
         totales.varios,
         totales.subtotal,
         totales.iva,
-        totales.total
+        totales.total,
+        modo === 'borrador' ? 'borrador' : 'pendiente'
       ]);
 
       const facturaId = resultado.insertId;
