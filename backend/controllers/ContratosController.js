@@ -24,7 +24,7 @@ class ContratosController {
 
             const {
                 page = 1,
-                limit = 50,
+                limit = 20,
                 cliente_id,
                 estado = '',
                 tipo_contrato = '',
@@ -33,195 +33,175 @@ class ContratosController {
             } = req.query;
 
             const pageNum = Math.max(1, parseInt(page) || 1);
-            const limitNum = Math.min(500, Math.max(1, parseInt(limit) || 50));
+            const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
             const offsetNum = (pageNum - 1) * limitNum;
 
-            // ✅ Query mejorado - maneja servicio_id NULL y JSON arrays
-            let query = `
-            SELECT
-                c.*,
-                COALESCE(cl.nombre,
-                    (SELECT ci.nombre FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
-                    'Cliente eliminado') as cliente_nombre,
-                COALESCE(cl.identificacion,
-                    (SELECT ci.identificacion FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
-                    'N/A') as cliente_identificacion,
-                COALESCE(cl.telefono,
-                    (SELECT ci.telefono FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
-                    '') as cliente_telefono,
-                COALESCE(cl.correo, '') as cliente_email,
-                COALESCE(cl.direccion,
-                    (SELECT ci.direccion FROM clientes_inactivos ci WHERE ci.cliente_id = c.cliente_id ORDER BY ci.fecha_inactivacion DESC LIMIT 1),
-                    '') as cliente_direccion,
-                COALESCE(cl.estrato, '') as cliente_estrato,
-                GROUP_CONCAT(
-                    DISTINCT CONCAT(
-                        COALESCE(ps.nombre, ''), '|',
-                        COALESCE(ps.precio, 0), '|',
-                        COALESCE(ps.tipo, '')
-                    ) SEPARATOR ';;'
-                ) as servicios_info
-            FROM contratos c
-            LEFT JOIN clientes cl ON c.cliente_id = cl.id
-            LEFT JOIN servicios_cliente sc ON (
-                CASE
-                    WHEN c.servicio_id IS NULL THEN FALSE
-                    WHEN c.servicio_id REGEXP '^[0-9]+$'
-                    THEN sc.id = CAST(c.servicio_id AS UNSIGNED)
-                    WHEN c.servicio_id LIKE '[%'
-                    THEN JSON_CONTAINS(CAST(c.servicio_id AS JSON), CAST(sc.id AS JSON))
-                    ELSE FALSE
-                END
-            )
-            LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
-            WHERE 1=1
-        `;
-
+            // ── Construir filtros WHERE (sobre tabla ligera) ──────────────────
+            const whereParts = ['1=1'];
             const params = [];
 
             if (cliente_id) {
-                query += ' AND c.cliente_id = ?';
+                whereParts.push('c.cliente_id = ?');
                 params.push(cliente_id);
             }
 
             if (para_firma === 'true' || para_firma === true) {
-                console.log('🖊️ Filtrando contratos para firma');
-
-                if (req.query.filtroEstado === 'pendiente') {
-                    query += ' AND c.firmado_cliente = 0 AND c.documento_pdf_path IS NOT NULL';
-                } else if (req.query.filtroEstado === 'firmado') {
-                    query += ' AND c.firmado_cliente = 1';
-                } else if (req.query.filtroEstado === 'anulado') {
-                    query += ' AND c.estado = "anulado"';
-                } else if (req.query.filtroEstado === 'todos') {
-                    // No filtrar por estado, mostrar todos los contratos
-                    console.log('📋 Mostrando todos los contratos para firma');
+                const filtroEstado = req.query.filtroEstado;
+                if (filtroEstado === 'pendiente') {
+                    whereParts.push('c.firmado_cliente = 0 AND c.documento_pdf_path IS NOT NULL');
+                } else if (filtroEstado === 'firmado') {
+                    whereParts.push('c.firmado_cliente = 1');
+                } else if (filtroEstado === 'anulado') {
+                    whereParts.push('c.estado = "anulado"');
                 }
+                // 'todos' → sin filtro adicional
             } else if (estado) {
-                query += ' AND c.estado = ?';
+                whereParts.push('c.estado = ?');
                 params.push(estado);
             }
 
             if (tipo_contrato) {
-                query += ' AND c.tipo_contrato = ?';
+                whereParts.push('c.tipo_contrato = ?');
                 params.push(tipo_contrato);
             }
 
+            // Búsqueda (JOIN a clientes solo si hay search o filtro de sede)
+            const needsClienteJoin = !!(search || (req.user?.rol !== 'administrador' && req.user?.sede_id));
+
             if (search) {
-                query += ' AND (c.numero_contrato LIKE ? OR cl.nombre LIKE ? OR cl.identificacion LIKE ?)';
-                const searchTerm = `%${search}%`;
-                params.push(searchTerm, searchTerm, searchTerm);
+                whereParts.push('(c.numero_contrato LIKE ? OR cl.nombre LIKE ? OR cl.identificacion LIKE ?)');
+                const t = `%${search}%`;
+                params.push(t, t, t);
             }
 
-            // Restricción de sede
+            // Restricción de sede para no-administradores
             if (req.user && req.user.rol !== 'administrador' && req.user.sede_id) {
-                query += ' AND cl.ciudad_id = ?';
+                whereParts.push('cl.ciudad_id = ?');
                 params.push(req.user.sede_id);
             }
 
-            query += ' GROUP BY c.id';
+            const whereClause = whereParts.join(' AND ');
+            const clienteJoinSql = needsClienteJoin
+                ? 'LEFT JOIN clientes cl ON c.cliente_id = cl.id'
+                : '';
 
-            // Contar total
-            const countQuery = `SELECT COUNT(DISTINCT c.id) as total FROM contratos c
-                           LEFT JOIN clientes cl ON c.cliente_id = cl.id
-                           LEFT JOIN clientes_inactivos ci ON c.cliente_id = ci.cliente_id
-                           WHERE 1=1 ${query.substring(query.indexOf('WHERE 1=1') + 9, query.indexOf('GROUP BY'))}`;
-            const [countResult] = await Database.query(countQuery, params);
-            const total = countResult[0]?.total || 0;
+            // ── PASO 1: Contar total (query liviano) ──────────────────────────
+            const [countRows] = await Database.query(
+                `SELECT COUNT(DISTINCT c.id) AS total
+                 FROM contratos c ${clienteJoinSql}
+                 WHERE ${whereClause}`,
+                params
+            );
+            const total = countRows[0]?.total || 0;
 
-            query += ` ORDER BY c.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
+            // ── PASO 2: Obtener IDs paginados (rápido, solo índices) ──────────
+            const [idRows] = await Database.query(
+                `SELECT c.id
+                 FROM contratos c ${clienteJoinSql}
+                 WHERE ${whereClause}
+                 ORDER BY c.created_at DESC
+                 LIMIT ${limitNum} OFFSET ${offsetNum}`,
+                params
+            );
 
-            let contratos = await Database.query(query, params);
+            if (idRows.length === 0) {
+                return res.json({
+                    success: true,
+                    data: {
+                        contratos: [],
+                        pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) }
+                    }
+                });
+            }
 
-            // ✅ Procesar cada contrato para extraer plan_nombre y plan_precio
+            const ids = idRows.map(r => r.id);
+            const placeholders = ids.map(() => '?').join(',');
+
+            // ── PASO 3: Enriquecer solo las N filas paginadas ─────────────────
+            // JOIN a clientes_inactivos como tabla derivada (una sola vez, no por fila)
+            let contratos = await Database.query(`
+                SELECT
+                    c.*,
+                    COALESCE(cl.nombre,        ci_last.nombre,        'Cliente eliminado') AS cliente_nombre,
+                    COALESCE(cl.identificacion, ci_last.identificacion, 'N/A')             AS cliente_identificacion,
+                    COALESCE(cl.telefono,       ci_last.telefono,       '')                AS cliente_telefono,
+                    COALESCE(cl.correo,         '')                                        AS cliente_email,
+                    COALESCE(cl.direccion,      ci_last.direccion,      '')                AS cliente_direccion,
+                    COALESCE(cl.estrato,        '')                                        AS cliente_estrato,
+                    GROUP_CONCAT(
+                        DISTINCT CONCAT(
+                            COALESCE(ps.nombre, ''), '|',
+                            COALESCE(ps.precio, 0),  '|',
+                            COALESCE(ps.tipo,   '')
+                        ) SEPARATOR ';;'
+                    ) AS servicios_info
+                FROM contratos c
+                LEFT JOIN clientes cl ON c.cliente_id = cl.id
+                -- Un único JOIN a tabla derivada en lugar de 4 subconsultas correlacionadas
+                LEFT JOIN (
+                    SELECT ci.cliente_id, ci.nombre, ci.identificacion, ci.telefono, ci.direccion
+                    FROM clientes_inactivos ci
+                    INNER JOIN (
+                        SELECT cliente_id, MAX(fecha_inactivacion) AS max_fi
+                        FROM clientes_inactivos
+                        GROUP BY cliente_id
+                    ) lci ON ci.cliente_id = lci.cliente_id AND ci.fecha_inactivacion = lci.max_fi
+                ) ci_last ON ci_last.cliente_id = c.cliente_id AND cl.id IS NULL
+                -- Servicios: solo numéricos simples (los JSON arrays se leen de observaciones)
+                LEFT JOIN servicios_cliente sc
+                    ON c.servicio_id IS NOT NULL
+                    AND c.servicio_id REGEXP '^[0-9]+$'
+                    AND sc.id = CAST(c.servicio_id AS UNSIGNED)
+                LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+                WHERE c.id IN (${placeholders})
+                GROUP BY c.id
+                ORDER BY c.created_at DESC
+            `, ids);
+
+            // ── PASO 4: Extraer plan_nombre / plan_precio de servicios_info u observaciones
             contratos = contratos.map(contrato => {
                 let plan_nombre = 'N/A';
                 let plan_precio = 0;
                 let plan_tipo = 'N/A';
 
-                // Primero intentar obtener de servicios_info
                 if (contrato.servicios_info && contrato.servicios_info.trim() !== '||') {
                     const servicios = contrato.servicios_info.split(';;').filter(s => s && s !== '||');
-
                     if (servicios.length === 1) {
                         const [nombre, precio, tipo] = servicios[0].split('|');
-                        if (nombre) {
-                            plan_nombre = nombre;
-                            plan_precio = parseFloat(precio) || 0;
-                            plan_tipo = tipo || 'servicio';
-                        }
+                        if (nombre) { plan_nombre = nombre; plan_precio = parseFloat(precio) || 0; plan_tipo = tipo || 'servicio'; }
                     } else if (servicios.length > 1) {
-                        const nombres = [];
-                        let precioTotal = 0;
-                        for (const servicio of servicios) {
-                            const [nombre, precio] = servicio.split('|');
-                            if (nombre) {
-                                nombres.push(nombre);
-                                precioTotal += parseFloat(precio) || 0;
-                            }
+                        const nombres = []; let precioTotal = 0;
+                        for (const s of servicios) {
+                            const [nombre, precio] = s.split('|');
+                            if (nombre) { nombres.push(nombre); precioTotal += parseFloat(precio) || 0; }
                         }
-                        if (nombres.length > 0) {
-                            plan_nombre = nombres.join(' + ');
-                            plan_precio = precioTotal;
-                            plan_tipo = 'combo';
-                        }
+                        if (nombres.length > 0) { plan_nombre = nombres.join(' + '); plan_precio = precioTotal; plan_tipo = 'combo'; }
                     }
                 }
 
-                // ✅ Si no hay datos, extraer de observaciones JSON
-if (plan_nombre === 'N/A' && contrato.observaciones) {
-    try {
-        const obs = JSON.parse(contrato.observaciones);
-        
-        // ✅ PRIMERO: Intentar usar precio_mensual_total (más confiable)
-        if (obs.precio_mensual_total) {
-            plan_precio = parseFloat(obs.precio_mensual_total);
-        }
-        
-        if (obs.servicios_incluidos) {
-            // Extraer nombres limpiando prefijos
-            plan_nombre = obs.servicios_incluidos
-                .replace(/INTERNET: /g, '')
-                .replace(/TELEVISION: /g, '')
-                .replace(/SERVICIO: /g, '')
-                .replace(/\(\$\d+(\.\d+)?\)/g, '') // Quitar precios entre paréntesis
-                .trim();
-
-            // ✅ Si no hay precio_mensual_total, extraer y sumar de servicios_incluidos
-            if (!obs.precio_mensual_total) {
-                const matches = obs.servicios_incluidos.match(/\(?\$(\d+)/g);
-                if (matches) {
-                    plan_precio = matches.reduce((sum, precio) => {
-                        const num = parseInt(precio.replace(/\(?\$/, ''));
-                        return sum + (isNaN(num) ? 0 : num);
-                    }, 0);
-                }
-            }
-            
-            plan_tipo = obs.cantidad_servicios > 1 ? 'combo' : 'servicio';
-        }
-    } catch (e) {
-        console.log(`⚠️ No se pudo parsear observaciones del contrato ${contrato.numero_contrato}`);
-    }
-}
-
-                // ✅ Último fallback - Mensaje más descriptivo si sigue siendo N/A
-                if (plan_nombre === 'N/A') {
-                    plan_nombre = 'Sin información de plan';
-                    plan_precio = 0;
-                    plan_tipo = 'servicio';
+                if (plan_nombre === 'N/A' && contrato.observaciones) {
+                    try {
+                        const obs = JSON.parse(contrato.observaciones);
+                        if (obs.precio_mensual_total) plan_precio = parseFloat(obs.precio_mensual_total);
+                        if (obs.servicios_incluidos) {
+                            plan_nombre = obs.servicios_incluidos
+                                .replace(/INTERNET: |TELEVISION: |SERVICIO: /g, '')
+                                .replace(/\(\$[\d.]+\)/g, '').trim();
+                            if (!obs.precio_mensual_total) {
+                                const m = obs.servicios_incluidos.match(/\$(\d+)/g);
+                                if (m) plan_precio = m.reduce((s, p) => s + (parseInt(p.replace('$', '')) || 0), 0);
+                            }
+                            plan_tipo = obs.cantidad_servicios > 1 ? 'combo' : 'servicio';
+                        }
+                    } catch (e) { /* observaciones no es JSON */ }
                 }
 
-                return {
-                    ...contrato,
-                    plan_nombre,
-                    plan_precio,
-                    plan_tipo,
-                    servicios_info: undefined // Remover campo temporal
-                };
+                if (plan_nombre === 'N/A') { plan_nombre = 'Sin información de plan'; plan_tipo = 'servicio'; }
+
+                return { ...contrato, plan_nombre, plan_precio, plan_tipo, servicios_info: undefined };
             });
 
-            console.log(`✅ Encontrados ${contratos.length} contratos`);
+            console.log(`✅ Contratos devueltos: ${contratos.length} de ${total}`);
 
             res.json({
                 success: true,
