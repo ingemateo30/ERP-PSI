@@ -58,14 +58,19 @@ class EstadisticasController {
         clientes,
         operacionales,
         tendencias,
-        metricasGerenciales
+        metricasGerenciales,
+        desglosePorSede
       ] = await Promise.all([
         EstadisticasController.getEstadisticasFinancieras(fechaDesde, fechaHasta, sedeId),
         EstadisticasController.getEstadisticasFinancieras(fechaDesdeAnterior, fechaHastaAnterior, sedeId),
         EstadisticasController.getEstadisticasClientes(sedeId),
         EstadisticasController.getEstadisticasOperacionales(sedeId),
         EstadisticasController.getTendenciasMensuales(sedeId),
-        EstadisticasController.getMetricasGerenciales(fechaDesde, fechaHasta, sedeId)
+        EstadisticasController.getMetricasGerenciales(fechaDesde, fechaHasta, sedeId),
+        // Desglose por sede solo cuando admin ve todo (sin filtro)
+        (req.user?.rol === 'administrador' && !sedeId)
+          ? EstadisticasController.getDesglosePorSede(fechaDesde, fechaHasta)
+          : Promise.resolve(null)
       ]);
 
       // Calcular variaciones porcentuales
@@ -102,6 +107,7 @@ class EstadisticasController {
           operacionales,
           tendencias,
           metricas_gerenciales: metricasGerenciales,
+          desglose_por_sede: desglosePorSede,
           comparaciones,
           fecha_actualizacion: new Date().toISOString()
         },
@@ -130,6 +136,121 @@ class EstadisticasController {
     }
     const variacion = ((valorActual - valorAnterior) / valorAnterior) * 100;
     return parseFloat(variacion.toFixed(2));
+  }
+
+  /**
+   * Obtener desglose de métricas clave por sede/ciudad (solo admin sin filtro de sede).
+   * Devuelve una fila por cada ciudad que tenga al menos un cliente.
+   */
+  static async getDesglosePorSede(fechaDesde, fechaHasta) {
+    try {
+      console.log('🏢 Obteniendo desglose por sede...');
+
+      // Clientes por sede
+      const clientesPorSede = await Database.query(`
+        SELECT
+          ci.id         AS sede_id,
+          ci.nombre     AS sede_nombre,
+          COUNT(cl.id)  AS total_clientes,
+          SUM(CASE WHEN cl.estado = 'activo'     THEN 1 ELSE 0 END) AS activos,
+          SUM(CASE WHEN cl.estado = 'suspendido' THEN 1 ELSE 0 END) AS suspendidos,
+          SUM(CASE WHEN cl.estado = 'cortado'    THEN 1 ELSE 0 END) AS cortados,
+          SUM(CASE WHEN cl.estado = 'retirado'   THEN 1 ELSE 0 END) AS retirados,
+          SUM(CASE WHEN cl.estado = 'inactivo'   THEN 1 ELSE 0 END) AS inactivos,
+          SUM(CASE WHEN MONTH(cl.created_at) = MONTH(CURDATE()) AND YEAR(cl.created_at) = YEAR(CURDATE()) THEN 1 ELSE 0 END) AS nuevos_mes
+        FROM ciudades ci
+        INNER JOIN clientes cl ON cl.ciudad_id = ci.id
+        GROUP BY ci.id, ci.nombre
+        ORDER BY total_clientes DESC
+      `);
+
+      // Facturación por sede para el período dado
+      const facturacionPorSede = await Database.query(`
+        SELECT
+          cl.ciudad_id                                               AS sede_id,
+          COUNT(f.id)                                                AS total_facturas,
+          COALESCE(SUM(f.total), 0)                                  AS valor_facturado,
+          COALESCE(SUM(CASE WHEN f.estado = 'pagada'    THEN f.total ELSE 0 END), 0) AS valor_recaudado,
+          COALESCE(SUM(CASE WHEN f.estado IN ('pendiente','vencida') THEN f.total ELSE 0 END), 0) AS cartera_pendiente,
+          COALESCE(SUM(CASE WHEN f.estado IN ('pendiente','vencida') AND f.fecha_vencimiento < CURDATE() THEN f.total ELSE 0 END), 0) AS cartera_vencida
+        FROM facturas f
+        INNER JOIN clientes cl ON f.cliente_id = cl.id
+        WHERE f.fecha_emision BETWEEN ? AND ?
+          AND f.activo = '1'
+        GROUP BY cl.ciudad_id
+      `, [fechaDesde, fechaHasta]);
+
+      // Servicios activos y contratos activos por sede
+      const serviciosPorSede = await Database.query(`
+        SELECT
+          cl.ciudad_id                                                 AS sede_id,
+          COUNT(sc.id)                                                 AS servicios_activos,
+          COALESCE(SUM(COALESCE(sc.precio_personalizado, ps.precio)), 0) AS mrr
+        FROM servicios_cliente sc
+        INNER JOIN clientes cl ON sc.cliente_id = cl.id
+        LEFT JOIN planes_servicio ps ON sc.plan_id = ps.id
+        WHERE sc.estado = 'activo'
+        GROUP BY cl.ciudad_id
+      `);
+
+      const contratosPorSede = await Database.query(`
+        SELECT
+          cl.ciudad_id                                                AS sede_id,
+          COUNT(co.id)                                                AS total_contratos,
+          SUM(CASE WHEN co.estado = 'activo' THEN 1 ELSE 0 END)      AS contratos_activos
+        FROM contratos co
+        INNER JOIN clientes cl ON co.cliente_id = cl.id
+        GROUP BY cl.ciudad_id
+      `);
+
+      // Indexar los sub-resultados por sede_id para O(1) lookup
+      const facMap = {};
+      for (const r of facturacionPorSede) facMap[r.sede_id] = r;
+      const svcMap = {};
+      for (const r of serviciosPorSede) svcMap[r.sede_id] = r;
+      const conMap = {};
+      for (const r of contratosPorSede) conMap[r.sede_id] = r;
+
+      return clientesPorSede.map(s => {
+        const f = facMap[s.sede_id] || {};
+        const sv = svcMap[s.sede_id] || {};
+        const co = conMap[s.sede_id] || {};
+        return {
+          sede_id:           s.sede_id,
+          sede_nombre:       s.sede_nombre,
+          clientes: {
+            total:       parseInt(s.total_clientes) || 0,
+            activos:     parseInt(s.activos) || 0,
+            suspendidos: parseInt(s.suspendidos) || 0,
+            cortados:    parseInt(s.cortados) || 0,
+            retirados:   parseInt(s.retirados) || 0,
+            inactivos:   parseInt(s.inactivos) || 0,
+            nuevos_mes:  parseInt(s.nuevos_mes) || 0,
+          },
+          facturacion: {
+            total_facturas:   parseInt(f.total_facturas) || 0,
+            valor_facturado:  parseFloat(f.valor_facturado) || 0,
+            valor_recaudado:  parseFloat(f.valor_recaudado) || 0,
+            cartera_pendiente: parseFloat(f.cartera_pendiente) || 0,
+            cartera_vencida:  parseFloat(f.cartera_vencida) || 0,
+            tasa_recaudo: f.valor_facturado > 0
+              ? parseFloat(((f.valor_recaudado / f.valor_facturado) * 100).toFixed(2))
+              : 0,
+          },
+          servicios: {
+            activos: parseInt(sv.servicios_activos) || 0,
+            mrr:     parseFloat(sv.mrr) || 0,
+          },
+          contratos: {
+            total:   parseInt(co.total_contratos) || 0,
+            activos: parseInt(co.contratos_activos) || 0,
+          },
+        };
+      });
+    } catch (error) {
+      console.error('❌ Error obteniendo desglose por sede:', error);
+      return [];
+    }
   }
 
   /**

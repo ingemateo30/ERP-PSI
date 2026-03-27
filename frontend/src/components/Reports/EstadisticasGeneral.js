@@ -318,7 +318,7 @@ const EstadisticasGeneral = () => {
     );
   }
 
-  const { financieras, clientes, operacionales, metricas_gerenciales, comparaciones } = estadisticas;
+  const { financieras, clientes, operacionales, metricas_gerenciales, comparaciones, desglose_por_sede } = estadisticas;
 
   return (
     <div className="space-y-6 p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
@@ -592,6 +592,123 @@ const EstadisticasGeneral = () => {
           color="from-red-400 to-red-500"
         />
       </div>
+
+      {/* ========================================= */}
+      {/* DESGLOSE POR SEDE (solo admin sin filtro) */}
+      {/* ========================================= */}
+      {desglose_por_sede && desglose_por_sede.length > 0 && (
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-4">
+            <Building className="w-5 h-5 text-[#0e6493]" />
+            Desglose por Sede / Ciudad
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-4 py-3 font-semibold text-gray-700">Sede</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-700">Clientes</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-700">Activos</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-700 hidden md:table-cell">Susp.</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-700 hidden md:table-cell">Cortados</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-700">Nuevos mes</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-700">Facturado</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-700">Recaudado</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-700 hidden lg:table-cell">Cartera vencida</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-700 hidden lg:table-cell">Serv. activos</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-700 hidden lg:table-cell">MRR</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {desglose_por_sede.map((sede) => (
+                  <tr key={sede.sede_id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-[#0e6493]">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        {sede.sede_nombre}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                      {sede.clientes.total.toLocaleString('es-CO')}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        {sede.clientes.activos.toLocaleString('es-CO')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right hidden md:table-cell">
+                      <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        {sede.clientes.suspendidos.toLocaleString('es-CO')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right hidden md:table-cell">
+                      <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        {sede.clientes.cortados.toLocaleString('es-CO')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-blue-600 font-medium">
+                      +{sede.clientes.nuevos_mes.toLocaleString('es-CO')}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-900">
+                      {formatCOP(sede.facturacion.valor_facturado)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-green-700 font-medium">
+                      {formatCOP(sede.facturacion.valor_recaudado)}
+                      {sede.facturacion.tasa_recaudo > 0 && (
+                        <span className="text-xs text-gray-400 ml-1">({sede.facturacion.tasa_recaudo}%)</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right text-red-600 hidden lg:table-cell">
+                      {formatCOP(sede.facturacion.cartera_vencida)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-700 hidden lg:table-cell">
+                      {sede.servicios.activos.toLocaleString('es-CO')}
+                    </td>
+                    <td className="px-4 py-3 text-right text-purple-600 font-medium hidden lg:table-cell">
+                      {formatCOP(sede.servicios.mrr)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-gray-50 border-t-2 border-gray-300">
+                <tr>
+                  <td className="px-4 py-3 font-bold text-gray-900">TOTAL</td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-900">
+                    {desglose_por_sede.reduce((s, r) => s + r.clientes.total, 0).toLocaleString('es-CO')}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-green-700">
+                    {desglose_por_sede.reduce((s, r) => s + r.clientes.activos, 0).toLocaleString('es-CO')}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-yellow-700 hidden md:table-cell">
+                    {desglose_por_sede.reduce((s, r) => s + r.clientes.suspendidos, 0).toLocaleString('es-CO')}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-red-700 hidden md:table-cell">
+                    {desglose_por_sede.reduce((s, r) => s + r.clientes.cortados, 0).toLocaleString('es-CO')}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-blue-700">
+                    +{desglose_por_sede.reduce((s, r) => s + r.clientes.nuevos_mes, 0).toLocaleString('es-CO')}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-900">
+                    {formatCOP(desglose_por_sede.reduce((s, r) => s + r.facturacion.valor_facturado, 0))}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-green-800">
+                    {formatCOP(desglose_por_sede.reduce((s, r) => s + r.facturacion.valor_recaudado, 0))}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-red-800 hidden lg:table-cell">
+                    {formatCOP(desglose_por_sede.reduce((s, r) => s + r.facturacion.cartera_vencida, 0))}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-900 hidden lg:table-cell">
+                    {desglose_por_sede.reduce((s, r) => s + r.servicios.activos, 0).toLocaleString('es-CO')}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-purple-800 hidden lg:table-cell">
+                    {formatCOP(desglose_por_sede.reduce((s, r) => s + r.servicios.mrr, 0))}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ========================================= */}
       {/* GRÁFICOS DE TENDENCIAS */}

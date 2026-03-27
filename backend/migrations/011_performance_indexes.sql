@@ -1,97 +1,69 @@
 -- ============================================================
 -- Migration 011: Índices de rendimiento para 100k+ registros
--- Compatible con MySQL 5.7+ y MariaDB
+-- Compatible MySQL 5.7+ / MariaDB
+-- NOTA: Si un índice ya existe MySQL lanzará ER_DUP_KEYNAME (1061)
+--       y continuará con el siguiente. Ignorar esos warnings.
+-- Ejecutar: mysql -u usuario -p base_psi < migrations/011_performance_indexes.sql
+--       o:  cd backend && node scripts/aplicar_indices.js
 -- ============================================================
 
-DELIMITER $$
+-- clientes
+ALTER TABLE `clientes` ADD INDEX `idx_clientes_estado`         (`estado`);
+ALTER TABLE `clientes` ADD INDEX `idx_clientes_ciudad_id`      (`ciudad_id`);
+ALTER TABLE `clientes` ADD INDEX `idx_clientes_sector_id`      (`sector_id`);
+ALTER TABLE `clientes` ADD INDEX `idx_clientes_identificacion` (`identificacion`);
+ALTER TABLE `clientes` ADD INDEX `idx_clientes_created_at`     (`created_at`);
+ALTER TABLE `clientes` ADD INDEX `idx_clientes_estado_ciudad`  (`estado`, `ciudad_id`);
 
-DROP PROCEDURE IF EXISTS agregar_indice$$
+-- facturas
+ALTER TABLE `facturas` ADD INDEX `idx_facturas_cliente_id`         (`cliente_id`);
+ALTER TABLE `facturas` ADD INDEX `idx_facturas_estado`             (`estado`);
+ALTER TABLE `facturas` ADD INDEX `idx_facturas_activo`             (`activo`);
+ALTER TABLE `facturas` ADD INDEX `idx_facturas_fecha_emision`      (`fecha_emision`);
+ALTER TABLE `facturas` ADD INDEX `idx_facturas_fecha_vencimiento`  (`fecha_vencimiento`);
+ALTER TABLE `facturas` ADD INDEX `idx_facturas_fecha_pago`         (`fecha_pago`);
+ALTER TABLE `facturas` ADD INDEX `idx_facturas_cliente_estado`     (`cliente_id`, `estado`);
+ALTER TABLE `facturas` ADD INDEX `idx_facturas_estado_activo`      (`estado`, `activo`);
+ALTER TABLE `facturas` ADD INDEX `idx_facturas_emision_activo`     (`fecha_emision`, `activo`);
+ALTER TABLE `facturas` ADD INDEX `idx_facturas_vcto_estado`        (`fecha_vencimiento`, `estado`);
 
-CREATE PROCEDURE agregar_indice(
-  IN p_tabla   VARCHAR(64),
-  IN p_indice  VARCHAR(64),
-  IN p_columnas TEXT
-)
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.STATISTICS
-    WHERE table_schema = DATABASE()
-      AND table_name   = p_tabla
-      AND index_name   = p_indice
-    LIMIT 1
-  ) THEN
-    SET @sql = CONCAT('ALTER TABLE `', p_tabla, '` ADD INDEX `', p_indice, '` (', p_columnas, ')');
-    PREPARE stmt FROM @sql;
-    EXECUTE stmt;
-    DEALLOCATE PREPARE stmt;
-    SELECT CONCAT('  ✅ Creado: ', p_tabla, '.', p_indice) AS resultado;
-  ELSE
-    SELECT CONCAT('  ⏩ Ya existe: ', p_tabla, '.', p_indice) AS resultado;
-  END IF;
-END$$
+-- servicios_cliente
+ALTER TABLE `servicios_cliente` ADD INDEX `idx_sc_cliente_id`     (`cliente_id`);
+ALTER TABLE `servicios_cliente` ADD INDEX `idx_sc_plan_id`        (`plan_id`);
+ALTER TABLE `servicios_cliente` ADD INDEX `idx_sc_estado`         (`estado`);
+ALTER TABLE `servicios_cliente` ADD INDEX `idx_sc_cliente_estado` (`cliente_id`, `estado`);
 
-DELIMITER ;
+-- contratos
+ALTER TABLE `contratos` ADD INDEX `idx_contratos_cliente_id` (`cliente_id`);
+ALTER TABLE `contratos` ADD INDEX `idx_contratos_estado`     (`estado`);
+ALTER TABLE `contratos` ADD INDEX `idx_contratos_created_at` (`created_at`);
 
--- ─── CLIENTES ────────────────────────────────────────────────
-CALL agregar_indice('clientes', 'idx_clientes_estado',        '`estado`');
-CALL agregar_indice('clientes', 'idx_clientes_ciudad_id',     '`ciudad_id`');
-CALL agregar_indice('clientes', 'idx_clientes_sector_id',     '`sector_id`');
-CALL agregar_indice('clientes', 'idx_clientes_identificacion','`identificacion`');
-CALL agregar_indice('clientes', 'idx_clientes_created_at',    '`created_at`');
-CALL agregar_indice('clientes', 'idx_clientes_estado_ciudad', '`estado`, `ciudad_id`');
+-- instalaciones
+ALTER TABLE `instalaciones` ADD INDEX `idx_inst_cliente_id` (`cliente_id`);
+ALTER TABLE `instalaciones` ADD INDEX `idx_inst_estado`     (`estado`);
+ALTER TABLE `instalaciones` ADD INDEX `idx_inst_fecha_prog` (`fecha_programada`);
+ALTER TABLE `instalaciones` ADD INDEX `idx_inst_created_at` (`created_at`);
 
--- ─── FACTURAS ────────────────────────────────────────────────
-CALL agregar_indice('facturas', 'idx_facturas_cliente_id',         '`cliente_id`');
-CALL agregar_indice('facturas', 'idx_facturas_estado',             '`estado`');
-CALL agregar_indice('facturas', 'idx_facturas_activo',             '`activo`');
-CALL agregar_indice('facturas', 'idx_facturas_fecha_emision',      '`fecha_emision`');
-CALL agregar_indice('facturas', 'idx_facturas_fecha_vencimiento',  '`fecha_vencimiento`');
-CALL agregar_indice('facturas', 'idx_facturas_fecha_pago',         '`fecha_pago`');
-CALL agregar_indice('facturas', 'idx_facturas_cliente_estado',     '`cliente_id`, `estado`');
-CALL agregar_indice('facturas', 'idx_facturas_estado_activo',      '`estado`, `activo`');
-CALL agregar_indice('facturas', 'idx_facturas_emision_activo',     '`fecha_emision`, `activo`');
-CALL agregar_indice('facturas', 'idx_facturas_vcto_estado',        '`fecha_vencimiento`, `estado`');
+-- pagos
+ALTER TABLE `pagos` ADD INDEX `idx_pagos_cliente_id` (`cliente_id`);
+ALTER TABLE `pagos` ADD INDEX `idx_pagos_factura_id` (`factura_id`);
+ALTER TABLE `pagos` ADD INDEX `idx_pagos_fecha_pago` (`fecha_pago`);
 
--- ─── SERVICIOS_CLIENTE ───────────────────────────────────────
-CALL agregar_indice('servicios_cliente', 'idx_sc_cliente_id',      '`cliente_id`');
-CALL agregar_indice('servicios_cliente', 'idx_sc_plan_id',         '`plan_id`');
-CALL agregar_indice('servicios_cliente', 'idx_sc_estado',          '`estado`');
-CALL agregar_indice('servicios_cliente', 'idx_sc_cliente_estado',  '`cliente_id`, `estado`');
+-- pqr
+ALTER TABLE `pqr` ADD INDEX `idx_pqr_cliente_id`  (`cliente_id`);
+ALTER TABLE `pqr` ADD INDEX `idx_pqr_estado`      (`estado`);
+ALTER TABLE `pqr` ADD INDEX `idx_pqr_fecha_recep` (`fecha_recepcion`);
 
--- ─── CONTRATOS ───────────────────────────────────────────────
-CALL agregar_indice('contratos', 'idx_contratos_cliente_id',  '`cliente_id`');
-CALL agregar_indice('contratos', 'idx_contratos_estado',      '`estado`');
-CALL agregar_indice('contratos', 'idx_contratos_created_at',  '`created_at`');
+-- sistema_usuarios
+ALTER TABLE `sistema_usuarios` ADD INDEX `idx_su_rol`     (`rol`);
+ALTER TABLE `sistema_usuarios` ADD INDEX `idx_su_sede_id` (`sede_id`);
+ALTER TABLE `sistema_usuarios` ADD INDEX `idx_su_activo`  (`activo`);
 
--- ─── INSTALACIONES ───────────────────────────────────────────
-CALL agregar_indice('instalaciones', 'idx_inst_cliente_id',  '`cliente_id`');
-CALL agregar_indice('instalaciones', 'idx_inst_estado',      '`estado`');
-CALL agregar_indice('instalaciones', 'idx_inst_fecha_prog',  '`fecha_programada`');
-CALL agregar_indice('instalaciones', 'idx_inst_created_at',  '`created_at`');
+-- inventario_equipos
+ALTER TABLE `inventario_equipos` ADD INDEX `idx_inv_estado` (`estado`);
+ALTER TABLE `inventario_equipos` ADD INDEX `idx_inv_sede`   (`sede`);
 
--- ─── PAGOS ───────────────────────────────────────────────────
-CALL agregar_indice('pagos', 'idx_pagos_cliente_id',  '`cliente_id`');
-CALL agregar_indice('pagos', 'idx_pagos_factura_id',  '`factura_id`');
-CALL agregar_indice('pagos', 'idx_pagos_fecha_pago',  '`fecha_pago`');
+-- sectores
+ALTER TABLE `sectores` ADD INDEX `idx_sectores_ciudad_id` (`ciudad_id`);
 
--- ─── PQR ─────────────────────────────────────────────────────
-CALL agregar_indice('pqr', 'idx_pqr_cliente_id',   '`cliente_id`');
-CALL agregar_indice('pqr', 'idx_pqr_estado',       '`estado`');
-CALL agregar_indice('pqr', 'idx_pqr_fecha_recep',  '`fecha_recepcion`');
-
--- ─── SISTEMA_USUARIOS ────────────────────────────────────────
-CALL agregar_indice('sistema_usuarios', 'idx_su_rol',      '`rol`');
-CALL agregar_indice('sistema_usuarios', 'idx_su_sede_id',  '`sede_id`');
-CALL agregar_indice('sistema_usuarios', 'idx_su_activo',   '`activo`');
-
--- ─── INVENTARIO_EQUIPOS ──────────────────────────────────────
-CALL agregar_indice('inventario_equipos', 'idx_inv_estado',  '`estado`');
-CALL agregar_indice('inventario_equipos', 'idx_inv_sede',    '`sede`');
-
--- ─── SECTORES ────────────────────────────────────────────────
-CALL agregar_indice('sectores', 'idx_sectores_ciudad_id', '`ciudad_id`');
-
--- Limpiar procedimiento temporal
-DROP PROCEDURE IF EXISTS agregar_indice;
-
-SELECT 'Índices de rendimiento aplicados correctamente' AS resultado;
+SELECT 'Índices aplicados. Los warnings de "Duplicate key name" son normales si ya existían.' AS resultado;
