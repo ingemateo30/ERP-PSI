@@ -122,12 +122,12 @@ class ContratosController {
             let contratos = await Database.query(`
                 SELECT
                     c.*,
-                    COALESCE(cl.nombre,        ci_last.nombre,        'Cliente eliminado') AS cliente_nombre,
-                    COALESCE(cl.identificacion, ci_last.identificacion, 'N/A')             AS cliente_identificacion,
-                    COALESCE(cl.telefono,       ci_last.telefono,       '')                AS cliente_telefono,
-                    COALESCE(cl.correo,         '')                                        AS cliente_email,
-                    COALESCE(cl.direccion,      ci_last.direccion,      '')                AS cliente_direccion,
-                    COALESCE(cl.estrato,        '')                                        AS cliente_estrato,
+                    COALESCE(ANY_VALUE(cl.nombre),        ANY_VALUE(ci_last.nombre),        'Cliente eliminado') AS cliente_nombre,
+                    COALESCE(ANY_VALUE(cl.identificacion), ANY_VALUE(ci_last.identificacion), 'N/A')             AS cliente_identificacion,
+                    COALESCE(ANY_VALUE(cl.telefono),       ANY_VALUE(ci_last.telefono),       '')                AS cliente_telefono,
+                    COALESCE(ANY_VALUE(cl.correo),         '')                                                    AS cliente_email,
+                    COALESCE(ANY_VALUE(cl.direccion),      ANY_VALUE(ci_last.direccion),      '')                AS cliente_direccion,
+                    COALESCE(ANY_VALUE(cl.estrato),        '')                                                    AS cliente_estrato,
                     GROUP_CONCAT(
                         DISTINCT CONCAT(
                             COALESCE(ps.nombre, ''), '|',
