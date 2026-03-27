@@ -1661,6 +1661,72 @@ router.delete('/:id',
 );
 // ─── Estado automático por mora ────────────────────────────────────────────
 
+// GET /clientes/estados-config — Devuelve la máquina de estados con reglas de negocio
+router.get('/estados-config',
+  authenticateToken,
+  (req, res) => {
+    res.json({
+      success: true,
+      data: {
+        estados: [
+          {
+            estado: 'activo',
+            label: 'Activo',
+            condicion: 'Al día o mora < 30 días',
+            facturacion: 'Se factura normalmente',
+            color: 'green',
+            transiciones_posibles: ['suspendido', 'retirado', 'inactivo']
+          },
+          {
+            estado: 'suspendido',
+            label: 'Suspendido',
+            condicion: 'Mora 30-60 días',
+            facturacion: 'Se factura (con intereses), acceso limitado',
+            color: 'yellow',
+            transiciones_posibles: ['activo (al pagar)', 'cortado']
+          },
+          {
+            estado: 'cortado',
+            label: 'Cortado',
+            condicion: 'Mora > 60 días',
+            facturacion: 'No se genera nueva factura; se cobra reconexión al pagar',
+            color: 'red',
+            transiciones_posibles: ['activo (al pagar + reconexión)']
+          },
+          {
+            estado: 'retirado',
+            label: 'Retirado',
+            condicion: 'Solicitud del cliente',
+            facturacion: 'No se factura, contrato terminado',
+            color: 'gray',
+            transiciones_posibles: []
+          },
+          {
+            estado: 'inactivo',
+            label: 'Inactivo',
+            condicion: 'Sin servicios activos / pendiente de activación',
+            facturacion: 'No se factura',
+            color: 'blue',
+            transiciones_posibles: ['activo (al activar servicio)']
+          }
+        ],
+        reglas_automaticas: {
+          dias_para_suspender: 30,
+          dias_para_cortar: 60,
+          reactivacion_automatica: 'Al pagar todas las facturas pendientes',
+          cargo_reconexion: 'Se activa la bandera requiere_reconexion=true cuando un cliente cortado paga',
+          cron_horario: 'Diariamente a las 02:30 AM'
+        },
+        endpoints: {
+          ejecutar_transiciones: 'POST /api/v1/clientes/ejecutar-transiciones',
+          resumen_estados: 'GET /api/v1/clientes/resumen-estados',
+          verificar_cliente: 'GET /api/v1/clientes/:id/verificar-estado'
+        }
+      }
+    });
+  }
+);
+
 // POST /clientes/ejecutar-transiciones — Aplica suspensión/corte/reactivación masiva
 router.post('/ejecutar-transiciones',
   authenticateToken,

@@ -3,6 +3,7 @@
 const { Database } = require('../models/Database');
 const Factura = require('../models/factura');
 const FacturaPDFGenerator = require('../utils/pdfGenerator');
+const EstadoClienteService = require('../services/EstadoClienteService');
 // Importaciones opcionales con manejo de errores
 let FacturacionAutomaticaService;
 let PDFGenerator;
@@ -1101,14 +1102,26 @@ static async marcarComoPagada(req, res) {
 
     console.log('✅ Factura marcada como pagada exitosamente:', id);
 
+    // Verificar reactivación automática del cliente
+    let reactivacion = null;
+    try {
+      reactivacion = await EstadoClienteService.procesarPostPago(factura.cliente_id, parseInt(id));
+      if (reactivacion.reactivado) {
+        console.log(`🔄 Cliente ${factura.cliente_id} reactivado automáticamente tras pago.`);
+      }
+    } catch (reactivacionError) {
+      console.warn('⚠️ No se pudo verificar reactivación del cliente:', reactivacionError.message);
+    }
+
     res.json({
       success: true,
       message: 'Factura marcada como pagada exitosamente',
-      data: { 
-        id, 
+      data: {
+        id,
         estado: 'pagada',
         fecha_pago: fecha_pago || new Date().toISOString().split('T')[0],
-        monto_pagado: monto_pagado || factura.total
+        monto_pagado: monto_pagado || factura.total,
+        reactivacion_cliente: reactivacion
       }
     });
 

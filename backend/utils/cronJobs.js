@@ -3,6 +3,7 @@
 
 const cron = require('node-cron');
 const FacturacionAutomaticaService = require('../services/FacturacionAutomaticaService');
+const EstadoClienteService = require('../services/EstadoClienteService');
 const { Database } = require('../models/Database');
 
 // Helper para fecha local en formato MySQL (evita bug UTC de toISOString)
@@ -34,6 +35,9 @@ class CronJobs {
 
     // Facturación mensual automática - cada día 20 del mes a las 06:00 (genera facturas del mes siguiente)
     this.facturacionMensualAutomatica();
+
+    // Transiciones automáticas de estado de clientes (activo→suspendido→cortado) - diario a las 02:30
+    this.transicionesEstadoClientes();
 
     // Actualización de estados de facturas - diario a las 02:00
     this.actualizacionEstadosFacturas();
@@ -172,6 +176,26 @@ class CronJobs {
    * Actualización de estados de facturas
    * Se ejecuta todos los días a las 02:00 AM
    */
+
+  /**
+   * Transiciones automáticas de estado de clientes.
+   * activo → suspendido (mora 30-60 días)
+   * suspendido → cortado (mora > 60 días)
+   * Se ejecuta diariamente a las 02:30 AM (después de actualizar estados de facturas)
+   */
+  static transicionesEstadoClientes() {
+    cron.schedule('30 2 * * *', async () => {
+      try {
+        console.log('🔄 [CronJobs] Ejecutando transiciones de estado de clientes...');
+        const resultado = await EstadoClienteService.ejecutarTransiciones();
+        console.log(`✅ [CronJobs] Transiciones completadas:`, resultado);
+      } catch (error) {
+        console.error('❌ [CronJobs] Error en transiciones de estado de clientes:', error.message);
+      }
+    });
+    console.log('✅ Tarea transiciones estado clientes: diario 02:30 AM');
+  }
+
   static actualizacionEstadosFacturas() {
     cron.schedule('0 2 * * *', async () => {
       try {
