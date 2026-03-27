@@ -2,10 +2,10 @@
 // Componente para gestionar servicios de un cliente específico
 
 import React, { useState, useEffect } from 'react';
-import { 
-  X, Plus, Edit3, Wifi, Calendar, DollarSign, 
+import {
+  X, Plus, Edit3, Wifi, Calendar, DollarSign,
   AlertCircle, Check, Loader2, History, Settings,
-  Trash2, Eye
+  Trash2, Eye, ArrowRightLeft, Clock, XCircle
 } from 'lucide-react';
 import clienteCompletoService from '../../services/clienteCompletoService';
 
@@ -15,8 +15,11 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
   const [planesDisponibles, setPlanesDisponibles] = useState([]);
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [showAgregarModal, setShowAgregarModal] = useState(false);
+  const [showMigrarModal, setShowMigrarModal] = useState(false);
+  const [showBajaModal, setShowBajaModal] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [error, setError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(null); // servicioId being processed
 
   useEffect(() => {
     if (cliente?.id) {
@@ -48,6 +51,39 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
   const handleCambiarPlan = (servicio) => {
     setSelectedService(servicio);
     setShowChangeModal(true);
+  };
+
+  const handleMigrarPlan = (servicio) => {
+    setSelectedService(servicio);
+    setShowMigrarModal(true);
+  };
+
+  const handleProgramarBaja = (servicio) => {
+    setSelectedService(servicio);
+    setShowBajaModal(true);
+  };
+
+  const handleCancelarBajaProgamada = async (servicio) => {
+    if (!window.confirm(`¿Cancelar la baja programada del servicio "${servicio.plan_nombre}"?`)) return;
+    setActionLoading(servicio.id);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const r = await fetch(`/api/v1/clientes/${cliente.id}/servicios/${servicio.id}/cancelar-programacion-baja`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const d = await r.json();
+      if (d.success) {
+        await cargarDatos();
+        onUpdate && onUpdate();
+      } else {
+        alert(d.message || 'Error al cancelar baja programada');
+      }
+    } catch {
+      alert('Error de conexión');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const getEstadoColor = (estado) => {
@@ -142,13 +178,43 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
                           </span>
                         )}
                       </div>
-                      <button
-                        onClick={() => handleCambiarPlan(servicio)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                      >
-                        <Edit3 className="w-3 h-3" />
-                        Cambiar Plan
-                      </button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => handleMigrarPlan(servicio)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                          title="Cambio de plan inmediato con prorrateo"
+                        >
+                          <ArrowRightLeft className="w-3 h-3" />
+                          Migrar Plan
+                        </button>
+                        {servicio.fecha_programada_cancelacion ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="flex items-center gap-1 text-xs text-red-700 bg-red-50 border border-red-200 px-2 py-1.5 rounded-lg">
+                              <Clock className="w-3 h-3" />
+                              Baja {new Date(servicio.fecha_programada_cancelacion + 'T12:00:00').toLocaleDateString('es-CO')}
+                            </span>
+                            <button
+                              onClick={() => handleCancelarBajaProgamada(servicio)}
+                              disabled={actionLoading === servicio.id}
+                              className="flex items-center gap-1 px-2 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs border border-gray-300"
+                              title="Cancelar baja programada"
+                            >
+                              {actionLoading === servicio.id
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <XCircle className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleProgramarBaja(servicio)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition-colors text-sm"
+                            title="Programar cancelación al final del ciclo actual"
+                          >
+                            <Clock className="w-3 h-3" />
+                            Programar Baja
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -192,6 +258,12 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
                         <div className="text-sm text-gray-600 space-y-1">
                           <p><strong>ID Servicio:</strong> #{servicio.id}</p>
                           <p><strong>Plan ID:</strong> #{servicio.plan_id}</p>
+                          {servicio.fecha_programada_cancelacion && (
+                            <p className="text-red-700 font-medium">
+                              <strong>Baja programada:</strong>{' '}
+                              {clienteCompletoService.formatearFecha(servicio.fecha_programada_cancelacion)}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -307,6 +379,37 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
           onClose={() => setShowAgregarModal(false)}
           onSuccess={() => {
             setShowAgregarModal(false);
+            cargarDatos();
+            onUpdate && onUpdate();
+          }}
+        />
+      )}
+
+      {/* Modal: Migrar plan (inmediato + prorrateo) */}
+      {showMigrarModal && selectedService && (
+        <MigrarPlanModal
+          cliente={cliente}
+          servicio={selectedService}
+          planesDisponibles={planesDisponibles}
+          onClose={() => { setShowMigrarModal(false); setSelectedService(null); }}
+          onSuccess={() => {
+            setShowMigrarModal(false);
+            setSelectedService(null);
+            cargarDatos();
+            onUpdate && onUpdate();
+          }}
+        />
+      )}
+
+      {/* Modal: Programar baja al fin del ciclo */}
+      {showBajaModal && selectedService && (
+        <ProgramarBajaModal
+          cliente={cliente}
+          servicio={selectedService}
+          onClose={() => { setShowBajaModal(false); setSelectedService(null); }}
+          onSuccess={() => {
+            setShowBajaModal(false);
+            setSelectedService(null);
             cargarDatos();
             onUpdate && onUpdate();
           }}
@@ -745,6 +848,259 @@ const AgregarServicioModal = ({ cliente, planesDisponibles, onClose, onSuccess }
                   Agregar Servicio
                 </>
               )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Modal: Migrar Plan (inmediato con prorrateo)
+// ═══════════════════════════════════════════════════════════════════════════
+const MigrarPlanModal = ({ cliente, servicio, planesDisponibles, onClose, onSuccess }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [planId, setPlanId] = useState('');
+  const [resultado, setResultado] = useState(null);
+
+  const planSeleccionado = planesDisponibles.find(p => p.id == planId);
+  const precioActual = servicio.precio_personalizado || servicio.plan_precio || 0;
+  const precioNuevo = planSeleccionado?.precio || 0;
+  const diferencia = precioNuevo - precioActual;
+
+  const handlePreview = () => {
+    if (!planId) return;
+    const hoy = new Date();
+    const diasEnMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+    const diasRestantes = diasEnMes - hoy.getDate() + 1;
+    const prorrateo = diferencia > 0 ? Math.round((diferencia / diasEnMes) * diasRestantes) : 0;
+    setResultado({ diasRestantes, prorrateo, diasEnMes });
+  };
+
+  useEffect(() => { if (planId) handlePreview(); else setResultado(null); }, [planId]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!planId) { setError('Seleccione el nuevo plan'); return; }
+    setLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('accessToken');
+      const r = await fetch(`/api/v1/clientes/${cliente.id}/servicios/${servicio.id}/migrar-plan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ nuevo_plan_id: planId })
+      });
+      const d = await r.json();
+      if (d.success) {
+        onSuccess();
+      } else {
+        setError(d.message || 'Error al migrar plan');
+      }
+    } catch {
+      setError('Error de conexión');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5 text-blue-600" />
+              Migrar Plan (Inmediato)
+            </h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              El cambio aplica hoy con prorrateo del mes actual
+            </p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
+              <AlertCircle className="w-4 h-4" /> {error}
+            </div>
+          )}
+
+          {/* Plan actual */}
+          <div className="p-3 bg-gray-50 rounded-lg text-sm">
+            <p className="text-gray-500 text-xs mb-1">Plan actual</p>
+            <p className="font-medium text-gray-900">{servicio.plan_nombre}</p>
+            <p className="text-gray-600">{clienteCompletoService.formatearMoneda(precioActual)} / mes</p>
+          </div>
+
+          {/* Nuevo plan */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nuevo plan <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={planId}
+              onChange={e => setPlanId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              required
+            >
+              <option value="">Seleccionar plan</option>
+              {planesDisponibles
+                .filter(p => p.id !== servicio.plan_id)
+                .map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} — {clienteCompletoService.formatearMoneda(p.precio)}/mes
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          {/* Preview prorrateo */}
+          {resultado && planSeleccionado && (
+            <div className={`p-4 rounded-lg border text-sm ${diferencia > 0 ? 'bg-amber-50 border-amber-200' : diferencia < 0 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+              <p className="font-medium text-gray-800 mb-2">Resumen del cambio</p>
+              <div className="space-y-1 text-gray-700">
+                <p>Días restantes del mes: <strong>{resultado.diasRestantes}</strong></p>
+                <p>Diferencia de precio: <strong>{clienteCompletoService.formatearMoneda(diferencia)}</strong></p>
+                {resultado.prorrateo > 0 && (
+                  <p className="text-amber-800 font-medium">
+                    Cargo por prorrateo en próxima factura: {clienteCompletoService.formatearMoneda(resultado.prorrateo)}
+                  </p>
+                )}
+                {diferencia <= 0 && (
+                  <p className="text-green-700">Sin cargo adicional (plan igual o menor precio)</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !planId}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              Confirmar Migración
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Modal: Programar Baja (al final del ciclo de facturación)
+// ═══════════════════════════════════════════════════════════════════════════
+const ProgramarBajaModal = ({ cliente, servicio, onClose, onSuccess }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [motivo, setMotivo] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('accessToken');
+      const r = await fetch(`/api/v1/clientes/${cliente.id}/servicios/${servicio.id}/programar-baja`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ motivo_cancelacion: motivo })
+      });
+      const d = await r.json();
+      if (d.success) {
+        onSuccess();
+      } else {
+        setError(d.message || 'Error al programar baja');
+      }
+    } catch {
+      setError('Error de conexión');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-red-600" />
+              Programar Baja de Servicio
+            </h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              El servicio se cancelará al final del ciclo de facturación actual
+            </p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
+              <AlertCircle className="w-4 h-4" /> {error}
+            </div>
+          )}
+
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 space-y-1">
+            <p className="font-medium">Servicio a cancelar: {servicio.plan_nombre}</p>
+            <p>Precio: {clienteCompletoService.formatearMoneda(servicio.precio_personalizado || servicio.plan_precio)}/mes</p>
+            <p className="mt-2 text-red-700">
+              El servicio seguirá activo hasta que venza la última factura pagada. La baja no aplica de forma inmediata.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Motivo de cancelación
+            </label>
+            <textarea
+              value={motivo}
+              onChange={e => setMotivo(e.target.value)}
+              rows={3}
+              placeholder="Ej: Solicitud del cliente, se muda, cambio de proveedor..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm resize-none"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              Programar Baja
             </button>
           </div>
         </form>
