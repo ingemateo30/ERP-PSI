@@ -51,8 +51,9 @@ try {
 // Autenticación requerida para todas las rutas
 router.use(authenticateToken);
 
-// Solo administradores pueden acceder a estadísticas
-router.use(requireRole(['administrador']));
+// Administradores, supervisores y secretarias pueden acceder
+// Las secretarias y supervisores solo ven datos de su sede
+router.use(requireRole(['administrador', 'supervisor', 'secretaria']));
 
 // ==========================================
 // RUTAS PRINCIPALES

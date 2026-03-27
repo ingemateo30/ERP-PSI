@@ -7,14 +7,16 @@ const dbConfig = {
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'base_psi',
-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 20,
   charset: 'utf8mb4',
   timezone: 'local',
   waitForConnections: true,
-  queueLimit: 0,
+  queueLimit: 100,
   idleTimeout: 60000,
-  maxIdle: 10
-  
+  maxIdle: 10,
+  // Optimizaciones para grandes volúmenes de datos
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
 };
 
 console.log('Configuración de base de datos:', {

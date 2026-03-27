@@ -6,6 +6,30 @@ const { Database } = require('../models/Database');
 class EstadisticasController {
 
   /**
+   * Determinar el sedeId efectivo según el rol del usuario.
+   * - Admin puede ver todo (sedeId=null) o filtrar por una sede específica (?sede_id=X)
+   * - Supervisor/Secretaria solo ven su sede
+   */
+  static resolverSedeId(req) {
+    const rol = req.user?.rol;
+    if (rol === 'administrador') {
+      // Admin puede filtrar por sede_id en query, o ver todo (null)
+      return req.query.sede_id ? parseInt(req.query.sede_id) : null;
+    }
+    // Supervisor / Secretaria: forzar su sede_id
+    return req.user?.sede_id || null;
+  }
+
+  /**
+   * Construir fragmento SQL para filtrar clientes por sede.
+   * tableAlias: alias de la tabla clientes en el query (ej: 'c', 'cl')
+   */
+  static buildSedeFilter(sedeId, tableAlias = 'c') {
+    if (!sedeId) return { sql: '', params: [] };
+    return { sql: ` AND ${tableAlias}.ciudad_id = ?`, params: [sedeId] };
+  }
+
+  /**
    * Obtener estadísticas generales del dashboard
    * GET /api/v1/estadisticas/dashboard
    */
@@ -14,6 +38,7 @@ class EstadisticasController {
       console.log('📊 [EstadisticasController] Obteniendo estadísticas generales del dashboard');
 
       const { fecha_desde, fecha_hasta } = req.query;
+      const sedeId = EstadisticasController.resolverSedeId(req);
 
       // Si no se proporcionan fechas, usar el mes actual
       const fechaDesde = fecha_desde || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -35,12 +60,12 @@ class EstadisticasController {
         tendencias,
         metricasGerenciales
       ] = await Promise.all([
-        EstadisticasController.getEstadisticasFinancieras(fechaDesde, fechaHasta),
-        EstadisticasController.getEstadisticasFinancieras(fechaDesdeAnterior, fechaHastaAnterior),
-        EstadisticasController.getEstadisticasClientes(),
-        EstadisticasController.getEstadisticasOperacionales(),
-        EstadisticasController.getTendenciasMensuales(),
-        EstadisticasController.getMetricasGerenciales(fechaDesde, fechaHasta)
+        EstadisticasController.getEstadisticasFinancieras(fechaDesde, fechaHasta, sedeId),
+        EstadisticasController.getEstadisticasFinancieras(fechaDesdeAnterior, fechaHastaAnterior, sedeId),
+        EstadisticasController.getEstadisticasClientes(sedeId),
+        EstadisticasController.getEstadisticasOperacionales(sedeId),
+        EstadisticasController.getTendenciasMensuales(sedeId),
+        EstadisticasController.getMetricasGerenciales(fechaDesde, fechaHasta, sedeId)
       ]);
 
       // Calcular variaciones porcentuales
@@ -70,6 +95,8 @@ class EstadisticasController {
             fecha_desde: fechaDesde,
             fecha_hasta: fechaHasta
           },
+          sede_id: sedeId,
+          sede_nombre: sedeId ? (req.user?.sede || null) : null,
           financieras,
           clientes,
           operacionales,
@@ -108,9 +135,12 @@ class EstadisticasController {
   /**
    * Obtener métricas gerenciales avanzadas
    */
-  static async getMetricasGerenciales(fechaDesde, fechaHasta) {
+  static async getMetricasGerenciales(fechaDesde, fechaHasta, sedeId = null) {
     try {
       console.log('📊 Obteniendo métricas gerenciales avanzadas...');
+
+      const sedeWhereC = sedeId ? ` AND c.ciudad_id = ?` : '';
+      const sedeParam = sedeId ? [sedeId] : [];
 
       // ARPU (Average Revenue Per User) - Ingreso promedio por usuario
       const [arpu] = await Database.query(`
@@ -122,8 +152,8 @@ class EstadisticasController {
         LEFT JOIN facturas f ON c.id = f.cliente_id
           AND f.fecha_emision BETWEEN ? AND ?
           AND f.activo = '1'
-        WHERE c.estado = 'activo'
-      `, [fechaDesde, fechaHasta]);
+        WHERE c.estado = 'activo'${sedeWhereC}
+      `, [fechaDesde, fechaHasta, ...sedeParam]);
 
       // LTV (Customer Lifetime Value) - Valor de vida del cliente
       const [ltv] = await Database.query(`
@@ -269,37 +299,42 @@ class EstadisticasController {
   /**
    * Obtener estadísticas financieras
    */
-  static async getEstadisticasFinancieras(fechaDesde, fechaHasta) {
+  static async getEstadisticasFinancieras(fechaDesde, fechaHasta, sedeId = null) {
     try {
       console.log('💰 Obteniendo estadísticas financieras...');
 
+      const sedeFilter = EstadisticasController.buildSedeFilter(sedeId, 'c');
+      const sedeJoin = sedeId ? ' INNER JOIN clientes c ON f.cliente_id = c.id' : '';
+      const sedeWhere = sedeId ? ` AND c.ciudad_id = ?` : '';
+      const sedeParam = sedeId ? [sedeId] : [];
+
       // Facturación del periodo
       const [facturacionPeriodo] = await Database.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total_facturas,
-          SUM(total) as total_facturado,
-          SUM(CASE WHEN estado = 'pagada' THEN total ELSE 0 END) as total_recaudado,
-          SUM(CASE WHEN estado = 'pendiente' THEN total ELSE 0 END) as total_pendiente,
-          SUM(CASE WHEN estado = 'vencida' OR (estado = 'pendiente' AND fecha_vencimiento < CURDATE()) THEN total ELSE 0 END) as total_vencido,
-          AVG(total) as promedio_factura
-        FROM facturas
-        WHERE fecha_emision BETWEEN ? AND ?
-          AND activo = '1'
-      `, [fechaDesde, fechaHasta]);
+          SUM(f.total) as total_facturado,
+          SUM(CASE WHEN f.estado = 'pagada' THEN f.total ELSE 0 END) as total_recaudado,
+          SUM(CASE WHEN f.estado = 'pendiente' THEN f.total ELSE 0 END) as total_pendiente,
+          SUM(CASE WHEN f.estado = 'vencida' OR (f.estado = 'pendiente' AND f.fecha_vencimiento < CURDATE()) THEN f.total ELSE 0 END) as total_vencido,
+          AVG(f.total) as promedio_factura
+        FROM facturas f${sedeJoin}
+        WHERE f.fecha_emision BETWEEN ? AND ?
+          AND f.activo = '1'${sedeWhere}
+      `, [fechaDesde, fechaHasta, ...sedeParam]);
 
       // Cartera total (toda la activa)
       const [carteraTotal] = await Database.query(`
-        SELECT 
-          COUNT(DISTINCT cliente_id) as clientes_con_deuda,
-          SUM(total) as cartera_total,
-          SUM(CASE WHEN DATEDIFF(CURDATE(), fecha_vencimiento) > 0 THEN total ELSE 0 END) as cartera_vencida,
-          SUM(CASE WHEN DATEDIFF(CURDATE(), fecha_vencimiento) BETWEEN 1 AND 30 THEN total ELSE 0 END) as mora_1_30,
-          SUM(CASE WHEN DATEDIFF(CURDATE(), fecha_vencimiento) BETWEEN 31 AND 60 THEN total ELSE 0 END) as mora_31_60,
-          SUM(CASE WHEN DATEDIFF(CURDATE(), fecha_vencimiento) > 60 THEN total ELSE 0 END) as mora_mayor_60
-        FROM facturas
-        WHERE estado IN ('pendiente', 'vencida')
-          AND activo = '1'
-      `);
+        SELECT
+          COUNT(DISTINCT f.cliente_id) as clientes_con_deuda,
+          SUM(f.total) as cartera_total,
+          SUM(CASE WHEN DATEDIFF(CURDATE(), f.fecha_vencimiento) > 0 THEN f.total ELSE 0 END) as cartera_vencida,
+          SUM(CASE WHEN DATEDIFF(CURDATE(), f.fecha_vencimiento) BETWEEN 1 AND 30 THEN f.total ELSE 0 END) as mora_1_30,
+          SUM(CASE WHEN DATEDIFF(CURDATE(), f.fecha_vencimiento) BETWEEN 31 AND 60 THEN f.total ELSE 0 END) as mora_31_60,
+          SUM(CASE WHEN DATEDIFF(CURDATE(), f.fecha_vencimiento) > 60 THEN f.total ELSE 0 END) as mora_mayor_60
+        FROM facturas f LEFT JOIN clientes c ON f.cliente_id = c.id
+        WHERE f.estado IN ('pendiente', 'vencida')
+          AND f.activo = '1'${sedeWhere}
+      `, sedeParam);
 
       // Tasa de recaudo
       const tasaRecaudo = facturacionPeriodo.total_facturado > 0
@@ -308,28 +343,28 @@ class EstadisticasController {
 
       // Pagos realizados en el periodo
       const [pagos] = await Database.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total_pagos,
-          SUM(monto) as monto_total_pagos,
-          COUNT(DISTINCT metodo_pago) as metodos_diferentes,
-          COUNT(DISTINCT cliente_id) as clientes_pagaron
-        FROM pagos
-        WHERE fecha_pago BETWEEN ? AND ?
-      `, [fechaDesde, fechaHasta]);
+          SUM(p.monto) as monto_total_pagos,
+          COUNT(DISTINCT p.metodo_pago) as metodos_diferentes,
+          COUNT(DISTINCT p.cliente_id) as clientes_pagaron
+        FROM pagos p${sedeId ? ' INNER JOIN clientes c ON p.cliente_id = c.id' : ''}
+        WHERE p.fecha_pago BETWEEN ? AND ?${sedeWhere}
+      `, [fechaDesde, fechaHasta, ...sedeParam]);
 
       // Facturación por método de pago
       const facturacionPorMetodo = await Database.query(`
         SELECT
-          metodo_pago,
+          f.metodo_pago,
           COUNT(*) as cantidad,
-          SUM(total) as monto_total
-        FROM facturas
-        WHERE fecha_pago BETWEEN ? AND ?
-          AND estado = 'pagada'
-          AND activo = '1'
-        GROUP BY metodo_pago
+          SUM(f.total) as monto_total
+        FROM facturas f${sedeJoin}
+        WHERE f.fecha_pago BETWEEN ? AND ?
+          AND f.estado = 'pagada'
+          AND f.activo = '1'${sedeWhere}
+        GROUP BY f.metodo_pago
         ORDER BY monto_total DESC
-      `, [fechaDesde, fechaHasta]);
+      `, [fechaDesde, fechaHasta, ...sedeParam]);
 
       // Top 10 deudores con cartera vencida
       const topDeudores = await Database.query(`
@@ -345,11 +380,11 @@ class EstadisticasController {
         INNER JOIN clientes c ON f.cliente_id = c.id
         WHERE f.estado IN ('pendiente','vencida')
           AND f.activo = '1'
-          AND f.fecha_vencimiento < CURDATE()
+          AND f.fecha_vencimiento < CURDATE()${sedeWhere}
         GROUP BY c.id, c.nombre, c.identificacion, c.telefono, c.ruta
         ORDER BY deuda_total DESC
         LIMIT 10
-      `);
+      `, sedeParam);
 
       return {
         periodo: {
@@ -394,13 +429,17 @@ class EstadisticasController {
   /**
    * Obtener estadísticas de clientes
    */
-  static async getEstadisticasClientes() {
+  static async getEstadisticasClientes(sedeId = null) {
     try {
       console.log('👥 Obteniendo estadísticas de clientes...');
 
+      const sedeWhere = sedeId ? ' AND cl.ciudad_id = ?' : '';
+      const sedeParam = sedeId ? [sedeId] : [];
+      const sedeWhereSimple = sedeId ? ' AND ciudad_id = ?' : '';
+
       // Resumen general de clientes
       const [resumenClientes] = await Database.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total_clientes,
           SUM(CASE WHEN estado = 'activo' THEN 1 ELSE 0 END) as activos,
           SUM(CASE WHEN estado = 'suspendido' THEN 1 ELSE 0 END) as suspendidos,
@@ -411,7 +450,8 @@ class EstadisticasController {
           SUM(CASE WHEN YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1) THEN 1 ELSE 0 END) as nuevos_semana,
           SUM(CASE WHEN MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE()) THEN 1 ELSE 0 END) as nuevos_mes
         FROM clientes
-      `);
+        WHERE 1=1${sedeWhereSimple}
+      `, sedeParam);
 
       // Distribución por sectores
       const distribucionSectores = await Database.query(`
@@ -424,27 +464,28 @@ class EstadisticasController {
         FROM clientes cl
         LEFT JOIN sectores s ON cl.sector_id = s.id
         LEFT JOIN ciudades c ON cl.ciudad_id = c.id
+        WHERE 1=1${sedeWhere}
         GROUP BY s.id, s.codigo, s.nombre, c.id, c.nombre
         HAVING total_clientes > 0
         ORDER BY total_clientes DESC
         LIMIT 10
-      `);
+      `, sedeParam);
 
       // Distribución por estratos
       const distribucionEstratos = await Database.query(`
-        SELECT 
+        SELECT
           estrato,
           COUNT(*) as cantidad,
           SUM(CASE WHEN estado = 'activo' THEN 1 ELSE 0 END) as activos
         FROM clientes
-        WHERE estrato IS NOT NULL
+        WHERE estrato IS NOT NULL${sedeWhereSimple}
         GROUP BY estrato
         ORDER BY estrato
-      `);
+      `, sedeParam);
 
       // Clientes con más servicios
       const clientesServiciosMultiples = await Database.query(`
-        SELECT 
+        SELECT
           c.id,
           c.identificacion,
           c.nombre,
@@ -453,23 +494,23 @@ class EstadisticasController {
         FROM clientes c
         INNER JOIN servicios_cliente sc ON c.id = sc.cliente_id
         INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
-        WHERE sc.estado = 'activo'
+        WHERE sc.estado = 'activo'${sedeWhere}
         GROUP BY c.id, c.identificacion, c.nombre
         HAVING total_servicios > 1
         ORDER BY total_servicios DESC
         LIMIT 10
-      `);
+      `, sedeParam);
 
       // Churn rate (clientes perdidos en el mes)
       const [churnData] = await Database.query(`
-        SELECT 
+        SELECT
           COUNT(*) as clientes_perdidos_mes,
-          (SELECT COUNT(*) FROM clientes WHERE estado = 'activo') as clientes_activos
+          (SELECT COUNT(*) FROM clientes WHERE estado = 'activo'${sedeWhereSimple}) as clientes_activos
         FROM clientes
         WHERE estado = 'retirado'
           AND MONTH(updated_at) = MONTH(CURDATE())
-          AND YEAR(updated_at) = YEAR(CURDATE())
-      `);
+          AND YEAR(updated_at) = YEAR(CURDATE())${sedeWhereSimple}
+      `, sedeId ? [sedeId, sedeId] : []);
 
       const churnRate = churnData.clientes_activos > 0
         ? (churnData.clientes_perdidos_mes / churnData.clientes_activos) * 100
@@ -497,59 +538,67 @@ class EstadisticasController {
   /**
    * Obtener estadísticas operacionales
    */
-  static async getEstadisticasOperacionales() {
+  static async getEstadisticasOperacionales(sedeId = null) {
     try {
       console.log('🔧 Obteniendo estadísticas operacionales...');
 
+      const sedeJoinInst = sedeId ? ' INNER JOIN clientes cl ON i.cliente_id = cl.id' : '';
+      const sedeWhereInst = sedeId ? ` AND cl.ciudad_id = ?` : '';
+      const sedeParam = sedeId ? [sedeId] : [];
+
       // Instalaciones
       const [instalaciones] = await Database.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total_instalaciones,
-          SUM(CASE WHEN estado = 'programada' THEN 1 ELSE 0 END) as programadas,
-          SUM(CASE WHEN estado = 'en_proceso' THEN 1 ELSE 0 END) as en_proceso,
-          SUM(CASE WHEN estado = 'completada' THEN 1 ELSE 0 END) as completadas,
-          SUM(CASE WHEN estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas,
-          SUM(CASE WHEN estado = 'reagendada' THEN 1 ELSE 0 END) as reagendadas,
-          SUM(CASE WHEN fecha_programada < CURDATE() AND estado NOT IN ('completada', 'cancelada') THEN 1 ELSE 0 END) as vencidas,
-          SUM(costo_instalacion) as ingresos_instalaciones,
-          AVG(costo_instalacion) as promedio_costo
-        FROM instalaciones
-        WHERE MONTH(created_at) = MONTH(CURDATE())
-          AND YEAR(created_at) = YEAR(CURDATE())
-      `);
+          SUM(CASE WHEN i.estado = 'programada' THEN 1 ELSE 0 END) as programadas,
+          SUM(CASE WHEN i.estado = 'en_proceso' THEN 1 ELSE 0 END) as en_proceso,
+          SUM(CASE WHEN i.estado = 'completada' THEN 1 ELSE 0 END) as completadas,
+          SUM(CASE WHEN i.estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas,
+          SUM(CASE WHEN i.estado = 'reagendada' THEN 1 ELSE 0 END) as reagendadas,
+          SUM(CASE WHEN i.fecha_programada < CURDATE() AND i.estado NOT IN ('completada', 'cancelada') THEN 1 ELSE 0 END) as vencidas,
+          SUM(i.costo_instalacion) as ingresos_instalaciones,
+          AVG(i.costo_instalacion) as promedio_costo
+        FROM instalaciones i${sedeJoinInst}
+        WHERE MONTH(i.created_at) = MONTH(CURDATE())
+          AND YEAR(i.created_at) = YEAR(CURDATE())${sedeWhereInst}
+      `, sedeParam);
 
-      // Inventario
+      // Inventario (filtrado por sede si aplica - campo 'sede' en inventario_equipos)
+      const invSedeWhere = sedeId ? ` AND ie.sede = (SELECT nombre FROM ciudades WHERE id = ? LIMIT 1)` : '';
       const [inventario] = await Database.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total_equipos,
-          SUM(CASE WHEN estado = 'disponible' THEN 1 ELSE 0 END) as disponibles,
-          SUM(CASE WHEN estado = 'asignado' THEN 1 ELSE 0 END) as asignados,
-          SUM(CASE WHEN estado = 'instalado' THEN 1 ELSE 0 END) as instalados,
-          SUM(CASE WHEN estado = 'dañado' THEN 1 ELSE 0 END) as dañados,
-          SUM(CASE WHEN estado = 'perdido' THEN 1 ELSE 0 END) as perdidos,
-          SUM(CASE WHEN estado = 'mantenimiento' THEN 1 ELSE 0 END) as en_mantenimiento,
-          SUM(precio_compra) as valor_total_inventario
-        FROM inventario_equipos
-      `);
+          SUM(CASE WHEN ie.estado = 'disponible' THEN 1 ELSE 0 END) as disponibles,
+          SUM(CASE WHEN ie.estado = 'asignado' THEN 1 ELSE 0 END) as asignados,
+          SUM(CASE WHEN ie.estado = 'instalado' THEN 1 ELSE 0 END) as instalados,
+          SUM(CASE WHEN ie.estado = 'dañado' THEN 1 ELSE 0 END) as dañados,
+          SUM(CASE WHEN ie.estado = 'perdido' THEN 1 ELSE 0 END) as perdidos,
+          SUM(CASE WHEN ie.estado = 'mantenimiento' THEN 1 ELSE 0 END) as en_mantenimiento,
+          SUM(ie.precio_compra) as valor_total_inventario
+        FROM inventario_equipos ie
+        WHERE 1=1${invSedeWhere}
+      `, sedeParam);
 
       // PQR
+      const pqrSedeJoin = sedeId ? ' INNER JOIN clientes cl ON p.cliente_id = cl.id' : '';
+      const pqrSedeWhere = sedeId ? ` AND cl.ciudad_id = ?` : '';
       const [pqr] = await Database.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total_pqr,
-          SUM(CASE WHEN estado = 'abierto' THEN 1 ELSE 0 END) as abiertas,
-          SUM(CASE WHEN estado = 'en_proceso' THEN 1 ELSE 0 END) as en_proceso,
-          SUM(CASE WHEN estado = 'resuelto' THEN 1 ELSE 0 END) as resueltas,
-          SUM(CASE WHEN estado = 'cerrado' THEN 1 ELSE 0 END) as cerradas,
-          SUM(CASE WHEN estado = 'escalado' THEN 1 ELSE 0 END) as escaladas,
-          AVG(tiempo_respuesta_horas) as tiempo_promedio_respuesta
-        FROM pqr
-        WHERE MONTH(fecha_recepcion) = MONTH(CURDATE())
-          AND YEAR(fecha_recepcion) = YEAR(CURDATE())
-      `);
+          SUM(CASE WHEN p.estado = 'abierto' THEN 1 ELSE 0 END) as abiertas,
+          SUM(CASE WHEN p.estado = 'en_proceso' THEN 1 ELSE 0 END) as en_proceso,
+          SUM(CASE WHEN p.estado = 'resuelto' THEN 1 ELSE 0 END) as resueltas,
+          SUM(CASE WHEN p.estado = 'cerrado' THEN 1 ELSE 0 END) as cerradas,
+          SUM(CASE WHEN p.estado = 'escalado' THEN 1 ELSE 0 END) as escaladas,
+          AVG(p.tiempo_respuesta_horas) as tiempo_promedio_respuesta
+        FROM pqr p${pqrSedeJoin}
+        WHERE MONTH(p.fecha_recepcion) = MONTH(CURDATE())
+          AND YEAR(p.fecha_recepcion) = YEAR(CURDATE())${pqrSedeWhere}
+      `, sedeParam);
 
-      // Incidencias
+      // Incidencias (generalmente globales, no por sede)
       const [incidencias] = await Database.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total_incidencias,
           SUM(CASE WHEN estado = 'reportado' THEN 1 ELSE 0 END) as reportadas,
           SUM(CASE WHEN estado = 'en_atencion' THEN 1 ELSE 0 END) as en_atencion,
@@ -563,30 +612,35 @@ class EstadisticasController {
       `);
 
       // Contratos
+      const contratoSedeJoin = sedeId ? ' INNER JOIN clientes cl ON co.cliente_id = cl.id' : '';
+      const contratoSedeWhere = sedeId ? ` AND cl.ciudad_id = ?` : '';
       const [contratos] = await Database.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total_contratos,
-          SUM(CASE WHEN estado = 'activo' THEN 1 ELSE 0 END) as activos,
-          SUM(CASE WHEN estado = 'vencido' THEN 1 ELSE 0 END) as vencidos,
-          SUM(CASE WHEN estado = 'terminado' THEN 1 ELSE 0 END) as terminados,
-          SUM(CASE WHEN estado = 'anulado' THEN 1 ELSE 0 END) as anulados,
-          SUM(CASE WHEN tipo_permanencia = 'con_permanencia' THEN 1 ELSE 0 END) as con_permanencia,
-          SUM(CASE WHEN tipo_permanencia = 'sin_permanencia' THEN 1 ELSE 0 END) as sin_permanencia
-        FROM contratos
-      `);
+          SUM(CASE WHEN co.estado = 'activo' THEN 1 ELSE 0 END) as activos,
+          SUM(CASE WHEN co.estado = 'vencido' THEN 1 ELSE 0 END) as vencidos,
+          SUM(CASE WHEN co.estado = 'terminado' THEN 1 ELSE 0 END) as terminados,
+          SUM(CASE WHEN co.estado = 'anulado' THEN 1 ELSE 0 END) as anulados,
+          SUM(CASE WHEN co.tipo_permanencia = 'con_permanencia' THEN 1 ELSE 0 END) as con_permanencia,
+          SUM(CASE WHEN co.tipo_permanencia = 'sin_permanencia' THEN 1 ELSE 0 END) as sin_permanencia
+        FROM contratos co${contratoSedeJoin}
+        WHERE 1=1${contratoSedeWhere}
+      `, sedeParam);
 
       // Servicios activos por tipo
+      const servicioSedeJoin = sedeId ? ' INNER JOIN clientes cl ON sc.cliente_id = cl.id' : '';
+      const servicioSedeWhere = sedeId ? ` AND cl.ciudad_id = ?` : '';
       const serviciosPorTipo = await Database.query(`
-        SELECT 
+        SELECT
           ps.tipo,
           COUNT(sc.id) as cantidad,
           SUM(COALESCE(sc.precio_personalizado, ps.precio)) as ingresos_mensuales
         FROM servicios_cliente sc
-        INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
-        WHERE sc.estado = 'activo'
+        INNER JOIN planes_servicio ps ON sc.plan_id = ps.id${servicioSedeJoin}
+        WHERE sc.estado = 'activo'${servicioSedeWhere}
         GROUP BY ps.tipo
         ORDER BY cantidad DESC
-      `);
+      `, sedeParam);
 
       return {
         instalaciones: {
@@ -623,52 +677,66 @@ class EstadisticasController {
   /**
    * Obtener tendencias mensuales (últimos 12 meses)
    */
-  static async getTendenciasMensuales() {
+  static async getTendenciasMensuales(sedeId = null) {
     try {
       console.log('📈 Obteniendo tendencias mensuales...');
 
-      // Usar la vista optimizada si existe
-      const tendenciasFacturacion = await Database.query(`
-        SELECT 
-          periodo,
-          total_facturas,
-          valor_total_facturado,
-          valor_recaudado,
-          valor_pendiente_cobro,
-          promedio_factura,
-          clientes_facturados
-        FROM vista_estadisticas_mensuales
-        WHERE periodo >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 12 MONTH), '%Y-%m')
-        ORDER BY periodo DESC
-        LIMIT 12
-      `);
+      const sedeJoinF = sedeId ? ' INNER JOIN clientes c ON f.cliente_id = c.id' : '';
+      const sedeWhereF = sedeId ? ` AND c.ciudad_id = ?` : '';
+      const sedeJoinI = sedeId ? ' INNER JOIN clientes cl ON i.cliente_id = cl.id' : '';
+      const sedeWhereI = sedeId ? ` AND cl.ciudad_id = ?` : '';
+      const sedeParam = sedeId ? [sedeId] : [];
+      const sedeWhereC = sedeId ? ` AND ciudad_id = ?` : '';
+
+      // Tendencias de facturación (reemplaza la vista si existe)
+      let tendenciasFacturacion = [];
+      try {
+        tendenciasFacturacion = await Database.query(`
+          SELECT
+            DATE_FORMAT(f.fecha_emision, '%Y-%m') as periodo,
+            COUNT(*) as total_facturas,
+            SUM(f.total) as valor_total_facturado,
+            SUM(CASE WHEN f.estado = 'pagada' THEN f.total ELSE 0 END) as valor_recaudado,
+            SUM(CASE WHEN f.estado IN ('pendiente','vencida') THEN f.total ELSE 0 END) as valor_pendiente_cobro,
+            AVG(f.total) as promedio_factura,
+            COUNT(DISTINCT f.cliente_id) as clientes_facturados
+          FROM facturas f${sedeJoinF}
+          WHERE f.fecha_emision >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+            AND f.activo = '1'${sedeWhereF}
+          GROUP BY DATE_FORMAT(f.fecha_emision, '%Y-%m')
+          ORDER BY periodo DESC
+          LIMIT 12
+        `, sedeParam);
+      } catch (e) {
+        console.warn('⚠️ Error obteniendo tendencias de facturación:', e.message);
+      }
 
       // Tendencia de clientes nuevos por mes
       const tendenciasClientes = await Database.query(`
-        SELECT 
+        SELECT
           DATE_FORMAT(created_at, '%Y-%m') as periodo,
           COUNT(*) as clientes_nuevos,
           SUM(CASE WHEN estado = 'activo' THEN 1 ELSE 0 END) as clientes_activos
         FROM clientes
-        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)${sedeWhereC}
         GROUP BY DATE_FORMAT(created_at, '%Y-%m')
         ORDER BY periodo DESC
         LIMIT 12
-      `);
+      `, sedeParam);
 
       // Tendencia de instalaciones por mes
       const tendenciasInstalaciones = await Database.query(`
-        SELECT 
-          DATE_FORMAT(created_at, '%Y-%m') as periodo,
+        SELECT
+          DATE_FORMAT(i.created_at, '%Y-%m') as periodo,
           COUNT(*) as total_instalaciones,
-          SUM(CASE WHEN estado = 'completada' THEN 1 ELSE 0 END) as completadas,
-          SUM(costo_instalacion) as ingresos
-        FROM instalaciones
-        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-        GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+          SUM(CASE WHEN i.estado = 'completada' THEN 1 ELSE 0 END) as completadas,
+          SUM(i.costo_instalacion) as ingresos
+        FROM instalaciones i${sedeJoinI}
+        WHERE i.created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)${sedeWhereI}
+        GROUP BY DATE_FORMAT(i.created_at, '%Y-%m')
         ORDER BY periodo DESC
         LIMIT 12
-      `);
+      `, sedeParam);
 
       return {
         facturacion: tendenciasFacturacion.reverse(),
@@ -690,8 +758,9 @@ class EstadisticasController {
       const { fecha_desde, fecha_hasta } = req.query;
       const fechaDesde = fecha_desde || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
       const fechaHasta = fecha_hasta || new Date().toISOString().split('T')[0];
+      const sedeId = EstadisticasController.resolverSedeId(req);
 
-      const estadisticas = await EstadisticasController.getEstadisticasFinancieras(fechaDesde, fechaHasta);
+      const estadisticas = await EstadisticasController.getEstadisticasFinancieras(fechaDesde, fechaHasta, sedeId);
 
       res.json({
         success: true,
@@ -714,7 +783,8 @@ class EstadisticasController {
    */
   static async getClientes(req, res) {
     try {
-      const estadisticas = await EstadisticasController.getEstadisticasClientes();
+      const sedeId = EstadisticasController.resolverSedeId(req);
+      const estadisticas = await EstadisticasController.getEstadisticasClientes(sedeId);
 
       res.json({
         success: true,
@@ -737,7 +807,8 @@ class EstadisticasController {
    */
   static async getOperacionales(req, res) {
     try {
-      const estadisticas = await EstadisticasController.getEstadisticasOperacionales();
+      const sedeId = EstadisticasController.resolverSedeId(req);
+      const estadisticas = await EstadisticasController.getEstadisticasOperacionales(sedeId);
 
       res.json({
         success: true,
@@ -777,8 +848,14 @@ class EstadisticasController {
           fechaDesde = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
       }
 
+      const sedeId = EstadisticasController.resolverSedeId(req);
+      const sedeWhere = sedeId ? ` AND c.ciudad_id = ?` : '';
+      const queryParams = sedeId
+        ? [fechaDesde, sedeId, parseInt(limit)]
+        : [fechaDesde, parseInt(limit)];
+
       const topClientes = await Database.query(`
-        SELECT 
+        SELECT
           c.id,
           c.identificacion,
           c.nombre,
@@ -791,11 +868,11 @@ class EstadisticasController {
         FROM clientes c
         INNER JOIN facturas f ON c.id = f.cliente_id
         WHERE f.fecha_emision >= ?
-          AND f.activo = '1'
+          AND f.activo = '1'${sedeWhere}
         GROUP BY c.id, c.identificacion, c.nombre, c.telefono, c.correo
         ORDER BY total_facturado DESC
         LIMIT ?
-      `, [fechaDesde, parseInt(limit)]);
+      `, queryParams);
 
       res.json({
         success: true,

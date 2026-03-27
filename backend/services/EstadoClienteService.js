@@ -187,7 +187,10 @@ class EstadoClienteService {
 
     let nuevoEstado = c.estado;
     if (c.facturas_pendientes === 0) {
-      nuevoEstado = 'activo';
+      // Sin deuda pendiente → reactivar si estaba suspendido/cortado
+      if (['suspendido', 'cortado'].includes(c.estado)) {
+        nuevoEstado = 'activo';
+      }
     } else if (c.dias_mora_max >= DIAS_PARA_CORTAR) {
       nuevoEstado = 'cortado';
     } else if (c.dias_mora_max >= DIAS_PARA_SUSPENDER) {
@@ -202,6 +205,113 @@ class EstadoClienteService {
       dias_para_suspender: DIAS_PARA_SUSPENDER,
       dias_para_cortar: DIAS_PARA_CORTAR,
     };
+  }
+
+  /**
+   * Procesa la reactivación automática de un cliente después de un pago.
+   * - Si estaba CORTADO y ahora no tiene deuda → activo + requiere reconexión
+   * - Si estaba SUSPENDIDO y ahora no tiene deuda → activo
+   * @param {number} clienteId
+   * @param {number} facturaId - ID de la factura que acaba de ser pagada
+   * @returns {{ reactivado: boolean, estado_anterior: string, estado_nuevo: string, requiere_reconexion: boolean }}
+   */
+  static async procesarPostPago(clienteId, facturaId) {
+    const conexion = await Database.getConnection();
+    try {
+      await conexion.beginTransaction();
+
+      // Obtener estado actual del cliente
+      const [clientes] = await conexion.execute(
+        'SELECT id, nombre, estado, requiere_reconexion FROM clientes WHERE id = ?',
+        [clienteId]
+      );
+      if (!clientes || clientes.length === 0) {
+        await conexion.rollback();
+        conexion.release();
+        return { reactivado: false, estado_anterior: null, estado_nuevo: null, requiere_reconexion: false };
+      }
+      const cliente = clientes[0];
+      const estadoAnterior = cliente.estado;
+
+      // Solo procesar si estaba suspendido o cortado
+      if (!['suspendido', 'cortado'].includes(estadoAnterior)) {
+        await conexion.rollback();
+        conexion.release();
+        return { reactivado: false, estado_anterior: estadoAnterior, estado_nuevo: estadoAnterior, requiere_reconexion: false };
+      }
+
+      // Verificar si aún tiene facturas pendientes después del pago
+      const [pendientes] = await conexion.execute(`
+        SELECT COUNT(*) AS total
+        FROM facturas
+        WHERE cliente_id = ?
+          AND estado IN ('pendiente', 'vencida')
+          AND activo = 1
+          AND id != ?
+      `, [clienteId, facturaId]);
+
+      const tienePendientes = pendientes[0].total > 0;
+
+      if (tienePendientes) {
+        // Aún tiene deuda, no reactivar
+        await conexion.rollback();
+        conexion.release();
+        return { reactivado: false, estado_anterior: estadoAnterior, estado_nuevo: estadoAnterior, requiere_reconexion: false };
+      }
+
+      // Sin deuda → reactivar
+      const requiereReconexion = estadoAnterior === 'cortado';
+
+      await conexion.execute(
+        `UPDATE clientes SET
+           estado = 'activo',
+           requiere_reconexion = ?,
+           updated_at = NOW()
+         WHERE id = ?`,
+        [requiereReconexion ? 1 : 0, clienteId]
+      );
+
+      await conexion.execute(
+        `UPDATE servicios_cliente SET estado = 'activo', updated_at = NOW()
+         WHERE cliente_id = ? AND estado IN ('suspendido', 'cortado')`,
+        [clienteId]
+      );
+
+      await conexion.commit();
+      conexion.release();
+
+      console.log(`✅ Cliente ${cliente.nombre} (ID:${clienteId}) reactivado: ${estadoAnterior} → activo${requiereReconexion ? ' (requiere reconexión)' : ''}`);
+
+      return {
+        reactivado: true,
+        estado_anterior: estadoAnterior,
+        estado_nuevo: 'activo',
+        requiere_reconexion: requiereReconexion,
+        mensaje: requiereReconexion
+          ? 'Cliente reactivado. Se debe cobrar cargo de reconexión.'
+          : 'Cliente reactivado sin cargo de reconexión.'
+      };
+
+    } catch (error) {
+      await conexion.rollback();
+      conexion.release();
+      console.error('❌ Error en procesarPostPago:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener descripción legible de un estado
+   */
+  static describirEstado(estado) {
+    const descripciones = {
+      activo:     { label: 'Activo',     color: 'green',  facturacion: 'Se factura normalmente', condicion: 'Al día o mora < 30 días' },
+      suspendido: { label: 'Suspendido', color: 'yellow', facturacion: 'Se factura (con intereses), acceso limitado', condicion: 'Mora 30-60 días' },
+      cortado:    { label: 'Cortado',    color: 'red',    facturacion: 'No se genera nueva factura; se cobra reconexión al pagar', condicion: 'Mora > 60 días' },
+      retirado:   { label: 'Retirado',   color: 'gray',   facturacion: 'No se factura, contrato terminado', condicion: 'Solicitud del cliente' },
+      inactivo:   { label: 'Inactivo',   color: 'blue',   facturacion: 'No se factura', condicion: 'Sin servicios activos / pendiente de activación' },
+    };
+    return descripciones[estado] || { label: estado, color: 'gray', facturacion: 'Desconocido', condicion: 'Desconocido' };
   }
 }
 

@@ -84,22 +84,32 @@ class ApiService {
         if (!response.ok) {
             let errorMessage;
             try {
-                const errorData = await response.json();
-                errorMessage = errorData.message || `Error ${response.status}: ${response.statusText}`;
-            } catch (parseError) {
                 const errorText = await response.text();
-                errorMessage = errorText || `Error ${response.status}: ${response.statusText}`;
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage = errorData.message || `Error ${response.status}: ${response.statusText}`;
+                } catch {
+                    errorMessage = errorText || `Error ${response.status}: ${response.statusText}`;
+                }
+            } catch {
+                errorMessage = `Error ${response.status}: ${response.statusText}`;
             }
             throw new Error(errorMessage);
         }
 
         try {
-            const data = await response.json();
-            console.log('✅ ApiService - Respuesta JSON exitosa');
-            return data;
-        } catch (parseError) {
-            console.warn('⚠️ ApiService - No se pudo parsear JSON, retornando texto');
-            return await response.text();
+            const responseText = await response.text();
+            try {
+                const data = JSON.parse(responseText);
+                console.log('✅ ApiService - Respuesta JSON exitosa');
+                return data;
+            } catch {
+                console.warn('⚠️ ApiService - No se pudo parsear JSON, retornando texto');
+                return responseText;
+            }
+        } catch (readError) {
+            console.error('❌ ApiService - Error leyendo respuesta:', readError);
+            throw readError;
         }
 
     } catch (error) {
