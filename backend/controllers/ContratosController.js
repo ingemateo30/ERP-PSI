@@ -86,7 +86,7 @@ class ContratosController {
                 : '';
 
             // ── PASO 1: Contar total (query liviano) ──────────────────────────
-            const [countRows] = await Database.query(
+            const countRows = await Database.query(
                 `SELECT COUNT(DISTINCT c.id) AS total
                  FROM contratos c ${clienteJoinSql}
                  WHERE ${whereClause}`,
@@ -95,7 +95,7 @@ class ContratosController {
             const total = countRows[0]?.total || 0;
 
             // ── PASO 2: Obtener IDs paginados (rápido, solo índices) ──────────
-            const [idRows] = await Database.query(
+            const idRows = await Database.query(
                 `SELECT c.id
                  FROM contratos c ${clienteJoinSql}
                  WHERE ${whereClause}
