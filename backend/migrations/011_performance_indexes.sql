@@ -1,79 +1,97 @@
 -- ============================================================
 -- Migration 011: Índices de rendimiento para 100k+ registros
+-- Compatible con MySQL 5.7+ y MariaDB
 -- ============================================================
--- Ejecutar: mysql -u usuario -p base_de_datos < 011_performance_indexes.sql
--- Seguro: usa IF NOT EXISTS para no duplicar índices
--- ============================================================
+
+DELIMITER $$
+
+DROP PROCEDURE IF EXISTS agregar_indice$$
+
+CREATE PROCEDURE agregar_indice(
+  IN p_tabla   VARCHAR(64),
+  IN p_indice  VARCHAR(64),
+  IN p_columnas TEXT
+)
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.STATISTICS
+    WHERE table_schema = DATABASE()
+      AND table_name   = p_tabla
+      AND index_name   = p_indice
+    LIMIT 1
+  ) THEN
+    SET @sql = CONCAT('ALTER TABLE `', p_tabla, '` ADD INDEX `', p_indice, '` (', p_columnas, ')');
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+    SELECT CONCAT('  ✅ Creado: ', p_tabla, '.', p_indice) AS resultado;
+  ELSE
+    SELECT CONCAT('  ⏩ Ya existe: ', p_tabla, '.', p_indice) AS resultado;
+  END IF;
+END$$
+
+DELIMITER ;
 
 -- ─── CLIENTES ────────────────────────────────────────────────
--- Búsquedas frecuentes: por estado, ciudad, sector, identificación
-ALTER TABLE clientes
-  ADD INDEX IF NOT EXISTS idx_clientes_estado         (estado),
-  ADD INDEX IF NOT EXISTS idx_clientes_ciudad_id      (ciudad_id),
-  ADD INDEX IF NOT EXISTS idx_clientes_sector_id      (sector_id),
-  ADD INDEX IF NOT EXISTS idx_clientes_identificacion (identificacion),
-  ADD INDEX IF NOT EXISTS idx_clientes_created_at     (created_at),
-  ADD INDEX IF NOT EXISTS idx_clientes_estado_ciudad  (estado, ciudad_id);
+CALL agregar_indice('clientes', 'idx_clientes_estado',        '`estado`');
+CALL agregar_indice('clientes', 'idx_clientes_ciudad_id',     '`ciudad_id`');
+CALL agregar_indice('clientes', 'idx_clientes_sector_id',     '`sector_id`');
+CALL agregar_indice('clientes', 'idx_clientes_identificacion','`identificacion`');
+CALL agregar_indice('clientes', 'idx_clientes_created_at',    '`created_at`');
+CALL agregar_indice('clientes', 'idx_clientes_estado_ciudad', '`estado`, `ciudad_id`');
 
 -- ─── FACTURAS ────────────────────────────────────────────────
--- Búsquedas frecuentes: por cliente, estado, fecha_emision, fecha_vencimiento
-ALTER TABLE facturas
-  ADD INDEX IF NOT EXISTS idx_facturas_cliente_id      (cliente_id),
-  ADD INDEX IF NOT EXISTS idx_facturas_estado          (estado),
-  ADD INDEX IF NOT EXISTS idx_facturas_activo          (activo),
-  ADD INDEX IF NOT EXISTS idx_facturas_fecha_emision   (fecha_emision),
-  ADD INDEX IF NOT EXISTS idx_facturas_fecha_vencimiento (fecha_vencimiento),
-  ADD INDEX IF NOT EXISTS idx_facturas_fecha_pago      (fecha_pago),
-  ADD INDEX IF NOT EXISTS idx_facturas_cliente_estado  (cliente_id, estado),
-  ADD INDEX IF NOT EXISTS idx_facturas_estado_activo   (estado, activo),
-  ADD INDEX IF NOT EXISTS idx_facturas_emision_activo  (fecha_emision, activo),
-  ADD INDEX IF NOT EXISTS idx_facturas_vcto_estado     (fecha_vencimiento, estado);
+CALL agregar_indice('facturas', 'idx_facturas_cliente_id',         '`cliente_id`');
+CALL agregar_indice('facturas', 'idx_facturas_estado',             '`estado`');
+CALL agregar_indice('facturas', 'idx_facturas_activo',             '`activo`');
+CALL agregar_indice('facturas', 'idx_facturas_fecha_emision',      '`fecha_emision`');
+CALL agregar_indice('facturas', 'idx_facturas_fecha_vencimiento',  '`fecha_vencimiento`');
+CALL agregar_indice('facturas', 'idx_facturas_fecha_pago',         '`fecha_pago`');
+CALL agregar_indice('facturas', 'idx_facturas_cliente_estado',     '`cliente_id`, `estado`');
+CALL agregar_indice('facturas', 'idx_facturas_estado_activo',      '`estado`, `activo`');
+CALL agregar_indice('facturas', 'idx_facturas_emision_activo',     '`fecha_emision`, `activo`');
+CALL agregar_indice('facturas', 'idx_facturas_vcto_estado',        '`fecha_vencimiento`, `estado`');
 
 -- ─── SERVICIOS_CLIENTE ───────────────────────────────────────
-ALTER TABLE servicios_cliente
-  ADD INDEX IF NOT EXISTS idx_sc_cliente_id  (cliente_id),
-  ADD INDEX IF NOT EXISTS idx_sc_plan_id     (plan_id),
-  ADD INDEX IF NOT EXISTS idx_sc_estado      (estado),
-  ADD INDEX IF NOT EXISTS idx_sc_cliente_estado (cliente_id, estado);
+CALL agregar_indice('servicios_cliente', 'idx_sc_cliente_id',      '`cliente_id`');
+CALL agregar_indice('servicios_cliente', 'idx_sc_plan_id',         '`plan_id`');
+CALL agregar_indice('servicios_cliente', 'idx_sc_estado',          '`estado`');
+CALL agregar_indice('servicios_cliente', 'idx_sc_cliente_estado',  '`cliente_id`, `estado`');
 
 -- ─── CONTRATOS ───────────────────────────────────────────────
-ALTER TABLE contratos
-  ADD INDEX IF NOT EXISTS idx_contratos_cliente_id  (cliente_id),
-  ADD INDEX IF NOT EXISTS idx_contratos_estado      (estado),
-  ADD INDEX IF NOT EXISTS idx_contratos_created_at  (created_at);
+CALL agregar_indice('contratos', 'idx_contratos_cliente_id',  '`cliente_id`');
+CALL agregar_indice('contratos', 'idx_contratos_estado',      '`estado`');
+CALL agregar_indice('contratos', 'idx_contratos_created_at',  '`created_at`');
 
 -- ─── INSTALACIONES ───────────────────────────────────────────
-ALTER TABLE instalaciones
-  ADD INDEX IF NOT EXISTS idx_inst_cliente_id     (cliente_id),
-  ADD INDEX IF NOT EXISTS idx_inst_estado         (estado),
-  ADD INDEX IF NOT EXISTS idx_inst_fecha_prog     (fecha_programada),
-  ADD INDEX IF NOT EXISTS idx_inst_created_at     (created_at);
+CALL agregar_indice('instalaciones', 'idx_inst_cliente_id',  '`cliente_id`');
+CALL agregar_indice('instalaciones', 'idx_inst_estado',      '`estado`');
+CALL agregar_indice('instalaciones', 'idx_inst_fecha_prog',  '`fecha_programada`');
+CALL agregar_indice('instalaciones', 'idx_inst_created_at',  '`created_at`');
 
 -- ─── PAGOS ───────────────────────────────────────────────────
-ALTER TABLE pagos
-  ADD INDEX IF NOT EXISTS idx_pagos_cliente_id  (cliente_id),
-  ADD INDEX IF NOT EXISTS idx_pagos_factura_id  (factura_id),
-  ADD INDEX IF NOT EXISTS idx_pagos_fecha_pago  (fecha_pago);
+CALL agregar_indice('pagos', 'idx_pagos_cliente_id',  '`cliente_id`');
+CALL agregar_indice('pagos', 'idx_pagos_factura_id',  '`factura_id`');
+CALL agregar_indice('pagos', 'idx_pagos_fecha_pago',  '`fecha_pago`');
 
 -- ─── PQR ─────────────────────────────────────────────────────
-ALTER TABLE pqr
-  ADD INDEX IF NOT EXISTS idx_pqr_cliente_id     (cliente_id),
-  ADD INDEX IF NOT EXISTS idx_pqr_estado         (estado),
-  ADD INDEX IF NOT EXISTS idx_pqr_fecha_recep    (fecha_recepcion);
+CALL agregar_indice('pqr', 'idx_pqr_cliente_id',   '`cliente_id`');
+CALL agregar_indice('pqr', 'idx_pqr_estado',       '`estado`');
+CALL agregar_indice('pqr', 'idx_pqr_fecha_recep',  '`fecha_recepcion`');
 
 -- ─── SISTEMA_USUARIOS ────────────────────────────────────────
-ALTER TABLE sistema_usuarios
-  ADD INDEX IF NOT EXISTS idx_su_rol      (rol),
-  ADD INDEX IF NOT EXISTS idx_su_sede_id  (sede_id),
-  ADD INDEX IF NOT EXISTS idx_su_activo   (activo);
+CALL agregar_indice('sistema_usuarios', 'idx_su_rol',      '`rol`');
+CALL agregar_indice('sistema_usuarios', 'idx_su_sede_id',  '`sede_id`');
+CALL agregar_indice('sistema_usuarios', 'idx_su_activo',   '`activo`');
 
 -- ─── INVENTARIO_EQUIPOS ──────────────────────────────────────
-ALTER TABLE inventario_equipos
-  ADD INDEX IF NOT EXISTS idx_inv_estado  (estado),
-  ADD INDEX IF NOT EXISTS idx_inv_sede    (sede);
+CALL agregar_indice('inventario_equipos', 'idx_inv_estado',  '`estado`');
+CALL agregar_indice('inventario_equipos', 'idx_inv_sede',    '`sede`');
 
 -- ─── SECTORES ────────────────────────────────────────────────
-ALTER TABLE sectores
-  ADD INDEX IF NOT EXISTS idx_sectores_ciudad_id (ciudad_id);
+CALL agregar_indice('sectores', 'idx_sectores_ciudad_id', '`ciudad_id`');
+
+-- Limpiar procedimiento temporal
+DROP PROCEDURE IF EXISTS agregar_indice;
 
 SELECT 'Índices de rendimiento aplicados correctamente' AS resultado;
