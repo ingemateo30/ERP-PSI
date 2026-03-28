@@ -459,10 +459,12 @@ const ModalCrearTraslado = ({ ciudades, token, onClose, onSuccess }) => {
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
   const [sectores, setSectoresModal] = useState([]);
+  const [barriosSugeridos, setBarriosSugeridos] = useState([]);
 
   const [form, setForm] = useState({
     cliente_id: '',
     direccion_nueva: '',
+    barrio_nuevo: '',
     ciudad_nueva_id: '',
     sector_nuevo_id: '',
     fecha_programada: new Date().toISOString().split('T')[0],
@@ -471,7 +473,7 @@ const ModalCrearTraslado = ({ ciudades, token, onClose, onSuccess }) => {
     observaciones: ''
   });
 
-  // Búsqueda de cliente con debounce
+  // Búsqueda de cliente con debounce — usa `nombre` que sí entiende el backend
   useEffect(() => {
     if (!busquedaCliente || busquedaCliente.trim().length < 2) {
       setClientes([]);
@@ -480,12 +482,14 @@ const ModalCrearTraslado = ({ ciudades, token, onClose, onSuccess }) => {
     const t = setTimeout(async () => {
       setBuscandoCliente(true);
       try {
+        const termino = busquedaCliente.trim();
+        // Usar endpoint /search?q= que busca en nombre, identificación y teléfono
         const r = await fetch(
-          `/api/v1/clientes?search=${encodeURIComponent(busquedaCliente.trim())}&limit=10&page=1`,
+          `/api/v1/clientes/search?q=${encodeURIComponent(termino)}`,
           { headers: { Authorization: `Bearer ${token()}` } }
         );
         const d = await r.json();
-        const lista = d?.data?.clientes || d?.data || [];
+        const lista = d?.data || [];
         setClientes(Array.isArray(lista) ? lista : []);
       } catch { setClientes([]); }
       finally { setBuscandoCliente(false); }
@@ -502,16 +506,24 @@ const ModalCrearTraslado = ({ ciudades, token, onClose, onSuccess }) => {
 
   const handleCiudadChange = async (e) => {
     const ciudadId = e.target.value;
-    setForm(f => ({ ...f, ciudad_nueva_id: ciudadId, sector_nuevo_id: '' }));
+    setForm(f => ({ ...f, ciudad_nueva_id: ciudadId, sector_nuevo_id: '', barrio_nuevo: '' }));
     setSectoresModal([]);
+    setBarriosSugeridos([]);
     if (!ciudadId) return;
     try {
-      const r = await fetch(`/api/v1/config/sectores-por-ciudad/${ciudadId}`, {
-        headers: { Authorization: `Bearer ${token()}` }
-      });
-      const d = await r.json();
-      setSectoresModal(d?.data || d?.sectores || []);
-    } catch { setSectoresModal([]); }
+      const [rSec, rBar] = await Promise.all([
+        fetch(`/api/v1/config/sectores-por-ciudad/${ciudadId}`, {
+          headers: { Authorization: `Bearer ${token()}` }
+        }),
+        fetch(`/api/v1/clientes/barrios?ciudad_id=${ciudadId}`, {
+          headers: { Authorization: `Bearer ${token()}` }
+        })
+      ]);
+      const dSec = await rSec.json();
+      const dBar = await rBar.json();
+      setSectoresModal(dSec?.data || dSec?.sectores || []);
+      setBarriosSugeridos(Array.isArray(dBar?.data) ? dBar.data : []);
+    } catch { setSectoresModal([]); setBarriosSugeridos([]); }
   };
 
   const handleSubmit = async (e) => {
@@ -641,7 +653,7 @@ const ModalCrearTraslado = ({ ciudades, token, onClose, onSuccess }) => {
             />
           </div>
 
-          {/* Ciudad y sector */}
+          {/* Ciudad y sector (primero, para cargar barrios por ciudad) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nueva Ciudad</label>
@@ -670,6 +682,24 @@ const ModalCrearTraslado = ({ ciudades, token, onClose, onSuccess }) => {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Barrio */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Barrio</label>
+            <input
+              type="text"
+              list="barrios-sugeridos"
+              value={form.barrio_nuevo}
+              onChange={e => setForm(f => ({ ...f, barrio_nuevo: e.target.value }))}
+              placeholder={form.ciudad_nueva_id ? 'Ej: El Carmen, La Esperanza...' : 'Seleccione ciudad primero'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+            {barriosSugeridos.length > 0 && (
+              <datalist id="barrios-sugeridos">
+                {barriosSugeridos.map((b, i) => <option key={i} value={b} />)}
+              </datalist>
+            )}
           </div>
 
           {/* Fecha programada */}
