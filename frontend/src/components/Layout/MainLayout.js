@@ -60,6 +60,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <DollarSign size={18} />, label: 'Cartera Morosos', path: '/cartera', keywords: ['cartera', 'morosos', 'deuda', 'vencidas', 'cobro'], color: 'red', permission: 'secretaria,supervisor,administrador' },
     { icon: <Wifi size={18} />, label: 'Planes de Servicio', path: '/config/service-plans', keywords: ['planes', 'servicios', 'plans'], color: 'blue', permission: 'administrador' },
     { icon: <Wrench size={18} />, label: 'Instalaciones', path: '/instalaciones', keywords: ['instalaciones', 'installation', 'instalar'], color: 'red', permission: 'instalador,secretaria,supervisor,administrador' },
+    { icon: <MapPin size={18} />, label: 'Traslados', path: '/traslados', keywords: ['traslados', 'mudanza', 'cambio', 'direccion', 'domicilio'], color: 'blue', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <Package size={18} />, label: 'Inventario', path: '/inventory', keywords: ['inventario', 'stock', 'productos'], color: 'indigo', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <ArrowRightLeft size={18} />, label: 'Movimientos Recientes', path: '/inventory/movimientos', keywords: ['movimientos', 'historial', 'inventario'], color: 'indigo', permission: 'secretaria,supervisor,administrador' },
     { icon: <Users size={18} />, label: 'Instaladores (Inventario)', path: '/inventory/instaladores', keywords: ['instaladores', 'inventario', 'equipos'], color: 'indigo', permission: 'secretaria,supervisor,administrador' },
@@ -475,6 +476,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
   const serviciosOperaciones = [
     { icon: <Wifi size={22} />, label: 'Planes de Servicio', path: '/config/service-plans', permission: 'administrador' },
     { icon: <Wrench size={22} />, label: 'Instalaciones', path: '/instalaciones', permission: 'instalador,secretaria,supervisor,administrador' },
+    { icon: <MapPin size={22} />, label: 'Traslados', path: '/traslados', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <Package size={22} />, label: 'Inventario', path: '/inventory', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <ArrowRightLeft size={18} />, label: 'Movimientos Recientes', path: '/inventory/movimientos', permission: 'secretaria,supervisor,administrador', subitem: true },
     { icon: <Users size={18} />, label: 'Instaladores', path: '/inventory/instaladores', permission: 'secretaria,supervisor,administrador', subitem: true },
