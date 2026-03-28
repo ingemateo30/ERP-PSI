@@ -247,6 +247,137 @@ router.get('/historial-cliente', async (req, res) => {
     });
   }
 });
+// ── GESTIÓN DE BORRADORES ────────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/facturas/borradores/resumen
+ * Resumen de facturas en borrador (por sede para admin)
+ */
+router.get('/borradores/resumen',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const { Database } = require('../models/Database');
+      const sedeId = req.user?.rol === 'administrador' ? req.query.sede_id || null : req.user?.sede_id;
+      const sedeJoin = sedeId ? ' INNER JOIN clientes c ON f.cliente_id = c.id' : '';
+      const sedeWhere = sedeId ? ` AND c.ciudad_id = ?` : '';
+      const sedeParam = sedeId ? [parseInt(sedeId)] : [];
+
+      const rows = await Database.query(`
+        SELECT
+          COUNT(*) AS total_borradores,
+          COALESCE(SUM(f.total), 0) AS valor_total,
+          MIN(f.created_at) AS generado_desde,
+          MAX(f.created_at) AS generado_hasta
+        FROM facturas f${sedeJoin}
+        WHERE f.estado = 'borrador' AND f.activo = 1${sedeWhere}
+      `, sedeParam);
+
+      // Por sede (para admin sin filtro)
+      let porSede = [];
+      if (!sedeId && req.user?.rol === 'administrador') {
+        porSede = await Database.query(`
+          SELECT ci.id AS sede_id, ci.nombre AS sede_nombre,
+                 COUNT(f.id) AS total, COALESCE(SUM(f.total),0) AS valor_total
+          FROM facturas f
+          INNER JOIN clientes cl ON f.cliente_id = cl.id
+          INNER JOIN ciudades ci ON cl.ciudad_id = ci.id
+          WHERE f.estado = 'borrador' AND f.activo = 1
+          GROUP BY ci.id, ci.nombre
+          ORDER BY ci.nombre
+        `, []);
+      }
+
+      res.json({ success: true, data: { resumen: rows[0] || {}, por_sede: porSede } });
+    } catch (err) {
+      res.status(500).json({ success: false, message: 'Error obteniendo borradores', error: err.message });
+    }
+  }
+);
+
+/**
+ * POST /api/v1/facturas/borradores/confirmar
+ * Convierte borradores en pendiente (facturas definitivas).
+ * Opcional: filtrar por sede_id para confirmar solo una sede.
+ */
+router.post('/borradores/confirmar',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const { Database } = require('../models/Database');
+      const sedeId = req.user?.rol === 'administrador' ? req.body.sede_id || null : req.user?.sede_id;
+      const sedeJoin = sedeId ? ' INNER JOIN clientes c ON f.cliente_id = c.id' : '';
+      const sedeWhere = sedeId ? ` AND c.ciudad_id = ?` : '';
+      const sedeParam = sedeId ? [parseInt(sedeId)] : [];
+
+      // IDs de facturas borrador en esa sede
+      const ids = await Database.query(`
+        SELECT f.id FROM facturas f${sedeJoin}
+        WHERE f.estado = 'borrador' AND f.activo = 1${sedeWhere}
+      `, sedeParam);
+
+      if (ids.length === 0) {
+        return res.json({ success: true, message: 'No hay borradores para confirmar', data: { confirmadas: 0 } });
+      }
+
+      const placeholders = ids.map(() => '?').join(',');
+      await Database.query(
+        `UPDATE facturas SET estado = 'pendiente', updated_at = NOW()
+         WHERE id IN (${placeholders})`,
+        ids.map(r => r.id)
+      );
+
+      res.json({
+        success: true,
+        message: `${ids.length} factura(s) confirmada(s) exitosamente`,
+        data: { confirmadas: ids.length }
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: 'Error confirmando borradores', error: err.message });
+    }
+  }
+);
+
+/**
+ * DELETE /api/v1/facturas/borradores/cancelar
+ * Elimina (anula) todos los borradores de una sede.
+ */
+router.delete('/borradores/cancelar',
+  requireRole('administrador', 'supervisor'),
+  async (req, res) => {
+    try {
+      const { Database } = require('../models/Database');
+      const sedeId = req.user?.rol === 'administrador' ? req.query.sede_id || null : req.user?.sede_id;
+      const sedeJoin = sedeId ? ' INNER JOIN clientes c ON f.cliente_id = c.id' : '';
+      const sedeWhere = sedeId ? ` AND c.ciudad_id = ?` : '';
+      const sedeParam = sedeId ? [parseInt(sedeId)] : [];
+
+      const ids = await Database.query(`
+        SELECT f.id FROM facturas f${sedeJoin}
+        WHERE f.estado = 'borrador' AND f.activo = 1${sedeWhere}
+      `, sedeParam);
+
+      if (ids.length === 0) {
+        return res.json({ success: true, message: 'No hay borradores para cancelar', data: { canceladas: 0 } });
+      }
+
+      const placeholders = ids.map(() => '?').join(',');
+      await Database.query(
+        `UPDATE facturas SET activo = 0, updated_at = NOW() WHERE id IN (${placeholders})`,
+        ids.map(r => r.id)
+      );
+
+      res.json({
+        success: true,
+        message: `${ids.length} borrador(es) cancelado(s)`,
+        data: { canceladas: ids.length }
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: 'Error cancelando borradores', error: err.message });
+    }
+  }
+);
+
 /**
  * @route GET /api/v1/facturas/:id/nota-credito
  * @desc Obtener datos de la Nota de Crédito asociada a una factura anulada

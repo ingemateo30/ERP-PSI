@@ -60,6 +60,7 @@ const CarteraPanel = lazy(() => import('./components/Cartera/CarteraPanel'));
 const SeguimientoTecnicos = lazy(() => import('./components/Instalaciones/SeguimientoTecnicos'));
 const MisPQR = lazy(() => import('./components/PQR/MisPQR'));
 const EstadoServidor = lazy(() => import('./components/Sistema/EstadoServidor'));
+const TrasladosManagement = lazy(() => import('./components/Traslados/TrasladosManagement'));
 
 // Componente de carga
 const LoadingFallback = ({ message = "Cargando..." }) => (
@@ -486,6 +487,20 @@ function App() {
                       subtitle="Administra las instalaciones de servicios de internet y televisión"
                     >
                       <InstalacionesManagement />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/traslados"
+                element={
+                  <ProtectedRoute requiredRole="instalador,secretaria,supervisor,administrador">
+                    <MainLayout
+                      title="Traslados"
+                      subtitle="Gestión de cambios de dirección de clientes"
+                    >
+                      <TrasladosManagement />
                     </MainLayout>
                   </ProtectedRoute>
                 }

@@ -17,9 +17,106 @@ const FacturacionAutomatica = () => {
   const [resultado, setResultado] = useState(null);
   const [expandedCliente, setExpandedCliente] = useState(null);
   const [diasVencimiento, setDiasVencimiento] = useState(15);
-  const [tabActiva, setTabActiva] = useState('facturacion'); // 'facturacion' | 'envio_masivo'
+  const [tabActiva, setTabActiva] = useState('facturacion');
+  // ── Nuevos estados para sede y borrador ───────────────────────────────────
+  const [sedeSeleccionada, setSedeSeleccionada] = useState('');   // '' = todas
+  const [sedes, setSedes] = useState([]);
+  const [modoBorrador, setModoBorrador] = useState(true);         // default: siempre borrador primero
+  const [resumenborradores, setResumenBorradores] = useState(null);
+  const [loadingBorradores, setLoadingBorradores] = useState(false);
+  // ──────────────────────────────────────────────────────────────────────────
 
   const { user } = useAuth();
+
+  // Cargar sedes al montar (solo admin)
+  useEffect(() => {
+    if (user?.rol === 'administrador') {
+      fetch('/api/v1/config/departments', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
+      })
+        .then(r => r.json())
+        .then(data => {
+          // Intentar también desde ciudades
+          return fetch('/api/v1/config/geography/cities', {
+            headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
+          });
+        })
+        .then(r => r.json())
+        .then(data => {
+          const lista = data?.data || data?.ciudades || [];
+          setSedes(Array.isArray(lista) ? lista : []);
+        })
+        .catch(() => setSedes([]));
+    }
+  }, [user]);
+
+  // Cargar resumen de borradores pendientes
+  const cargarResumenBorradores = async () => {
+    try {
+      setLoadingBorradores(true);
+      const params = sedeSeleccionada ? `?sede_id=${sedeSeleccionada}` : '';
+      const resp = await fetch(`/api/v1/facturas/borradores/resumen${params}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
+      });
+      const data = await resp.json();
+      setResumenBorradores(data.success ? data.data : null);
+    } catch { setResumenBorradores(null); }
+    finally { setLoadingBorradores(false); }
+  };
+
+  useEffect(() => {
+    cargarResumenBorradores();
+  }, [sedeSeleccionada]);
+
+  // Confirmar borradores → pendiente
+  const confirmarBorradores = async () => {
+    if (!window.confirm(
+      `¿Confirmar las ${resumenborradores?.resumen?.total_borradores || 0} facturas en borrador?\n\n` +
+      `Pasarán a estado "pendiente" y serán visibles para los clientes.\n` +
+      `También puede enviar notificaciones desde la pestaña de Envío Masivo.`
+    )) return;
+
+    setLoadingBorradores(true);
+    try {
+      const resp = await fetch('/api/v1/facturas/borradores/confirmar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        body: JSON.stringify({ sede_id: sedeSeleccionada || null })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        alert(`✅ ${data.data.confirmadas} factura(s) confirmada(s) exitosamente`);
+        setResumenBorradores(null);
+        await cargarResumenBorradores();
+      } else {
+        alert(`Error: ${data.message}`);
+      }
+    } catch (err) { alert('Error al confirmar'); }
+    finally { setLoadingBorradores(false); }
+  };
+
+  // Cancelar borradores
+  const cancelarBorradores = async () => {
+    if (!window.confirm('¿Cancelar y eliminar todos los borradores? Esta acción no se puede deshacer.')) return;
+    setLoadingBorradores(true);
+    try {
+      const params = sedeSeleccionada ? `?sede_id=${sedeSeleccionada}` : '';
+      const resp = await fetch(`/api/v1/facturas/borradores/cancelar${params}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
+      });
+      const data = await resp.json();
+      if (data.success) {
+        alert(`🗑️ ${data.data.canceladas} borrador(es) cancelado(s)`);
+        setResumenBorradores(null);
+        await cargarResumenBorradores();
+      }
+    } catch (err) { alert('Error al cancelar'); }
+    finally { setLoadingBorradores(false); }
+  };
 
   // Limpiar estados
   const limpiarEstados = () => {
@@ -32,12 +129,13 @@ const FacturacionAutomatica = () => {
   const generarPreview = async () => {
     setLoading(true);
     limpiarEstados();
-    
+
     try {
       console.log('👁️ Solicitando preview detallado...');
-      
+
       const response = await facturasService.getPreviewFacturacionMensual({
-        periodo: new Date().toISOString().slice(0, 7)
+        periodo: new Date().toISOString().slice(0, 7),
+        sede_id: sedeSeleccionada || undefined
       });
       
       console.log('✅ Preview recibido:', response);
@@ -56,33 +154,43 @@ const FacturacionAutomatica = () => {
     }
   };
 
-  // Ejecutar facturación
+  // Ejecutar facturación (en modo borrador o definitivo)
   const ejecutarFacturacion = async () => {
+    const nombreSede = sedeSeleccionada
+      ? sedes.find(s => String(s.id) === String(sedeSeleccionada))?.nombre || `Sede ${sedeSeleccionada}`
+      : 'TODAS LAS SEDES';
+
+    const modoTexto = modoBorrador ? 'BORRADOR (para revisión)' : 'DEFINITIVO';
+
     if (!window.confirm(
-      `Esta acción generará la facturación mensual para todos los clientes activos.\n\n` +
+      `Facturación mensual — ${modoTexto}\n\n` +
+      `Sede: ${nombreSede}\n` +
       `Días de vencimiento: ${diasVencimiento} días\n\n` +
-      `⚠️ ESTA ACCIÓN NO SE PUEDE DESHACER.\n\n` +
-      `¿Desea continuar?`
-    )) {
-      return;
-    }
+      (modoBorrador
+        ? '📋 Se generarán facturas en BORRADOR. Podrá revisarlas y confirmarlas antes de que sean visibles.\n\n'
+        : '⚠️ Se generarán facturas DEFINITIVAS. Esta acción no se puede deshacer.\n\n') +
+      '¿Desea continuar?'
+    )) return;
 
     setLoading(true);
 
     try {
       console.log('⚡ Ejecutando facturación mensual...');
-      console.log(`📅 Días de vencimiento: ${diasVencimiento}`);
 
       const response = await facturasService.generarFacturacionMensual({
         periodo: new Date().toISOString().slice(0, 7),
-        diasVencimiento: parseInt(diasVencimiento)
+        diasVencimiento: parseInt(diasVencimiento),
+        sede_id: sedeSeleccionada || undefined,
+        modo: modoBorrador ? 'borrador' : 'definitivo'
       });
       
       console.log('✅ Facturación completada:', response);
       
       setResultado(response.data || response);
       setPreview(null);
-      
+      // Recargar resumen de borradores si se generó en modo borrador
+      if (modoBorrador) await cargarResumenBorradores();
+
     } catch (error) {
       console.error('❌ Error ejecutando facturación:', error);
       setResultado({
@@ -323,12 +431,89 @@ const FacturacionAutomatica = () => {
         </div>
       )}
 
+      {/* ── Panel de borradores pendientes ───────────────────────────────── */}
+      {resumenborradores?.resumen?.total_borradores > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex-1">
+            <p className="font-semibold text-amber-800 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              {resumenborradores.resumen.total_borradores} factura(s) en borrador pendientes de confirmación
+            </p>
+            <p className="text-sm text-amber-700 mt-1">
+              Valor total: {new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0}).format(resumenborradores.resumen.valor_total || 0)}
+            </p>
+            {resumenborradores.por_sede?.length > 0 && (
+              <p className="text-xs text-amber-600 mt-1">
+                Por sede: {resumenborradores.por_sede.map(s => `${s.sede_nombre} (${s.total})`).join(' · ')}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={confirmarBorradores}
+              disabled={loadingBorradores}
+              className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+            >
+              <CheckCircle className="w-4 h-4" />
+              Confirmar
+            </button>
+            <button
+              onClick={cancelarBorradores}
+              disabled={loadingBorradores}
+              className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-1"
+            >
+              <XCircle className="w-4 h-4" />
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Configuración de Facturación */}
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex items-center gap-3 mb-4">
           <Calendar className="w-5 h-5 text-gray-600" />
           <h3 className="text-lg font-semibold text-gray-900">Configuración de Facturación</h3>
         </div>
+
+        {/* Sede (solo admin) */}
+        {user?.rol === 'administrador' && (
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sede / Ciudad</label>
+              <select
+                value={sedeSeleccionada}
+                onChange={e => setSedeSeleccionada(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Todas las sedes</option>
+                {sedes.map(s => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Modo de generación</label>
+              <div className="flex gap-3 mt-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" checked={modoBorrador} onChange={() => setModoBorrador(true)} />
+                  <span className="text-sm">
+                    <span className="font-medium text-amber-700">Borrador</span>
+                    <span className="text-gray-500 ml-1">(revisar antes de confirmar)</span>
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" checked={!modoBorrador} onChange={() => setModoBorrador(false)} />
+                  <span className="text-sm">
+                    <span className="font-medium text-green-700">Definitivo</span>
+                    <span className="text-gray-500 ml-1">(inmediato)</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">

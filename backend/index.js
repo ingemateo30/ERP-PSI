@@ -343,6 +343,11 @@ const auditoriaRoutes = require('./routes/auditoria');
 app.use('/api/v1/auditoria', auditoriaRoutes);
 console.log('✅ Rutas de auditoría cargadas: /api/v1/auditoria');
 
+console.log('🚚 Cargando rutas de traslados...');
+const trasladosRoutes = require('./routes/traslados');
+app.use('/api/v1/traslados', trasladosRoutes);
+console.log('✅ Rutas de traslados cargadas: /api/v1/traslados');
+
   const inicializarFacturacionAutomatica = () => {
     const cronEnabled = process.env.NODE_ENV === 'production' ||
       process.env.FACTURACION_CRON_ENABLED === 'true';
