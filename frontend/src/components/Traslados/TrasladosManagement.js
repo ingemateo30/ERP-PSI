@@ -512,7 +512,7 @@ const ModalCrearTraslado = ({ ciudades, token, onClose, onSuccess }) => {
     if (!ciudadId) return;
     try {
       const [rSec, rBar] = await Promise.all([
-        fetch(`/api/v1/config/sectores-por-ciudad/${ciudadId}`, {
+        fetch(`/api/v1/config/sectors?ciudad_id=${ciudadId}`, {
           headers: { Authorization: `Bearer ${token()}` }
         }),
         fetch(`/api/v1/clientes/barrios?ciudad_id=${ciudadId}`, {
@@ -521,7 +521,7 @@ const ModalCrearTraslado = ({ ciudades, token, onClose, onSuccess }) => {
       ]);
       const dSec = await rSec.json();
       const dBar = await rBar.json();
-      setSectoresModal(dSec?.data || dSec?.sectores || []);
+      setSectoresModal(Array.isArray(dSec?.data) ? dSec.data : []);
       setBarriosSugeridos(Array.isArray(dBar?.data) ? dBar.data : []);
     } catch { setSectoresModal([]); setBarriosSugeridos([]); }
   };
