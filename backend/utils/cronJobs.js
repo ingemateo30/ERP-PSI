@@ -60,6 +60,9 @@ class CronJobs {
     // Proceso de reconexión automática - día 3 de cada mes a las 02:00
     this.procesoReconexionAutomatica();
 
+    // Ejecución de bajas programadas - diario a las 06:30
+    this.bajasProgramadas();
+
     console.log('✅ Todas las tareas programadas de facturación configuradas');
   }
 
@@ -1005,6 +1008,100 @@ class CronJobs {
     });
   }
   /**
+   * Ejecución de bajas programadas (fecha_programada_cancelacion)
+   * Cancela servicios cuya fecha programada ya llegó.
+   * Se ejecuta diariamente a las 06:30 AM.
+   */
+  static bajasProgramadas() {
+    cron.schedule('30 6 * * *', async () => {
+      try {
+        console.log('🔄 [CronJobs] Ejecutando bajas programadas...');
+
+        const conexion = await Database.getConnection();
+        const hoy = fechaLocalMySQL();
+
+        try {
+          // Obtener servicios con baja programada para hoy o antes
+          const [servicios] = await conexion.execute(`
+            SELECT sc.id, sc.cliente_id, sc.motivo_cancelacion,
+                   c.nombre AS cliente_nombre
+            FROM servicios_cliente sc
+            JOIN clientes c ON sc.cliente_id = c.id
+            WHERE sc.estado = 'activo'
+              AND sc.fecha_programada_cancelacion IS NOT NULL
+              AND sc.fecha_programada_cancelacion <= ?
+          `, [hoy]);
+
+          if (servicios.length === 0) {
+            console.log('✅ [CronJobs] No hay bajas programadas para hoy.');
+            return;
+          }
+
+          let cancelados = 0;
+          let errores = 0;
+
+          for (const sc of servicios) {
+            try {
+              await conexion.execute(`
+                UPDATE servicios_cliente
+                SET estado = 'cancelado',
+                    fecha_cancelacion = ?,
+                    fecha_programada_cancelacion = NULL,
+                    updated_at = NOW()
+                WHERE id = ? AND estado = 'activo'
+              `, [hoy, sc.id]);
+
+              // Si el cliente no tiene más servicios activos → cambiar estado
+              const [activos] = await conexion.execute(`
+                SELECT COUNT(*) AS total
+                FROM servicios_cliente
+                WHERE cliente_id = ? AND estado = 'activo'
+              `, [sc.cliente_id]);
+
+              if (parseInt(activos[0].total) === 0) {
+                await conexion.execute(`
+                  UPDATE clientes
+                  SET estado = 'inactivo', updated_at = NOW()
+                  WHERE id = ? AND estado IN ('activo','suspendido')
+                `, [sc.cliente_id]);
+              }
+
+              console.log(`✅ Baja ejecutada: ${sc.cliente_nombre} (servicio ${sc.id})`);
+              cancelados++;
+            } catch (err) {
+              console.error(`❌ Error cancelando servicio ${sc.id}:`, err.message);
+              errores++;
+            }
+          }
+
+          await this.registrarLogSistema('BAJAS_PROGRAMADAS', {
+            fecha: hoy,
+            total_procesados: servicios.length,
+            cancelados,
+            errores
+          });
+
+          console.log(`✅ [CronJobs] Bajas programadas: ${cancelados} cancelados, ${errores} errores`);
+
+        } finally {
+          conexion.release();
+        }
+
+      } catch (error) {
+        console.error('❌ [CronJobs] Error en bajas programadas:', error.message);
+        await this.registrarLogSistema('BAJAS_PROGRAMADAS_ERROR', {
+          error: error.message,
+          fecha_error: new Date().toISOString()
+        });
+      }
+    }, {
+      timezone: 'America/Bogota'
+    });
+
+    console.log('📅 Tarea programada: Bajas programadas (diario a las 06:30)');
+  }
+
+  /**
    * Listar todas las tareas programadas disponibles
    */
   static listarTareasProgramadas() {
@@ -1049,6 +1146,18 @@ class CronJobs {
         descripcion: 'Generación de reportes mensuales',
         horario: '0 7 2 * *',
         descripcion_horario: 'Día 2 de cada mes a las 07:00',
+        activa: true
+      },
+      reconexion_automatica: {
+        descripcion: 'Proceso de reconexión automática (marca inactivos sin reconexión)',
+        horario: '0 2 3 * *',
+        descripcion_horario: 'Día 3 de cada mes a las 02:00',
+        activa: true
+      },
+      bajas_programadas: {
+        descripcion: 'Ejecución de bajas programadas (fecha_programada_cancelacion)',
+        horario: '30 6 * * *',
+        descripcion_horario: 'Diario a las 06:30',
         activa: true
       }
     };
