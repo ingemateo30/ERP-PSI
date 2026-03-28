@@ -205,6 +205,11 @@ class Cliente {
         params.push(filtros.ciudad_id);
       }
 
+      if (filtros.telefono) {
+        query += ' AND (c.telefono LIKE ? OR c.telefono_2 LIKE ?)';
+        params.push(`%${filtros.telefono}%`, `%${filtros.telefono}%`);
+      }
+
       const connection = await pool.getConnection();
       const [filas] = await connection.execute(query, params);
       connection.release();
@@ -242,11 +247,13 @@ class Cliente {
     }
   }
 
-  // Obtener cliente por identificación
+  // Obtener cliente(s) por identificación.
+  // Un mismo número de identificación puede existir en varias ciudades (multi-sede),
+  // por lo que se devuelve un array con todos los registros encontrados.
   static async obtenerPorIdentificacion(identificacion) {
     try {
       const query = `
-        SELECT 
+        SELECT
           c.*,
           s.nombre as sector_nombre,
           s.codigo as sector_codigo,
@@ -257,13 +264,14 @@ class Cliente {
         LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
         LEFT JOIN departamentos d ON ci.departamento_id = d.id
         WHERE c.identificacion = ?
+        ORDER BY c.created_at DESC
       `;
 
       const connection = await pool.getConnection();
       const [filas] = await connection.execute(query, [identificacion]);
       connection.release();
 
-      return filas[0] || null;
+      return filas;
     } catch (error) {
       throw new Error(`Error al obtener cliente por identificación: ${error.message}`);
     }
