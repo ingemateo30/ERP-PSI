@@ -29,7 +29,6 @@ const TrasladosManagement = () => {
 
   // ── Datos auxiliares ─────────────────────────────────────────────────────
   const [ciudades, setCiudades] = useState([]);
-  const [sectores, setSectores] = useState([]);
   const [estadisticas, setEstadisticas] = useState(null);
 
   // ── Modales ──────────────────────────────────────────────────────────────
@@ -54,23 +53,12 @@ const TrasladosManagement = () => {
 
   const cargarCiudades = async () => {
     try {
-      const r = await fetch(`${API_URL}/config/geography/cities`, {
+      const r = await fetch(`${API_URL}/config/cities`, {
         headers: { Authorization: `Bearer ${token()}` }
       });
       const d = await r.json();
       setCiudades(d?.data || d?.ciudades || []);
     } catch { /* silencioso */ }
-  };
-
-  const cargarSectores = async (ciudadId) => {
-    if (!ciudadId) { setSectores([]); return; }
-    try {
-      const r = await fetch(`${API_URL}/config/geography/sectors?ciudad_id=${ciudadId}`, {
-        headers: { Authorization: `Bearer ${token()}` }
-      });
-      const d = await r.json();
-      setSectores(d?.data || d?.sectores || []);
-    } catch { setSectores([]); }
   };
 
   const cargarEstadisticas = async () => {
@@ -204,7 +192,7 @@ const TrasladosManagement = () => {
             <option value="completada">Completado</option>
             <option value="cancelada">Cancelado</option>
           </select>
-          {user?.rol === 'administrador' && ciudades.length > 0 && (
+          {user?.rol !== 'instalador' && ciudades.length > 0 && (
             <select
               value={filtroSede}
               onChange={e => { setFiltroSede(e.target.value); setPage(1); }}
@@ -293,14 +281,14 @@ const TrasladosManagement = () => {
                       </td>
                       <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">
                         {t.direccion_anterior || '—'}
-                        {t.ciudad_anterior_nombre && (
-                          <span className="block text-xs text-gray-400">{t.ciudad_anterior_nombre}</span>
+                        {t.ciudad_anterior && (
+                          <span className="block text-xs text-gray-400">{t.ciudad_anterior}</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">
-                        {t.nueva_direccion || t.direccion || '—'}
-                        {t.nueva_ciudad_nombre && (
-                          <span className="block text-xs text-gray-400">{t.nueva_ciudad_nombre}</span>
+                        {t.direccion_nueva || t.direccion_instalacion || '—'}
+                        {t.ciudad_nueva && (
+                          <span className="block text-xs text-gray-400">{t.ciudad_nueva}</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
@@ -312,7 +300,7 @@ const TrasladosManagement = () => {
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorEstado(t.estado)}`}>
                           {labelEstado(t.estado)}
                         </span>
-                        {t.cobrar_instalacion ? (
+                        {parseFloat(t.costo_instalacion) > 0 ? (
                           <span className="ml-2 text-xs text-amber-600 font-medium">Con cargo</span>
                         ) : null}
                       </td>
@@ -351,19 +339,19 @@ const TrasladosManagement = () => {
                             <div>
                               <p className="font-medium text-gray-700 mb-1">Dirección anterior</p>
                               <p className="text-gray-600">{t.direccion_anterior || 'No registrada'}</p>
-                              <p className="text-gray-500 text-xs">{[t.ciudad_anterior_nombre, t.sector_anterior_nombre].filter(Boolean).join(' › ')}</p>
+                              <p className="text-gray-500 text-xs">{[t.ciudad_anterior].filter(Boolean).join(' › ')}</p>
                             </div>
                             <div>
                               <p className="font-medium text-gray-700 mb-1 flex items-center gap-1">
                                 <ArrowRight className="w-4 h-4 text-blue-600" /> Nueva dirección
                               </p>
-                              <p className="text-gray-600">{t.nueva_direccion || t.direccion || 'No registrada'}</p>
-                              <p className="text-gray-500 text-xs">{[t.nueva_ciudad_nombre, t.nuevo_sector_nombre].filter(Boolean).join(' › ')}</p>
+                              <p className="text-gray-600">{t.direccion_nueva || t.direccion_instalacion || 'No registrada'}</p>
+                              <p className="text-gray-500 text-xs">{[t.ciudad_nueva, t.sector_nuevo].filter(Boolean).join(' › ')}</p>
                             </div>
                             <div>
                               <p className="font-medium text-gray-700 mb-1">Detalles</p>
                               <p className="text-gray-600">
-                                {t.cobrar_instalacion ? '✅ Se cobra instalación' : '⛔ Sin cargo de instalación'}
+                                {parseFloat(t.costo_instalacion) > 0 ? '✅ Se cobra instalación' : '⛔ Sin cargo de instalación'}
                               </p>
                               <p className="text-gray-600">
                                 {t.actualizar_direccion_cliente ? '🔄 Actualiza dirección del cliente' : '📍 No actualiza dirección'}
@@ -416,8 +404,6 @@ const TrasladosManagement = () => {
       {showCrear && (
         <ModalCrearTraslado
           ciudades={ciudades}
-          cargarSectores={cargarSectores}
-          sectores={sectores}
           token={token}
           onClose={() => setShowCrear(false)}
           onSuccess={() => {
@@ -465,22 +451,23 @@ const TrasladosManagement = () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // Modal: Crear Traslado
 // ═══════════════════════════════════════════════════════════════════════════
-const ModalCrearTraslado = ({ ciudades, cargarSectores, sectores, token, onClose, onSuccess }) => {
+const ModalCrearTraslado = ({ ciudades, token, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [clientes, setClientes] = useState([]);
   const [busquedaCliente, setBusquedaCliente] = useState('');
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
+  const [sectores, setSectoresModal] = useState([]);
 
   const [form, setForm] = useState({
     cliente_id: '',
-    nueva_direccion: '',
-    nueva_ciudad_id: '',
-    nuevo_sector_id: '',
+    direccion_nueva: '',
+    ciudad_nueva_id: '',
+    sector_nuevo_id: '',
     fecha_programada: new Date().toISOString().split('T')[0],
-    cobrar_instalacion: false,
-    actualizar_direccion_cliente: true,
+    cobra_instalacion: false,
+    actualizar_direccion: true,
     observaciones: ''
   });
 
@@ -508,21 +495,29 @@ const ModalCrearTraslado = ({ ciudades, cargarSectores, sectores, token, onClose
 
   const seleccionarCliente = (c) => {
     setClienteSeleccionado(c);
-    setForm(f => ({ ...f, cliente_id: c.id }));
+    setForm(prev => ({ ...prev, cliente_id: c.id }));
     setClientes([]);
     setBusquedaCliente('');
   };
 
-  const handleCiudadChange = (e) => {
+  const handleCiudadChange = async (e) => {
     const ciudadId = e.target.value;
-    setForm(f => ({ ...f, nueva_ciudad_id: ciudadId, nuevo_sector_id: '' }));
-    cargarSectores(ciudadId);
+    setForm(f => ({ ...f, ciudad_nueva_id: ciudadId, sector_nuevo_id: '' }));
+    setSectoresModal([]);
+    if (!ciudadId) return;
+    try {
+      const r = await fetch(`/api/v1/config/sectores-por-ciudad/${ciudadId}`, {
+        headers: { Authorization: `Bearer ${token()}` }
+      });
+      const d = await r.json();
+      setSectoresModal(d?.data || d?.sectores || []);
+    } catch { setSectoresModal([]); }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.cliente_id) { setError('Debe seleccionar un cliente'); return; }
-    if (!form.nueva_direccion.trim()) { setError('Ingrese la nueva dirección'); return; }
+    if (!form.direccion_nueva.trim()) { setError('Ingrese la nueva dirección'); return; }
 
     setLoading(true);
     setError('');
@@ -638,8 +633,8 @@ const ModalCrearTraslado = ({ ciudades, cargarSectores, sectores, token, onClose
             </label>
             <input
               type="text"
-              value={form.nueva_direccion}
-              onChange={e => setForm(f => ({ ...f, nueva_direccion: e.target.value }))}
+              value={form.direccion_nueva}
+              onChange={e => setForm(f => ({ ...f, direccion_nueva: e.target.value }))}
               placeholder="Ej: Calle 45 # 12-30 Apto 302"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               required
@@ -651,7 +646,7 @@ const ModalCrearTraslado = ({ ciudades, cargarSectores, sectores, token, onClose
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nueva Ciudad</label>
               <select
-                value={form.nueva_ciudad_id}
+                value={form.ciudad_nueva_id}
                 onChange={handleCiudadChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               >
@@ -664,10 +659,10 @@ const ModalCrearTraslado = ({ ciudades, cargarSectores, sectores, token, onClose
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Sector</label>
               <select
-                value={form.nuevo_sector_id}
-                onChange={e => setForm(f => ({ ...f, nuevo_sector_id: e.target.value }))}
+                value={form.sector_nuevo_id}
+                onChange={e => setForm(f => ({ ...f, sector_nuevo_id: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                disabled={!form.nueva_ciudad_id}
+                disabled={!form.ciudad_nueva_id}
               >
                 <option value="">Seleccionar sector</option>
                 {sectores.map(s => (
@@ -696,8 +691,8 @@ const ModalCrearTraslado = ({ ciudades, cargarSectores, sectores, token, onClose
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
-                checked={form.cobrar_instalacion}
-                onChange={e => setForm(f => ({ ...f, cobrar_instalacion: e.target.checked }))}
+                checked={form.cobra_instalacion}
+                onChange={e => setForm(f => ({ ...f, cobra_instalacion: e.target.checked }))}
                 className="mt-0.5"
               />
               <div>
@@ -709,8 +704,8 @@ const ModalCrearTraslado = ({ ciudades, cargarSectores, sectores, token, onClose
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
-                checked={form.actualizar_direccion_cliente}
-                onChange={e => setForm(f => ({ ...f, actualizar_direccion_cliente: e.target.checked }))}
+                checked={form.actualizar_direccion}
+                onChange={e => setForm(f => ({ ...f, actualizar_direccion: e.target.checked }))}
                 className="mt-0.5"
               />
               <div>
@@ -773,7 +768,7 @@ const ModalCompletarTraslado = ({ traslado, token, onClose, onSuccess }) => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token()}`
         },
-        body: JSON.stringify({ observaciones })
+        body: JSON.stringify({ observaciones_finales: observaciones })
       });
       const d = await r.json();
       if (d.success) {
