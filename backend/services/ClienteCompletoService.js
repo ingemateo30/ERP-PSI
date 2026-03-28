@@ -21,26 +21,23 @@ class ClienteCompletoService {
    * Crear cliente completo con servicio y documentos automáticos
    */
   static async crearClienteCompleto(datosCompletos, createdBy = null) {
+    // Detectar ruta multi-servicio ANTES de abrir transacción para evitar
+    // crear el cliente dos veces (una aquí y otra dentro de crearClienteConServicios).
+    const serviciosData = datosCompletos.servicios || datosCompletos.sedes || [];
+    if (serviciosData.length > 0) {
+      const primerServicio = serviciosData[0];
+      if (primerServicio.planInternetId && primerServicio.planTelevisionId) {
+        console.log('🔀 Detectados servicios separados (Internet + TV), delegando a crearClienteConServicios');
+        return await this.crearClienteConServicios(datosCompletos, createdBy);
+      }
+    }
+
     return await Database.transaction(async (conexion) => {
       console.log('🚀 Iniciando creación completa de cliente...');
 
       // 1. CREAR CLIENTE
       const clienteId = await this.crearCliente(conexion, datosCompletos.cliente, createdBy);
       console.log(`✅ Cliente creado con ID: ${clienteId}`);
-
-      // ✅ CORRECCIÓN 1: Manejar estructura del frontend (servicios array vs servicio singular)
-      const serviciosData = datosCompletos.servicios || datosCompletos.sedes || [];
-
-      // ✅ NUEVA LÓGICA: Detectar si hay servicios separados (Internet Y TV)
-      if (serviciosData.length > 0) {
-        const primerServicio = serviciosData[0];
-
-        // Si hay tanto planInternetId como planTelevisionId, usar crearClienteConServicios
-        if (primerServicio.planInternetId && primerServicio.planTelevisionId) {
-          console.log('🔀 Detectados servicios separados (Internet + TV), usando método de servicios múltiples');
-          return await this.crearClienteConServicios(datosCompletos, createdBy);
-        }
-      }
 
       let servicioData = datosCompletos.servicio;
 
@@ -342,8 +339,18 @@ class ClienteCompletoService {
 
       const servicio = servicios[0];
 
-      // 3. Generar número de factura
-      const numeroFactura = `${config.prefijo_factura || 'FAC'}${String(config.consecutivo_factura || 1).padStart(6, '0')}`;
+      // 3. Generar número de factura de forma atómica para evitar duplicados
+      // en ejecuciones concurrentes: incrementar primero, luego leer.
+      await conexion.execute(`
+        UPDATE configuracion_empresa
+        SET consecutivo_factura = consecutivo_factura + 1
+        WHERE id = 1
+      `);
+      const [configActualizado] = await conexion.execute(
+        'SELECT prefijo_factura, consecutivo_factura, resolucion_facturacion FROM configuracion_empresa WHERE id = 1'
+      );
+      const configNum = configActualizado[0] || {};
+      const numeroFactura = `${configNum.prefijo_factura || config.prefijo_factura || 'FAC'}${String(configNum.consecutivo_factura || 1).padStart(6, '0')}`;
 
       // 4. Calcular totales del servicio con IVA correcto
       const precioBaseServicio = parseFloat(servicio.precio_personalizado || servicio.precio_plan);
@@ -503,12 +510,7 @@ class ClienteCompletoService {
         console.log(`✅ Detalle de instalación: Base=$${costoInstalacion}, IVA=$${ivaInstalacion}, Total=$${costoInstalacion + ivaInstalacion}`);
       }
 
-      // 7. Actualizar consecutivo
-      await conexion.execute(`
-        UPDATE configuracion_empresa 
-        SET consecutivo_factura = consecutivo_factura + 1 
-        WHERE id = 1
-      `);
+      // El consecutivo ya fue incrementado de forma atómica al generar el número de factura.
 
       console.log(`✅ Primera factura ${numeroFactura} generada con ID: ${facturaId}`);
 
@@ -786,14 +788,18 @@ const observacionesContrato = JSON.stringify({
     const permanenciaMeses = tipoPermanencia === 'con_permanencia' ?
       (planData.permanencia_minima_meses || 6) : 0;
 
-    // ✅ CORRECCIÓN: Usar valores de cobro de instalación separados de permanencia
+    // Usar la misma lógica de cobro que generarPrimeraFacturaInternoCompleta:
+    // solo cobra instalación cuando cobrar_instalacion es explícitamente true/1/'true'.
     let costoInstalacion = 0;
-    if (datosServicio?.cobrar_instalacion !== false) {
-      // Si se debe cobrar instalación, usar el valor personalizado o el valor por defecto
+    const debeCobraInstalacionContrato =
+      datosServicio?.cobrar_instalacion === true ||
+      datosServicio?.cobrar_instalacion === 'true' ||
+      datosServicio?.cobrar_instalacion === 1;
+
+    if (debeCobraInstalacionContrato) {
       if (datosServicio?.valor_instalacion !== undefined && datosServicio?.valor_instalacion !== null) {
         costoInstalacion = parseFloat(datosServicio.valor_instalacion);
       } else {
-        // Valores por defecto basados en tipo de permanencia
         costoInstalacion = tipoPermanencia === 'con_permanencia' ?
           (planData.costo_instalacion_permanencia || 50000) :
           (planData.costo_instalacion_sin_permanencia || 150000);
@@ -1084,22 +1090,28 @@ const observacionesContrato = JSON.stringify({
       const plan = planes[0];
       const valor = datosPreview.precio_personalizado || plan.precio;
 
-      // Calcular preview de la factura
+      // Calcular IVA real usando el mismo servicio que la generación de factura
+      const calculo = IVACalculatorService.calcularPrecioConIVA(
+        parseFloat(valor),
+        plan.tipo,
+        datosPreview.estrato || 3
+      );
+
+      // Sumar conceptos adicionales
+      let subtotalExtra = 0;
+      for (const concepto of (datosPreview.conceptos_adicionales || [])) {
+        subtotalExtra += parseFloat(concepto.valor || 0);
+      }
+
       const preview = {
         plan_nombre: plan.nombre,
         valor_plan: parseFloat(valor),
         conceptos_adicionales: datosPreview.conceptos_adicionales || [],
-        subtotal: parseFloat(valor),
-        iva: 0, // Sin IVA para estratos residenciales
-        total: parseFloat(valor),
+        subtotal: calculo.precio_sin_iva + subtotalExtra,
+        iva: calculo.valor_iva,
+        total: calculo.precio_con_iva + subtotalExtra,
         fecha_estimada_vencimiento: fechaLocalMySQL(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000))
       };
-
-      // Agregar conceptos adicionales al preview
-      for (const concepto of preview.conceptos_adicionales) {
-        preview.subtotal += parseFloat(concepto.valor || 0);
-        preview.total += parseFloat(concepto.valor || 0);
-      }
 
       return preview;
 

@@ -685,18 +685,21 @@ static async crear(req, res) {
         });
       }
 
-      const cliente = await Cliente.obtenerPorIdentificacion(identificacion);
+      const clientes = await Cliente.obtenerPorIdentificacion(identificacion);
 
-      if (!cliente) {
+      if (!clientes || clientes.length === 0) {
         return res.status(404).json({
           success: false,
           message: 'Cliente no encontrado'
         });
       }
 
+      // Devolver array para soportar clientes multi-sede con la misma identificación.
+      // Si solo hay un registro se mantiene compatibilidad accediendo a data[0].
       res.json({
         success: true,
-        data: cliente
+        data: clientes,
+        total: clientes.length
       });
     } catch (error) {
       console.error('Error al obtener cliente por identificación:', error);
