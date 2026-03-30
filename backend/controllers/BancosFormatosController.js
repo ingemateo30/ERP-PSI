@@ -386,7 +386,8 @@ class BancosFormatosController {
     try {
       const sede = req.query.sede || 'otros';
       const empresa = await BancosFormatosController.getEmpresaConfig();
-      const facturas = await BancosFormatosController.getUltimasFacturasPendientes(sede);
+      // Finecoop consolida TODAS las facturas pendientes por cliente (no solo la última)
+      const facturas = await BancosFormatosController.getFacturasPendientesAgrupadas();
       const fecha = BancosFormatosController.formatFecha(new Date());
 
       // Calcular fechas límite y hasta (último día del mes actual)
@@ -448,7 +449,8 @@ class BancosFormatosController {
     try {
       const sede = req.query.sede || 'otros';
       const empresa = await BancosFormatosController.getEmpresaConfig();
-      const facturas = await BancosFormatosController.getUltimasFacturasPendientes(sede);
+      // Comultrasan consolida TODAS las facturas pendientes por cliente (no solo la última)
+      const facturas = await BancosFormatosController.getFacturasPendientesAgrupadas();
       const fecha = BancosFormatosController.formatFecha(new Date());
 
       const ahora = new Date();
