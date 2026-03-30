@@ -31,16 +31,9 @@ const FacturacionAutomatica = () => {
   // Cargar sedes al montar (solo admin)
   useEffect(() => {
     if (user?.rol === 'administrador') {
-      fetch('/api/v1/config/departments', {
+      fetch('/api/v1/config/cities', {
         headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
       })
-        .then(r => r.json())
-        .then(data => {
-          // Intentar también desde ciudades
-          return fetch('/api/v1/config/geography/cities', {
-            headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
-          });
-        })
         .then(r => r.json())
         .then(data => {
           const lista = data?.data || data?.ciudades || [];
