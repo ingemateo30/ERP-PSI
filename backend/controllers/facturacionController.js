@@ -178,25 +178,24 @@ class FacturacionController {
 
       // Consulta principal
       const query = `
-        SELECT 
+        SELECT
           f.*,
-          c.nombres,
-          c.apellidos,
-          c.numero_identificacion,
+          c.nombre,
+          c.identificacion,
           c.estrato,
           c.ruta,
           c.telefono,
-          c.email,
-          CONCAT(c.nombres, ' ', c.apellidos) as nombre_completo,
+          c.correo as email,
+          c.nombre as nombre_completo,
           -- Información de IVA por estrato
-          CASE 
+          CASE
             WHEN c.estrato IN (1,2,3) THEN 'Estratos 1-3: Internet sin IVA'
             ELSE 'Estratos 4-6: Internet con IVA 19%'
           END as info_iva_internet,
           'Televisión: IVA 19% todos los estratos' as info_iva_television,
           -- Cálculos adicionales
           DATEDIFF(CURDATE(), f.fecha_vencimiento) as dias_vencido,
-          (f.total - COALESCE(f.pagado, 0)) as saldo_pendiente
+          (f.total - COALESCE(f.saldo_anterior, 0)) as saldo_pendiente
         FROM facturas f
         INNER JOIN clientes c ON f.cliente_id = c.id
         WHERE ${whereConditions.join(' AND ')}
@@ -252,24 +251,23 @@ class FacturacionController {
 
       // Obtener factura principal
       const facturaQuery = `
-        SELECT 
+        SELECT
           f.*,
-          c.nombres,
-          c.apellidos,
-          c.numero_identificacion,
-          c.tipo_identificacion,
+          c.nombre,
+          c.identificacion,
+          c.tipo_documento as tipo_identificacion,
           c.estrato,
           c.direccion,
           c.telefono,
-          c.email,
+          c.correo as email,
           c.ruta,
-          CONCAT(c.nombres, ' ', c.apellidos) as nombre_completo,
+          c.nombre as nombre_completo,
           d.nombre as departamento,
           cd.nombre as ciudad,
           s.nombre as sector
         FROM facturas f
         INNER JOIN clientes c ON f.cliente_id = c.id
-        LEFT JOIN departamentos d ON c.departamento_id = d.id
+        LEFT JOIN departamentos d ON cd.departamento_id = d.id
         LEFT JOIN ciudades cd ON c.ciudad_id = cd.id
         LEFT JOIN sectores s ON c.sector_id = s.id
         WHERE f.id = ? AND f.activo = 1
