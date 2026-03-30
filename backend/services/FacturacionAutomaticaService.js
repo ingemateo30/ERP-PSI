@@ -658,15 +658,17 @@ class FacturacionAutomaticaService {
 
   static async calcularInteresMora(conexion, clienteId) {
     try {
-      // Usar el servicio de intereses moratorios
-      const interes = await InteresesMoratoriosService.calcularInteresesMoratorios(clienteId);
+      // CORRECCIÓN: usar obtenerInteresesPendientes (solo lectura) en vez de
+      // calcularInteresesMoratorios que hace UPDATE como side effect.
+      // El cron diario (calculoInteresesMora) es quien debe actualizar facturas.interes.
+      const interes = await InteresesMoratoriosService.obtenerInteresesPendientes(clienteId);
 
       return {
         tipo: 'interes',
         concepto: 'Intereses de mora',
         cantidad: 1,
-        precio_unitario: interes.total_intereses || 0,
-        valor: Math.round(interes.total_intereses || 0),
+        precio_unitario: interes.total || 0,
+        valor: Math.round(interes.total || 0),
         aplica_iva: false,
         porcentaje_iva: 0
       };

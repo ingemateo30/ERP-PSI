@@ -1057,6 +1057,20 @@ static async marcarComoPagada(req, res) {
       });
     }
 
+    // Validar que el monto pagado cubre el total de la factura
+    const montoRecibido = parseFloat(monto_pagado) || parseFloat(factura.total);
+    const totalFactura  = parseFloat(factura.total);
+    if (montoRecibido < totalFactura) {
+      return res.status(400).json({
+        success: false,
+        message: `Pago insuficiente: la factura total es $${totalFactura.toLocaleString('es-CO')} y se recibió $${montoRecibido.toLocaleString('es-CO')}. ` +
+                 `Para registrar un abono parcial use el endpoint POST /api/v1/facturas/${id}/abono.`,
+        total_factura: totalFactura,
+        monto_recibido: montoRecibido,
+        diferencia: totalFactura - montoRecibido
+      });
+    }
+
     // ✅ CORRECCIÓN: Orden correcto de parámetros en el UPDATE
     await Database.query(`
       UPDATE facturas SET
@@ -1081,18 +1095,23 @@ static async marcarComoPagada(req, res) {
 
     // Registrar pago en tabla pagos si existe
     try {
+      // Generar número de recibo único
+      const numeroRecibo = `REC${Date.now()}`;
       await Database.query(`
         INSERT INTO pagos (
-          factura_id, fecha_pago, valor_pagado, metodo_pago,
-          referencia_pago, banco_id, usuario_registro, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+          cliente_id, factura_id, numero_recibo, monto, metodo_pago,
+          referencia, banco_id, fecha_pago, observaciones, recibido_por, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
       `, [
+        factura.cliente_id,
         id,
-        fecha_pago || new Date().toISOString().split('T')[0],
+        numeroRecibo,
         monto_pagado || factura.total,
         metodo_pago || 'efectivo',
         referencia_pago || null,
         banco_id || null,
+        fecha_pago || new Date().toISOString().split('T')[0],
+        observaciones || null,
         req.user?.id || null
       ]);
       console.log('✅ Pago registrado en tabla pagos');

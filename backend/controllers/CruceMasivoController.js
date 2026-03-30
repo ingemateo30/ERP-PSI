@@ -3,6 +3,7 @@
 
 const { Database } = require('../models/Database');
 const XLSX = require('../node_modules/xlsx');
+const EstadoClienteService = require('../services/EstadoClienteService');
 
 class CruceMasivoController {
 
@@ -249,15 +250,49 @@ class CruceMasivoController {
         // Determinar fecha de pago
         let fechaPago = fechaPagoManual || pago.fechaPago || new Date().toISOString().split('T')[0];
 
+        // Mapear fuente/banco al ENUM de metodo_pago
+        const metodoMap = {
+          cajasocial: 'consignacion', asobancaria: 'consignacion',
+          finecoop: 'consignacion',   comultrasan: 'consignacion',
+          efectivo: 'efectivo',       transferencia: 'transferencia'
+        };
+        const metodoPago = metodoMap[banco?.toLowerCase()] || 'consignacion';
+
         await Database.query(`
           UPDATE facturas SET
-            estado       = 'pagada',
-            fecha_pago   = ?,
-            valor_pagado = ?,
-            metodo_pago  = ?,
-            updated_at   = NOW()
+            estado      = 'pagada',
+            fecha_pago  = ?,
+            metodo_pago = ?,
+            referencia_pago = ?,
+            updated_at  = NOW()
           WHERE id = ? AND estado IN ('pendiente','vencida')
-        `, [fechaPago, Math.round(pago.monto), banco, factura.id]);
+        `, [fechaPago, metodoPago, pago.referencia || null, factura.id]);
+
+        // Insertar en tabla pagos con columnas correctas
+        const numeroRecibo = `CRUCE-${banco?.toUpperCase()}-${Date.now()}`;
+        await Database.query(`
+          INSERT INTO pagos (
+            cliente_id, factura_id, numero_recibo, monto, metodo_pago,
+            referencia, banco_id, fecha_pago, observaciones, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        `, [
+          factura.cliente_id,
+          factura.id,
+          numeroRecibo,
+          Math.round(pago.monto),
+          metodoPago,
+          pago.referencia || null,
+          null,
+          fechaPago,
+          `Cruce masivo: ${banco}`
+        ]);
+
+        // Reactivar cliente si quedó sin deudas pendientes
+        try {
+          await EstadoClienteService.procesarPostPago(factura.cliente_id, factura.id);
+        } catch (e) {
+          console.warn(`⚠️ No se pudo verificar reactivación cliente ${factura.cliente_id}:`, e.message);
+        }
 
         marcadas.push({
           factura_id:      factura.id,

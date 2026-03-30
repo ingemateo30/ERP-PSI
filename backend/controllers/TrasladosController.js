@@ -256,6 +256,21 @@ class TrasladosController {
         ]);
       }
 
+      // Si hay costo de traslado, agregar a varios_pendientes para incluir en próxima factura
+      const costoTraslado = parseFloat(t.costo_instalacion) || 0;
+      if (costoTraslado > 0) {
+        const hoy = new Date();
+        const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+        await connection.execute(
+          `INSERT INTO varios_pendientes
+             (cliente_id, concepto, cantidad, valor_unitario, valor_total,
+              aplica_iva, porcentaje_iva, fecha_aplicacion, facturado, activo)
+           VALUES (?, 'Costo de traslado de servicio', 1, ?, ?, 0, 0, ?, 0, 1)`,
+          [t.cliente_id, costoTraslado, costoTraslado, fechaHoy]
+        );
+        console.log(`💰 Costo traslado $${costoTraslado.toLocaleString('es-CO')} registrado en varios_pendientes para cliente ${t.cliente_id}`);
+      }
+
       await connection.commit();
 
       res.json({
@@ -263,7 +278,9 @@ class TrasladosController {
         message: `Traslado completado para ${t.cliente_nombre}`,
         data: {
           direccion_actualizada: t.actualizar_direccion_cliente ? t.direccion_instalacion : null,
-          cobra_instalacion: parseFloat(t.costo_instalacion) > 0
+          cobra_instalacion: costoTraslado > 0,
+          costo_traslado: costoTraslado,
+          nota: costoTraslado > 0 ? `Costo $${costoTraslado.toLocaleString('es-CO')} agregado a la próxima factura` : null
         }
       });
 

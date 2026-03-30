@@ -4,6 +4,7 @@
 const cron = require('node-cron');
 const FacturacionAutomaticaService = require('../services/FacturacionAutomaticaService');
 const EstadoClienteService = require('../services/EstadoClienteService');
+const InteresesMoratoriosService = require('../services/InteresesMoratoriosService');
 const { Database } = require('../models/Database');
 
 // Helper para fecha local en formato MySQL (evita bug UTC de toISOString)
@@ -265,63 +266,20 @@ class CronJobs {
       try {
         console.log('🔄 Calculando intereses por mora...');
 
-        const conexion = await Database.getConnection();
+        // Delegar al servicio centralizado que calcula interes = total_acumulado_desde_vencimiento
+        // (reemplaza, no acumula diariamente) para evitar doble conteo con el endpoint manual
+        const resultado = await InteresesMoratoriosService.calcularInteresesMoratorios(null, new Date());
 
-        try {
-          // Obtener facturas morosas (más de 30 días vencidas)
-          const [facturasMorosas] = await conexion.execute(`
-            SELECT 
-              f.id,
-              f.cliente_id,
-              f.numero_factura,
-              f.total,
-              DATEDIFF(NOW(), f.fecha_vencimiento) as dias_mora,
-              COALESCE(SUM(p.monto), 0) as total_pagado
-            FROM facturas f
-            LEFT JOIN pagos p ON f.id = p.factura_id
-            WHERE f.estado IN ('pendiente', 'vencida')
-              AND f.activo = 1
-              AND DATEDIFF(NOW(), f.fecha_vencimiento) >= 30
-            GROUP BY f.id, f.cliente_id, f.numero_factura, f.total
-            HAVING (f.total - total_pagado) > 0
-          `);
+        console.log(`💰 Intereses calculados: $${resultado.total_intereses} en ${resultado.facturas_con_intereses} facturas`);
 
-          let totalInteresesCalculados = 0;
-          let facturasConIntereses = 0;
+        await this.registrarLogSistema('CALCULO_INTERESES_MORA', {
+          facturas_procesadas: resultado.facturas_procesadas,
+          facturas_con_intereses: resultado.facturas_con_intereses,
+          total_intereses: resultado.total_intereses,
+          fecha_proceso: new Date().toISOString()
+        });
 
-          for (const factura of facturasMorosas) {
-            const saldoPendiente = factura.total - factura.total_pagado;
-            const tasaInteresDiaria = 0.000666; // ~2.0% mensual
-            const interesesDiarios = saldoPendiente * tasaInteresDiaria;
-
-            // Solo calcular intereses si han pasado al menos 30 días
-            if (factura.dias_mora >= 30) {
-              totalInteresesCalculados += interesesDiarios;
-              facturasConIntereses++;
-
-              // Actualizar tabla de intereses (si existe) o campo en facturas
-              await conexion.execute(`
-                UPDATE facturas 
-                SET interes = interes + ?, updated_at = NOW()
-                WHERE id = ?
-              `, [Math.round(interesesDiarios), factura.id]);
-            }
-          }
-
-          console.log(`💰 Intereses calculados: $${Math.round(totalInteresesCalculados)} en ${facturasConIntereses} facturas`);
-
-          await this.registrarLogSistema('CALCULO_INTERESES_MORA', {
-            facturas_procesadas: facturasMorosas.length,
-            facturas_con_intereses: facturasConIntereses,
-            total_intereses: Math.round(totalInteresesCalculados),
-            fecha_proceso: new Date().toISOString()
-          });
-
-          console.log('✅ Cálculo de intereses completado');
-
-        } finally {
-          conexion.release();
-        }
+        console.log('✅ Cálculo de intereses completado');
 
       } catch (error) {
         console.error('❌ Error calculando intereses por mora:', error);
@@ -470,8 +428,8 @@ class CronJobs {
           `, [fechaHoy]);
 
           const [pagosHoy] = await conexion.execute(`
-            SELECT COUNT(*) as total, SUM(valor_pagado) as total_pagado 
-            FROM pagos 
+            SELECT COUNT(*) as total, SUM(monto) as total_pagado
+            FROM pagos
             WHERE DATE(created_at) = ?
           `, [fechaHoy]);
 
@@ -634,6 +592,142 @@ class CronJobs {
     });
 
     console.log('📅 Tarea programada: Reportes mensuales (día 2 de cada mes a las 07:00)');
+  }
+
+  /**
+   * Proceso de reconexión automática
+   * Se ejecuta el día 3 de cada mes a las 02:00 AM
+   * Marca como 'inactivo' a clientes cortados que no se han reconectado en 3+ días
+   */
+  static procesoReconexionAutomatica() {
+    cron.schedule('0 2 3 * *', async () => {
+      try {
+        console.log('🔌 [CronJobs] Ejecutando proceso de reconexión automática...');
+
+        const conexion = await Database.getConnection();
+
+        try {
+          // Clientes en estado 'cortado' que aún requieren reconexión y llevan
+          // más de 3 días desde que se marcaron como cortados sin pagar
+          const [sinReconectar] = await conexion.execute(`
+            SELECT c.id, c.nombre
+            FROM clientes c
+            WHERE c.estado = 'cortado'
+              AND c.requiere_reconexion = 1
+              AND c.updated_at < DATE_SUB(NOW(), INTERVAL 3 DAY)
+          `);
+
+          let marcadosInactivos = 0;
+          for (const c of sinReconectar) {
+            await conexion.execute(
+              `UPDATE clientes SET estado = 'inactivo', updated_at = NOW() WHERE id = ?`,
+              [c.id]
+            );
+            await conexion.execute(
+              `UPDATE servicios_cliente SET estado = 'inactivo', updated_at = NOW()
+               WHERE cliente_id = ? AND estado = 'cortado'`,
+              [c.id]
+            );
+            marcadosInactivos++;
+            console.log(`🔴 Cliente ${c.nombre} (ID:${c.id}) marcado como inactivo por falta de reconexión`);
+          }
+
+          await this.registrarLogSistema('PROCESO_RECONEXION_AUTOMATICA', {
+            clientes_marcados_inactivos: marcadosInactivos,
+            fecha_proceso: new Date().toISOString()
+          });
+
+          console.log(`✅ [CronJobs] Reconexión automática: ${marcadosInactivos} clientes marcados inactivos`);
+
+        } finally {
+          conexion.release();
+        }
+
+      } catch (error) {
+        console.error('❌ [CronJobs] Error en proceso de reconexión automática:', error.message);
+        await this.registrarLogSistema('PROCESO_RECONEXION_ERROR', {
+          error: error.message,
+          fecha_error: new Date().toISOString()
+        });
+      }
+    }, {
+      timezone: 'America/Bogota'
+    });
+
+    console.log('📅 Tarea programada: Proceso reconexión automática (día 3 de cada mes a las 02:00)');
+  }
+
+  /**
+   * Ejecución de bajas programadas
+   * Se ejecuta todos los días a las 06:30 AM
+   * Cancela servicios con fecha de baja ya alcanzada
+   */
+  static bajasProgramadas() {
+    cron.schedule('30 6 * * *', async () => {
+      try {
+        console.log('🔻 [CronJobs] Ejecutando bajas programadas...');
+
+        const conexion = await Database.getConnection();
+
+        try {
+          // Cancelar servicios con fecha_baja <= hoy que aún están activos/suspendidos
+          const [serviciosParaBaja] = await conexion.execute(`
+            SELECT sc.id, sc.cliente_id, sc.fecha_baja, c.nombre AS cliente_nombre
+            FROM servicios_cliente sc
+            JOIN clientes c ON sc.cliente_id = c.id
+            WHERE sc.fecha_baja IS NOT NULL
+              AND sc.fecha_baja <= CURDATE()
+              AND sc.estado IN ('activo', 'suspendido', 'cortado')
+          `);
+
+          let bajasProcesadas = 0;
+          for (const sc of serviciosParaBaja) {
+            await conexion.execute(
+              `UPDATE servicios_cliente SET estado = 'cancelado', updated_at = NOW() WHERE id = ?`,
+              [sc.id]
+            );
+
+            // Si el cliente no tiene más servicios activos, marcarlo como retirado
+            const [otrosActivos] = await conexion.execute(`
+              SELECT COUNT(*) AS total FROM servicios_cliente
+              WHERE cliente_id = ? AND estado IN ('activo','suspendido','cortado') AND id != ?
+            `, [sc.cliente_id, sc.id]);
+
+            if (otrosActivos[0].total === 0) {
+              await conexion.execute(
+                `UPDATE clientes SET estado = 'retirado', updated_at = NOW() WHERE id = ?`,
+                [sc.cliente_id]
+              );
+              console.log(`👋 Cliente ${sc.cliente_nombre} (ID:${sc.cliente_id}) marcado como retirado`);
+            }
+
+            bajasProcesadas++;
+            console.log(`🔻 Servicio ${sc.id} del cliente ${sc.cliente_nombre} dado de baja (fecha: ${sc.fecha_baja})`);
+          }
+
+          await this.registrarLogSistema('BAJAS_PROGRAMADAS', {
+            bajas_procesadas: bajasProcesadas,
+            fecha_proceso: new Date().toISOString()
+          });
+
+          console.log(`✅ [CronJobs] Bajas programadas: ${bajasProcesadas} servicios cancelados`);
+
+        } finally {
+          conexion.release();
+        }
+
+      } catch (error) {
+        console.error('❌ [CronJobs] Error en bajas programadas:', error.message);
+        await this.registrarLogSistema('BAJAS_PROGRAMADAS_ERROR', {
+          error: error.message,
+          fecha_error: new Date().toISOString()
+        });
+      }
+    }, {
+      timezone: 'America/Bogota'
+    });
+
+    console.log('📅 Tarea programada: Bajas programadas (diario a las 06:30)');
   }
 
   // ==========================================
