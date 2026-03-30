@@ -163,7 +163,7 @@ class TrasladosController {
           i.nuevo_sector_id, s_new.nombre AS sector_nuevo,
           i.costo_instalacion, i.actualizar_direccion_cliente,
           i.instalador_id,
-          CONCAT(u.nombres, ' ', COALESCE(u.apellidos,'')) AS instalador_nombre,
+          COALESCE(u.nombre, '') AS instalador_nombre,
           i.persona_recibe, i.observaciones, i.fotos_instalacion,
           i.created_at
         FROM instalaciones i
