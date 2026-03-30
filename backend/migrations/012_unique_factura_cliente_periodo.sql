@@ -1,38 +1,79 @@
--- Migración 012: Agregar constraint UNIQUE (cliente_id, fecha_desde, fecha_hasta)
--- en tabla facturas para prevenir facturas duplicadas por período.
+-- Migración 012 v2: Prevenir facturas duplicadas por período
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PROBLEMA ORIGINAL: MySQL no soporta índices parciales (WHERE activo = '1'),
+-- por lo que un UNIQUE KEY incluye TODAS las filas incluyendo las anuladas.
+-- El simple UPDATE a estado='anulada' no resuelve el conflicto porque
+-- fecha_desde/fecha_hasta siguen iguales.
 --
--- NOTA: Se usa la combinación (cliente_id, fecha_desde, fecha_hasta) en lugar de
--- (cliente_id, periodo_facturacion) porque un mismo período YYYY-MM puede tener
--- facturas de nivelación con rangos de fechas distintos.
--- El UNIQUE se aplica solo a facturas activas (activo = '1').
+-- SOLUCIÓN:
+-- 1. Para cada grupo de duplicados (mismo cliente_id + fecha_desde + fecha_hasta):
+--    Conservar la factura de MENOR id (la más antigua).
+--    En las demás: poner fecha_desde=NULL y fecha_hasta=NULL.
+--    MySQL permite múltiples NULL en índices UNIQUE → sin conflicto.
+-- 2. Crear el UNIQUE KEY sobre (cliente_id, fecha_desde, fecha_hasta).
 --
--- Ejecutar: mysql -u<user> -p <db> < 012_unique_factura_cliente_periodo.sql
+-- Ejecutar: mysql -u<usuario> -p <base_datos> < 012_unique_factura_cliente_periodo.sql
+-- ─────────────────────────────────────────────────────────────────────────────
 
--- 1. Verificar y eliminar duplicados existentes antes de crear el constraint
---    (conservar el de menor ID, anular los demás)
-UPDATE facturas f1
-  JOIN facturas f2
-    ON  f1.cliente_id    = f2.cliente_id
-    AND f1.fecha_desde   = f2.fecha_desde
-    AND f1.fecha_hasta   = f2.fecha_hasta
-    AND f1.activo        = '1'
-    AND f2.activo        = '1'
-    AND f1.id            > f2.id
-    AND f1.estado       != 'anulada'
-SET f1.estado = 'anulada',
-    f1.observaciones = CONCAT(COALESCE(f1.observaciones, ''), ' | ANULADA AUTOMÁTICAMENTE: factura duplicada detectada en migración 012'),
-    f1.updated_at = NOW()
+-- ── PASO 1: Reportar cuántos duplicados existen antes de limpiar ─────────────
+SELECT
+    f1.cliente_id,
+    f1.fecha_desde,
+    f1.fecha_hasta,
+    COUNT(*) AS total_duplicados,
+    GROUP_CONCAT(f1.id ORDER BY f1.id) AS ids_facturas
+FROM facturas f1
 WHERE f1.fecha_desde IS NOT NULL
-  AND f1.fecha_hasta IS NOT NULL;
+  AND f1.fecha_hasta IS NOT NULL
+GROUP BY f1.cliente_id, f1.fecha_desde, f1.fecha_hasta
+HAVING COUNT(*) > 1;
 
--- 2. Crear índice único funcional sobre facturas activas no anuladas.
---    MySQL no soporta índices parciales (WHERE), así que usamos un índice
---    normal compuesto; la validación de duplicados ya existe en la capa
---    de servicio (validarClienteParaFacturacion) y se refuerza aquí a nivel
---    de aplicación.
---    El UNIQUE se crea sobre (cliente_id, fecha_desde, fecha_hasta) para
---    cubrir el caso más común. Si hay NULL en fecha_desde/fecha_hasta
---    MySQL los permite múltiples veces (comportamiento estándar SQL).
+-- ── PASO 2: Nullear fecha_desde/fecha_hasta en los duplicados extra ───────────
+-- Se conserva el de MENOR id (la primera factura emitida para ese período).
+-- Los duplicados quedan con fecha_desde=NULL, fecha_hasta=NULL y estado=anulada.
+UPDATE facturas f_dup
+  INNER JOIN (
+    -- Subconsulta: obtiene el id MÍNIMO por grupo (el que se conserva)
+    SELECT MIN(id) AS id_a_conservar, cliente_id, fecha_desde, fecha_hasta
+    FROM facturas
+    WHERE fecha_desde IS NOT NULL
+      AND fecha_hasta IS NOT NULL
+    GROUP BY cliente_id, fecha_desde, fecha_hasta
+    HAVING COUNT(*) > 1
+  ) keeper
+    ON  f_dup.cliente_id  = keeper.cliente_id
+    AND f_dup.fecha_desde = keeper.fecha_desde
+    AND f_dup.fecha_hasta = keeper.fecha_hasta
+    AND f_dup.id         != keeper.id_a_conservar   -- todos excepto el conservado
+SET
+    f_dup.fecha_desde    = NULL,
+    f_dup.fecha_hasta    = NULL,
+    f_dup.estado         = 'anulada',
+    f_dup.observaciones  = CONCAT(
+        COALESCE(f_dup.observaciones, ''),
+        ' | [MIG-012] Duplicado anulado - período ya cubierto por factura id=',
+        keeper.id_a_conservar
+    ),
+    f_dup.updated_at     = NOW();
+
+-- ── PASO 3: Verificar que no queden duplicados ────────────────────────────────
+SELECT
+    cliente_id, fecha_desde, fecha_hasta, COUNT(*) AS total
+FROM facturas
+WHERE fecha_desde IS NOT NULL
+  AND fecha_hasta IS NOT NULL
+GROUP BY cliente_id, fecha_desde, fecha_hasta
+HAVING COUNT(*) > 1;
+-- Si la consulta anterior devuelve filas → hay duplicados aún → NO continuar.
+
+-- ── PASO 4: Crear UNIQUE KEY ──────────────────────────────────────────────────
+-- MySQL permite múltiples NULL en UNIQUE → las filas anuladas con NULL
+-- en fecha_desde/fecha_hasta no causarán conflicto.
 ALTER TABLE facturas
   ADD UNIQUE KEY `uq_factura_cliente_periodo`
     (`cliente_id`, `fecha_desde`, `fecha_hasta`);
+
+-- ── PASO 5: Crear índice adicional de performance para consultas de cartera ───
+-- (Solo si no existe ya)
+ALTER TABLE facturas
+  ADD KEY `idx_cliente_fechas` (`cliente_id`, `fecha_desde`, `fecha_hasta`);

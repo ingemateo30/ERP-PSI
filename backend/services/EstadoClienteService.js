@@ -265,10 +265,10 @@ class EstadoClienteService {
       await conexion.execute(
         `UPDATE clientes SET
            estado = 'activo',
-           requiere_reconexion = ?,
+           requiere_reconexion = 0,
            updated_at = NOW()
          WHERE id = ?`,
-        [requiereReconexion ? 1 : 0, clienteId]
+        [clienteId]
       );
 
       await conexion.execute(
@@ -277,18 +277,43 @@ class EstadoClienteService {
         [clienteId]
       );
 
+      // ── Auto-generar cargo de reconexión en varios_pendientes ────────────────
+      // Solo para clientes que venían CORTADOS (mora > 60 días).
+      // El cargo se toma de configuracion_empresa.valor_reconexion.
+      let valorReconexion = 0;
+      if (requiereReconexion) {
+        const [config] = await conexion.execute(
+          'SELECT valor_reconexion FROM configuracion_empresa WHERE id = 1'
+        );
+        valorReconexion = parseFloat(config[0]?.valor_reconexion || 0);
+
+        if (valorReconexion > 0) {
+          const hoy = new Date();
+          const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+          await conexion.execute(
+            `INSERT INTO varios_pendientes
+               (cliente_id, concepto, cantidad, valor_unitario, valor_total,
+                aplica_iva, porcentaje_iva, fecha_aplicacion, facturado, activo)
+             VALUES (?, 'Cargo de reconexión de servicio', 1, ?, ?, 0, 0, ?, 0, 1)`,
+            [clienteId, valorReconexion, valorReconexion, fechaHoy]
+          );
+          console.log(`💰 Cargo de reconexión $${valorReconexion.toLocaleString('es-CO')} registrado para cliente ${clienteId}`);
+        }
+      }
+
       await conexion.commit();
       conexion.release();
 
-      console.log(`✅ Cliente ${cliente.nombre} (ID:${clienteId}) reactivado: ${estadoAnterior} → activo${requiereReconexion ? ' (requiere reconexión)' : ''}`);
+      console.log(`✅ Cliente ${cliente.nombre} (ID:${clienteId}) reactivado: ${estadoAnterior} → activo${requiereReconexion ? ` (cargo reconexión $${valorReconexion})` : ''}`);
 
       return {
         reactivado: true,
         estado_anterior: estadoAnterior,
         estado_nuevo: 'activo',
         requiere_reconexion: requiereReconexion,
+        cargo_reconexion: valorReconexion,
         mensaje: requiereReconexion
-          ? 'Cliente reactivado. Se debe cobrar cargo de reconexión.'
+          ? `Cliente reactivado. Cargo de reconexión $${valorReconexion.toLocaleString('es-CO')} registrado para próxima factura.`
           : 'Cliente reactivado sin cargo de reconexión.'
       };
 

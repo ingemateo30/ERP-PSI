@@ -603,6 +603,17 @@ if (firma_cliente !== undefined) {
 }
         // Estado
         if (estado) {
+            // Regulación CRC: no se puede cerrar/resolver sin respuesta al usuario
+            if ((estado === 'resuelto' || estado === 'cerrado') && !respuesta) {
+                const [pqrActual] = await db.query('SELECT respuesta FROM pqr WHERE id = ?', [id]);
+                if (!pqrActual || !pqrActual.respuesta) {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'No se puede cerrar/resolver una PQR sin registrar la respuesta al usuario. Regulación CRC Resolución 2000-81.'
+                    });
+                }
+            }
+
             updateFields.push('estado = ?');
             params.push(estado);
 

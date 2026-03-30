@@ -804,6 +804,15 @@ const selectQuery = `
             const query = `UPDATE instalaciones SET ${camposActualizar.join(', ')} WHERE id = ?`;
             await connection.query(query, parametros);
 
+            // Si se completa y no vino fecha_realizada, auto-asignar hoy
+            // (crítico: la facturación usa fecha_realizada como base del primer período)
+            if (estado === 'completada' && !fecha_realizada) {
+                await connection.query(
+                    `UPDATE instalaciones SET fecha_realizada = CURDATE() WHERE id = ? AND fecha_realizada IS NULL`,
+                    [id]
+                );
+            }
+
             // Lógica específica por estado
             if (estado === 'completada') {
                 // Actualizar equipos a estado "instalado"
@@ -822,10 +831,18 @@ const selectQuery = `
 
                 // Activar servicio del cliente si no está activo
                 await connection.query(
-                    `UPDATE servicios_cliente 
+                    `UPDATE servicios_cliente
            SET estado = 'activo', fecha_activacion = CURDATE()
            WHERE id = ? AND estado != 'activo'`,
                     [instalacionActual.servicio_cliente_id]
+                );
+
+                // Activar contrato asociado al servicio (si existe y no está activo)
+                await connection.query(
+                    `UPDATE contratos
+           SET estado = 'activo', updated_at = NOW()
+           WHERE servicio_id = ? AND estado NOT IN ('activo','anulado','terminado')`,
+                    [String(instalacionActual.servicio_cliente_id)]
                 );
                 // ✅✅✅ INSERTAR AQUÍ TODO EL CÓDIGO NUEVO ✅✅✅
                 // Actualizar IP, TAP, MAC y ONT en la tabla clientes si vienen en el request
