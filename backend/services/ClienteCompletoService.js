@@ -2852,7 +2852,7 @@ static async generarNumeroFactura(conexion) {
       if (!plan_id) throw new Error('El ID del nuevo plan es requerido');
 
       // Obtener el servicio a cambiar
-      let query = 'SELECT * FROM servicios_cliente WHERE cliente_id = ? AND estado = \'activo\'';
+      let query = "SELECT * FROM servicios_cliente WHERE cliente_id = ? AND estado = 'activo'";
       const params = [clienteId];
 
       if (servicio_id) {
@@ -2876,6 +2876,28 @@ static async generarNumeroFactura(conexion) {
       const nuevoPlan = planes[0];
       const precioFinal = precio_personalizado ? parseFloat(precio_personalizado) : parseFloat(nuevoPlan.precio);
 
+      // ── Calcular prorrateo del período restante del mes actual ───────────────
+      // Si el cambio ocurre a mitad de mes, calcular los días restantes para
+      // registrar la diferencia como ajuste en varios_pendientes.
+      const hoy = new Date();
+      const ultimoDiaMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+      const diasRestantes = ultimoDiaMes - hoy.getDate() + 1; // incluye hoy
+      const diasMes = ultimoDiaMes;
+
+      const precioAnterior = parseFloat(servicioActual.precio_personalizado || 0);
+      let ajusteProrrateo = 0;
+      let descripcionAjuste = '';
+
+      if (diasRestantes < diasMes && precioAnterior > 0) {
+        // Diferencia proporcional por los días restantes del mes
+        const prorrateoAnterior = Math.round((precioAnterior * diasRestantes) / diasMes);
+        const prorrateoNuevo    = Math.round((precioFinal   * diasRestantes) / diasMes);
+        ajusteProrrateo = prorrateoNuevo - prorrateoAnterior;
+        descripcionAjuste = `Ajuste prorrateo cambio de plan (${diasRestantes}/${diasMes} días): ` +
+          `anterior $${precioAnterior.toLocaleString('es-CO')} → nuevo $${precioFinal.toLocaleString('es-CO')}`;
+        console.log(`💰 Prorrateo cambio de plan: ajuste $${ajusteProrrateo.toLocaleString('es-CO')} (${diasRestantes} días restantes)`);
+      }
+
       // Cancelar servicio actual
       await conexion.execute(
         `UPDATE servicios_cliente SET estado = 'cancelado', fecha_suspension = NOW(),
@@ -2891,13 +2913,24 @@ static async generarNumeroFactura(conexion) {
         [clienteId, plan_id, precioFinal, observaciones || `Cambio desde plan ID ${servicioActual.plan_id}`]
       );
 
+      // Registrar ajuste de prorrateo en varios_pendientes para incluirlo en próxima factura
+      if (ajusteProrrateo !== 0) {
+        await conexion.execute(
+          `INSERT INTO varios_pendientes (cliente_id, concepto, valor, activo, created_at)
+           VALUES (?, ?, ?, 1, NOW())`,
+          [clienteId, descripcionAjuste, ajusteProrrateo]
+        );
+      }
+
       console.log(`✅ Plan cambiado: servicio ${servicioActual.id} cancelado, nuevo servicio ${resultado.insertId} creado`);
 
       return {
         servicio_anterior_id: servicioActual.id,
         servicio_nuevo_id: resultado.insertId,
         nuevo_plan: nuevoPlan.nombre,
-        precio: precioFinal
+        precio: precioFinal,
+        ajuste_prorrateo: ajusteProrrateo,
+        descripcion_ajuste: descripcionAjuste || null
       };
     });
   }

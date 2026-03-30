@@ -775,6 +775,25 @@ class FacturacionAutomaticaService {
       const fechaVencimiento = new Date();
       fechaVencimiento.setDate(fechaVencimiento.getDate() + diasVencimiento);
 
+      // ── Guardia anti-duplicados: verificar solapamiento de fechas antes de insertar ──
+      const [duplicados] = await conexion.execute(`
+        SELECT id, numero_factura FROM facturas
+        WHERE cliente_id = ?
+          AND activo = 1
+          AND estado != 'anulada'
+          AND fecha_desde IS NOT NULL
+          AND fecha_hasta IS NOT NULL
+          AND fecha_desde <= ? AND fecha_hasta >= ?
+        LIMIT 1
+      `, [cliente.id, periodo.fecha_hasta, periodo.fecha_desde]);
+
+      if (duplicados.length > 0) {
+        throw new Error(
+          `Ya existe la factura ${duplicados[0].numero_factura} que cubre este período ` +
+          `(${periodo.fecha_desde} – ${periodo.fecha_hasta}). No se genera duplicado.`
+        );
+      }
+
       // ✅ C4 FIX: INSERT de factura dentro de la transacción
       const [resultado] = await conexion.execute(`
         INSERT INTO facturas (
@@ -806,10 +825,20 @@ class FacturacionAutomaticaService {
         totales.subtotal,
         totales.iva,
         totales.total,
-        modo === 'borrador' ? 'borrador' : 'pendiente'
+        // El ENUM solo acepta 'pendiente','pagada','vencida','anulada'.
+        // Modo borrador usa activo=0 para ocultar la factura hasta confirmar.
+        'pendiente'
       ]);
 
       const facturaId = resultado.insertId;
+
+      // Si el modo es borrador, dejar la factura inactiva hasta que el operador confirme
+      if (modo === 'borrador') {
+        await conexion.execute(
+          "UPDATE facturas SET activo = 0, observaciones = 'BORRADOR - pendiente de confirmación' WHERE id = ?",
+          [facturaId]
+        );
+      }
 
       // ✅ C4 FIX: Detalles dentro de la misma transacción
       await this.crearDetalleFactura(conexion, facturaId, conceptos);
