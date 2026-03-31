@@ -134,6 +134,10 @@ export const facturasService = {
         periodo: params.periodo || new Date().toISOString().slice(0, 7) // YYYY-MM
       };
 
+      if (params.sede_id) {
+        queryParams.sede_id = params.sede_id;
+      }
+
       console.log('👁️ Enviando parámetros de preview:', queryParams);
 
       const response = await apiService.get(`${API_BASE}/automatica/preview-mensual`, queryParams);

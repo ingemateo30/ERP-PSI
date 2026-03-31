@@ -13,11 +13,11 @@ class FacturacionAutomaticaController {
     try {
       console.log('👁️ Generando preview DETALLADO de facturación...');
 
-      const { periodo } = req.query;
+      const { periodo, sede_id } = req.query;
       const fechaPeriodo = periodo ? new Date(periodo + '-01') : new Date();
 
-      // 1. Obtener clientes para facturar
-      const clientesParaFacturar = await FacturacionAutomaticaService.obtenerClientesParaFacturar(fechaPeriodo);
+      // 1. Obtener clientes para facturar (filtrados por sede si se especifica)
+      const clientesParaFacturar = await FacturacionAutomaticaService.obtenerClientesParaFacturar(fechaPeriodo, sede_id || null);
 
       console.log(`📊 Clientes encontrados: ${clientesParaFacturar.length}`);
 
