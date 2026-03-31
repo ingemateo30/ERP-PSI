@@ -242,6 +242,7 @@ const ClientesPorSector = () => {
   };
 
   const hayFiltros = filtroCiudad || filtroZona || filtroEstado || busqueda;
+  const hayFiltrosAvanzados = filtroCiudad || filtroZona || filtroEstado;
 
   return (
     <div className="space-y-4">
@@ -260,6 +261,18 @@ const ClientesPorSector = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Búsqueda siempre visible */}
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar cliente..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0e6493] focus:border-transparent w-48"
+            />
+          </div>
+
           <button
             onClick={() => setShowFilters(p => !p)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
@@ -268,7 +281,7 @@ const ClientesPorSector = () => {
           >
             <Filter size={16} />
             Filtros
-            {hayFiltros && <span className="bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">!</span>}
+            {(filtroCiudad || filtroZona || filtroEstado) && <span className="bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">!</span>}
           </button>
           <button
             onClick={cargarDatos}
@@ -281,22 +294,10 @@ const ClientesPorSector = () => {
         </div>
       </div>
 
-      {/* Panel de filtros */}
+      {/* Panel de filtros (sin la búsqueda que ya está arriba) */}
       {showFilters && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Búsqueda */}
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar cliente..."
-                value={busqueda}
-                onChange={e => setBusqueda(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0e6493] focus:border-transparent"
-              />
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Ciudad */}
             <select
               value={filtroCiudad}
@@ -335,7 +336,7 @@ const ClientesPorSector = () => {
             </select>
           </div>
 
-          {hayFiltros && (
+          {(filtroCiudad || filtroZona || filtroEstado) && (
             <button
               onClick={limpiarFiltros}
               className="flex items-center gap-1 text-sm text-red-600 hover:text-red-700"

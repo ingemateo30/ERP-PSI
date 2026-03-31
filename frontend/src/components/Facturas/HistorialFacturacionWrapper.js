@@ -658,7 +658,7 @@ const formatearPeriodoFacturado = (factura) => {
                         {loading ? (
                             <div className="flex items-center justify-center py-8">
                                 <RefreshCw className="w-6 h-6 animate-spin text-[#0e6493] mr-2" />
-                                <span className="text-gray-600">Cargando clientes...</span>
+                                <span className="text-gray-600">Buscando clientes...</span>
                             </div>
                         ) : (
                             <div className="grid gap-3 max-h-96 overflow-y-auto">
@@ -686,10 +686,16 @@ const formatearPeriodoFacturado = (factura) => {
                                             </div>
                                         </div>
                                     ))
-                                ) : (
+                                ) : busquedaCliente.trim().length >= 2 ? (
                                     <div className="text-center py-8">
                                         <Users className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-                                        <p className="text-gray-500">No se encontraron clientes</p>
+                                        <p className="text-gray-500">No se encontraron clientes con "{busquedaCliente}"</p>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8">
+                                        <Search className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                                        <p className="text-gray-500">Ingrese el nombre, identificación o teléfono del cliente</p>
+                                        <p className="text-gray-400 text-sm mt-1">Mínimo 2 caracteres para buscar</p>
                                     </div>
                                 )}
                             </div>

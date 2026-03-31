@@ -5,11 +5,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Save, Loader2, User, MapPin, Phone, Mail,
-  AlertCircle, Check, Clock
+  AlertCircle, Check, Clock, Truck
 } from 'lucide-react';
 import { clientService } from '../../services/clientService';
+import { usePermissions } from '../../hooks/usePermissions';
 
-const ClientEditForm = ({ client, onClose, onSave }) => {
+const ClientEditForm = ({ client, onClose, onSave, onGenerarTraslado }) => {
+  const { esSecretaria } = usePermissions();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
@@ -148,7 +150,7 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
       nuevosErrores.nombre = 'El nombre es requerido';
     }
 
-    if (!formData.direccion.trim()) {
+    if (!esSecretaria && !formData.direccion.trim()) {
       nuevosErrores.direccion = 'La dirección es requerida';
     }
 
@@ -369,16 +371,36 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                 Ubicación
               </h3>
               
+              {/* Aviso para secretarias: dirección bloqueada */}
+              {esSecretaria && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-amber-700 text-sm">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>Para cambiar la dirección debes generar un <strong>Traslado</strong>.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onGenerarTraslado && onGenerarTraslado(client)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    <Truck className="w-3.5 h-3.5" />
+                    Generar Traslado
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Dirección *
+                    Dirección {!esSecretaria && '*'}
                   </label>
                   <input
                     type="text"
                     value={formData.direccion}
                     onChange={(e) => handleInputChange('direccion', e.target.value)}
+                    disabled={esSecretaria}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
+                      esSecretaria ? 'bg-gray-100 text-gray-500 cursor-not-allowed' :
                       errors.direccion ? 'border-red-300' : 'border-gray-300'
                     }`}
                     placeholder="Dirección completa del cliente"
@@ -396,7 +418,10 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                     type="text"
                     value={formData.barrio}
                     onChange={(e) => handleInputChange('barrio', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                    disabled={esSecretaria}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
+                      esSecretaria ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
+                    }`}
                     placeholder="Nombre del barrio"
                   />
                 </div>
@@ -408,7 +433,10 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                   <select
                     value={formData.estrato}
                     onChange={(e) => handleInputChange('estrato', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                    disabled={esSecretaria}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
+                      esSecretaria ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
+                    }`}
                   >
                     <option value="1">Estrato 1</option>
                     <option value="2">Estrato 2</option>
@@ -426,7 +454,10 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                   <select
                     value={formData.ciudad_id}
                     onChange={(e) => handleInputChange('ciudad_id', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
+                    disabled={esSecretaria}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
+                      esSecretaria ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
+                    }`}
                   >
                     <option value="">Seleccionar ciudad</option>
                     {ciudades.map(ciudad => (
@@ -444,8 +475,10 @@ const ClientEditForm = ({ client, onClose, onSave }) => {
                   <select
                     value={formData.sector_id}
                     onChange={(e) => handleInputChange('sector_id', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493]"
-                    disabled={!formData.ciudad_id}
+                    disabled={esSecretaria || !formData.ciudad_id}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e6493] ${
+                      esSecretaria ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
+                    }`}
                   >
                     <option value="">Seleccionar sector</option>
                     {sectores.map(sector => (
