@@ -181,20 +181,36 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 console.log('✅ Dispositivo ya estaba abierto');
             }
 
-            // Configurar canvas para mostrar la firma
+            // Configurar canvas para mostrar la firma con corrección DPR
             const canvas = wacomCanvasRef.current;
             if (!canvas) {
                 throw new Error('Canvas no disponible');
             }
 
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+            // Resolución real del digitalizador STU-540
+            const MAX_X = 10800;
+            const MAX_Y = 6000;
+            // Aspect ratio del digitalizador: 10800/6000 = 1.8 (9:5)
+            const DIGITIZER_RATIO = MAX_X / MAX_Y;
 
-            console.log('🎨 Canvas configurado:', canvas.width + 'x' + canvas.height);
+            // Ajustar canvas para que coincida con el aspect ratio del digitalizador
+            const dpr = window.devicePixelRatio || 1;
+            const displayWidth = canvas.clientWidth || 800;
+            const displayHeight = Math.round(displayWidth / DIGITIZER_RATIO);
+
+            // Canvas interno a alta resolución (DPR) para nitidez
+            canvas.width = displayWidth * dpr;
+            canvas.height = displayHeight * dpr;
+            canvas.style.width = displayWidth + 'px';
+            canvas.style.height = displayHeight + 'px';
+
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, displayWidth, displayHeight);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, displayWidth, displayHeight);
+
+            console.log(`🎨 Canvas: display=${displayWidth}x${displayHeight}, internal=${canvas.width}x${canvas.height}, dpr=${dpr}`);
 
             let signaturePoints = [];
             let isDrawing = false;
@@ -202,16 +218,21 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
             let lastY = -1;
             let reportCount = 0;
             let lastStatus = -1;
+            let lastPressure = 0;
+            let lastTime = 0;
+            let lastLineWidth = 2;
 
-            // Buffer de suavizado: promedio móvil de últimos N puntos
-            const SMOOTH_BUFFER_SIZE = 4;
-            let smoothBuffer = [];
+            // Suavizado EMA (exponential moving average) - menos lag que buffer promedio
+            const SMOOTHING = 0.3; // 0 = sin suavizado, 1 = máximo suavizado
+            let smoothX = -1;
+            let smoothY = -1;
 
-            // Resolución real del digitalizador STU-540 (PID=0xa8)
-            const MAX_X = 10800;
-            const MAX_Y = 6000;
+            // Configuración de presión y grosor
+            const MIN_LINE_WIDTH = 0.8;
+            const MAX_LINE_WIDTH = 3.5;
+            const PRESSURE_MAX = 1023; // STU-540 soporta 1024 niveles
 
-            console.log('⚙️ STU-540 config: maxX=' + MAX_X + ' maxY=' + MAX_Y);
+            console.log('⚙️ STU-540 config: maxX=' + MAX_X + ' maxY=' + MAX_Y + ' pressureLevels=' + (PRESSURE_MAX + 1));
 
             // Función para limpiar pantalla LCD del STU-540
             const limpiarPantallaSTU = async () => {
@@ -225,30 +246,10 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
 
             await limpiarPantallaSTU();
 
-            // Configurar estilo del canvas una sola vez
+            // Configurar estilo base del canvas
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 3;
-
-            // Función de suavizado: promedio móvil ponderado
-            const smoothPoint = (rawX, rawY) => {
-                smoothBuffer.push({ x: rawX, y: rawY });
-                if (smoothBuffer.length > SMOOTH_BUFFER_SIZE) {
-                    smoothBuffer.shift();
-                }
-                // Promedio ponderado: puntos más recientes pesan más
-                let totalWeight = 0;
-                let sx = 0;
-                let sy = 0;
-                for (let i = 0; i < smoothBuffer.length; i++) {
-                    const weight = i + 1; // 1, 2, 3, 4...
-                    sx += smoothBuffer[i].x * weight;
-                    sy += smoothBuffer[i].y * weight;
-                    totalWeight += weight;
-                }
-                return { x: sx / totalWeight, y: sy / totalWeight };
-            };
 
             const procesarDatosHID = (event) => {
                 reportCount++;
@@ -259,10 +260,12 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 const status = data[0];
                 const x = data[1] | (data[2] << 8);
                 const y = data[3] | (data[4] << 8);
+                // Extraer presión del pen (bytes 5-6, little-endian) si están disponibles
+                const pressure = data.length >= 7 ? (data[5] | (data[6] << 8)) : 0;
 
                 // Log cambios de status para debug
                 if (status !== lastStatus) {
-                    console.log(`🔔 STATUS: 0x${lastStatus.toString(16)} → 0x${status.toString(16)} | x=${x} y=${y} | report #${reportCount}`);
+                    console.log(`🔔 STATUS: 0x${lastStatus.toString(16)} → 0x${status.toString(16)} | x=${x} y=${y} p=${pressure} | report #${reportCount}`);
                     lastStatus = status;
                 }
 
@@ -271,7 +274,8 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     if (isDrawing) {
                         isDrawing = false;
                         ctx.stroke();
-                        smoothBuffer = [];
+                        smoothX = -1;
+                        smoothY = -1;
                     }
                     return;
                 }
@@ -280,62 +284,84 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 if (x > MAX_X || y > MAX_Y) return;
                 if (x === 0 && y === 0) return;
 
-                // Hover (0x80 exactamente) → no dibujar
+                // Hover (0x80 exactamente, sin bits de contacto) → no dibujar
                 if (status === 0x80) {
                     if (isDrawing) {
                         isDrawing = false;
                         ctx.stroke();
-                        smoothBuffer = [];
+                        smoothX = -1;
+                        smoothY = -1;
                     }
                     return;
                 }
 
-                // Pen TOCANDO → dibujar con suavizado
-                const rawCanvasX = (x / MAX_X) * canvas.width;
-                const rawCanvasY = (y / MAX_Y) * canvas.height;
+                // Mapear coordenadas del digitalizador al espacio de display del canvas
+                const rawCanvasX = (x / MAX_X) * displayWidth;
+                const rawCanvasY = (y / MAX_Y) * displayHeight;
 
-                // Aplicar suavizado de coordenadas
-                const smoothed = smoothPoint(rawCanvasX, rawCanvasY);
-                const canvasX = smoothed.x;
-                const canvasY = smoothed.y;
+                // Calcular ancho de línea basado en presión
+                let normalizedPressure = pressure > 0 ? Math.min(pressure / PRESSURE_MAX, 1.0) : 0.5;
+                const targetWidth = MIN_LINE_WIDTH + (MAX_LINE_WIDTH - MIN_LINE_WIDTH) * normalizedPressure;
+                // Suavizar transición de grosor para evitar cambios bruscos
+                const lineWidth = lastLineWidth + (targetWidth - lastLineWidth) * 0.4;
+                lastLineWidth = lineWidth;
 
                 if (!isDrawing) {
-                    // Inicio de trazo
+                    // Inicio de trazo - usar punto crudo sin suavizar
                     isDrawing = true;
-                    smoothBuffer = [{ x: rawCanvasX, y: rawCanvasY }];
+                    smoothX = rawCanvasX;
+                    smoothY = rawCanvasY;
+                    lastX = rawCanvasX;
+                    lastY = rawCanvasY;
+                    lastTime = Date.now();
+                    lastPressure = normalizedPressure;
+                    lastLineWidth = targetWidth;
                     ctx.beginPath();
-                    ctx.moveTo(canvasX, canvasY);
-                    lastX = canvasX;
-                    lastY = canvasY;
+                    ctx.moveTo(rawCanvasX, rawCanvasY);
                 } else {
+                    // Aplicar suavizado EMA (exponential moving average)
+                    const canvasX = smoothX + (rawCanvasX - smoothX) * (1 - SMOOTHING);
+                    const canvasY = smoothY + (rawCanvasY - smoothY) * (1 - SMOOTHING);
+                    smoothX = canvasX;
+                    smoothY = canvasY;
+
                     const dx = canvasX - lastX;
                     const dy = canvasY - lastY;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
-                    // Umbral mínimo para evitar jitter
-                    if (dist > 2) {
-                        // Curva cuadrática suave SIN romper el path
+                    // Umbral mínimo dinámico: más bajo a baja velocidad para detalle fino
+                    const minDist = dist > 10 ? 1.5 : 0.5;
+
+                    if (dist > minDist) {
+                        // Establecer grosor antes de dibujar
+                        ctx.lineWidth = lineWidth;
+
+                        // Curva cuadrática suave usando punto medio
                         const midX = (lastX + canvasX) / 2;
                         const midY = (lastY + canvasY) / 2;
                         ctx.quadraticCurveTo(lastX, lastY, midX, midY);
-                        // Renderizar cada 3 puntos sin romper el path
-                        if (signaturePoints.length % 3 === 0) {
+
+                        // Renderizar periódicamente sin romper continuidad visual
+                        if (signaturePoints.length % 8 === 0) {
                             ctx.stroke();
-                            // Reiniciar path desde último punto para mantener continuidad
+                            // Reiniciar path desde punto medio para continuidad perfecta
                             ctx.beginPath();
                             ctx.moveTo(midX, midY);
                         }
+
                         lastX = canvasX;
                         lastY = canvasY;
+                        lastTime = Date.now();
+                        lastPressure = normalizedPressure;
                     }
                 }
 
-                // Guardar punto
+                // Guardar punto con datos biométricos
                 signaturePoints.push({
-                    x, y,
+                    x, y, pressure,
                     timestamp: Date.now(),
-                    canvas_x: canvasX,
-                    canvas_y: canvasY,
+                    canvas_x: smoothX,
+                    canvas_y: smoothY,
                     raw_status: status
                 });
             };
@@ -591,19 +617,19 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
         
         // Limpiar canvas Wacom completamente
         if (wacomCanvasRef.current) {
-            const ctx = wacomCanvasRef.current.getContext('2d');
-            let isDrawing = false;
-            
-            // Limpiar completamente el canvas
-            ctx.clearRect(0, 0, wacomCanvasRef.current.width, wacomCanvasRef.current.height);
-            
-            // Restaurar configuración del canvas
+            const cvs = wacomCanvasRef.current;
+            const ctx = cvs.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+
+            // Resetear transformaciones y limpiar
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+            // Re-aplicar escala DPR y fondo blanco
+            ctx.scale(dpr, dpr);
             ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, wacomCanvasRef.current.width, wacomCanvasRef.current.height);
-            
-            // Resetear estado de dibujo
-            isDrawing = false;
-            
+            ctx.fillRect(0, 0, cvs.width / dpr, cvs.height / dpr);
+
             console.log('🧹 Canvas limpiado completamente');
         }
         
@@ -1187,9 +1213,9 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                                     <canvas
                                         ref={wacomCanvasRef}
                                         width={800}
-                                        height={480}
+                                        height={444}
                                         className="w-full border rounded bg-white mx-auto block"
-                                        style={{ aspectRatio: '5/3', maxHeight: '300px' }}
+                                        style={{ aspectRatio: '9/5' }}
                                     />
                                     {!isCapturingWacom && (
                                         <p className="text-center text-sm text-green-700 mt-2">
