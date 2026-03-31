@@ -451,18 +451,29 @@ const TrasladosManagement = () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // Modal: Crear Traslado
 // ═══════════════════════════════════════════════════════════════════════════
-const ModalCrearTraslado = ({ ciudades, token, onClose, onSuccess }) => {
+const ModalCrearTraslado = ({ ciudades: ciudadesProp, token, onClose, onSuccess, clienteInicial }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [clientes, setClientes] = useState([]);
   const [busquedaCliente, setBusquedaCliente] = useState('');
-  const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(clienteInicial || null);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
   const [sectores, setSectoresModal] = useState([]);
   const [barriosSugeridos, setBarriosSugeridos] = useState([]);
+  const [ciudades, setCiudades] = useState(ciudadesProp || []);
+
+  // Cargar ciudades si no se pasan como prop
+  useEffect(() => {
+    if (!ciudadesProp || ciudadesProp.length === 0) {
+      fetch('/api/v1/config/cities', { headers: { Authorization: `Bearer ${token()}` } })
+        .then(r => r.json())
+        .then(d => setCiudades(d?.data || d?.ciudades || []))
+        .catch(() => {});
+    }
+  }, []);
 
   const [form, setForm] = useState({
-    cliente_id: '',
+    cliente_id: clienteInicial?.id || '',
     direccion_nueva: '',
     barrio_nuevo: '',
     ciudad_nueva_id: '',
@@ -971,4 +982,5 @@ const ModalCancelarTraslado = ({ traslado, token, onClose, onSuccess }) => {
   );
 };
 
+export { ModalCrearTraslado };
 export default TrasladosManagement;

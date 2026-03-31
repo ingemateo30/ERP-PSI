@@ -16,6 +16,7 @@ import ClientFilters from './ClientFilters';
 import ClientStats from './ClientStats';
 import ClientModal from './ClientModal';
 import ClientesInactivos from './ClientesInactivos'; // NUEVO: Componente para clientes inactivos
+import { ModalCrearTraslado } from '../Traslados/TrasladosManagement';
 
 const ClientsManagement = () => {
   const { user } = useAuth();
@@ -51,6 +52,10 @@ const ClientsManagement = () => {
   // Estados para cancelar instalación (suspender + anular factura/contrato)
   const [showCancelarInstalacionModal, setShowCancelarInstalacionModal] = useState(false);
   const [cancelandoInstalacion, setCancelandoInstalacion] = useState(false);
+
+  // Estado para modal de traslado desde edición de cliente
+  const [showTrasladoModal, setShowTrasladoModal] = useState(false);
+  const [clienteParaTraslado, setClienteParaTraslado] = useState(null);
 
   // Permisos del usuario actual
   const permissions = ROLE_PERMISSIONS[user?.role] || ROLE_PERMISSIONS.instalador;
@@ -102,6 +107,13 @@ const ClientsManagement = () => {
         window.showNotification('error', error.message || 'Error al cambiar estado del cliente');
       }
     }
+  };
+
+  // Manejar apertura del modal de traslado desde edición
+  const handleGenerarTraslado = (client) => {
+    setShowEditForm(false);
+    setClienteParaTraslado(client);
+    setShowTrasladoModal(true);
   };
 
   // NUEVO: Manejar inactivación de cliente con modal de confirmación
@@ -472,6 +484,18 @@ const ClientsManagement = () => {
           client={selectedClient}
           onClose={handleCloseForm}
           onSave={handleClientSaved}
+          onGenerarTraslado={handleGenerarTraslado}
+        />
+      )}
+
+      {/* Modal traslado desde edición de cliente */}
+      {showTrasladoModal && clienteParaTraslado && (
+        <ModalCrearTraslado
+          ciudades={[]}
+          token={() => localStorage.getItem('accessToken')}
+          clienteInicial={clienteParaTraslado}
+          onClose={() => { setShowTrasladoModal(false); setClienteParaTraslado(null); }}
+          onSuccess={() => { setShowTrasladoModal(false); setClienteParaTraslado(null); refresh(); }}
         />
       )}
 
