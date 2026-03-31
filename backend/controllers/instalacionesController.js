@@ -509,7 +509,20 @@ const selectQuery = `
                 console.log('🔔 Notificación de nueva instalación creada');
             } catch (notifError) {
                 console.error('⚠️ Error creando notificación:', notifError);
-                // No fallar la creación de la instalación si falla la notificación
+            }
+
+            // SMS al técnico si está asignado y tiene teléfono
+            if (instalacionCreada.instalador_telefono) {
+                try {
+                    const SMSService = require('../services/SMSService');
+                    await SMSService.notificarTecnicoInstalacionAsignada(
+                        { telefono: instalacionCreada.instalador_telefono },
+                        instalacionCreada
+                    );
+                    console.log('📱 SMS enviado al técnico:', instalacionCreada.instalador_nombre);
+                } catch (smsError) {
+                    console.error('⚠️ Error enviando SMS al técnico:', smsError.message);
+                }
             }
 
             res.status(201).json({

@@ -153,6 +153,22 @@ class SMSService {
     const msg = `PSI - PQR #${pqrId} asignada a ti: ${descripcionCorta}. Atiende a la brevedad.`.slice(0, 160);
     return SMSService.enviar(tecnico.telefono, msg);
   }
+
+  static async notificarTecnicoInstalacionAsignada(tecnico, instalacion) {
+    const fecha = instalacion.fecha_programada
+      ? new Date(instalacion.fecha_programada).toLocaleDateString('es-CO')
+      : 'por confirmar';
+    const hora = instalacion.hora_programada ? ` a las ${instalacion.hora_programada}` : '';
+    const dir = instalacion.direccion_instalacion || 'sin dirección';
+    const msg = `PSI - Instalacion asignada: Cliente ${instalacion.cliente_nombre}, el ${fecha}${hora}. Dir: ${dir}`.slice(0, 160);
+    return SMSService.enviar(tecnico.telefono, msg);
+  }
+
+  static async notificarSecretariaNuevoCliente(secretaria, cliente) {
+    const tel = cliente.telefono ? ` Tel: ${cliente.telefono}.` : '';
+    const msg = `PSI - Nuevo cliente: ${cliente.nombre} (${cliente.identificacion}).${tel} Dir: ${cliente.direccion}`.slice(0, 160);
+    return SMSService.enviar(secretaria.telefono, msg);
+  }
 }
 
 module.exports = SMSService;

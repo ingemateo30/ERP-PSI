@@ -414,6 +414,30 @@ static async crear(req, res) {
     // Confirmar transacción
     await conexion.commit();
 
+    // SMS a secretarias de la sede asociada al cliente
+    try {
+      const SMSService = require('../services/SMSService');
+      const db = require('../config/database');
+      const [secretarias] = await db.query(
+        `SELECT telefono, nombre FROM sistema_usuarios
+         WHERE rol = 'secretaria' AND activo = 1
+           AND telefono IS NOT NULL AND telefono != ''
+           AND sede_id = ?`,
+        [datosCliente.ciudad_id || null]
+      );
+      for (const sec of secretarias) {
+        await SMSService.notificarSecretariaNuevoCliente(sec, {
+          nombre,
+          identificacion: datosCliente.identificacion,
+          telefono: datosCliente.telefono,
+          direccion: datosCliente.direccion
+        });
+        console.log('📱 SMS enviado a secretaria:', sec.nombre);
+      }
+    } catch (smsError) {
+      console.error('⚠️ Error enviando SMS a secretarias:', smsError.message);
+    }
+
     // ✅ OBTENER CLIENTE CREADO Y RESPONDER
     const clienteCreado = await Cliente.obtenerPorId(clienteId);
 
