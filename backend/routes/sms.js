@@ -13,14 +13,14 @@ router.use(authenticateToken);
  * GET /api/v1/sms/estado
  * Verificar si las credenciales LabsMobile están configuradas
  */
-router.get('/estado', requireRole('administrador', 'supervisor'), (req, res) => {
-  const configurado = !!(process.env.LABSMOBILE_USER && process.env.LABSMOBILE_TOKEN);
+router.get('/estado', requireRole('administrador', 'supervisor'), async (req, res) => {
+  const configurado = await SMSService.estaConfigurado();
   res.json({
     success: true,
     configurado,
     mensaje: configurado
       ? 'LabsMobile configurado correctamente'
-      : 'Faltan las variables LABSMOBILE_USER y/o LABSMOBILE_TOKEN en el archivo .env'
+      : 'Configure las credenciales LabsMobile en la sección de Notificaciones'
   });
 });
 
@@ -36,7 +36,13 @@ router.post('/enviar', requireRole('administrador', 'supervisor'), async (req, r
       return res.status(400).json({ success: false, message: 'telefonos y mensaje son requeridos' });
     }
     const resultado = await SMSService.enviar(telefonos, mensaje);
-    res.json({ success: resultado.success, data: resultado.resultado });
+    res.json({
+      success: resultado.success,
+      data: resultado.resultado,
+      message: resultado.success
+        ? 'SMS enviado correctamente'
+        : (resultado.resultado?.description || resultado.resultado?.message || `Error LabsMobile código: ${resultado.resultado?.code || 'desconocido'}`)
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
