@@ -1,4 +1,3 @@
-import { formatCOP } from '../../utils/formatCurrency';
 // frontend/src/components/Clients/ClientForm.js
 // Formulario completo corregido con selector de permanencia
 
@@ -8,6 +7,12 @@ import {
   CreditCard, Building, Wifi, Tv, AlertCircle, Check,
   Calendar, DollarSign, Settings, Clock, FileText, ChevronDown, Search
 } from 'lucide-react';
+import { formatCOP } from '../../utils/formatCurrency';
+import { clientService } from '../../services/clientService';
+import configService, { ConfigService } from '../../services/configService';
+import clienteCompletoService from '../../services/clienteCompletoService';
+import AlertasClienteService from '../../services/alertasClienteService';
+import AlertaClienteExistente from './AlertaClienteExistente';
 
 // ─── Selector con búsqueda integrada ───────────────────────────────────────
 const SearchableSelect = ({ value, onChange, options, placeholder, emptyLabel }) => {
@@ -92,12 +97,6 @@ const SearchableSelect = ({ value, onChange, options, placeholder, emptyLabel })
     </div>
   );
 };
-import { clientService } from '../../services/clientService';
-import configService, { ConfigService } from '../../services/configService';
-import clienteCompletoService from '../../services/clienteCompletoService';
-import AlertasClienteService from '../../services/alertasClienteService';
-import AlertaClienteExistente from './AlertaClienteExistente';
-
 const ClientForm = ({ client, onClose, onSave, permissions }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
