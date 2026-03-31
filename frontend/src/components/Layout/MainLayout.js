@@ -504,6 +504,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <Shield size={22} />, label: 'Auditoría', path: '/auditoria', permission: 'administrador' },
     { icon: <Activity size={22} />, label: 'Estado del Servidor', path: '/sistema/estado-servidor', permission: 'administrador' },
     { icon: <FileText size={22} />, label: 'Firma de Contratos', path: '/firma-contratos', permission: 'operador,secretaria,supervisor,administrador' },
+    { icon: <Bell size={22} />, label: 'Notificaciones', path: '/config/notificaciones', permission: 'administrador' },
     { icon: <Settings size={22} />, label: 'Configuración', path: '/config', permission: 'administrador' }
   ];
 
