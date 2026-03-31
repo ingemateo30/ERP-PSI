@@ -82,7 +82,7 @@ class SMSService {
 
     const payload = JSON.stringify({
       message: mensaje.slice(0, 160),
-      recipients: numeros.map(n => ({ msisdn: n })),
+      recipients: numeros.map(n => ({ msisdn: n.replace(/^\+/, '') })),
       ...(creds.sender && { sender: creds.sender })
     });
 
