@@ -331,7 +331,7 @@ if (facturasCargadas.length === 0) {
             const token = localStorage.getItem('accessToken');
             const API_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
             const resp = await fetch(
-                `${API_URL}/clientes/buscar?q=${encodeURIComponent(termino.trim())}`,
+                `${API_URL}/clientes/search?q=${encodeURIComponent(termino.trim())}`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             const data = await resp.json();
