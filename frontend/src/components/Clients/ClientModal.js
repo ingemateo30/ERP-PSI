@@ -5,7 +5,7 @@ import {
   X, Edit, Trash2, Phone, Mail, MapPin, Calendar,
   User, CreditCard, Wifi, Settings, AlertTriangle,
   CheckCircle, Clock, XCircle, FileText, DollarSign,
-  Package, Activity, ChevronRight, Loader
+  Package, Activity, ChevronRight, Loader, RefreshCw
 } from 'lucide-react';
 import { clientService } from '../../services/clientService';
 import ClientServiceManager from './ClientServiceManager';
@@ -18,10 +18,11 @@ const TABS = [
   { id: 'contratos', label: 'Contratos',   icon: FileText },
 ];
 
-const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
+const ClientModal = ({ client, onClose, onEdit, onDelete, onCambiarEstado, permissions }) => {
   const [deleting, setDeleting]                   = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showServiceManager, setShowServiceManager] = useState(false);
+  const [showCambiarEstado, setShowCambiarEstado] = useState(false);
   const [activeTab, setActiveTab]                 = useState('personal');
   const [clienteCompleto, setClienteCompleto]     = useState(null);
   const [loadingCompleto, setLoadingCompleto]     = useState(false);
@@ -481,6 +482,12 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
                   </button>
                 )}
                 {permissions.canEdit && (
+                  <button onClick={() => setShowCambiarEstado(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-lg text-xs transition-colors">
+                    <RefreshCw className="w-3.5 h-3.5" /> Estado
+                  </button>
+                )}
+                {permissions.canEdit && (
                   <button onClick={onEdit}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-lg text-xs transition-colors">
                     <Edit className="w-3.5 h-3.5" /> Editar
@@ -589,7 +596,160 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, permissions }) => {
           onUpdate={() => setShowServiceManager(false)}
         />
       )}
+
+      {showCambiarEstado && (
+        <ModalCambiarEstado
+          client={client}
+          onConfirm={(datos) => {
+            setShowCambiarEstado(false);
+            onCambiarEstado?.(datos);
+          }}
+          onCancel={() => setShowCambiarEstado(false)}
+        />
+      )}
     </>
+  );
+};
+
+/* ═══════════════════ Modal Cambiar Estado ═══════════════════ */
+const ESTADOS_CONFIG = {
+  activo:     { label: 'Activo',     color: 'green',  icon: CheckCircle, desc: 'Servicio normal, se factura' },
+  suspendido: { label: 'Suspendido', color: 'yellow', icon: Clock,       desc: 'Servicio limitado, se factura con intereses' },
+  cortado:    { label: 'Cortado',    color: 'red',    icon: XCircle,     desc: 'Sin servicio, cobra reconexión al reactivar' },
+  retirado:   { label: 'Retirado',   color: 'gray',   icon: X,           desc: 'Contrato terminado, no se factura' },
+  inactivo:   { label: 'Inactivo',   color: 'blue',   icon: AlertTriangle, desc: 'Sin servicios activos' },
+};
+
+const TRANSICIONES = {
+  activo:     ['suspendido', 'cortado', 'retirado', 'inactivo'],
+  suspendido: ['activo', 'cortado', 'retirado'],
+  cortado:    ['activo', 'suspendido', 'retirado'],
+  retirado:   ['activo'],
+  inactivo:   ['activo'],
+};
+
+const COLOR_CLASSES = {
+  green:  'bg-green-100 text-green-800 border-green-300 hover:bg-green-200',
+  yellow: 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200',
+  red:    'bg-red-100 text-red-800 border-red-300 hover:bg-red-200',
+  gray:   'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200',
+  blue:   'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200',
+};
+
+const ModalCambiarEstado = ({ client, onConfirm, onCancel }) => {
+  const [nuevoEstado, setNuevoEstado] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+
+  const estadoActual = client.estado || 'activo';
+  const opcionesDisponibles = TRANSICIONES[estadoActual] || [];
+  const configActual = ESTADOS_CONFIG[estadoActual] || {};
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!nuevoEstado || !motivo.trim()) return;
+    onConfirm({ clienteId: client.id, nuevo_estado: nuevoEstado, motivo, observaciones });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Cambiar Estado del Cliente</h2>
+          <p className="text-sm text-gray-500 mt-0.5">{client.nombre} - {client.identificacion}</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Estado actual */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Estado actual</label>
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${COLOR_CLASSES[configActual.color] || ''}`}>
+              {configActual.icon && <configActual.icon className="w-4 h-4" />}
+              {configActual.label}
+            </div>
+          </div>
+
+          {/* Nuevo estado */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Cambiar a</label>
+            <div className="grid grid-cols-2 gap-2">
+              {opcionesDisponibles.map(est => {
+                const cfg = ESTADOS_CONFIG[est];
+                const Icon = cfg.icon;
+                const selected = nuevoEstado === est;
+                return (
+                  <button type="button" key={est}
+                    onClick={() => setNuevoEstado(est)}
+                    className={`flex items-center gap-2 p-3 rounded-lg border-2 text-left text-sm transition-all
+                      ${selected
+                        ? `${COLOR_CLASSES[cfg.color]} border-current ring-2 ring-offset-1`
+                        : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+                  >
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium">{cfg.label}</div>
+                      <div className="text-xs opacity-70">{cfg.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Advertencia reconexión */}
+          {estadoActual === 'cortado' && nuevoEstado === 'activo' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-sm text-amber-800">
+                <strong>Nota:</strong> Al reactivar un cliente cortado se generará un cargo de reconexión automáticamente.
+              </p>
+            </div>
+          )}
+
+          {/* Motivo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Motivo <span className="text-red-500">*</span>
+            </label>
+            <select value={motivo} onChange={e => setMotivo(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required>
+              <option value="">Seleccionar motivo...</option>
+              <option value="Solicitud del cliente">Solicitud del cliente</option>
+              <option value="Mora en pagos">Mora en pagos</option>
+              <option value="Pago realizado">Pago realizado / Puesta al día</option>
+              <option value="Reconexión autorizada">Reconexión autorizada</option>
+              <option value="Retiro voluntario">Retiro voluntario</option>
+              <option value="Cambio de domicilio">Cambio de domicilio</option>
+              <option value="Decisión administrativa">Decisión administrativa</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+
+          {/* Observaciones */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+            <textarea value={observaciones} onChange={e => setObservaciones(e.target.value)}
+              rows={2} placeholder="Detalles adicionales (opcional)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+            />
+          </div>
+
+          {/* Botones */}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onCancel}
+              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
+              Cancelar
+            </button>
+            <button type="submit" disabled={!nuevoEstado || !motivo.trim()}
+              className="flex items-center gap-2 px-4 py-2 bg-[#0e6493] text-white rounded-lg hover:bg-[#0a4f75] text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+              <RefreshCw className="w-4 h-4" />
+              Cambiar Estado
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 };
 

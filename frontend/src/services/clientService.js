@@ -414,7 +414,27 @@ async getMisClientes() {
     }
   }
 
-  
+  /**
+   * Cambiar estado de un cliente manualmente (admin)
+   */
+  async cambiarEstadoCliente(clienteId, { nuevo_estado, motivo, observaciones }) {
+    try {
+      this.log('Cambiando estado de cliente', { clienteId, nuevo_estado, motivo });
+      const response = await apiService.put(`/clients/${clienteId}/cambiar-estado`, {
+        nuevo_estado, motivo, observaciones
+      });
+      if (response.success) {
+        this.log('Estado cambiado exitosamente', response);
+        return response;
+      } else {
+        throw new Error(response.message || 'Error al cambiar estado del cliente');
+      }
+    } catch (error) {
+      this.log('Error cambiando estado', error);
+      throw this.handleError(error, 'cambiar estado del cliente');
+    }
+  }
+
   // Buscar clientes
   async buscarClientes(termino) {
     try {

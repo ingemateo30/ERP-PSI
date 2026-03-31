@@ -1900,6 +1900,168 @@ router.put('/:id/reactivar',
   }
 );
 
+// ─── Cambio manual de estado (admin) ──────────────────────────────────────────
+// PUT /clientes/:id/cambiar-estado
+// Permite transiciones manuales entre estados con reglas de negocio
+router.put('/:id/cambiar-estado',
+  rateLimiter.clientes,
+  requireRole(['administrador']),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { nuevo_estado, motivo, observaciones } = req.body;
+
+      if (!id || isNaN(id)) {
+        return res.status(400).json({ success: false, message: 'ID de cliente inválido' });
+      }
+
+      const estadosValidos = ['activo', 'suspendido', 'cortado', 'retirado', 'inactivo'];
+      if (!nuevo_estado || !estadosValidos.includes(nuevo_estado)) {
+        return res.status(400).json({
+          success: false,
+          message: `Estado inválido. Valores permitidos: ${estadosValidos.join(', ')}`
+        });
+      }
+
+      if (!motivo || motivo.trim().length < 3) {
+        return res.status(400).json({ success: false, message: 'Debe indicar un motivo (mínimo 3 caracteres)' });
+      }
+
+      const connection = await pool.getConnection();
+
+      try {
+        await connection.beginTransaction();
+
+        // 1. Obtener cliente actual
+        const [clienteData] = await connection.execute(
+          'SELECT id, nombre, estado, identificacion FROM clientes WHERE id = ?', [id]
+        );
+
+        if (clienteData.length === 0) {
+          await connection.rollback();
+          return res.status(404).json({ success: false, message: 'Cliente no encontrado' });
+        }
+
+        const cliente = clienteData[0];
+        const estadoAnterior = cliente.estado;
+
+        if (estadoAnterior === nuevo_estado) {
+          await connection.rollback();
+          return res.status(400).json({ success: false, message: `El cliente ya está en estado "${nuevo_estado}"` });
+        }
+
+        // 2. Validar transiciones permitidas
+        const transiciones = {
+          activo:     ['suspendido', 'cortado', 'retirado', 'inactivo'],
+          suspendido: ['activo', 'cortado', 'retirado'],
+          cortado:    ['activo', 'suspendido', 'retirado'],
+          retirado:   ['activo'],
+          inactivo:   ['activo']
+        };
+
+        const permitidas = transiciones[estadoAnterior] || [];
+        if (!permitidas.includes(nuevo_estado)) {
+          await connection.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `No se puede cambiar de "${estadoAnterior}" a "${nuevo_estado}". Transiciones permitidas: ${permitidas.join(', ')}`
+          });
+        }
+
+        // 3. Actualizar estado del cliente
+        await connection.execute(
+          'UPDATE clientes SET estado = ?, updated_at = NOW() WHERE id = ?',
+          [nuevo_estado, id]
+        );
+
+        // 4. Actualizar servicios según el nuevo estado
+        if (['activo', 'suspendido', 'cortado'].includes(nuevo_estado)) {
+          // Transicionar servicios que estaban en el estado anterior
+          const estadosServicioOrigen = estadoAnterior === 'retirado' || estadoAnterior === 'inactivo'
+            ? ['cancelado', 'suspendido', 'cortado', 'inactivo']
+            : [estadoAnterior];
+
+          await connection.execute(
+            `UPDATE servicios_cliente SET estado = ?, updated_at = NOW()
+             WHERE cliente_id = ? AND estado IN (${estadosServicioOrigen.map(() => '?').join(',')})`,
+            [nuevo_estado, id, ...estadosServicioOrigen]
+          );
+        } else if (nuevo_estado === 'retirado') {
+          await connection.execute(
+            `UPDATE servicios_cliente SET estado = 'cancelado', fecha_suspension = NOW(), updated_at = NOW()
+             WHERE cliente_id = ? AND estado IN ('activo', 'suspendido', 'cortado')`,
+            [id]
+          );
+        } else if (nuevo_estado === 'inactivo') {
+          await connection.execute(
+            `UPDATE servicios_cliente SET estado = 'inactivo', updated_at = NOW()
+             WHERE cliente_id = ? AND estado IN ('activo', 'suspendido', 'cortado')`,
+            [id]
+          );
+          // Registrar en clientes_inactivos
+          await connection.execute(
+            `INSERT IGNORE INTO clientes_inactivos (cliente_id, identificacion, nombre, direccion, telefono, estrato, motivo_inactivacion, fecha_inactivacion)
+             SELECT id, identificacion, nombre, direccion, telefono, estrato, ?, NOW()
+             FROM clientes WHERE id = ?`,
+            [motivo, id]
+          );
+        }
+
+        // 5. Si se reactiva desde inactivo, limpiar registro
+        if (estadoAnterior === 'inactivo' && nuevo_estado === 'activo') {
+          await connection.execute('DELETE FROM clientes_inactivos WHERE cliente_id = ?', [id]);
+        }
+
+        // 6. Cargo de reconexión si venía de cortado → activo
+        let cargoReconexion = 0;
+        if (estadoAnterior === 'cortado' && nuevo_estado === 'activo') {
+          const [config] = await connection.execute(
+            'SELECT valor_reconexion FROM configuracion_empresa WHERE id = 1'
+          );
+          cargoReconexion = parseFloat(config[0]?.valor_reconexion || 0);
+
+          if (cargoReconexion > 0) {
+            await connection.execute(
+              `INSERT INTO varios_pendientes
+                 (cliente_id, concepto, cantidad, valor_unitario, valor_total,
+                  aplica_iva, porcentaje_iva, fecha_aplicacion, facturado, activo)
+               VALUES (?, 'Cargo de reconexión de servicio', 1, ?, ?, 0, 0, ?, 0, 1)`,
+              [id, cargoReconexion, cargoReconexion, fechaLocalMySQL()]
+            );
+          }
+        }
+
+        await connection.commit();
+
+        console.log(`✅ Estado cliente ${cliente.nombre} (ID:${id}): ${estadoAnterior} → ${nuevo_estado} | Motivo: ${motivo} | Por: ${req.user?.nombre || 'admin'}`);
+
+        res.json({
+          success: true,
+          message: `Estado cambiado de "${estadoAnterior}" a "${nuevo_estado}"`,
+          data: {
+            id: parseInt(id),
+            nombre: cliente.nombre,
+            estado_anterior: estadoAnterior,
+            estado_nuevo: nuevo_estado,
+            motivo,
+            cargo_reconexion: cargoReconexion > 0 ? cargoReconexion : undefined
+          }
+        });
+
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+
+    } catch (error) {
+      console.error('❌ Error cambiando estado de cliente:', error);
+      res.status(500).json({ success: false, message: error.message || 'Error al cambiar estado del cliente' });
+    }
+  }
+);
+
 // Actualizar cliente (debe ir después de las rutas específicas)
 router.put('/:id',
   rateLimiter.clientes,
