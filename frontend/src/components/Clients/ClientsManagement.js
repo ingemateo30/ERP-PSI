@@ -78,6 +78,32 @@ const ClientsManagement = () => {
     setShowEditForm(true);
   };
 
+  // Manejar cambio de estado manual
+  const handleCambiarEstado = async ({ clienteId, nuevo_estado, motivo, observaciones }) => {
+    try {
+      const response = await clientService.cambiarEstadoCliente(clienteId, {
+        nuevo_estado, motivo, observaciones
+      });
+      if (response.success) {
+        if (window.showNotification) {
+          let msg = `Estado cambiado: ${response.data?.estado_anterior} → ${response.data?.estado_nuevo}`;
+          if (response.data?.cargo_reconexion) {
+            msg += ` (Cargo reconexión: $${response.data.cargo_reconexion.toLocaleString('es-CO')})`;
+          }
+          window.showNotification('success', msg);
+        }
+        refresh();
+        setShowClientModal(false);
+        setSelectedClient(null);
+      }
+    } catch (error) {
+      console.error('Error cambiando estado:', error);
+      if (window.showNotification) {
+        window.showNotification('error', error.message || 'Error al cambiar estado del cliente');
+      }
+    }
+  };
+
   // NUEVO: Manejar inactivación de cliente con modal de confirmación
   const handleInactivarCliente = (client) => {
     setSelectedClient(client);
@@ -423,7 +449,8 @@ const ClientsManagement = () => {
             setShowClientModal(false);
             handleEditClient(selectedClient);
           }}
-          onInactivar={() => handleInactivarCliente(selectedClient)} // NUEVO: Función para inactivar
+          onInactivar={() => handleInactivarCliente(selectedClient)}
+          onCambiarEstado={handleCambiarEstado}
           onDelete={handleDeleteClient}
           permissions={permissions}
         />
