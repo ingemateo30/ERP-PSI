@@ -1,10 +1,17 @@
 // frontend/src/components/Notificaciones/NotificationBell.js
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Bell, X, Check, Trash2, Users, Wrench, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Bell, X, Check, Trash2, Users, Wrench, CheckCircle, BellOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import notificacionesService from '../../services/notificacionesService';
+import {
+  registrarServiceWorker,
+  suscribirse,
+  cancelarSuscripcion,
+  estaSuscrito,
+  obtenerEstadoPermiso
+} from '../../services/pushService';
 
 const NotificationBell = () => {
   const [notificaciones, setNotificaciones] = useState([]);
@@ -13,8 +20,50 @@ const NotificationBell = () => {
   const [loading, setLoading] = useState(false);
   const panelRef = useRef(null);
 
+  // Push notifications state
+  const [pushSuscrito, setPushSuscrito] = useState(false);
+  const [pushPermiso, setPushPermiso] = useState('default');
+  const [pushCargando, setPushCargando] = useState(false);
+
   const { getToken, userRole } = useAuth();
   const navigate = useNavigate();
+
+  // Verificar estado push al montar
+  const verificarPush = useCallback(async () => {
+    setPushPermiso(obtenerEstadoPermiso());
+    const suscrito = await estaSuscrito();
+    setPushSuscrito(suscrito);
+    // Registrar service worker si aún no está registrado
+    if ('serviceWorker' in navigator) {
+      registrarServiceWorker().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => { verificarPush(); }, [verificarPush]);
+
+  const activarPush = async () => {
+    setPushCargando(true);
+    try {
+      await suscribirse();
+      setPushSuscrito(true);
+      setPushPermiso('granted');
+    } catch (e) {
+      if (e.message?.includes('denegado') || Notification.permission === 'denied') {
+        setPushPermiso('denied');
+      }
+      console.warn('Push:', e.message);
+    }
+    setPushCargando(false);
+  };
+
+  const desactivarPush = async () => {
+    setPushCargando(true);
+    try {
+      await cancelarSuscripcion();
+      setPushSuscrito(false);
+    } catch (_) {}
+    setPushCargando(false);
+  };
 
   // Cerrar panel al hacer clic fuera
   useEffect(() => {
@@ -210,6 +259,32 @@ const NotificationBell = () => {
                 <X size={18} className="text-gray-500" />
               </button>
             </div>
+          </div>
+
+          {/* Footer: botón push */}
+          <div className="px-4 py-2 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <span className="text-xs text-gray-500">Notificaciones push</span>
+            {pushPermiso === 'denied' ? (
+              <span className="text-xs text-red-500 flex items-center gap-1">
+                <BellOff size={12} /> Bloqueadas
+              </span>
+            ) : pushSuscrito ? (
+              <button
+                onClick={desactivarPush}
+                disabled={pushCargando}
+                className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1 transition-colors"
+              >
+                <BellOff size={12} /> Desactivar
+              </button>
+            ) : (
+              <button
+                onClick={activarPush}
+                disabled={pushCargando}
+                className="text-xs text-[#0e6493] hover:text-[#0a5273] flex items-center gap-1 font-medium transition-colors"
+              >
+                <Bell size={12} /> {pushCargando ? 'Activando...' : 'Activar push'}
+              </button>
+            )}
           </div>
 
           {/* Lista de notificaciones */}

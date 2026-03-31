@@ -69,6 +69,7 @@ const MainLayout = ({ children, title, subtitle, showWelcome = false }) => {
     { icon: <MessageSquare size={18} />, label: 'Mis PQR', path: '/mis-pqr', keywords: ['mis pqr', 'pqr asignadas', 'casos'], color: 'blue', permission: 'instalador,secretaria,supervisor,administrador' },
     { icon: <Loader2 size={18} />, label: 'Incidencias', path: '/incidencias', keywords: ['incidencias', 'issues', 'problemas'], color: 'orange', permission: 'secretaria,supervisor,administrador' },
     { icon: <Mail size={18} />, label: 'Plantillas Correo', path: '/config/plantillas-correo', keywords: ['correo', 'email', 'plantillas'], color: 'blue', permission: 'secretaria,supervisor,administrador' },
+    { icon: <Bell size={18} />, label: 'Notificaciones', path: '/config/notificaciones', keywords: ['sms', 'push', 'notificaciones', 'labsmobile', 'alertas'], color: 'blue', permission: 'administrador' },
     { icon: <PieChartIcon size={18} />, label: 'Reportes', path: '/reportes-regulatorios', keywords: ['reportes', 'reports', 'regulatorios'], color: 'purple', permission: 'administrador' },
     { icon: <BarChart3 size={18} />, label: 'Estadísticas', path: '/reports', keywords: ['estadisticas', 'stats', 'analytics'], color: 'green', permission: 'administrador' },
     { icon: <Navigation size={18} />, label: 'Seguimiento Técnicos', path: '/seguimiento-tecnicos', keywords: ['seguimiento', 'tecnicos', 'ruta', 'agenda', 'diaria', 'supervision'], color: 'green', permission: 'administrador,supervisor,secretaria' },
