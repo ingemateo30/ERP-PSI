@@ -1,29 +1,88 @@
--- Migración 013: Agregar configuración LabsMobile SMS y VAPID para Push Notifications
+-- Migración 013: SMS (LabsMobile) y Push Notifications
+-- Compatible con MySQL 5.7+
 
--- Credenciales LabsMobile en tabla de configuración de empresa
-ALTER TABLE configuracion_empresa
-  ADD COLUMN IF NOT EXISTS labsmobile_user VARCHAR(150) NULL COMMENT 'Usuario/email LabsMobile',
-  ADD COLUMN IF NOT EXISTS labsmobile_token VARCHAR(150) NULL COMMENT 'Token API LabsMobile',
-  ADD COLUMN IF NOT EXISTS labsmobile_sender VARCHAR(20) NULL COMMENT 'Número remitente LabsMobile (opcional)',
-  ADD COLUMN IF NOT EXISTS sms_activo TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = SMS habilitado';
+DROP PROCEDURE IF EXISTS migrar_013;
 
--- Claves VAPID para Web Push Notifications
-ALTER TABLE configuracion_empresa
-  ADD COLUMN IF NOT EXISTS vapid_public_key TEXT NULL COMMENT 'Clave pública VAPID',
-  ADD COLUMN IF NOT EXISTS vapid_private_key TEXT NULL COMMENT 'Clave privada VAPID',
-  ADD COLUMN IF NOT EXISTS push_activo TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = Push notifications habilitadas';
+DELIMITER $$
+CREATE PROCEDURE migrar_013()
+BEGIN
+  -- labsmobile_user
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'configuracion_empresa' AND COLUMN_NAME = 'labsmobile_user'
+  ) THEN
+    ALTER TABLE configuracion_empresa ADD COLUMN labsmobile_user VARCHAR(150) NULL COMMENT 'Usuario/email LabsMobile';
+  END IF;
 
--- Tabla para guardar suscripciones push de usuarios
-CREATE TABLE IF NOT EXISTS push_subscriptions (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  usuario_id INT NOT NULL,
-  endpoint TEXT NOT NULL,
-  p256dh TEXT NOT NULL,
-  auth TEXT NOT NULL,
-  user_agent VARCHAR(255) NULL,
-  activo TINYINT(1) NOT NULL DEFAULT 1,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_usuario_endpoint (usuario_id, endpoint(255)),
-  FOREIGN KEY (usuario_id) REFERENCES sistema_usuarios(id) ON DELETE CASCADE
-);
+  -- labsmobile_token
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'configuracion_empresa' AND COLUMN_NAME = 'labsmobile_token'
+  ) THEN
+    ALTER TABLE configuracion_empresa ADD COLUMN labsmobile_token VARCHAR(150) NULL COMMENT 'Token API LabsMobile';
+  END IF;
+
+  -- labsmobile_sender
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'configuracion_empresa' AND COLUMN_NAME = 'labsmobile_sender'
+  ) THEN
+    ALTER TABLE configuracion_empresa ADD COLUMN labsmobile_sender VARCHAR(20) NULL COMMENT 'Número remitente LabsMobile (opcional)';
+  END IF;
+
+  -- sms_activo
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'configuracion_empresa' AND COLUMN_NAME = 'sms_activo'
+  ) THEN
+    ALTER TABLE configuracion_empresa ADD COLUMN sms_activo TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = SMS habilitado';
+  END IF;
+
+  -- vapid_public_key
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'configuracion_empresa' AND COLUMN_NAME = 'vapid_public_key'
+  ) THEN
+    ALTER TABLE configuracion_empresa ADD COLUMN vapid_public_key TEXT NULL COMMENT 'Clave pública VAPID';
+  END IF;
+
+  -- vapid_private_key
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'configuracion_empresa' AND COLUMN_NAME = 'vapid_private_key'
+  ) THEN
+    ALTER TABLE configuracion_empresa ADD COLUMN vapid_private_key TEXT NULL COMMENT 'Clave privada VAPID';
+  END IF;
+
+  -- push_activo
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'configuracion_empresa' AND COLUMN_NAME = 'push_activo'
+  ) THEN
+    ALTER TABLE configuracion_empresa ADD COLUMN push_activo TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = Push notifications habilitadas';
+  END IF;
+
+  -- Tabla push_subscriptions
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'push_subscriptions'
+  ) THEN
+    CREATE TABLE push_subscriptions (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      usuario_id INT NOT NULL,
+      endpoint TEXT NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      user_agent VARCHAR(255) NULL,
+      activo TINYINT(1) NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT fk_push_usuario FOREIGN KEY (usuario_id) REFERENCES sistema_usuarios(id) ON DELETE CASCADE
+    );
+  END IF;
+
+END$$
+DELIMITER ;
+
+CALL migrar_013();
+DROP PROCEDURE IF EXISTS migrar_013;
