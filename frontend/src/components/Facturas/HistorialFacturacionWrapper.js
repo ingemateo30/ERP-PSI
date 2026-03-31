@@ -331,13 +331,12 @@ if (facturasCargadas.length === 0) {
             const token = localStorage.getItem('accessToken');
             const API_URL = process.env.REACT_APP_API_URL || 'http://45.173.69.5:3000/api/v1';
             const resp = await fetch(
-                `${API_URL}/clientes?search=${encodeURIComponent(termino.trim())}&limit=20&page=1`,
+                `${API_URL}/clientes/buscar?q=${encodeURIComponent(termino.trim())}`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             const data = await resp.json();
-            // La respuesta puede ser { success, data: { clientes, pagination } } o { success, data: [] }
-            const lista = data?.data?.clientes || data?.data || [];
-            setClientes(Array.isArray(lista) ? lista : []);
+            const lista = Array.isArray(data?.data) ? data.data : [];
+            setClientes(lista);
         } catch (error) {
             console.error('Error buscando clientes:', error);
             setClientes([]);
