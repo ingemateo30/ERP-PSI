@@ -28,6 +28,7 @@ const BanksConfig = lazy(() => import('./components/Config/BanksConfig'));
 const GeographyConfig = lazy(() => import('./components/Config/GeographyConfig'));
 const ServicePlansConfig = lazy(() => import('./components/Config/ServicePlansConfig'));
 const PlantillasCorreoConfig = lazy(() => import('./components/Config/PlantillasCorreoConfig'));
+const NotificacionesConfig = lazy(() => import('./components/Config/NotificacionesConfig'));
 const InventoryManagement   = lazy(() => import('./components/Inventory/InventoryManagement'));
 const MovimientosInventario  = lazy(() => import('./components/Inventory/MovimientosInventario'));
 const InstalladoresInventario= lazy(() => import('./components/Inventory/InstalladoresInventario'));
@@ -345,6 +346,16 @@ function App() {
                   <ProtectedRoute requiredRole="secretaria,supervisor,administrador">
                     <MainLayout title="Plantillas de Correo" subtitle="Gestión de plantillas de correo electrónico">
                       <PlantillasCorreoConfig />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/config/notificaciones"
+                element={
+                  <ProtectedRoute requiredRole="administrador">
+                    <MainLayout title="Notificaciones" subtitle="Configuración de SMS y Push Notifications">
+                      <NotificacionesConfig />
                     </MainLayout>
                   </ProtectedRoute>
                 }

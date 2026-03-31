@@ -1,11 +1,8 @@
 // backend/services/SMSService.js
 // Integración con LabsMobile para envío de SMS a clientes y técnicos
-// Documentación API: https://www.labsmobile.com/api/rest/
 //
-// Variables de entorno requeridas:
-//   LABSMOBILE_USER   — usuario/email LabsMobile
-//   LABSMOBILE_TOKEN  — API token LabsMobile
-//   LABSMOBILE_SENDER — número remitente (opcional, usa el del plan por defecto)
+// Las credenciales se leen primero desde las variables de entorno y,
+// si no están configuradas, desde la tabla configuracion_empresa (DB).
 
 const https = require('https');
 
@@ -13,18 +10,48 @@ const LABSMOBILE_API = 'https://api.labsmobile.com/json/send';
 
 class SMSService {
   /**
-   * Verifica que las credenciales de LabsMobile estén configuradas.
-   * Lanza error si no lo están.
+   * Carga credenciales desde la DB si no están en .env
    */
-  static _verificarCredenciales() {
-    if (!process.env.LABSMOBILE_USER || !process.env.LABSMOBILE_TOKEN) {
-      throw new Error('Variables de entorno LABSMOBILE_USER y LABSMOBILE_TOKEN son requeridas');
+  static async _obtenerCredenciales() {
+    const user  = process.env.LABSMOBILE_USER;
+    const token = process.env.LABSMOBILE_TOKEN;
+
+    if (user && token) {
+      return {
+        user,
+        token,
+        sender: process.env.LABSMOBILE_SENDER || null
+      };
     }
+
+    // Intentar leer desde DB
+    try {
+      const { Database } = require('../models/Database');
+      const [cfg] = await Database.query(
+        'SELECT labsmobile_user, labsmobile_token, labsmobile_sender FROM configuracion_empresa LIMIT 1'
+      );
+      if (cfg && cfg.labsmobile_user && cfg.labsmobile_token) {
+        return {
+          user:   cfg.labsmobile_user,
+          token:  cfg.labsmobile_token,
+          sender: cfg.labsmobile_sender || null
+        };
+      }
+    } catch (_) { /* silencioso */ }
+
+    return null;
+  }
+
+  /**
+   * Verifica si hay credenciales disponibles (para mostrar estado en UI)
+   */
+  static async estaConfigurado() {
+    const creds = await SMSService._obtenerCredenciales();
+    return !!creds;
   }
 
   /**
    * Normaliza un número de teléfono colombiano al formato internacional (+57XXXXXXXXXX).
-   * Si ya tiene prefijo internacional lo respeta.
    */
   static normalizarTelefono(telefono) {
     if (!telefono) return null;
@@ -37,12 +64,14 @@ class SMSService {
 
   /**
    * Envía un SMS a uno o varios destinatarios.
-   * @param {string|string[]} telefonos — teléfono(s) destino
-   * @param {string} mensaje — texto del SMS (máx 160 chars para SMS simple)
-   * @returns {Promise<{success: boolean, resultado: object}>}
+   * @param {string|string[]} telefonos
+   * @param {string} mensaje
    */
   static async enviar(telefonos, mensaje) {
-    SMSService._verificarCredenciales();
+    const creds = await SMSService._obtenerCredenciales();
+    if (!creds) {
+      throw new Error('LabsMobile no configurado. Configure LABSMOBILE_USER y LABSMOBILE_TOKEN en .env o en la configuración del sistema.');
+    }
 
     const numeros = (Array.isArray(telefonos) ? telefonos : [telefonos])
       .map(SMSService.normalizarTelefono)
@@ -54,15 +83,17 @@ class SMSService {
     const payload = JSON.stringify({
       message: mensaje.slice(0, 160),
       recipients: numeros.map(n => ({ msisdn: n })),
-      ...(process.env.LABSMOBILE_SENDER && { sender: process.env.LABSMOBILE_SENDER })
+      ...(creds.sender && { sender: creds.sender })
     });
 
     return new Promise((resolve, reject) => {
-      const auth = Buffer.from(
-        `${process.env.LABSMOBILE_USER}:${process.env.LABSMOBILE_TOKEN}`
-      ).toString('base64');
+      const auth = Buffer.from(`${creds.user}:${creds.token}`).toString('base64');
 
+      const url = new URL(LABSMOBILE_API);
       const options = {
+        hostname: url.hostname,
+        path: url.pathname,
+        port: 443,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,11 +101,6 @@ class SMSService {
           'Content-Length': Buffer.byteLength(payload)
         }
       };
-
-      const url = new URL(LABSMOBILE_API);
-      options.hostname = url.hostname;
-      options.path = url.pathname;
-      options.port = 443;
 
       const req = https.request(options, (res) => {
         let data = '';
@@ -101,17 +127,20 @@ class SMSService {
   // ============================================================
 
   static async notificarVencimientoFactura(cliente) {
-    const msg = `PSI Telecomunicaciones: Estimado ${cliente.nombre}, su factura por $${Number(cliente.total || 0).toLocaleString('es-CO')} vence el ${cliente.fecha_vencimiento}. Evite cortes de servicio. Info: ${process.env.EMPRESA_TELEFONO || ''}`.slice(0, 160);
+    const empresaTel = process.env.EMPRESA_TELEFONO || '';
+    const msg = `PSI Telecomunicaciones: Estimado ${cliente.nombre}, su factura por $${Number(cliente.total || 0).toLocaleString('es-CO')} vence el ${cliente.fecha_vencimiento}. Evite cortes de servicio.${empresaTel ? ' Info: ' + empresaTel : ''}`.slice(0, 160);
     return SMSService.enviar(cliente.telefono, msg);
   }
 
   static async notificarCorteServicio(cliente) {
-    const msg = `PSI Telecomunicaciones: Estimado ${cliente.nombre}, su servicio sera suspendido por mora. Para reconexion comuniquese al ${process.env.EMPRESA_TELEFONO || 'nuestra linea'}`.slice(0, 160);
+    const empresaTel = process.env.EMPRESA_TELEFONO || 'nuestra línea';
+    const msg = `PSI Telecomunicaciones: Estimado ${cliente.nombre}, su servicio sera suspendido por mora. Para reconexion comuniquese al ${empresaTel}`.slice(0, 160);
     return SMSService.enviar(cliente.telefono, msg);
   }
 
   static async notificarInstalacionProgramada(cliente, fechaHora, tecnicoNombre) {
-    const msg = `PSI Telecomunicaciones: Su instalacion esta programada para el ${fechaHora}. Tecnico: ${tecnicoNombre || 'asignado'}. Informes: ${process.env.EMPRESA_TELEFONO || ''}`.slice(0, 160);
+    const empresaTel = process.env.EMPRESA_TELEFONO || '';
+    const msg = `PSI Telecomunicaciones: Su instalacion esta programada para el ${fechaHora}. Tecnico: ${tecnicoNombre || 'asignado'}.${empresaTel ? ' Informes: ' + empresaTel : ''}`.slice(0, 160);
     return SMSService.enviar(cliente.telefono, msg);
   }
 

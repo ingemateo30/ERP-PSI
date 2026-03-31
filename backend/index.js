@@ -302,6 +302,10 @@ console.log('✅ Rutas de registro web cargadas: /api/v1/registro-web');
   const smsRoutes = require('./routes/sms');
   app.use('/api/v1/sms', smsRoutes);
 
+  // Rutas de Push Notifications (Web Push / VAPID)
+  const pushRoutes = require('./routes/push');
+  app.use('/api/v1/push', pushRoutes);
+
   //rutas de instalaciones
   console.log('🔧 Cargando rutas de instalaciones...');
   const instalacionesRoutes = require('./routes/instalaciones');
