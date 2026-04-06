@@ -1900,12 +1900,12 @@ router.put('/:id/reactivar',
   }
 );
 
-// ─── Cambio manual de estado (admin) ──────────────────────────────────────────
+// ─── Cambio manual de estado (admin, supervisor, secretaria) ─────────────────
 // PUT /clientes/:id/cambiar-estado
 // Permite transiciones manuales entre estados con reglas de negocio
 router.put('/:id/cambiar-estado',
   rateLimiter.clientes,
-  requireRole(['administrador']),
+  requireRole(['administrador', 'supervisor', 'secretaria']),
   async (req, res) => {
     try {
       const { id } = req.params;
