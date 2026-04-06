@@ -506,9 +506,13 @@ class Cliente {
 
   // Obtener estadísticas
   // Modelo Cliente - Método obtenerEstadisticas CORREGIDO
-  static async obtenerEstadisticas() {
+  static async obtenerEstadisticas(sedeId = null) {
     try {
       const connection = await pool.getConnection();
+
+      // Filtro por sede cuando se proporciona (para secretarias/supervisores)
+      const sedeFilter = sedeId ? 'WHERE ciudad_id = ?' : '';
+      const sedeParams = sedeId ? [sedeId] : [];
 
       // Estadísticas básicas con todos los campos que necesita el frontend
       const [estadisticasBasicas] = await connection.execute(`
@@ -523,21 +527,25 @@ class Cliente {
         SUM(CASE WHEN DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as nuevos_semana,
         SUM(CASE WHEN DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as nuevos_mes
       FROM clientes
-    `);
+      ${sedeFilter}
+    `, sedeParams);
 
       // Estadísticas por ciudad (para uso futuro)
+      const ciudadFilter = sedeId ? 'WHERE c.ciudad_id = ?' : '';
       const [estadisticasCiudad] = await connection.execute(`
       SELECT
         ci.nombre as ciudad,
         COUNT(*) as cantidad
       FROM clientes c
       LEFT JOIN ciudades ci ON c.ciudad_id = ci.id
+      ${ciudadFilter}
       GROUP BY c.ciudad_id, ci.nombre
       ORDER BY cantidad DESC
       LIMIT 10
-    `);
+    `, sedeParams);
 
       // Estadísticas por sector (para uso futuro)
+      const sectorFilter = sedeId ? 'AND c.ciudad_id = ?' : '';
       const [estadisticasSector] = await connection.execute(`
       SELECT
         s.codigo, s.nombre as sector,
@@ -545,10 +553,11 @@ class Cliente {
       FROM clientes c
       LEFT JOIN sectores s ON c.sector_id = s.id
       WHERE s.codigo IS NOT NULL
+      ${sectorFilter}
       GROUP BY c.sector_id, s.codigo, s.nombre
       ORDER BY cantidad DESC
       LIMIT 10
-    `);
+    `, sedeParams);
 
       connection.release();
 

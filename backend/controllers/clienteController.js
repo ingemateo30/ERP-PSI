@@ -681,7 +681,12 @@ static async crear(req, res) {
   // Obtener estadísticas
   static async obtenerEstadisticas(req, res) {
     try {
-      const estadisticas = await Cliente.obtenerEstadisticas();
+      // Filtrar por sede para usuarios no-administradores
+      const sedeId = (req.user && req.user.rol !== 'administrador' && req.user.sede_id)
+        ? req.user.sede_id
+        : null;
+
+      const estadisticas = await Cliente.obtenerEstadisticas(sedeId);
 
       res.json({
         success: true,
