@@ -1,34 +1,88 @@
 // backend/services/EmailService.js
-// Servicio para envío de correos electrónicos con soporte para adjuntos
+// Servicio para envío de correos electrónicos via smtp.com Email API
 
-const nodemailer = require('nodemailer');
+const axios = require('axios');
 const pool = require('../config/database');
 const PDFGenerator = require('../utils/pdfGenerator');
 const ContratoPDFGeneratorMINTIC = require('../utils/ContratoPDFGeneratorMINTIC');
 const IVACalculatorService = require('./IVACalculatorService');
 
+const SMTPCOM_API_URL = 'https://api.smtp.com/v4/messages';
+
 class EmailService {
   /**
-   * Crear transporte de nodemailer con configuración de entorno
+   * Verificar que la configuración de smtp.com esté disponible
    */
-  static crearTransporte() {
-    const config = {
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.EMAIL_PORT || '587'),
-      secure: process.env.EMAIL_SECURE === 'true', // true para 465, false para otros puertos
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    };
+  static configuracionDisponible() {
+    return !!(process.env.SMTPCOM_API_KEY && process.env.SMTPCOM_CHANNEL);
+  }
 
-    // Si no hay configuración, usar modo testing (ethereal)
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-      console.warn('⚠️ Configuración de email no encontrada. Usando modo de prueba.');
+  /**
+   * Enviar correo vía smtp.com Email API
+   * @param {object} opciones
+   * @param {string}   opciones.from      - "Nombre <email>" o solo "email"
+   * @param {string}   opciones.to        - email o "Nombre <email>" del destinatario
+   * @param {string}   opciones.subject   - Asunto
+   * @param {string}   opciones.html      - Cuerpo HTML
+   * @param {string}  [opciones.text]     - Cuerpo texto plano (opcional)
+   * @param {Array}   [opciones.attachments] - [{ filename, content (Buffer), contentType }]
+   * @returns {object} { messageId }
+   */
+  static async enviar(opciones) {
+    if (!this.configuracionDisponible()) {
+      console.warn('⚠️ SMTPCOM_API_KEY o SMTPCOM_CHANNEL no configurados. No se puede enviar correo.');
       return null;
     }
 
-    return nodemailer.createTransport(config);
+    // Parsear "Nombre <email>" → { name, email }
+    const parsearDireccion = (str) => {
+      const match = str && str.match(/^"?([^"<]*)"?\s*<?([^>]+)>?$/);
+      if (match && match[2]) {
+        return { name: (match[1] || '').trim(), email: match[2].trim() };
+      }
+      return { name: '', email: (str || '').trim() };
+    };
+
+    const fromAddr = parsearDireccion(opciones.from);
+    const toAddr   = parsearDireccion(opciones.to);
+
+    // Construir adjuntos en base64
+    const adjuntos = (opciones.attachments || []).map(adj => ({
+      name: adj.filename,
+      type: adj.contentType || 'application/octet-stream',
+      content: Buffer.isBuffer(adj.content)
+        ? adj.content.toString('base64')
+        : adj.content
+    }));
+
+    const payload = {
+      channel: process.env.SMTPCOM_CHANNEL,
+      recipients: {
+        to: [{ address: { email: toAddr.email, name: toAddr.name } }]
+      },
+      originator: {
+        from: { address: { email: fromAddr.email, name: fromAddr.name } }
+      },
+      subject: opciones.subject,
+      body: {
+        html_part: opciones.html || '',
+        ...(opciones.text ? { text_part: opciones.text } : {})
+      },
+      ...(adjuntos.length > 0 ? { attachments: adjuntos } : {})
+    };
+
+    const respuesta = await axios.post(SMTPCOM_API_URL, payload, {
+      headers: {
+        'Authorization': `Bearer ${process.env.SMTPCOM_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      timeout: 30000
+    });
+
+    const messageId = respuesta.data?.data?.message_id || respuesta.data?.message_id || 'ok';
+    console.log(`✅ smtp.com → mensaje enviado: ${messageId}`);
+    return { messageId };
   }
 
   /**
@@ -358,15 +412,9 @@ static async generarPDFContrato(contratoId, conexionExistente = null) {
       const asunto = this.reemplazarVariables(plantilla.asunto, variables);
       const contenidoHTML = this.reemplazarVariables(plantilla.contenido, variables);
 
-      // 8. Crear transporte de email
-      const transporte = this.crearTransporte();
-
-      if (!transporte) {
-        console.error('❌ No se pudo crear transporte de email. Verifique configuración.');
-        return {
-          enviado: false,
-          motivo: 'Configuración de email no disponible'
-        };
+      if (!this.configuracionDisponible()) {
+        console.error('❌ SMTPCOM_API_KEY / SMTPCOM_CHANNEL no configurados.');
+        return { enviado: false, motivo: 'Configuración de email no disponible' };
       }
 
       // 9. Preparar adjuntos (PDFs)
@@ -417,18 +465,18 @@ static async generarPDFContrato(contratoId, conexionExistente = null) {
         }
       }
 
-      // 10. Preparar opciones del correo
-      const mailOptions = {
-        from: `"${empresa.empresa_nombre || 'PSI'}" <${process.env.EMAIL_USER}>`,
+      // 10. Enviar correo vía smtp.com API
+      const fromEmail = process.env.SMTPCOM_FROM_EMAIL || process.env.EMAIL_FROM || process.env.SMTPCOM_CHANNEL;
+      const fromName  = process.env.SMTPCOM_FROM_NAME  || process.env.EMAIL_FROM_NAME || empresa.empresa_nombre || 'PSI';
+
+      console.log(`📤 Enviando correo a: ${cliente.correo}`);
+      const info = await this.enviar({
+        from: `"${fromName}" <${fromEmail}>`,
         to: cliente.correo,
         subject: asunto,
         html: contenidoHTML,
         attachments: adjuntos
-      };
-
-      // 11. Enviar correo
-      console.log(`📤 Enviando correo a: ${cliente.correo}`);
-      const info = await transporte.sendMail(mailOptions);
+      });
 
       console.log(`✅ Correo de bienvenida enviado exitosamente: ${info.messageId}`);
 
@@ -524,11 +572,8 @@ static async generarPDFContrato(contratoId, conexionExistente = null) {
       // Obtener configuración de empresa
       const empresa = await this.obtenerConfiguracionEmpresa();
 
-      // Crear transporte
-      const transporte = this.crearTransporte();
-
-      if (!transporte) {
-        throw new Error('Configuración de email no disponible');
+      if (!this.configuracionDisponible()) {
+        throw new Error('SMTPCOM_API_KEY / SMTPCOM_CHANNEL no configurados');
       }
 
       // Obtener plantilla de correo para facturas (con fallback)
@@ -558,9 +603,11 @@ static async generarPDFContrato(contratoId, conexionExistente = null) {
         variables
       );
 
-      // Preparar y enviar correo
-      const mailOptions = {
-        from: `"${empresa.empresa_nombre || 'PSI'}" <${process.env.EMAIL_USER}>`,
+      const fromEmail = process.env.SMTPCOM_FROM_EMAIL || process.env.EMAIL_FROM || process.env.SMTPCOM_CHANNEL;
+      const fromName  = process.env.SMTPCOM_FROM_NAME  || process.env.EMAIL_FROM_NAME || empresa.empresa_nombre || 'PSI';
+
+      const info = await this.enviar({
+        from: `"${fromName}" <${fromEmail}>`,
         to: destinatario,
         subject: asunto,
         html: contenidoHTML,
@@ -569,9 +616,7 @@ static async generarPDFContrato(contratoId, conexionExistente = null) {
           content: pdfBuffer,
           contentType: 'application/pdf'
         }]
-      };
-
-      const info = await transporte.sendMail(mailOptions);
+      });
 
       console.log(`✅ Factura enviada exitosamente: ${info.messageId}`);
 
@@ -618,16 +663,18 @@ static async generarPDFContrato(contratoId, conexionExistente = null) {
       }
 
       const empresa = await this.obtenerConfiguracionEmpresa();
-      const transporte = this.crearTransporte();
 
-      if (!transporte) {
-        throw new Error('Configuración de email no disponible');
+      if (!this.configuracionDisponible()) {
+        throw new Error('SMTPCOM_API_KEY / SMTPCOM_CHANNEL no configurados');
       }
 
       const diasVencidos = Math.floor((new Date() - new Date(factura.fecha_vencimiento)) / (1000 * 60 * 60 * 24));
 
-      const mailOptions = {
-        from: `"${empresa.empresa_nombre || 'PSI'}" <${process.env.EMAIL_USER}>`,
+      const fromEmail = process.env.SMTPCOM_FROM_EMAIL || process.env.EMAIL_FROM || process.env.SMTPCOM_CHANNEL;
+      const fromName  = process.env.SMTPCOM_FROM_NAME  || process.env.EMAIL_FROM_NAME || empresa.empresa_nombre || 'PSI';
+
+      const info = await this.enviar({
+        from: `"${fromName}" <${fromEmail}>`,
         to: factura.cliente_email,
         subject: `Recordatorio: Factura ${factura.numero_factura} ${diasVencidos > 0 ? 'VENCIDA' : 'por vencer'}`,
         html: `
@@ -639,9 +686,7 @@ static async generarPDFContrato(contratoId, conexionExistente = null) {
           <p>Por favor, realice su pago a la mayor brevedad para evitar suspensión del servicio.</p>
           <p>Saludos cordiales,<br>${empresa.empresa_nombre}</p>
         `
-      };
-
-      const info = await transporte.sendMail(mailOptions);
+      });
 
       console.log(`✅ Notificación de vencimiento enviada: ${info.messageId}`);
 
@@ -668,31 +713,34 @@ static async generarPDFContrato(contratoId, conexionExistente = null) {
       return { enviado: false };
     }
 
-    const transporte = this.crearTransporte();
-
-    if (!transporte) {
-      throw new Error('Configuración de email no disponible');
+    if (!this.configuracionDisponible()) {
+      throw new Error('SMTPCOM_API_KEY / SMTPCOM_CHANNEL no configurados');
     }
 
     const empresa = await this.obtenerConfiguracionEmpresa();
+    const fromEmail = process.env.SMTPCOM_FROM_EMAIL || process.env.EMAIL_FROM || process.env.SMTPCOM_CHANNEL;
+    const fromName  = process.env.SMTPCOM_FROM_NAME  || process.env.EMAIL_FROM_NAME || empresa.empresa_nombre || 'PSI';
 
-    const mailOptions = {
-      from: `"${empresa.empresa_nombre || 'PSI'} - Sistema" <${process.env.EMAIL_USER}>`,
-      to: emailsAdmin.join(','),
-      subject: `[ADMIN] ${asunto}`,
-      html: `
-        <h2>${asunto}</h2>
-        <p>${mensaje}</p>
-        ${datos && Object.keys(datos).length > 0 ? `
-          <h3>Datos adicionales:</h3>
-          <pre>${JSON.stringify(datos, null, 2)}</pre>
-        ` : ''}
-        <hr>
-        <small>Este es un mensaje automático del sistema ERP-PSI</small>
-      `
-    };
-
-    const info = await transporte.sendMail(mailOptions);
+    // smtp.com acepta un destinatario por llamada; enviar a cada admin individualmente
+    let lastInfo;
+    for (const adminEmail of emailsAdmin) {
+      lastInfo = await this.enviar({
+        from: `"${fromName} - Sistema" <${fromEmail}>`,
+        to: adminEmail.trim(),
+        subject: `[ADMIN] ${asunto}`,
+        html: `
+          <h2>${asunto}</h2>
+          <p>${mensaje}</p>
+          ${datos && Object.keys(datos).length > 0 ? `
+            <h3>Datos adicionales:</h3>
+            <pre>${JSON.stringify(datos, null, 2)}</pre>
+          ` : ''}
+          <hr>
+          <small>Este es un mensaje automático del sistema ERP-PSI</small>
+        `
+      });
+    }
+    const info = lastInfo || {};
 
     console.log(`✅ Notificación a admins enviada: ${info.messageId}`);
 
