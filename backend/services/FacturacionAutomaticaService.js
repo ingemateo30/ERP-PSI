@@ -450,22 +450,45 @@ class FacturacionAutomaticaService {
           return { permitir: true, razon: 'Sin facturas previas — genera primera factura' };
         }
 
-        if (totalFacturas === 1) {
-          return { permitir: true, razon: 'Con primera factura — genera segunda (nivelación)' };
-        }
-
-        // 2+ facturas: billing mensual
         const hoy = new Date();
         const diaHoy = hoy.getDate();
-        const ultimoDiaMesActual = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0); // último día del mes actual
-        const ultimoDiaMesSiguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0); // último día del mes siguiente
+        const ultimoDiaMesActual = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+        const ultimoDiaMesSiguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0);
+        const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
         const ultimaCobertura = coberturaData[0].ultima_cobertura
           ? new Date(coberturaData[0].ultima_cobertura)
           : null;
 
+        // Helper: convierte fecha UTC de MySQL a fecha local (evita desfase UTC-5)
+        const coberturaLocal = ultimaCobertura ? new Date(
+          ultimaCobertura.getUTCFullYear(),
+          ultimaCobertura.getUTCMonth(),
+          ultimaCobertura.getUTCDate(),
+          12, 0, 0
+        ) : null;
+
+        if (totalFacturas === 1) {
+          // 2da factura: si la próxima factura empieza en un mes futuro, aplicar regla del día 20
+          if (coberturaLocal && diaHoy < 20) {
+            const inicioSegunda = new Date(coberturaLocal);
+            inicioSegunda.setDate(inicioSegunda.getDate() + 1);
+            const esMesFuturo = inicioSegunda.getFullYear() > hoy.getFullYear() ||
+              (inicioSegunda.getFullYear() === hoy.getFullYear() && inicioSegunda.getMonth() > hoy.getMonth());
+            if (esMesFuturo) {
+              const nombreMes = meses[inicioSegunda.getMonth() % 12];
+              return {
+                permitir: false,
+                razon: `2da factura inicia en ${nombreMes} — se habilita a partir del día 20 del mes (hoy día ${diaHoy})`
+              };
+            }
+          }
+          return { permitir: true, razon: 'Con primera factura — genera segunda (nivelación)' };
+        }
+
+        // 2+ facturas: billing mensual
         // Bloquear si ya tiene cobertura completa hasta el último día del mes siguiente
-        if (ultimaCobertura && ultimaCobertura > ultimoDiaMesSiguiente) {
+        if (coberturaLocal && coberturaLocal > ultimoDiaMesSiguiente) {
           const fechaStr = fechaLocalMySQL(ultimaCobertura);
           return {
             permitir: false,
@@ -474,23 +497,12 @@ class FacturacionAutomaticaService {
         }
 
         // Bloquear facturación del mes siguiente antes del día 20
-        // Si la cobertura ya llega al fin del mes actual, la próxima factura sería para el mes siguiente.
-        // Eso solo se habilita a partir del día 20 del mes.
-        if (ultimaCobertura && diaHoy < 20) {
-          const coberturaLocal = new Date(
-            ultimaCobertura.getUTCFullYear(),
-            ultimaCobertura.getUTCMonth(),
-            ultimaCobertura.getUTCDate(),
-            12, 0, 0
-          );
-          if (coberturaLocal >= ultimoDiaMesActual) {
-            const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-            const nombreMesSig = meses[(hoy.getMonth() + 1) % 12];
-            return {
-              permitir: false,
-              razon: `Facturación de ${nombreMesSig} se habilita a partir del día 20 del mes (hoy día ${diaHoy})`
-            };
-          }
+        if (coberturaLocal && diaHoy < 20 && coberturaLocal >= ultimoDiaMesActual) {
+          const nombreMesSig = meses[(hoy.getMonth() + 1) % 12];
+          return {
+            permitir: false,
+            razon: `Facturación de ${nombreMesSig} se habilita a partir del día 20 del mes (hoy día ${diaHoy})`
+          };
         }
 
         return { permitir: true, razon: 'Cliente apto para facturación mensual' };
