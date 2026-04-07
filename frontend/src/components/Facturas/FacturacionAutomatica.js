@@ -373,6 +373,11 @@ const FacturacionAutomatica = () => {
                 <p className="text-2xl font-bold text-gray-900">
                   {preview.resumen.total_clientes}
                 </p>
+                {preview.resumen.clientes_excluidos > 0 && (
+                  <p className="text-xs text-yellow-600 mt-1">
+                    {preview.resumen.clientes_excluidos} excluidos
+                  </p>
+                )}
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <Users className="w-6 h-6 text-blue-600" />
