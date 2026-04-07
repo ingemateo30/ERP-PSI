@@ -181,7 +181,6 @@ class FacturacionAutomaticaService {
             AND f.activo = 1
           WHERE c.estado = 'activo' ${sedeWhere}
           GROUP BY c.id, c.identificacion, c.nombre, c.estrato, c.ciudad_id, c.fecha_registro
-          HAVING COUNT(DISTINCT sc.id) > 0
           ORDER BY c.id ASC
         `);
 
@@ -456,19 +455,42 @@ class FacturacionAutomaticaService {
         }
 
         // 2+ facturas: billing mensual
-        // Bloquear SOLO si ya tiene cobertura completa hasta el último día del mes siguiente
         const hoy = new Date();
-        const ultimoDiaMesSiguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0);
+        const diaHoy = hoy.getDate();
+        const ultimoDiaMesActual = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0); // último día del mes actual
+        const ultimoDiaMesSiguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0); // último día del mes siguiente
+
         const ultimaCobertura = coberturaData[0].ultima_cobertura
           ? new Date(coberturaData[0].ultima_cobertura)
           : null;
 
+        // Bloquear si ya tiene cobertura completa hasta el último día del mes siguiente
         if (ultimaCobertura && ultimaCobertura > ultimoDiaMesSiguiente) {
           const fechaStr = fechaLocalMySQL(ultimaCobertura);
           return {
             permitir: false,
             razon: `Ya tiene cobertura completa hasta ${fechaStr} (mes siguiente cubierto al 100%)`
           };
+        }
+
+        // Bloquear facturación del mes siguiente antes del día 20
+        // Si la cobertura ya llega al fin del mes actual, la próxima factura sería para el mes siguiente.
+        // Eso solo se habilita a partir del día 20 del mes.
+        if (ultimaCobertura && diaHoy < 20) {
+          const coberturaLocal = new Date(
+            ultimaCobertura.getUTCFullYear(),
+            ultimaCobertura.getUTCMonth(),
+            ultimaCobertura.getUTCDate(),
+            12, 0, 0
+          );
+          if (coberturaLocal >= ultimoDiaMesActual) {
+            const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+            const nombreMesSig = meses[(hoy.getMonth() + 1) % 12];
+            return {
+              permitir: false,
+              razon: `Facturación de ${nombreMesSig} se habilita a partir del día 20 del mes (hoy día ${diaHoy})`
+            };
+          }
         }
 
         return { permitir: true, razon: 'Cliente apto para facturación mensual' };
