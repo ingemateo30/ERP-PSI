@@ -887,90 +887,114 @@ router.post('/facturas/:id/pagar', requireRole('administrador', 'supervisor'), a
     }
 
     const { Database } = require('../models/Database');
+    const conexion = await Database.getConnection();
 
-    // Obtener datos de la factura
-    const factura = await Database.query(`
-      SELECT id, cliente_id, total, estado 
-      FROM facturas 
-      WHERE id = ? AND activo = 1
-    `, [id]);
+    try {
+      // Obtener datos de la factura
+      const [facturas] = await conexion.execute(`
+        SELECT id, cliente_id, total, estado
+        FROM facturas
+        WHERE id = ? AND activo = 1
+      `, [id]);
 
-    if (factura.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Factura no encontrada'
-      });
-    }
+      if (facturas.length === 0) {
+        return res.status(404).json({ success: false, message: 'Factura no encontrada' });
+      }
 
-    const facturaData = factura[0];
+      const facturaData = facturas[0];
 
-    // Verificar que la factura esté pendiente
-    if (facturaData.estado === 'pagada') {
-      return res.status(400).json({
-        success: false,
-        message: 'La factura ya está pagada'
-      });
-    }
+      if (facturaData.estado === 'pagada') {
+        return res.status(400).json({ success: false, message: 'La factura ya está pagada' });
+      }
 
-    const fechaPagoFinal = fecha_pago || fechaLocalMySQL();
-    
-    // ✅ CORRECCIÓN: Actualizar con banco_id, metodo_pago y referencia_pago
-    let nuevoEstado = 'pendiente';
-    if (parseFloat(valor_pagado) >= parseFloat(facturaData.total)) {
-      nuevoEstado = 'pagada';
-      
-      // ✅ UPDATE con TODOS los campos del pago
-      await Database.query(`
-        UPDATE facturas 
-        SET 
-          estado = 'pagada', 
+      const fechaPagoFinal = fecha_pago || fechaLocalMySQL();
+      const pagoParcial = parseFloat(valor_pagado) < parseFloat(facturaData.total);
+      const nuevoEstado = pagoParcial ? 'pendiente' : 'pagada';
+      const numeroRecibo = `REC${Date.now()}`;
+
+      // ── Transacción atómica: registro en pagos + actualización de factura ──
+      await conexion.beginTransaction();
+
+      // 1. Siempre insertar en tabla pagos (registro permanente del pago)
+      const [insertPago] = await conexion.execute(`
+        INSERT INTO pagos
+          (cliente_id, factura_id, numero_recibo, monto, metodo_pago,
+           banco_id, referencia, fecha_pago, observaciones, recibido_por)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        facturaData.cliente_id,
+        parseInt(id),
+        numeroRecibo,
+        parseFloat(valor_pagado),
+        metodo_pago,
+        banco_id || null,
+        referencia_pago || null,
+        fechaPagoFinal,
+        observaciones || null,
+        usuario_id
+      ]);
+
+      // 2. Actualizar factura (si pago completo: marcar pagada; si parcial: dejar pendiente pero registrar último pago)
+      await conexion.execute(`
+        UPDATE facturas
+        SET
+          estado = ?,
           fecha_pago = ?,
           metodo_pago = ?,
           referencia_pago = ?,
           banco_id = ?,
           observaciones = COALESCE(?, observaciones)
         WHERE id = ?
-      `, [
-        fechaPagoFinal, 
-        metodo_pago, 
-        referencia_pago || null, 
-        banco_id || null, 
-        observaciones || null, 
-        id
-      ]);
+      `, [nuevoEstado, fechaPagoFinal, metodo_pago, referencia_pago || null, banco_id || null, observaciones || null, id]);
+
+      await conexion.commit();
+
+      // 3. Reactivar cliente si corresponde (fuera de transacción, no es crítico)
+      try {
+        const EstadoClienteService = require('../services/EstadoClienteService');
+        if (typeof EstadoClienteService.procesarPostPago === 'function') {
+          await EstadoClienteService.procesarPostPago(facturaData.cliente_id, parseInt(id));
+        }
+      } catch (estadoErr) {
+        console.warn('⚠️ No se pudo procesar post-pago:', estadoErr.message);
+      }
+
+      audit({
+        usuario_id,
+        accion: 'PAGO_REGISTRADO',
+        tabla: 'facturas',
+        registro_id: parseInt(id),
+        datos_nuevos: { pago_id: insertPago.insertId, valor_pagado, metodo_pago, referencia_pago, banco_id, nuevo_estado: nuevoEstado },
+        ...metaFromReq(req),
+      });
+
+      res.json({
+        success: true,
+        data: {
+          pago_id: insertPago.insertId,
+          numero_recibo: numeroRecibo,
+          factura_id: parseInt(id),
+          nuevo_estado: nuevoEstado,
+          valor_pagado: parseFloat(valor_pagado),
+          saldo_pendiente: Math.max(0, parseFloat(facturaData.total) - parseFloat(valor_pagado)),
+          metodo_pago,
+          banco_id: banco_id || null,
+          referencia_pago: referencia_pago || null
+        },
+        message: `Pago registrado exitosamente. Factura ${nuevoEstado === 'pagada' ? 'pagada completamente' : 'con pago parcial registrado'}`
+      });
+
+    } catch (txError) {
+      try { await conexion.rollback(); } catch (_) {}
+      console.error('❌ Error registrando pago (rollback ejecutado):', txError);
+      res.status(500).json({ success: false, message: 'Error registrando pago', error: txError.message });
+    } finally {
+      conexion.release();
     }
-
-    audit({
-      usuario_id,
-      accion: 'PAGO_REGISTRADO',
-      tabla: 'facturas',
-      registro_id: parseInt(id),
-      datos_nuevos: { valor_pagado, metodo_pago, referencia_pago, banco_id, nuevo_estado: nuevoEstado },
-      ...metaFromReq(req),
-    });
-
-    res.json({
-      success: true,
-      data: {
-        pago_id: Date.now(),
-        factura_id: id,
-        nuevo_estado: nuevoEstado,
-        valor_pagado: parseFloat(valor_pagado),
-        saldo_pendiente: Math.max(0, parseFloat(facturaData.total) - parseFloat(valor_pagado)),
-        metodo_pago: metodo_pago,
-        banco_id: banco_id,
-        referencia_pago: referencia_pago
-      },
-      message: `Pago registrado exitosamente. Factura ${nuevoEstado === 'pagada' ? 'pagada completamente' : 'con pago parcial'}`
-    });
 
   } catch (error) {
     console.error('❌ Error registrando pago:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error registrando pago',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Error registrando pago', error: error.message });
   }
 });
 // ==========================================

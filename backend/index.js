@@ -140,13 +140,32 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check público — solo información mínima para load balancers
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
+// Health check público — verifica app + conexión a base de datos
+app.get('/health', async (req, res) => {
+  const pool = require('./config/database');
+  let dbStatus = 'disconnected';
+  let dbLatencyMs = null;
+  try {
+    const t0 = Date.now();
+    const conn = await pool.getConnection();
+    await conn.ping();
+    conn.release();
+    dbLatencyMs = Date.now() - t0;
+    dbStatus = 'connected';
+  } catch (_) {
+    // DB no disponible
+  }
+
+  const healthy = dbStatus === 'connected';
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'OK' : 'DEGRADED',
     service: 'PSI sistema gestion',
     version: '1.0.0',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    database: {
+      status: dbStatus,
+      latency_ms: dbLatencyMs
+    }
   });
 });
 
