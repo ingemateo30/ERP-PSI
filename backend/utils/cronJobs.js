@@ -196,6 +196,8 @@ class CronJobs {
       } catch (error) {
         console.error('❌ [CronJobs] Error en transiciones de estado de clientes:', error.message);
       }
+    }, {
+      timezone: 'America/Bogota'
     });
     console.log('✅ Tarea transiciones estado clientes: diario 02:30 AM');
   }
