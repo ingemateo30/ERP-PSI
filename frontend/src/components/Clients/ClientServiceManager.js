@@ -96,8 +96,8 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
     return colores[estado] || 'bg-gray-100 text-gray-800';
   };
 
-  const serviciosActivos = servicios.filter(s => s.estado === 'activo');
-  const serviciosInactivos = servicios.filter(s => s.estado !== 'activo');
+  const serviciosActivos = servicios.filter(s => s.estado === 'activo' || s.estado === 'suspendido');
+  const serviciosInactivos = servicios.filter(s => s.estado === 'cancelado' || s.estado === 'cortado');
 
   if (loading) {
     return (
@@ -152,7 +152,7 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">
-                  Servicios Activos ({serviciosActivos.length})
+                  Servicios ({serviciosActivos.length})
                 </h3>
                 <button
                   onClick={() => setShowAgregarModal(true)}
@@ -165,7 +165,7 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
 
               <div className="space-y-4">
                 {serviciosActivos.map(servicio => (
-                  <div key={servicio.id} className="bg-green-50 border border-green-200 rounded-lg p-6">
+                  <div key={servicio.id} className={`rounded-lg p-6 ${servicio.estado === 'suspendido' ? 'bg-yellow-50 border border-yellow-200' : 'bg-green-50 border border-green-200'}`}>
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <h4 className="font-medium text-gray-900 text-lg">{servicio.plan_nombre}</h4>
@@ -321,7 +321,7 @@ const ClientServiceManager = ({ cliente, onClose, onUpdate }) => {
           )}
 
           {/* Estado sin servicios */}
-          {servicios.length === 0 && serviciosActivos.length === 0 && (
+          {serviciosActivos.length === 0 && serviciosInactivos.length === 0 && (
             <div className="text-center py-12">
               <Wifi size={48} className="mx-auto text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
