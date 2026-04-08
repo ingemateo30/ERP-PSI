@@ -327,7 +327,7 @@ router.delete('/:clienteId/servicios/:servicioId',
         `SELECT sc.*, ps.nombre as plan_nombre, ps.tipo
          FROM servicios_cliente sc
          JOIN planes_servicio ps ON sc.plan_id = ps.id
-         WHERE sc.id = ? AND sc.cliente_id = ? AND sc.estado = 'activo'`,
+         WHERE sc.id = ? AND sc.cliente_id = ? AND sc.estado IN ('activo', 'suspendido')`,
         [servicioId, clienteId]
       );
 
@@ -418,11 +418,11 @@ router.post('/:id/servicios/:servicioId/programar-baja',
         `SELECT sc.*, ps.nombre AS plan_nombre, ps.precio
          FROM servicios_cliente sc
          INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
-         WHERE sc.id = ? AND sc.cliente_id = ? AND sc.estado = 'activo'`,
+         WHERE sc.id = ? AND sc.cliente_id = ? AND sc.estado IN ('activo', 'suspendido')`,
         [servicioId, clienteId]
       );
       if (servicios.length === 0) {
-        return res.status(404).json({ success: false, message: 'Servicio activo no encontrado' });
+        return res.status(404).json({ success: false, message: 'Servicio no encontrado o ya cancelado' });
       }
       const servicio = servicios[0];
 
@@ -528,11 +528,11 @@ router.post('/:id/servicios/:servicioId/migrar-plan',
                 ps.tipo AS tipo_plan
          FROM servicios_cliente sc
          INNER JOIN planes_servicio ps ON sc.plan_id = ps.id
-         WHERE sc.id = ? AND sc.cliente_id = ? AND sc.estado = 'activo'`,
+         WHERE sc.id = ? AND sc.cliente_id = ? AND sc.estado IN ('activo', 'suspendido')`,
         [servicioId, clienteId]
       );
       if (servicios.length === 0) {
-        return res.status(404).json({ success: false, message: 'Servicio activo no encontrado' });
+        return res.status(404).json({ success: false, message: 'Servicio no encontrado o ya cancelado' });
       }
       const servicio = servicios[0];
 
@@ -1607,7 +1607,7 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
           ps.nombre as plan_nombre, ps.precio as plan_precio, ps.tipo
         FROM servicios_cliente sc
         JOIN planes_servicio ps ON sc.plan_id = ps.id
-        WHERE sc.cliente_id = ? AND sc.estado = 'activo'
+        WHERE sc.cliente_id = ? AND sc.estado IN ('activo', 'suspendido')
       `, [clienteId]);
 
       serviciosArray = serviciosDB.map(s => ({
