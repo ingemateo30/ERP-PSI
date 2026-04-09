@@ -256,31 +256,45 @@ router.post('/instalacion/:id/completar', async (req, res) => {
     const horaFin = horaColombia();
     const fechaRealizada = fechaColombia();
 
-    // Actualizar instalación — firma guardada en columna dedicada
-    await Database.query(`
-      UPDATE instalaciones
-      SET estado = 'completada',
-          hora_fin = ?,
-          fecha_realizada = ?,
-          equipos_instalados = ?,
-          fotos_instalacion = ?,
-          firma_instalador = ?,
-          observaciones = CONCAT(COALESCE(observaciones, ''), '\n', ?)
-      WHERE id = ? AND instalador_id = ?
-    `, [
+    // equipos puede ser array de IDs o array de objetos {equipo_id, cantidad, ...}
+    const equipoIds = equipos && equipos.length > 0
+      ? equipos.map(e => (typeof e === 'object' ? e.equipo_id : e)).filter(Boolean)
+      : [];
+    const equiposJson = equipos && equipos.length > 0 ? JSON.stringify(equipos) : null;
+
+    // Construir UPDATE dinámico: firma_instalador solo si se envió
+    // (evita error si la columna no existe aún en la BD)
+    const updateFields = [
+      'estado = ?',
+      'hora_fin = ?',
+      'fecha_realizada = ?',
+      'equipos_instalados = ?',
+      'fotos_instalacion = ?',
+      "observaciones = CONCAT(COALESCE(observaciones, ''), '\\n', ?)"
+    ];
+    const updateValues = [
+      'completada',
       horaFin,
       fechaRealizada,
-      JSON.stringify(equipos),
+      equiposJson,
       foto ? JSON.stringify([foto]) : null,
-      firma_instalador || null,
-      observaciones || '',
-      id,
-      req.user.id
-    ]);
+      observaciones || ''
+    ];
+
+    if (firma_instalador) {
+      updateFields.splice(5, 0, 'firma_instalador = ?');
+      updateValues.splice(5, 0, firma_instalador);
+    }
+
+    updateValues.push(id, req.user.id);
+    await Database.query(
+      `UPDATE instalaciones SET ${updateFields.join(', ')} WHERE id = ? AND instalador_id = ?`,
+      updateValues
+    );
 
     // Actualizar estado de equipos a 'instalado'
-    if (equipos && equipos.length > 0) {
-      for (const equipoId of equipos) {
+    if (equipoIds.length > 0) {
+      for (const equipoId of equipoIds) {
         await Database.query(`
           UPDATE inventario_equipos
           SET estado = 'instalado',
@@ -340,12 +354,12 @@ router.get('/mis-equipos', async (req, res) => {
     const instaladorId = req.user.id;
     
     const equipos = await Database.query(`
-      SELECT 
+      SELECT
         id, codigo, nombre, tipo, marca, modelo,
         numero_serie, estado, fecha_asignacion, ubicacion_actual, observaciones
       FROM inventario_equipos
       WHERE instalador_id = ?
-        AND estado IN ('asignado', 'instalado')
+        AND estado = 'asignado'
       ORDER BY fecha_asignacion DESC
     `, [instaladorId]);
     
