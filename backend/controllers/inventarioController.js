@@ -332,9 +332,11 @@ class InventoryController {
                 });
             }
 
+            const metrosAsignar = req.body.metros_a_asignar ? parseFloat(req.body.metros_a_asignar) : null;
             const assignmentData = {
                 ubicacion: req.body.ubicacion?.trim(),
-                notas: req.body.notas?.trim()
+                notas: req.body.notas?.trim(),
+                metros_a_asignar: metrosAsignar && metrosAsignar > 0 ? metrosAsignar : null
             };
 
             const equipoAsignado = await InventoryModel.assignToInstaller(

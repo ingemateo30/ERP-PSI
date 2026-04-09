@@ -29,6 +29,8 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
   const [loading, setLoading] = useState(false);
   const [equiposDisponibles, setEquiposDisponibles] = useState([]);
   const [equiposSeleccionados, setEquiposSeleccionados] = useState([]);
+  // metros usados por equipo con seguimiento de metros {equipo_id: metros_usados}
+  const [metrosPorEquipo, setMetrosPorEquipo] = useState({});
   const [foto, setFoto] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
   const [observaciones, setObservaciones] = useState('');
@@ -214,9 +216,28 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
       // ✅ CAPTURAR FIRMA EN BASE64
       const firmaBase64 = sigCanvas.current.toDataURL();
 
+      // Construir lista de equipos: no-metros como IDs simples, metros como objetos
+      const equiposPayload = [
+        // Equipos sin metraje seleccionados por checkbox
+        ...equiposSeleccionados
+          .filter(id => {
+            const eq = equiposDisponibles.find(e => e.id === id);
+            return eq && !(eq.metros_disponibles > 0);
+          })
+          .map(id => id),
+        // Equipos con metraje: incluir metros usados
+        ...equiposDisponibles
+          .filter(eq => eq.metros_disponibles > 0)
+          .map(eq => ({
+            equipo_id: eq.id,
+            metros_usados: parseFloat(metrosPorEquipo[eq.id] || 0)
+          }))
+          .filter(e => e.metros_usados > 0)
+      ];
+
       // ✅ PAYLOAD CON IP, TAP, MAC, ONT Y FIRMA
       const formData = {
-        equipos: equiposSeleccionados,
+        equipos: equiposPayload,
         foto: fotoPreview, // Base64
         observaciones,
         ip_asignada: ipAsignada.trim(),
@@ -260,6 +281,7 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
     setFoto(null);
     setFotoPreview(null);
     setEquiposSeleccionados([]);
+    setMetrosPorEquipo({});
     setObservaciones('');
     setIpAsignada('');
     setTap('');
@@ -352,26 +374,68 @@ const ModalCompletarInstalacion = ({ isOpen, onClose, instalacion, onSuccess }) 
                 <p className="text-sm text-gray-500">Sin equipos asignados — puedes continuar sin seleccionar</p>
               </div>
             ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">
-                {equiposDisponibles.map(equipo => (
-                  <label
-                    key={equipo.id}
-                    className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={equiposSeleccionados.includes(equipo.id)}
-                      onChange={() => toggleEquipo(equipo.id)}
-                      className="w-4 h-4 text-[#0e6493] rounded"
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{equipo.nombre}</p>
-                      <p className="text-sm text-gray-600">
-                        {equipo.tipo} - S/N: {equipo.numero_serie}
-                      </p>
+              <div className="space-y-2 max-h-64 overflow-y-auto border rounded-lg p-3">
+                {equiposDisponibles.map(equipo => {
+                  const tieneMetros = equipo.metros_disponibles > 0;
+                  return (
+                    <div
+                      key={equipo.id}
+                      className={`p-3 border rounded-lg transition-colors ${
+                        tieneMetros ? 'border-orange-200 bg-orange-50' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-start space-x-3">
+                        {!tieneMetros && (
+                          <input
+                            type="checkbox"
+                            checked={equiposSeleccionados.includes(equipo.id)}
+                            onChange={() => toggleEquipo(equipo.id)}
+                            className="w-4 h-4 text-[#0e6493] rounded mt-1"
+                          />
+                        )}
+                        {tieneMetros && (
+                          <span className="text-orange-500 mt-1 flex-shrink-0">📏</span>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900">{equipo.nombre}</p>
+                          <p className="text-xs text-gray-500">
+                            {equipo.tipo} · S/N: {equipo.numero_serie || 'N/A'}
+                          </p>
+                          {tieneMetros && (
+                            <div className="mt-2">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs text-orange-700 font-medium">
+                                  Disponibles: {equipo.metros_disponibles} m de {equipo.metros_totales} m
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={equipo.metros_disponibles}
+                                  step="0.5"
+                                  value={metrosPorEquipo[equipo.id] || ''}
+                                  onChange={e => setMetrosPorEquipo(prev => ({
+                                    ...prev,
+                                    [equipo.id]: e.target.value
+                                  }))}
+                                  placeholder="0"
+                                  className="w-24 px-2 py-1 text-sm border border-orange-300 rounded focus:ring-1 focus:ring-orange-400"
+                                />
+                                <span className="text-xs text-gray-600">metros usados en esta instalación</span>
+                              </div>
+                              {metrosPorEquipo[equipo.id] > 0 && (
+                                <p className="text-xs text-green-700 mt-1">
+                                  Quedarán {Math.max(0, equipo.metros_disponibles - parseFloat(metrosPorEquipo[equipo.id] || 0)).toFixed(1)} m disponibles
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </label>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

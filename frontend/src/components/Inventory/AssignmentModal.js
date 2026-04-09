@@ -7,7 +7,8 @@ const AssignmentModal = ({ equipo, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
     instalador_id: '',
     ubicacion: '',
-    notas: ''
+    notas: '',
+    metros_a_asignar: equipo?.metros_totales || ''
   });
   const [instaladores, setInstaladores] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -168,6 +169,35 @@ const AssignmentModal = ({ equipo, onSubmit, onCancel }) => {
             )}
           </div>
 
+          {/* Metros a asignar — aplica para cables y fibra */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Metros a asignar
+              <span className="ml-2 text-xs font-normal text-gray-400">(cable, fibra drop, etc.)</span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="metros_a_asignar"
+                value={formData.metros_a_asignar}
+                onChange={handleChange}
+                min="0"
+                step="0.01"
+                placeholder="Ej: 1000  (dejar vacío si no aplica)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">m</span>
+            </div>
+            {equipo?.metros_disponibles > 0 && (
+              <p className="mt-1 text-xs text-blue-600">
+                Actualmente tiene <strong>{equipo.metros_disponibles} m</strong> disponibles de {equipo.metros_totales} m asignados previamente.
+              </p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              Si asignas un carrete, ingresa su longitud total (ej: 1000 m). Se registrarán los metros disponibles para control de sobras.
+            </p>
+          </div>
+
           {/* Ubicación */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -231,6 +261,9 @@ const AssignmentModal = ({ equipo, onSubmit, onCancel }) => {
                     <li>Se registrará la fecha y hora de asignación</li>
                     <li>El instalador podrá ver este equipo en su lista personal</li>
                     <li>Se creará un registro en el historial del equipo</li>
+                    {formData.metros_a_asignar > 0 && (
+                      <li>Se registrarán <strong>{formData.metros_a_asignar} m</strong> disponibles — el sistema descontará metros en cada instalación</li>
+                    )}
                   </ul>
                 </div>
               </div>
