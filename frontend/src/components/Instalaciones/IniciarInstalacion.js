@@ -76,6 +76,7 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
   // Estados para completar
   const [observaciones, setObservaciones] = useState(instalacion.observaciones || '');
   const [motivoCancelacion, setMotivoCancelacion] = useState('');
+  const [mostrarCancelar, setMostrarCancelar] = useState(false);
 
   // Cargar equipos disponibles
   useEffect(() => {
@@ -215,7 +216,7 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       equipo_nombre: equipo.nombre,
       tipo: equipo.tipo,
       marca: equipo.marca,
-      cantidad: equipo.tipo === 'cable' ? 1 : 1,
+      cantidad: equipo.tipo === 'cable' ? '' : 1,
       numero_serie: equipo.numero_serie || '',
       observaciones: ''
     };
@@ -332,9 +333,9 @@ if (data.success) {
 
     const token = localStorage.getItem('accessToken');
     
-    // Preparar datos como lo hace ModalCompletarInstalacion
+    // Enviar objetos completos para preservar cantidad (metros para cables)
     const formData = {
-      equipos: equiposAsignados.map(eq => eq.equipo_id), // Solo los IDs de equipos
+      equipos: equiposAsignados,
       foto: previsualizacionDespues, // Base64
       observaciones: observaciones
     };
@@ -624,15 +625,33 @@ if (data.success) {
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Cantidad {equipo.tipo === 'cable' ? '(metros)' : ''}
+                              {equipo.tipo === 'cable' ? 'Metros utilizados *' : 'Cantidad'}
                             </label>
                             <input
                               type="number"
-                              min="1"
+                              min={equipo.tipo === 'cable' ? '0' : '1'}
+                              placeholder={equipo.tipo === 'cable' ? 'Ej: 150' : '1'}
                               value={equipo.cantidad}
-                              onChange={(e) => actualizarEquipo(index, 'cantidad', parseInt(e.target.value) || 1)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0e6493]"
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '') {
+                                  actualizarEquipo(index, 'cantidad', '');
+                                } else {
+                                  const num = parseInt(val);
+                                  actualizarEquipo(index, 'cantidad', isNaN(num) ? '' : num);
+                                }
+                              }}
+                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#0e6493] ${
+                                equipo.tipo === 'cable' && !equipo.cantidad
+                                  ? 'border-orange-400 bg-orange-50'
+                                  : 'border-gray-300'
+                              }`}
                             />
+                            {equipo.tipo === 'cable' && (
+                              <p className="text-xs text-orange-600 mt-0.5">
+                                Ingresa los metros usados del carrete (el carrete tiene 1.000 m)
+                              </p>
+                            )}
                           </div>
 
                           <div>
@@ -738,10 +757,12 @@ if (data.success) {
 
               {/* Opción de cancelar */}
               <div className="border-t pt-4">
-                <label className="flex items-center space-x-2 mb-3">
+                <label className="flex items-center space-x-2 mb-3 cursor-pointer">
                   <input
                     type="checkbox"
+                    checked={mostrarCancelar}
                     onChange={(e) => {
+                      setMostrarCancelar(e.target.checked);
                       if (!e.target.checked) {
                         setMotivoCancelacion('');
                       }
@@ -753,7 +774,7 @@ if (data.success) {
                   </span>
                 </label>
 
-                {motivoCancelacion !== null && (
+                {mostrarCancelar && (
                   <textarea
                     value={motivoCancelacion}
                     onChange={(e) => setMotivoCancelacion(e.target.value)}
@@ -820,7 +841,7 @@ if (data.success) {
 
             {paso === 3 && (
               <>
-                {motivoCancelacion ? (
+                {mostrarCancelar ? (
                   <button
                     onClick={cancelarInstalacion}
                     disabled={procesando || !motivoCancelacion.trim()}
