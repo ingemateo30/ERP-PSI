@@ -26,6 +26,12 @@ Database.query(`
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 `).catch(err => console.warn('⚠️ No se pudo crear tabla ubicaciones_tecnicos:', err.message));
 
+// Auto-agregar columnas de metraje a inventario_equipos (solo si no existen)
+Database.query('ALTER TABLE inventario_equipos ADD COLUMN metros_totales DECIMAL(10,2) DEFAULT NULL COMMENT \'Metros totales asignados al técnico\' ')
+  .catch(() => {}); // ignora si ya existe
+Database.query('ALTER TABLE inventario_equipos ADD COLUMN metros_disponibles DECIMAL(10,2) DEFAULT NULL COMMENT \'Metros restantes del carrete\' ')
+  .catch(() => {}); // ignora si ya existe
+
 // Hora / fecha en zona Colombia (UTC-5, sin horario de verano)
 // Usamos resta explícita de ms en vez de toLocaleString para mayor fiabilidad en cualquier servidor
 const horaColombia = () => {
@@ -292,15 +298,45 @@ router.post('/instalacion/:id/completar', async (req, res) => {
       updateValues
     );
 
-    // Actualizar estado de equipos a 'instalado'
-    if (equipoIds.length > 0) {
-      for (const equipoId of equipoIds) {
-        await Database.query(`
-          UPDATE inventario_equipos
-          SET estado = 'instalado',
-              ubicacion_actual = (SELECT direccion_instalacion FROM instalaciones WHERE id = ?)
-          WHERE id = ? AND instalador_id = ?
-        `, [id, equipoId, req.user.id]);
+    // Actualizar estado de equipos
+    // - Equipos con metros_usados: descontar metros; solo marcar 'instalado' si no quedan
+    // - Equipos sin metros: marcar 'instalado' directamente
+    if (equipos && equipos.length > 0) {
+      for (const item of equipos) {
+        const eqId = typeof item === 'object' ? (item.equipo_id || item.id) : item;
+        if (!eqId) continue;
+
+        // metros_usados puede venir de: item.metros_usados (ModalCompletar) o item.cantidad (IniciarInstalacion con metros_disponibles)
+        const metrosUsados = typeof item === 'object'
+          ? (item.metros_usados || (item.metros_disponibles != null ? parseFloat(item.cantidad) || 0 : 0))
+          : 0;
+
+        if (metrosUsados > 0) {
+          // Equipo con seguimiento de metros: descontar
+          await Database.query(`
+            UPDATE inventario_equipos
+            SET metros_disponibles = GREATEST(0, COALESCE(metros_disponibles, 0) - ?),
+                ubicacion_actual = CASE
+                  WHEN GREATEST(0, COALESCE(metros_disponibles, 0) - ?) <= 0
+                  THEN (SELECT direccion_instalacion FROM instalaciones WHERE id = ?)
+                  ELSE ubicacion_actual
+                END,
+                estado = CASE
+                  WHEN GREATEST(0, COALESCE(metros_disponibles, 0) - ?) <= 0
+                  THEN 'instalado'
+                  ELSE estado
+                END
+            WHERE id = ? AND instalador_id = ?
+          `, [metrosUsados, metrosUsados, id, metrosUsados, eqId, req.user.id]);
+        } else {
+          // Equipo sin metros: marcar como instalado
+          await Database.query(`
+            UPDATE inventario_equipos
+            SET estado = 'instalado',
+                ubicacion_actual = (SELECT direccion_instalacion FROM instalaciones WHERE id = ?)
+            WHERE id = ? AND instalador_id = ?
+          `, [id, eqId, req.user.id]);
+        }
       }
     }
 
@@ -356,7 +392,8 @@ router.get('/mis-equipos', async (req, res) => {
     const equipos = await Database.query(`
       SELECT
         id, codigo, nombre, tipo, marca, modelo,
-        numero_serie, estado, fecha_asignacion, ubicacion_actual, observaciones
+        numero_serie, estado, fecha_asignacion, ubicacion_actual, observaciones,
+        metros_totales, metros_disponibles
       FROM inventario_equipos
       WHERE instalador_id = ?
         AND estado = 'asignado'

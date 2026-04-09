@@ -301,7 +301,15 @@ const [equipos] = await db.execute(query, params);
         assignmentData.notas || null,
         userId
       ]);
-      
+
+      // Si se especificaron metros, registrarlos en el equipo
+      if (assignmentData.metros_a_asignar) {
+        await db.execute(
+          'UPDATE inventario_equipos SET metros_totales = ?, metros_disponibles = ? WHERE id = ?',
+          [assignmentData.metros_a_asignar, assignmentData.metros_a_asignar, equipoId]
+        );
+      }
+
       return await this.getById(equipoId);
     } catch (error) {
       console.error('❌ Error en assignToInstaller:', error);

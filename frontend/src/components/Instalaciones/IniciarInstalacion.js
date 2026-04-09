@@ -216,9 +216,12 @@ const IniciarInstalacion = ({ instalacion, onClose, onSuccess }) => {
       equipo_nombre: equipo.nombre,
       tipo: equipo.tipo,
       marca: equipo.marca,
-      cantidad: equipo.tipo === 'cable' ? '' : 1,
+      // Para items con metros: iniciar vacío para que el técnico ingrese los metros usados
+      cantidad: (equipo.metros_disponibles > 0 || equipo.tipo === 'cable') ? '' : 1,
       numero_serie: equipo.numero_serie || '',
-      observaciones: ''
+      observaciones: '',
+      metros_totales: equipo.metros_totales || null,
+      metros_disponibles: equipo.metros_disponibles || null
     };
 
     setEquiposAsignados([...equiposAsignados, nuevoEquipo]);
@@ -625,31 +628,44 @@ if (data.success) {
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              {equipo.tipo === 'cable' ? 'Metros utilizados *' : 'Cantidad'}
+                              {(equipo.metros_disponibles > 0 || equipo.tipo === 'cable')
+                                ? 'Metros utilizados *'
+                                : 'Cantidad'}
                             </label>
                             <input
                               type="number"
-                              min={equipo.tipo === 'cable' ? '0' : '1'}
-                              placeholder={equipo.tipo === 'cable' ? 'Ej: 150' : '1'}
+                              min="0"
+                              step={equipo.metros_disponibles > 0 ? '0.5' : '1'}
+                              max={equipo.metros_disponibles > 0 ? equipo.metros_disponibles : undefined}
+                              placeholder={
+                                equipo.metros_disponibles > 0
+                                  ? `Máx ${equipo.metros_disponibles} m`
+                                  : equipo.tipo === 'cable' ? 'Ej: 150' : '1'
+                              }
                               value={equipo.cantidad}
                               onChange={(e) => {
                                 const val = e.target.value;
                                 if (val === '') {
                                   actualizarEquipo(index, 'cantidad', '');
                                 } else {
-                                  const num = parseInt(val);
+                                  const num = parseFloat(val);
                                   actualizarEquipo(index, 'cantidad', isNaN(num) ? '' : num);
                                 }
                               }}
                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#0e6493] ${
-                                equipo.tipo === 'cable' && !equipo.cantidad
+                                (equipo.metros_disponibles > 0 || equipo.tipo === 'cable') && !equipo.cantidad
                                   ? 'border-orange-400 bg-orange-50'
                                   : 'border-gray-300'
                               }`}
                             />
-                            {equipo.tipo === 'cable' && (
+                            {equipo.metros_disponibles > 0 ? (
                               <p className="text-xs text-orange-600 mt-0.5">
-                                Ingresa los metros usados del carrete (el carrete tiene 1.000 m)
+                                Disponibles: <strong>{equipo.metros_disponibles} m</strong> de {equipo.metros_totales} m asignados
+                                {equipo.cantidad > 0 && ` · Quedarán ${Math.max(0, equipo.metros_disponibles - parseFloat(equipo.cantidad)).toFixed(1)} m`}
+                              </p>
+                            ) : equipo.tipo === 'cable' && (
+                              <p className="text-xs text-orange-600 mt-0.5">
+                                Ingresa los metros usados del carrete
                               </p>
                             )}
                           </div>
