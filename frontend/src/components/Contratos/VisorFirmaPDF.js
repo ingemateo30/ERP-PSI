@@ -284,13 +284,23 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 if (x > MAX_X || y > MAX_Y) return;
                 if (x === 0 && y === 0) return;
 
-                // Detección de contacto: bit 0 = tip switch O presión > umbral
-                // Usar ambos para cubrir variaciones de firmware
-                const tipSwitch = (status & 0x01) !== 0;
-                const isContact = tipSwitch || pressure > 10;
+                // Detección de contacto con histéresis de presión
+                // Replica el comportamiento del Wacom STU SDK (getInkThreshold):
+                //   PRESSURE_ON:  presión mínima para INICIAR trazo
+                //                 → protege contra hover electromagnético donde el
+                //                   bit de tip switch (bit 0) puede activarse ANTES
+                //                   del contacto físico real en la STU-540
+                //   PRESSURE_OFF: presión mínima para CONTINUAR trazo (histéresis)
+                //                 → evita que trazos ligeros se corten a mitad
+                //
+                // Durante hover: pressure = 0  → no dibuja sin importar los bits
+                // Durante contacto real: pressure > PRESSURE_ON → dibuja
+                const PRESSURE_ON  = 20;  // ~2% del máx (1023) — inicio de trazo
+                const PRESSURE_OFF = 8;   // ~0.8% — histéresis para continuación
+                const isContact = pressure > (isDrawing ? PRESSURE_OFF : PRESSURE_ON);
 
                 if (!isContact) {
-                    // Hover (pen en rango pero sin tocar) → terminar trazo
+                    // Sin contacto (hover o pen levantado) → terminar trazo
                     if (isDrawing) {
                         isDrawing = false;
                         smoothX = -1;
