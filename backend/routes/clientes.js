@@ -1794,12 +1794,13 @@ async function generarPrimeraFacturaAutomatica(conexion, clienteId, datosCliente
 
 
 
-    // 14. MARCAR VARIOS COMO FACTURADOS
+    // 14. MARCAR VARIOS COMO FACTURADOS (solo los no recurrentes)
+    // Los recurrentes (recurrente = 1) permanecen con facturado = 0 para incluirse en cada factura.
     if (valorVarios > 0) {
       await conexion.execute(`
-        UPDATE varios_pendientes 
+        UPDATE varios_pendientes
         SET facturado = 1, fecha_facturacion = NOW()
-        WHERE cliente_id = ? AND facturado = 0 AND activo = 1
+        WHERE cliente_id = ? AND facturado = 0 AND activo = 1 AND (recurrente = 0 OR recurrente IS NULL)
       `, [clienteId]);
     }
 
@@ -2183,6 +2184,107 @@ router.get('/:id/verificar-estado',
     } catch (error) {
       console.error('❌ Error en verificar-estado:', error);
       res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// ─── VARIOS RECURRENTES ────────────────────────────────────────────────────────
+// Conceptos fijos que se incluyen en CADA factura mensual del cliente sin marcarse como facturados.
+
+// GET /clientes/:id/varios-recurrentes — Listar varios recurrentes activos del cliente
+router.get('/:id/varios-recurrentes',
+  authenticateToken,
+  async (req, res) => {
+    const conexion = await pool.getConnection();
+    try {
+      const [rows] = await conexion.execute(
+        `SELECT id, concepto, cantidad, valor_unitario, valor_total, aplica_iva, porcentaje_iva, fecha_aplicacion, activo
+         FROM varios_pendientes
+         WHERE cliente_id = ? AND recurrente = 1
+         ORDER BY fecha_aplicacion DESC`,
+        [req.params.id]
+      );
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    } finally {
+      conexion.release();
+    }
+  }
+);
+
+// POST /clientes/:id/varios-recurrentes — Crear un concepto recurrente
+router.post('/:id/varios-recurrentes',
+  authenticateToken,
+  async (req, res) => {
+    const { concepto, cantidad = 1, valor_unitario, aplica_iva = true, porcentaje_iva = 19 } = req.body;
+    if (!concepto || !valor_unitario) {
+      return res.status(400).json({ success: false, message: 'concepto y valor_unitario son obligatorios' });
+    }
+    const valorTotal = parseFloat(valor_unitario) * parseInt(cantidad);
+    const conexion = await pool.getConnection();
+    try {
+      const [result] = await conexion.execute(
+        `INSERT INTO varios_pendientes
+           (cliente_id, concepto, cantidad, valor_unitario, valor_total, aplica_iva, porcentaje_iva,
+            fecha_aplicacion, facturado, activo, recurrente)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, 1)`,
+        [req.params.id, concepto, cantidad, valor_unitario, valorTotal,
+         aplica_iva ? 1 : 0, aplica_iva ? porcentaje_iva : 0, fechaLocalMySQL()]
+      );
+      res.status(201).json({ success: true, data: { id: result.insertId } });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    } finally {
+      conexion.release();
+    }
+  }
+);
+
+// PUT /clientes/:id/varios-recurrentes/:variosId — Actualizar un concepto recurrente
+router.put('/:id/varios-recurrentes/:variosId',
+  authenticateToken,
+  async (req, res) => {
+    const { concepto, cantidad = 1, valor_unitario, aplica_iva = true, porcentaje_iva = 19, activo = 1 } = req.body;
+    if (!concepto || !valor_unitario) {
+      return res.status(400).json({ success: false, message: 'concepto y valor_unitario son obligatorios' });
+    }
+    const valorTotal = parseFloat(valor_unitario) * parseInt(cantidad);
+    const conexion = await pool.getConnection();
+    try {
+      await conexion.execute(
+        `UPDATE varios_pendientes
+         SET concepto = ?, cantidad = ?, valor_unitario = ?, valor_total = ?,
+             aplica_iva = ?, porcentaje_iva = ?, activo = ?
+         WHERE id = ? AND cliente_id = ? AND recurrente = 1`,
+        [concepto, cantidad, valor_unitario, valorTotal,
+         aplica_iva ? 1 : 0, aplica_iva ? porcentaje_iva : 0, activo ? 1 : 0,
+         req.params.variosId, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    } finally {
+      conexion.release();
+    }
+  }
+);
+
+// DELETE /clientes/:id/varios-recurrentes/:variosId — Eliminar (desactivar) un concepto recurrente
+router.delete('/:id/varios-recurrentes/:variosId',
+  authenticateToken,
+  async (req, res) => {
+    const conexion = await pool.getConnection();
+    try {
+      await conexion.execute(
+        `UPDATE varios_pendientes SET activo = 0 WHERE id = ? AND cliente_id = ? AND recurrente = 1`,
+        [req.params.variosId, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    } finally {
+      conexion.release();
     }
   }
 );

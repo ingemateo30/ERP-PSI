@@ -5,7 +5,8 @@ import {
   X, Edit, Trash2, Phone, Mail, MapPin, Calendar,
   User, CreditCard, Wifi, Settings, AlertTriangle,
   CheckCircle, Clock, XCircle, FileText, DollarSign,
-  Package, Activity, ChevronRight, Loader, RefreshCw
+  Package, Activity, ChevronRight, Loader, RefreshCw,
+  Plus, Save, RotateCcw
 } from 'lucide-react';
 import { clientService } from '../../services/clientService';
 import ClientServiceManager from './ClientServiceManager';
@@ -26,6 +27,11 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, onCambiarEstado, permi
   const [activeTab, setActiveTab]                 = useState('personal');
   const [clienteCompleto, setClienteCompleto]     = useState(null);
   const [loadingCompleto, setLoadingCompleto]     = useState(false);
+  const [variosRecurrentes, setVariosRecurrentes] = useState([]);
+  const [loadingVarios, setLoadingVarios]         = useState(false);
+  const [showVariosForm, setShowVariosForm]       = useState(false);
+  const [editingVarios, setEditingVarios]         = useState(null);
+  const [variosForm, setVariosForm]               = useState({ concepto: '', cantidad: 1, valor_unitario: '', aplica_iva: true, porcentaje_iva: 19 });
 
   /* ──────────────────── helpers ──────────────────── */
 
@@ -103,6 +109,62 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, onCambiarEstado, permi
       .catch(() => {})
       .finally(() => setLoadingCompleto(false));
   }, [client?.id]);
+
+  /* ──────────────────── varios recurrentes ──────────────────── */
+
+  const fetchVariosRecurrentes = async () => {
+    if (!client?.id) return;
+    setLoadingVarios(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const r = await fetch(`${process.env.REACT_APP_API_URL}/clientes/${client.id}/varios-recurrentes`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const res = await r.json();
+      setVariosRecurrentes(res.success ? (res.data || []) : []);
+    } catch { setVariosRecurrentes([]); }
+    finally { setLoadingVarios(false); }
+  };
+
+  useEffect(() => { fetchVariosRecurrentes(); }, [client?.id]);
+
+  const handleGuardarVarios = async () => {
+    if (!variosForm.concepto || !variosForm.valor_unitario) return;
+    const token = localStorage.getItem('accessToken');
+    const base = process.env.REACT_APP_API_URL;
+    const url = editingVarios
+      ? `${base}/clientes/${client.id}/varios-recurrentes/${editingVarios.id}`
+      : `${base}/clientes/${client.id}/varios-recurrentes`;
+    const method = editingVarios ? 'PUT' : 'POST';
+    try {
+      const r = await fetch(url, {
+        method,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(variosForm)
+      });
+      const res = await r.json();
+      if (res.success) {
+        await fetchVariosRecurrentes();
+        setShowVariosForm(false);
+        setEditingVarios(null);
+        setVariosForm({ concepto: '', cantidad: 1, valor_unitario: '', aplica_iva: true, porcentaje_iva: 19 });
+        window.showNotification?.('success', editingVarios ? 'Concepto actualizado' : 'Concepto recurrente agregado');
+      }
+    } catch { window.showNotification?.('error', 'Error al guardar el concepto'); }
+  };
+
+  const handleEliminarVarios = async (v) => {
+    if (!window.confirm(`¿Eliminar concepto "${v.concepto}"?`)) return;
+    const token = localStorage.getItem('accessToken');
+    try {
+      const r = await fetch(`${process.env.REACT_APP_API_URL}/clientes/${client.id}/varios-recurrentes/${v.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const res = await r.json();
+      if (res.success) { await fetchVariosRecurrentes(); window.showNotification?.('success', 'Concepto eliminado'); }
+    } catch { window.showNotification?.('error', 'Error al eliminar'); }
+  };
 
   /* ──────────────────── delete ──────────────────── */
 
@@ -353,6 +415,133 @@ const ClientModal = ({ client, onClose, onEdit, onDelete, onCambiarEstado, permi
             </div>
           </div>
         ))}
+
+        {/* ── Conceptos Varios Recurrentes ── */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="bg-amber-50 px-5 py-3 flex items-center justify-between border-b border-amber-200">
+            <div className="flex items-center gap-2">
+              <RotateCcw className="w-4 h-4 text-amber-600" />
+              <span className="text-sm font-semibold text-amber-800">Conceptos Varios Recurrentes</span>
+              <span className="text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Se incluyen en cada factura mensual</span>
+            </div>
+            <button
+              onClick={() => { setEditingVarios(null); setVariosForm({ concepto: '', cantidad: 1, valor_unitario: '', aplica_iva: true, porcentaje_iva: 19 }); setShowVariosForm(v => !v); }}
+              className="flex items-center gap-1 text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 transition-colors"
+            >
+              <Plus className="w-3 h-3" /> Agregar
+            </button>
+          </div>
+
+          <div className="p-4 space-y-3">
+            {/* Formulario de agregar/editar */}
+            {showVariosForm && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
+                  {editingVarios ? 'Editar concepto' : 'Nuevo concepto recurrente'}
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-600 block mb-1">Descripción del concepto</label>
+                    <input
+                      type="text"
+                      value={variosForm.concepto}
+                      onChange={e => setVariosForm(f => ({ ...f, concepto: e.target.value }))}
+                      placeholder="Ej: Enlace adicional, Soporte preferencial…"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 block mb-1">Cantidad</label>
+                    <input
+                      type="number" min="1"
+                      value={variosForm.cantidad}
+                      onChange={e => setVariosForm(f => ({ ...f, cantidad: parseInt(e.target.value) || 1 }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 block mb-1">Valor unitario ($)</label>
+                    <input
+                      type="number" min="0"
+                      value={variosForm.valor_unitario}
+                      onChange={e => setVariosForm(f => ({ ...f, valor_unitario: e.target.value }))}
+                      placeholder="0"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
+                  <div className="col-span-2 flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={variosForm.aplica_iva}
+                        onChange={e => setVariosForm(f => ({ ...f, aplica_iva: e.target.checked }))}
+                        className="rounded"
+                      />
+                      <span className="text-xs text-gray-700">Aplica IVA (19%)</span>
+                    </label>
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => { setShowVariosForm(false); setEditingVarios(null); }}
+                    className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleGuardarVarios}
+                    disabled={!variosForm.concepto || !variosForm.valor_unitario}
+                    className="flex items-center gap-1 text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save className="w-3 h-3" /> Guardar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Lista de varios recurrentes */}
+            {loadingVarios ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader className="w-4 h-4 text-amber-500 animate-spin mr-2" />
+                <span className="text-xs text-gray-500">Cargando conceptos...</span>
+              </div>
+            ) : variosRecurrentes.filter(v => v.activo).length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4 italic">
+                No hay conceptos recurrentes configurados. Los varios de este cliente se generan una sola vez.
+              </p>
+            ) : (
+              variosRecurrentes.filter(v => v.activo).map(v => (
+                <div key={v.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{v.concepto}</p>
+                    <p className="text-xs text-gray-500">
+                      {v.cantidad > 1 ? `${v.cantidad} × ` : ''}{formatCurrency(v.valor_unitario)}
+                      {v.aplica_iva ? ` + ${v.porcentaje_iva}% IVA` : ' (sin IVA)'}
+                      {' · '}
+                      <span className="text-amber-600 font-medium">Total: {formatCurrency(v.valor_total)}</span>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setEditingVarios(v); setVariosForm({ concepto: v.concepto, cantidad: v.cantidad, valor_unitario: v.valor_unitario, aplica_iva: Boolean(v.aplica_iva), porcentaje_iva: v.porcentaje_iva || 19 }); setShowVariosForm(true); }}
+                      className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                      title="Editar"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleEliminarVarios(v)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
     );
   };
