@@ -20,6 +20,8 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
     const sigCanvas = useRef();
     const fileInputRef = useRef();
     const wacomCanvasRef = useRef();
+    // Referencia al listener HID activo para evitar listeners duplicados
+    const hidListenerRef = useRef(null);
 
     const [pdfUrl, setPdfUrl] = useState('');
     const [contratoData, setContratoData] = useState({});
@@ -257,20 +259,22 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 reportCount++;
                 const data = new Uint8Array(event.data.buffer);
 
-                if (data.length < 5) return;
+                // Los reportes de datos del pen tienen mínimo 7 bytes:
+                // [status(1)] [x_lo(1) x_hi(1)] [y_lo(1) y_hi(1)] [p_lo(1) p_hi(1)]
+                if (data.length < 7) return;
 
                 const status = data[0];
                 const x = data[1] | (data[2] << 8);
                 const y = data[3] | (data[4] << 8);
-                const pressure = data.length >= 7 ? (data[5] | (data[6] << 8)) : 0;
+                const pressure = data[5] | (data[6] << 8);
 
-                // Log cambios de status para debug
+                // Log cambios de status para debug (incluye presión para diagnóstico)
                 if (status !== lastStatus) {
-                    console.log(`🔔 STATUS: 0x${lastStatus.toString(16)} → 0x${status.toString(16)} | x=${x} y=${y} p=${pressure} | report #${reportCount}`);
+                    console.log(`🔔 STATUS: 0x${lastStatus.toString(16).padStart(2,'0')} → 0x${status.toString(16).padStart(2,'0')} | x=${x} y=${y} p=${pressure} | report #${reportCount} | reportId=${event.reportId}`);
                     lastStatus = status;
                 }
 
-                // Pen NO está en rango (bit 7 = proximity)
+                // Pen NO está en rango — STU-540: bit 7 (0x80) = isProximity
                 if (!(status & 0x80)) {
                     if (isDrawing) {
                         isDrawing = false;
@@ -284,20 +288,24 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 if (x > MAX_X || y > MAX_Y) return;
                 if (x === 0 && y === 0) return;
 
-                // Detección de contacto con histéresis de presión
-                // Replica el comportamiento del Wacom STU SDK (getInkThreshold):
-                //   PRESSURE_ON:  presión mínima para INICIAR trazo
-                //                 → protege contra hover electromagnético donde el
-                //                   bit de tip switch (bit 0) puede activarse ANTES
-                //                   del contacto físico real en la STU-540
-                //   PRESSURE_OFF: presión mínima para CONTINUAR trazo (histéresis)
-                //                 → evita que trazos ligeros se corten a mitad
+                // ─── Detección de contacto robusta (AND lógico) ──────────────────
+                // Referencia: Wacom STU SDK usa getInkThreshold() para thresholds
+                // calibrados. Sin SDK, usamos:
+                //   - tip switch (bit 0): detecta contacto físico del plumín
+                //   - pressure > umbral:  filtra activación electromagnética previa
+                //     al contacto donde bit 0 se activa pero pressure ≈ 0
                 //
-                // Durante hover: pressure = 0  → no dibuja sin importar los bits
-                // Durante contacto real: pressure > PRESSURE_ON → dibuja
-                const PRESSURE_ON  = 20;  // ~2% del máx (1023) — inicio de trazo
-                const PRESSURE_OFF = 8;   // ~0.8% — histéresis para continuación
-                const isContact = pressure > (isDrawing ? PRESSURE_OFF : PRESSURE_ON);
+                // SE REQUIEREN AMBAS CONDICIONES (AND):
+                //   tipSwitch activo SIN presión suficiente = hover electromagnético → NO dibuja
+                //   presión > umbral SIN tipSwitch = reporte de estado no-pen   → NO dibuja
+                //   tipSwitch Y presión > umbral   = contacto real               → dibuja
+                //
+                // Umbrales: ~10% del máximo (0-1023) para inicio, ~4% para continuación
+                // Si la firma es muy débil y no empieza, reducir PRESSURE_ON a 50.
+                const tipSwitch = (status & 0x01) !== 0;
+                const PRESSURE_ON  = 100;  // ~10% de 1023 — umbral de inicio de trazo
+                const PRESSURE_OFF = 40;   // ~4%  de 1023 — umbral de continuación (histéresis)
+                const isContact = tipSwitch && pressure > (isDrawing ? PRESSURE_OFF : PRESSURE_ON);
 
                 if (!isContact) {
                     // Sin contacto (hover o pen levantado) → terminar trazo
@@ -378,9 +386,15 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 });
             };
 
-            // Escuchar eventos del dispositivo
-            console.log('👂 Configurando listeners para STU-540...');
+            // Registrar listener HID — eliminar el anterior primero para evitar
+            // listeners duplicados que causan trazos dobles y puntos fantasma
+            console.log('👂 Configurando listener para STU-540...');
+            if (hidListenerRef.current) {
+                selectedDevice.removeEventListener('inputreport', hidListenerRef.current);
+                console.log('🗑️ Listener anterior eliminado');
+            }
             selectedDevice.addEventListener('inputreport', procesarDatosHID);
+            hidListenerRef.current = procesarDatosHID;
 
             // NUEVO: También escuchar eventos de connect/disconnect
             selectedDevice.addEventListener('connect', () => {
@@ -433,6 +447,7 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     clearTimeout(timeoutId);
                     clearTimeout(testTimeout);
                     selectedDevice.removeEventListener('inputreport', procesarDatosHID);
+                    hidListenerRef.current = null;
                     
                     console.log(`📊 Finalizando captura. Total puntos: ${signaturePoints.length}`);
                     
@@ -476,6 +491,7 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     clearTimeout(timeoutId);
                     clearTimeout(testTimeout);
                     selectedDevice.removeEventListener('inputreport', procesarDatosHID);
+                    hidListenerRef.current = null;
                     await limpiarPantallaSTU();
                     reject(new Error('Captura cancelada'));
                 };
