@@ -503,6 +503,40 @@ class FacturacionAutomaticaService {
               };
             }
           }
+
+          // ✅ REGLA: Si la 2da Nivelación resulta en ≤ 5 días, omitir del ciclo actual.
+          // Se factura en el siguiente ciclo (después del día 20 del mes siguiente),
+          // donde el período se extenderá automáticamente hasta el fin de ese mes.
+          // Ej: 2da inicia 30 abr → 1 día en abril → omitir ahora, facturar en ciclo de mayo (después del día 20 de mayo)
+          if (coberturaLocal) {
+            const MIN_DIAS_NIVELACION = 5;
+            const inicioNivelacion = new Date(coberturaLocal);
+            inicioNivelacion.setDate(inicioNivelacion.getDate() + 1);
+            const finMesNivelacion = new Date(
+              inicioNivelacion.getFullYear(),
+              inicioNivelacion.getMonth() + 1,
+              0, 12, 0, 0
+            );
+            const diasNivelacionInicial = Math.ceil((finMesNivelacion - inicioNivelacion) / (1000 * 60 * 60 * 24)) + 1;
+
+            if (diasNivelacionInicial <= MIN_DIAS_NIVELACION) {
+              // El período extendido cubre el mes siguiente al mes de inicio de la nivelación
+              const mesExtension = inicioNivelacion.getMonth() + 1; // índice 0 del mes siguiente
+              const anioExtension = inicioNivelacion.getMonth() === 11
+                ? inicioNivelacion.getFullYear() + 1
+                : inicioNivelacion.getFullYear();
+              const dia20Extension = new Date(anioExtension, mesExtension, 20, 0, 0, 0);
+
+              if (hoy < dia20Extension) {
+                const nombreMesExt = meses[mesExtension % 12];
+                return {
+                  permitir: false,
+                  razon: `2da Nivelación muy corta (${diasNivelacionInicial} día${diasNivelacionInicial > 1 ? 's' : ''} en ${meses[inicioNivelacion.getMonth()]}) — se incluirá en el ciclo de ${nombreMesExt} (a partir del día 20)`
+                };
+              }
+            }
+          }
+
           return { permitir: true, razon: 'Con primera factura — genera segunda (nivelación)' };
         }
 
