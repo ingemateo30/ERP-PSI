@@ -322,6 +322,26 @@ class FacturacionAutomaticaService {
             12, 0, 0
           );
 
+          // ✅ REGLA: Si la nivelación resulta en muy pocos días (≤ 5),
+          // extender hasta el último día del MES SIGUIENTE para evitar
+          // facturas de muy pocos días que no son prácticas de cobrar.
+          // Ej: fechaDesde = 30 abr → fechaHasta normal = 30 abr (1 día)
+          //     → se extiende a 31 may (32 días)
+          // Ej: fechaDesde = 28 abr → fechaHasta normal = 30 abr (3 días)
+          //     → se extiende a 31 may (34 días)
+          const MIN_DIAS_NIVELACION = 5;
+          const diasNivelacionInicial = Math.ceil((fechaHasta - fechaDesde) / (1000 * 60 * 60 * 24)) + 1;
+          if (diasNivelacionInicial <= MIN_DIAS_NIVELACION) {
+            fechaHasta = new Date(
+              fechaDesde.getFullYear(),
+              fechaDesde.getMonth() + 2, // Mes siguiente al de fechaDesde
+              0, // Último día de ese mes siguiente
+              12, 0, 0
+            );
+            tipoFacturacion = 'Segunda facturación (nivelación + mes siguiente)';
+            console.log(`   ⚠️ Nivelación muy corta (${diasNivelacionInicial} días ≤ ${MIN_DIAS_NIVELACION}), extendiendo al mes siguiente`);
+          }
+
           console.log(`   🔄 2da Factura (nivelación): ${fechaDesde.toLocaleDateString('es-CO')} → ${fechaHasta.toLocaleDateString('es-CO')}`);
         }
         
