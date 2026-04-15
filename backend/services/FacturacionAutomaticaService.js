@@ -983,9 +983,10 @@ class FacturacionAutomaticaService {
         [clienteId]
       );
 
-      // Marcar varios pendientes como facturados
+      // Marcar varios pendientes como facturados (SOLO los no recurrentes)
+      // Los recurrentes (recurrente = 1) se mantienen activos para incluirse en cada factura mensual.
       await conexion.execute(
-        'UPDATE varios_pendientes SET facturado = 1, fecha_facturacion = NOW() WHERE cliente_id = ? AND facturado = 0 AND activo = 1',
+        'UPDATE varios_pendientes SET facturado = 1, fecha_facturacion = NOW() WHERE cliente_id = ? AND facturado = 0 AND activo = 1 AND (recurrente = 0 OR recurrente IS NULL)',
         [clienteId]
       );
     } finally {
