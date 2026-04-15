@@ -216,14 +216,16 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
             let isDrawing = false;
             let lastX = -1;
             let lastY = -1;
+            let prevMidX = -1; // punto de inicio del segmento actual
+            let prevMidY = -1;
             let reportCount = 0;
             let lastStatus = -1;
             let lastPressure = 0;
             let lastTime = 0;
             let lastLineWidth = 2;
 
-            // Suavizado EMA (exponential moving average) - menos lag que buffer promedio
-            const SMOOTHING = 0.3; // 0 = sin suavizado, 1 = máximo suavizado
+            // Suavizado EMA - factor bajo = más responsivo, menos lag
+            const SMOOTHING = 0.2; // 0 = sin suavizado, 1 = máximo suavizado
             let smoothX = -1;
             let smoothY = -1;
 
@@ -260,7 +262,6 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 const status = data[0];
                 const x = data[1] | (data[2] << 8);
                 const y = data[3] | (data[4] << 8);
-                // Extraer presión del pen (bytes 5-6, little-endian) si están disponibles
                 const pressure = data.length >= 7 ? (data[5] | (data[6] << 8)) : 0;
 
                 // Log cambios de status para debug
@@ -269,11 +270,10 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     lastStatus = status;
                 }
 
-                // Pen NO está en rango → fin de trazo
+                // Pen NO está en rango (bit 7 = proximity)
                 if (!(status & 0x80)) {
                     if (isDrawing) {
                         isDrawing = false;
-                        ctx.stroke();
                         smoothX = -1;
                         smoothY = -1;
                     }
@@ -284,42 +284,46 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                 if (x > MAX_X || y > MAX_Y) return;
                 if (x === 0 && y === 0) return;
 
-                // Hover (0x80 exactamente, sin bits de contacto) → no dibujar
-                if (status === 0x80) {
+                // Detección de contacto: bit 0 = tip switch O presión > umbral
+                // Usar ambos para cubrir variaciones de firmware
+                const tipSwitch = (status & 0x01) !== 0;
+                const isContact = tipSwitch || pressure > 10;
+
+                if (!isContact) {
+                    // Hover (pen en rango pero sin tocar) → terminar trazo
                     if (isDrawing) {
                         isDrawing = false;
-                        ctx.stroke();
                         smoothX = -1;
                         smoothY = -1;
                     }
                     return;
                 }
 
-                // Mapear coordenadas del digitalizador al espacio de display del canvas
+                // Mapear coordenadas del digitalizador al canvas
                 const rawCanvasX = (x / MAX_X) * displayWidth;
                 const rawCanvasY = (y / MAX_Y) * displayHeight;
 
                 // Calcular ancho de línea basado en presión
-                let normalizedPressure = pressure > 0 ? Math.min(pressure / PRESSURE_MAX, 1.0) : 0.5;
+                const normalizedPressure = pressure > 0 ? Math.min(pressure / PRESSURE_MAX, 1.0) : 0.5;
                 const targetWidth = MIN_LINE_WIDTH + (MAX_LINE_WIDTH - MIN_LINE_WIDTH) * normalizedPressure;
-                // Suavizar transición de grosor para evitar cambios bruscos
+                // Suavizar transición de grosor
                 const lineWidth = lastLineWidth + (targetWidth - lastLineWidth) * 0.4;
                 lastLineWidth = lineWidth;
 
                 if (!isDrawing) {
-                    // Inicio de trazo - usar punto crudo sin suavizar
+                    // Inicio de trazo: inicializar posición sin suavizado
                     isDrawing = true;
                     smoothX = rawCanvasX;
                     smoothY = rawCanvasY;
                     lastX = rawCanvasX;
                     lastY = rawCanvasY;
+                    prevMidX = rawCanvasX;
+                    prevMidY = rawCanvasY;
                     lastTime = Date.now();
                     lastPressure = normalizedPressure;
                     lastLineWidth = targetWidth;
-                    ctx.beginPath();
-                    ctx.moveTo(rawCanvasX, rawCanvasY);
                 } else {
-                    // Aplicar suavizado EMA (exponential moving average)
+                    // Aplicar suavizado EMA
                     const canvasX = smoothX + (rawCanvasX - smoothX) * (1 - SMOOTHING);
                     const canvasY = smoothY + (rawCanvasY - smoothY) * (1 - SMOOTHING);
                     smoothX = canvasX;
@@ -329,26 +333,24 @@ const VisorFirmaPDF = ({ contratoId, onFirmaCompleta, onCancelar }) => {
                     const dy = canvasY - lastY;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
-                    // Umbral mínimo dinámico: más bajo a baja velocidad para detalle fino
-                    const minDist = dist > 10 ? 1.5 : 0.5;
-
-                    if (dist > minDist) {
-                        // Establecer grosor antes de dibujar
-                        ctx.lineWidth = lineWidth;
-
-                        // Curva cuadrática suave usando punto medio
+                    // Umbral fijo — no aumentar a alta velocidad para no perder puntos
+                    if (dist > 0.5) {
                         const midX = (lastX + canvasX) / 2;
                         const midY = (lastY + canvasY) / 2;
+
+                        // CORRECCIÓN PRINCIPAL: dibujar cada segmento con su propio
+                        // beginPath + stroke para que lineWidth se aplique individualmente.
+                        // Con el patrón anterior (acumular 8 puntos y hacer stroke al final)
+                        // ctx.stroke() usaba el lineWidth del último punto para TODA la ruta,
+                        // causando líneas con grosor incorrecto → garabatos.
+                        ctx.beginPath();
+                        ctx.moveTo(prevMidX, prevMidY);
+                        ctx.lineWidth = lineWidth;
                         ctx.quadraticCurveTo(lastX, lastY, midX, midY);
+                        ctx.stroke();
 
-                        // Renderizar periódicamente sin romper continuidad visual
-                        if (signaturePoints.length % 8 === 0) {
-                            ctx.stroke();
-                            // Reiniciar path desde punto medio para continuidad perfecta
-                            ctx.beginPath();
-                            ctx.moveTo(midX, midY);
-                        }
-
+                        prevMidX = midX;
+                        prevMidY = midY;
                         lastX = canvasX;
                         lastY = canvasY;
                         lastTime = Date.now();
